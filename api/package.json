@@ -1,0 +1,16 @@
+{
+  "name": "@modig/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@azure/data-tables": "^13.3.2",
+    "@azure/functions": "^4.16.5",
+    "@azure/storage-blob": "^12.34.0",
+    "@modig/shared": "*"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.15.2",
+    "esbuild": "^0.28.2"
+  }
+}
