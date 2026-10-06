@@ -1,6 +1,7 @@
 import { CONFLICT_MESSAGE } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
-import { ApiRequestError } from '../../lib/api';
+import { ApiRequestError, SIGNED_OUT_MESSAGE } from '../../lib/api';
+import { createAutosaver } from './autosave';
 import { classifySaveError } from './useAutosave';
 
 const apiError = (status: number, message = 'Nope.') =>
@@ -36,5 +37,27 @@ describe('classifySaveError', () => {
     for (const status of [400, 404]) {
       expect(classifySaveError(apiError(status)).kind).toBe('rejected');
     }
+  });
+});
+
+describe('a save refused because the session ended', () => {
+  it('shows the failure (no retry, no hanging "Saving…") and fails the flush', async () => {
+    // What apiFetch throws for a write that SWA answered with a redirect to the sign-in page.
+    const signedOut = new ApiRequestError(401, {
+      error: 'unauthorized',
+      message: SIGNED_OUT_MESSAGE,
+    });
+    const saver = createAutosaver<string>({
+      etag: 'e0',
+      save: () => Promise.reject(signedOut),
+      classifyError: classifySaveError,
+    });
+    saver.change('typed after the session ended');
+    await expect(saver.flush()).resolves.toBe(false);
+    expect(saver.getState()).toEqual({
+      status: 'error',
+      message: SIGNED_OUT_MESSAGE,
+      willRetry: false,
+    });
   });
 });

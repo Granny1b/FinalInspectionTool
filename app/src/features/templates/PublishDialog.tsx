@@ -8,7 +8,9 @@ import { Field, INPUT } from '../../components/Field';
 import { focusIssue, templateIssueField } from './publishIssues';
 import { errorMessage, isConflict, publishIssuesOf } from './queries';
 
-export type FlushResult = 'saved' | 'conflict' | 'failed';
+/** How saving pending edits went; `message` says why it failed, when known. */
+export type FlushResult =
+  { status: 'saved' } | { status: 'conflict' } | { status: 'failed'; message: string | null };
 
 type Props = {
   /** The number this publish creates. */
@@ -54,11 +56,14 @@ export function PublishDialog({
     setError(null);
     setStep('saving');
     const flushed = await flush();
-    if (flushed !== 'saved') {
+    if (flushed.status !== 'saved') {
       setStep('idle');
-      if (flushed === 'conflict') return conflict();
+      if (flushed.status === 'conflict') return conflict();
+      // The save's own reason: a refused save (e.g. the model is taken) won't go through on retry.
       setError(
-        'Your latest changes couldn’t be saved, so nothing was published. Check your connection and try again.',
+        `Your latest changes couldn’t be saved, so nothing was published. ${
+          flushed.message ?? 'Check your connection and try again.'
+        }`,
       );
       return;
     }

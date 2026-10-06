@@ -30,13 +30,22 @@ export async function createUploadUrl(): Promise<ImageUploadUrlResponse> {
   return { imageId, sasUrl, expiresAt: expiresOn.toISOString() };
 }
 
-/** A read-only URL for an existing image, or null if there is no such image. */
+/**
+ * A read-only URL for an existing image, or null if there is no such image. It serves an inline
+ * JPEG whatever type and disposition the uploader stored (the SAS's rsct/rscd), so a read link
+ * can never serve a web page or a download from the storage account's domain.
+ */
 export async function createReadUrl(imageId: string): Promise<ImageReadUrlResponse | null> {
   await ensureStorage();
   const blob = imageBlob(imageId);
   if (!(await blob.exists())) return null;
   const expiresOn = minutesFromNow(READ_MINUTES);
-  const url = await blob.generateSasUrl({ permissions: BlobSASPermissions.parse('r'), expiresOn });
+  const url = await blob.generateSasUrl({
+    permissions: BlobSASPermissions.parse('r'),
+    expiresOn,
+    contentType: 'image/jpeg',
+    contentDisposition: 'inline',
+  });
   return { url, expiresAt: expiresOn.toISOString() };
 }
 

@@ -127,11 +127,15 @@ is one template per machine model: **New template** offers the models that don't
   the draft has unpublished changes.
 - **Autosave.** Changes are saved to the draft about a second after you stop typing; the header
   says _Unsaved changes_, _Saving…_ or _Saved_. A save that fails on the way (network, server) is
-  retried, and _Retry_ saves at once. Closing the tab with unsaved changes asks first; following a link in the app saves
-  first.
+  retried, and _Retry_ saves at once. Closing the tab with unsaved changes asks first; following
+  a link in the app saves first (and waits for a cover photo that is still uploading).
+- **Signed out.** If the session ended (signed out in another tab, or it ran out), saving stops
+  with "You were signed out": your changes stay on the page. Sign in again in a new tab (the
+  banner's **Sign in** opens one), then choose _Retry_.
 - **Conflicts.** Every save says which version of the draft it is based on. If another admin saved
   in between, nothing is overwritten: the editor shows "Someone else changed this – reload to see
-  the latest version.", stops saving and offers **Reload**.
+  the latest version.", stops saving and offers **Reload** (in the banner and next to _Not
+  saved_).
 - **Publish.** **Publish** freezes the draft as the next revision, with an optional change note.
   A template needs a name and a section; every section needs a title and a row, and no row may be
   empty. Otherwise Publish lists the problems, with links that jump to each, and marks them in
@@ -148,7 +152,8 @@ In the checklist:
 | ------------------------------------------- | ----------------------------------------------------------------- |
 | Add a row below                             | `Enter` in a row; **+ Add row** at the end of a section           |
 | Start a new section's rows                  | `Enter` in its title                                              |
-| Delete an empty row                         | `Backspace` in it                                                 |
+| Delete an empty row                         | `Backspace` in it (holding it down only empties a row)            |
+| Undo deleting a row or section              | **Undo** at the bottom of the window, until the next such change  |
 | Move between rows                           | `↑` / `↓` from the first or last line of a row                    |
 | Duplicate or delete a row                   | The icons that appear on hover or focus; on a tablet, its **⋯**   |
 | Rename, duplicate, move or delete a section | Its **⋯** menu (deleting a section with rows asks first)          |
@@ -189,8 +194,9 @@ npm run seed                # write into local Azurite (it must be running)
 It is idempotent and never changes what already exists. Containers, the `deviations` table and
 `config/settings.json` are created when missing; after that the settings belong to the admins and
 the seed leaves them alone. The RigiMill MG template is imported only if none exists yet
-(published revision 2, continuing the workbook's "Rev: 2", plus a draft at revision 3); an import
-that was interrupted between those two writes is completed on the next run. To start over
+(published revision 2, continuing the workbook's "Rev: 2", plus a draft at revision 3); it is
+still recognised after an admin moves it to another model. An import that was interrupted
+between those two writes is completed on the next run. To start over
 locally, stop `npm run dev`, delete `.azurite/` and start it again.
 
 `STORAGE_CONNECTION_STRING` points the seed at another storage account (see
@@ -222,13 +228,15 @@ because it usually means the command that produced it failed.
   redirect for pages and the API, the anonymous pre-login files (and that an encoded `../` cannot
   reach the app through them), the sign-in link, the inspector and admin navigation, the no-access
   page, a deep link, signing out and the seed. For templates: the list, autosave across a reload,
-  `Enter` and `Backspace`, dragging a row into another section, publishing with a change note, two
-  admins in conflict, a cover photo upload, a new template whose empty row blocks publishing, and
-  the inspector's read-only view (the API refuses their saves with 403). They sign in by setting
-  the SWA CLI's `StaticWebAppsAuthCookie` directly. Each editing test writes its own throwaway
-  template into the local Azurite and deletes it afterwards, so the seeded RigiMill MG is only
-  read. The tests expect it as seeded (published revision 2, 90 rows): if you have published or
-  edited it locally, stop `npm run dev` and delete `.azurite/` first.
+  `Enter` and `Backspace` (also held down), undoing a delete, a long word at tablet width,
+  dragging a row into another section, the section menu, saving before leaving and the tab-close
+  warning, publishing with a change note, two admins in conflict, a lost save answer, a save after
+  signing out, a cover photo upload (also leaving while it uploads), a new template whose empty
+  row blocks publishing, and the inspector's read-only view (the API refuses their saves with
+  403). They sign in by setting the SWA CLI's `StaticWebAppsAuthCookie` directly. Each test
+  writes its own throwaway templates into the local Azurite and deletes them afterwards, so local
+  edits to the seeded RigiMill MG never break them. The New template test needs one machine model
+  that has no template yet.
 
 CI (`.github/workflows/azure-static-web-apps.yml`) runs `typecheck`, `lint`, `format:check`, a
 Bicep lint, `test` and `build` on every pull request and push to `main`. The end-to-end tests run

@@ -73,6 +73,12 @@ export function deleteSection(sections: Section[], sectionId: string): Section[]
   return index < 0 ? sections : sections.filter((_, i) => i !== index);
 }
 
+/** Undo of a delete: puts the section object back (same ids) at `index` (clamped). */
+export function restoreSection(sections: Section[], index: number, section: Section): Section[] {
+  if (findSection(sections, section.id) >= 0) return sections;
+  return insertAt(sections, clamp(index, 0, sections.length), section);
+}
+
 /** Moves a section to `toIndex` (clamped), as Move up/down and drag and drop do. */
 export function moveSection(sections: Section[], sectionId: string, toIndex: number): Section[] {
   const from = findSection(sections, sectionId);
@@ -137,6 +143,25 @@ export function deleteRow(sections: Section[], itemId: string): Section[] {
   return replaceAt(sections, at.sectionIndex, {
     ...at.section,
     items: at.section.items.filter((_, i) => i !== at.rowIndex),
+  });
+}
+
+/**
+ * Undo of a delete: puts the item object back (same id, text and guide) at `index` (clamped) of
+ * its section. Returns the input when the section is gone or the row is already there.
+ */
+export function restoreRow(
+  sections: Section[],
+  sectionId: string,
+  index: number,
+  item: Item,
+): Section[] {
+  const sectionIndex = findSection(sections, sectionId);
+  const section = sections[sectionIndex];
+  if (!section || findRow(sections, item.id)) return sections;
+  return replaceAt(sections, sectionIndex, {
+    ...section,
+    items: insertAt(section.items, clamp(index, 0, section.items.length), item),
   });
 }
 

@@ -29,6 +29,8 @@ type Props = {
   /** Shown while publish problems are highlighted and the name is blank. */
   nameError: string | undefined;
   onChange: (patch: Partial<TemplateDraftInput>) => void;
+  /** A cover photo upload has started; the promise settles once it is in the draft (or failed). */
+  onUpload: (upload: Promise<void>) => void;
 };
 
 /**
@@ -45,6 +47,7 @@ export const TemplateSettingsCard = memo(function TemplateSettingsCard({
   takenModels,
   nameError,
   onChange,
+  onUpload,
 }: Props) {
   // The saved model may have been removed from the settings since; keep it selectable.
   const options =
@@ -57,6 +60,7 @@ export const TemplateSettingsCard = memo(function TemplateSettingsCard({
       <CoverImageField
         imageId={coverImageId}
         onChange={(imageId) => onChange({ coverImageId: imageId })}
+        onUpload={onUpload}
       />
       <div className="space-y-4">
         <Field id={TEMPLATE_NAME_ID} label="Template name" error={nameError}>
@@ -143,11 +147,14 @@ function SpareRowsField({ value, onChange }: { value: number; onChange: (n: numb
 function CoverImageField({
   imageId,
   onChange,
+  onUpload,
 }: {
   imageId: string | undefined;
   onChange: (imageId: string | undefined) => void;
+  onUpload: (upload: Promise<void>) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const pickRef = useRef<HTMLButtonElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -174,11 +181,15 @@ function CoverImageField({
         )}
       </CoverPhoto>
       <div className="mt-2.5 flex flex-wrap gap-2">
+        {/* aria-disabled, not disabled: a disabled button would drop the keyboard focus. */}
         <Button
+          ref={pickRef}
           variant="secondary"
-          className="h-8 px-2.5"
-          disabled={uploading}
-          onClick={() => fileRef.current?.click()}
+          className="h-8 px-2.5 aria-disabled:opacity-50"
+          aria-disabled={uploading || undefined}
+          onClick={() => {
+            if (!uploading) fileRef.current?.click();
+          }}
         >
           <ImagePlus size={15} aria-hidden="true" />
           {imageId ? 'Replace' : 'Add cover photo'}
@@ -188,7 +199,11 @@ function CoverImageField({
             variant="ghost"
             className="h-8 px-2.5"
             disabled={uploading}
-            onClick={() => onChange(undefined)}
+            onClick={() => {
+              onChange(undefined);
+              // This button disappears; the focus goes to "Add cover photo".
+              pickRef.current?.focus();
+            }}
           >
             <Trash2 size={15} aria-hidden="true" />
             Remove
@@ -204,7 +219,7 @@ function CoverImageField({
           const file = event.target.files?.[0];
           // Cleared so picking the same file again still fires onChange.
           event.target.value = '';
-          if (file) void upload(file);
+          if (file) onUpload(upload(file));
         }}
       />
       {error && (

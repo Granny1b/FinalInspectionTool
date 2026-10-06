@@ -1,4 +1,4 @@
-import type { Section } from '@modig/shared';
+import { rowRef, sectionNumber, type Item, type Section } from '@modig/shared';
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import {
   addRow,
@@ -9,12 +9,15 @@ import {
   deleteSection,
   duplicateRow,
   duplicateSection,
+  findRow,
   findSection,
   focusAfterRowDelete,
   focusAfterSectionDelete,
   moveRow,
   moveSection,
   renameSection,
+  restoreRow,
+  restoreSection,
   setRowText,
   singleLine,
   type Field,
@@ -47,7 +50,17 @@ export type DocumentActions = {
   /** ArrowUp/ArrowDown at the edge of a line; false when there is nowhere to go. */
   moveFocus: (from: Field, direction: 'up' | 'down') => boolean;
   focusSectionMenu: (sectionId: string) => void;
+  /** Puts the last deleted row or section back where it was, with the same ids. */
+  undoDelete: (deleted: Deleted) => void;
 };
+
+/**
+ * The last row or section deleted, so it can be put back: with the same ids, it keeps its history
+ * (results and KPIs key on the row id). Offered until the next change to the structure.
+ */
+export type Deleted =
+  | { kind: 'row'; label: string; sectionId: string; index: number; item: Item }
+  | { kind: 'section'; label: string; index: number; section: Section };
 
 /** Focus targets, plus two the UI needs: a section's ⋯ button, and a title with its text selected. */
 type FocusRequest =
@@ -58,6 +71,8 @@ type Options = {
   onChange: (sections: Section[]) => void;
   rootRef: RefObject<HTMLElement | null>;
   confirmDelete: (sectionId: string) => void;
+  /** A delete that can be undone, or null once the structure changes otherwise. */
+  onDeleted: (deleted: Deleted | null) => void;
 };
 
 /**
@@ -70,12 +85,13 @@ export function useDocumentActions({
   onChange,
   rootRef,
   confirmDelete,
+  onDeleted,
 }: Options): DocumentActions {
-  const latest = useRef({ sections, onChange, confirmDelete });
+  const latest = useRef({ sections, onChange, confirmDelete, onDeleted });
   const pendingFocus = useRef<FocusRequest | null>(null);
 
   useLayoutEffect(() => {
-    latest.current = { sections, onChange, confirmDelete };
+    latest.current = { sections, onChange, confirmDelete, onDeleted };
     const request = pendingFocus.current;
     if (request && focusElement(rootRef.current, request)) pendingFocus.current = null;
   });
@@ -93,8 +109,31 @@ export function useDocumentActions({
       if (focus) pendingFocus.current = focus;
       latest.current.onChange(next);
     };
-    const removeSection = (sectionId: string) =>
-      commit(deleteSection(current(), sectionId), focusAfterSectionDelete(current(), sectionId));
+    /** An edit of the structure (not of a text): it ends the undo of the last delete. */
+    const restructure = (
+      next: Section[],
+      focus: FocusRequest | null = null,
+      deleted: Deleted | null = null,
+    ) => {
+      if (next !== latest.current.sections) latest.current.onDeleted(deleted);
+      commit(next, focus);
+    };
+    const removeSection = (sectionId: string) => {
+      const sections = current();
+      const index = findSection(sections, sectionId);
+      const section = sections[index];
+      if (!section) return;
+      // Nothing worth an undo in an empty, untitled section.
+      const deleted: Deleted | null =
+        section.items.length > 0 || section.title.trim()
+          ? { kind: 'section', label: `Section ${sectionNumber(index)}`, index, section }
+          : null;
+      restructure(
+        deleteSection(sections, sectionId),
+        focusAfterSectionDelete(sections, sectionId),
+        deleted,
+      );
+    };
 
     return {
       setTitle: (sectionId, title) =>
@@ -103,20 +142,22 @@ export function useDocumentActions({
         const first = current()[findSection(current(), sectionId)]?.items[0];
         if (first) return focusNow({ kind: 'row', itemId: first.id, caret: 'end' });
         const created = addRow(current(), sectionId, 0);
-        if (created) commit(created.sections, { kind: 'row', itemId: created.id, caret: 'end' });
+        if (created) {
+          restructure(created.sections, { kind: 'row', itemId: created.id, caret: 'end' });
+        }
       },
       renameSection: (sectionId) => focusNow({ kind: 'rename', sectionId }),
       duplicateSection: (sectionId) => {
         const created = duplicateSection(current(), sectionId);
-        if (created) commit(created.sections, { kind: 'rename', sectionId: created.id });
+        if (created) restructure(created.sections, { kind: 'rename', sectionId: created.id });
       },
       moveSectionBy: (sectionId, delta) =>
-        commit(
+        restructure(
           moveSection(current(), sectionId, findSection(current(), sectionId) + delta),
           // Keep the moved section's ⋯ button focused and in view for the next Move up/down.
           { kind: 'menu', sectionId },
         ),
-      moveSectionTo: (sectionId, index) => commit(moveSection(current(), sectionId, index)),
+      moveSectionTo: (sectionId, index) => restructure(moveSection(current(), sectionId, index)),
       deleteSection: (sectionId) => {
         const section = current()[findSection(current(), sectionId)];
         if (!section) return;
@@ -126,26 +167,49 @@ export function useDocumentActions({
       removeSection,
       addSection: () => {
         const created = addSection(current());
-        commit(created.sections, { kind: 'title', sectionId: created.id });
+        restructure(created.sections, { kind: 'title', sectionId: created.id });
       },
 
       setText: (itemId, text) => commit(setRowText(current(), itemId, singleLine(text))),
       addRow: (sectionId) => {
         const section = current()[findSection(current(), sectionId)];
         const created = section && addRow(current(), sectionId, section.items.length);
-        if (created) commit(created.sections, { kind: 'row', itemId: created.id, caret: 'end' });
+        if (created) {
+          restructure(created.sections, { kind: 'row', itemId: created.id, caret: 'end' });
+        }
       },
       insertRowAfter: (itemId) => {
         const created = addRowAfter(current(), itemId);
-        if (created) commit(created.sections, { kind: 'row', itemId: created.id, caret: 'end' });
+        if (created) {
+          restructure(created.sections, { kind: 'row', itemId: created.id, caret: 'end' });
+        }
       },
       duplicateRow: (itemId) => {
         const created = duplicateRow(current(), itemId);
-        if (created) commit(created.sections, { kind: 'row', itemId: created.id, caret: 'end' });
+        if (created) {
+          restructure(created.sections, { kind: 'row', itemId: created.id, caret: 'end' });
+        }
       },
-      deleteRow: (itemId) =>
-        commit(deleteRow(current(), itemId), focusAfterRowDelete(current(), itemId)),
-      moveRowTo: (itemId, position) => commit(moveRow(current(), itemId, position)),
+      deleteRow: (itemId) => {
+        const sections = current();
+        const at = findRow(sections, itemId);
+        const section = at && sections[at.sectionIndex];
+        const item = at && section?.items[at.rowIndex];
+        if (!at || !section || !item) return;
+        // An empty row (Enter, then Backspace) has nothing worth an undo.
+        const deleted: Deleted | null =
+          item.text.trim() || item.guide
+            ? {
+                kind: 'row',
+                label: `Row ${rowRef(at.sectionIndex, at.rowIndex)}`,
+                sectionId: section.id,
+                index: at.rowIndex,
+                item,
+              }
+            : null;
+        restructure(deleteRow(sections, itemId), focusAfterRowDelete(sections, itemId), deleted);
+      },
+      moveRowTo: (itemId, position) => restructure(moveRow(current(), itemId, position)),
       moveFocus: (from, direction) => {
         const next = adjacentField(current(), from, direction);
         if (!next) return false;
@@ -157,6 +221,17 @@ export function useDocumentActions({
         return true;
       },
       focusSectionMenu: (sectionId) => focusNow({ kind: 'menu', sectionId }),
+      undoDelete: (deleted) =>
+        deleted.kind === 'row'
+          ? restructure(restoreRow(current(), deleted.sectionId, deleted.index, deleted.item), {
+              kind: 'row',
+              itemId: deleted.item.id,
+              caret: 'end',
+            })
+          : restructure(restoreSection(current(), deleted.index, deleted.section), {
+              kind: 'title',
+              sectionId: deleted.section.id,
+            }),
     };
   }, [rootRef]);
 }

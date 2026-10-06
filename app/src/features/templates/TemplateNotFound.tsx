@@ -10,7 +10,11 @@ export function TemplateNotFound({ what = 'template' }: { what?: 'template' | 'r
       <EmptyState
         icon={SearchX}
         title={what === 'template' ? 'This template doesn’t exist' : 'This revision doesn’t exist'}
-        hint="The link may be mistyped, or it was never published."
+        hint={
+          what === 'template'
+            ? 'The link may be mistyped.'
+            : 'The link may be mistyped, or that revision was never published.'
+        }
         action={
           <ButtonLink to="/templates" variant="secondary">
             <ArrowLeft size={16} aria-hidden="true" />

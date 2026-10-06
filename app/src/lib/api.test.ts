@@ -1,6 +1,6 @@
 import { CONFLICT_MESSAGE, MeSchema } from '@modig/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiFetch, ApiRequestError } from './api';
+import { apiFetch, ApiRequestError, SIGNED_OUT_MESSAGE } from './api';
 import { shouldRetry } from './queryClient';
 
 const assign = vi.fn<(url: string) => void>();
@@ -74,7 +74,7 @@ describe('apiFetch', () => {
     expect(headers.get('If-Match')).toBe('"0x8D1"');
   });
 
-  it('sends an expired session (SWA redirect) to the login page and never settles', async () => {
+  it('sends a read with an expired session (SWA redirect) to the login page, never settling', async () => {
     fetchMock.mockResolvedValue(opaqueRedirect());
 
     expect(await settled(apiFetch('/api/me'))).toBe('pending');
@@ -86,6 +86,33 @@ describe('apiFetch', () => {
 
     expect(await settled(apiFetch('/api/me'))).toBe('pending');
     expect(assign).toHaveBeenCalledWith('/login.html');
+  });
+
+  it.each([
+    ['an SWA redirect', opaqueRedirect],
+    ["SWA's own 401", () => new Response('', { status: 401 })],
+  ])('throws for a save that gets %s, never leaving the page', async (_what, answer) => {
+    fetchMock.mockResolvedValue(answer());
+
+    const saving = apiFetch('/api/templates/abc', { method: 'PUT', body: {}, ifMatch: '"0x1"' });
+
+    await expect(saving).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 401,
+      code: 'unauthorized',
+      message: SIGNED_OUT_MESSAGE,
+    });
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it("throws for a write that gets SWA's own 403 (role removed), never leaving the page", async () => {
+    fetchMock.mockResolvedValue(new Response('<!doctype html>', { status: 403 }));
+
+    await expect(apiFetch('/api/templates', { method: 'POST', body: {} })).rejects.toMatchObject({
+      status: 403,
+      code: 'forbidden',
+    });
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("throws the API's own 401 instead of navigating (no loop via the login page)", async () => {

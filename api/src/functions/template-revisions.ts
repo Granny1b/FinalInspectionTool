@@ -39,7 +39,7 @@ import {
  * If-Match is the draft ETag the admin is looking at, so what gets published is exactly what
  * they saw. Answers like GET /api/templates/{id}, with the bumped draft's ETag.
  */
-export const publishTemplate = endpoint({ role: 'admin' }, async (req, _context, user) => {
+export const publishTemplate = endpoint({ role: 'admin' }, async (req, context, user) => {
   const id = idParam(req);
   const ifMatch = requireIfMatch(req);
   const { changeNote } = await readJsonBody(req, PublishTemplateRequestSchema);
@@ -76,7 +76,9 @@ export const publishTemplate = endpoint({ role: 'admin' }, async (req, _context,
   });
 
   // The draft now continues as the next revision. If someone saved in between, the publish still
-  // stands and their draft is kept; reads normalise its revision number anyway.
+  // stands and their draft is kept; reads normalise its revision number anyway. rev-N is committed,
+  // so nothing from here on may turn the publish into a failure: the user would try again, and the
+  // unchanged ETag would let that publish the same content again as N + 1.
   const draft: Template = {
     ...content,
     revision: revision + 1,
@@ -85,7 +87,9 @@ export const publishTemplate = endpoint({ role: 'admin' }, async (req, _context,
   };
   await writeJson(CONTAINERS.templates, blobNames.templateDraft(id), draft, { ifMatch }).catch(
     (error: unknown) => {
-      if (!(error instanceof PreconditionFailedError)) throw error;
+      if (!(error instanceof PreconditionFailedError)) {
+        context.warn(`Published revision ${revision} of ${id}; moving the draft on failed`, error);
+      }
     },
   );
 

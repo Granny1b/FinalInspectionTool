@@ -306,11 +306,128 @@ describe('autosave', () => {
     });
   });
 
-  it('cancel() drops the pending debounce', async () => {
-    const { saver, save } = setup();
-    saver.change('a');
-    saver.cancel();
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(save).not.toHaveBeenCalled();
+  describe('dispose (unmount)', () => {
+    it('drops the pending debounce and ignores later changes', async () => {
+      const { saver, save } = setup();
+      saver.change('a');
+      saver.dispose();
+      saver.change('late'); // e.g. a photo upload that finishes after the editor closed
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(save).not.toHaveBeenCalled();
+      await expect(saver.flush()).resolves.toBe(false);
+    });
+
+    it('sends nothing more after the answer of a save in flight', async () => {
+      const { saver, save, calls } = setup();
+      saver.change('a');
+      await vi.advanceTimersByTimeAsync(1000);
+      saver.change('b');
+      saver.dispose();
+      calls[0]?.resolve('e1');
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it('works again after revive (StrictMode mounts twice)', async () => {
+      const { saver, save } = setup();
+      saver.dispose();
+      saver.revive();
+      saver.change('a');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(save).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe('a save stored on the server whose answer was lost', () => {
+  type Next = 'answer' | 'lose the answer' | 'fail on the way';
+
+  /**
+   * A server like PUT /api/templates/{id}: 412 unless If-Match is the stored ETag, else it stores
+   * the value under a new ETag. `failNext` makes the next request fail like a dropped connection:
+   * after storing (the answer is lost) or before reaching the server.
+   */
+  function server() {
+    const stored = { value: 'v0', etag: 'e0', version: 0 };
+    let next: Next = 'answer';
+    const save = vi.fn(async (value: string, etag: string) => {
+      const mode = next;
+      next = 'answer';
+      if (mode === 'fail on the way') throw new TypeError('Failed to fetch');
+      if (etag !== stored.etag) throw new FakeError('conflict');
+      stored.version += 1;
+      Object.assign(stored, { value, etag: `e${stored.version}` });
+      if (mode === 'lose the answer') throw new TypeError('Failed to fetch');
+      return stored.etag;
+    });
+    const reconcile = vi.fn(async () => ({ etag: stored.etag, value: stored.value }));
+    const saver = createAutosaver<string>({
+      etag: 'e0',
+      save,
+      reconcile,
+      classifyError: (error) => ({
+        kind: error instanceof FakeError ? error.kind : 'transient',
+        message: 'Could not save',
+      }),
+    });
+    return { saver, save, reconcile, stored, failNext: (mode: Next) => (next = mode) };
+  }
+
+  it('takes the stored ETag over and saves the newer edits instead of reporting a conflict', async () => {
+    const { saver, save, reconcile, stored, failNext } = server();
+    failNext('lose the answer');
+    saver.change('EDIT-ONE');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(saver.getState()).toMatchObject({ status: 'error', willRetry: true });
+    expect(stored.value).toBe('EDIT-ONE');
+
+    // Typed on meanwhile; the retry (old ETag) gets 412, and the check finds EDIT-ONE stored.
+    saver.change('EDIT-ONE EDIT-TWO');
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(saver.getState().status).toBe('saved');
+    expect(stored).toMatchObject({ value: 'EDIT-ONE EDIT-TWO' });
+    expect(saver.etag()).toBe(stored.etag);
+
+    // And autosave goes on as normal.
+    saver.change('EDIT-THREE');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(stored.value).toBe('EDIT-THREE');
+    expect(save).toHaveBeenCalledTimes(4);
+  });
+
+  it('settles a flush once the retried value turns out stored', async () => {
+    const { saver, stored, failNext } = server();
+    failNext('lose the answer');
+    saver.change('only');
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(saver.flush()).resolves.toBe(true);
+    expect(saver.getState().status).toBe('saved');
+    expect(saver.etag()).toBe(stored.etag);
+  });
+
+  it('is still a conflict when what is stored is someone else’s', async () => {
+    const { saver, stored, reconcile, failNext } = server();
+    // Our save fails before reaching the server; then someone else saves.
+    failNext('fail on the way');
+    saver.change('mine');
+    await vi.advanceTimersByTimeAsync(1000);
+    Object.assign(stored, { value: 'their edit', etag: 'theirs' });
+    // The retry gets 412; the check finds their edit, not ours.
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(saver.getState()).toEqual({ status: 'conflict' });
+    expect(stored.value).toBe('their edit');
+  });
+
+  it('does not check a 412 that follows no failure', async () => {
+    const { saver, stored, reconcile } = server();
+    stored.etag = 'theirs';
+    saver.change('mine');
+    await expect(saver.flush()).resolves.toBe(false);
+    expect(reconcile).not.toHaveBeenCalled();
+    expect(saver.getState()).toEqual({ status: 'conflict' });
   });
 });

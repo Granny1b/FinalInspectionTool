@@ -33,6 +33,9 @@ import type { DocumentActions } from './useDocumentActions';
 export type DragState =
   { kind: 'row'; itemId: string; working: Section[] } | { kind: 'section'; sectionId: string };
 
+/** What is being dragged, if anything. */
+export type DragKind = DragState['kind'] | null;
+
 const INSTRUCTIONS =
   'To move a section or row, press Space or Enter on its handle, move it with the arrow keys, ' +
   'then press Space or Enter to drop it, or Escape to cancel.';

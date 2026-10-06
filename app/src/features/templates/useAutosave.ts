@@ -18,8 +18,12 @@ export function useAutosave<T>(
 ): [Autosaver<T>, AutosaveState] {
   const [saver] = useState(() => createAutosaver({ classifyError: classifySaveError, ...options }));
   const state = useSyncExternalStore(saver.subscribe, saver.getState);
-  // Unmounting drops a pending debounce; leaving the page flushes first (useLeaveGuard).
-  useEffect(() => saver.cancel, [saver]);
+  // Unmounting stops autosave for good, so a late change (a photo upload finishing after the editor
+  // closed) is never saved with an outdated ETag. Leaving the page saves first (useLeaveGuard).
+  useEffect(() => {
+    saver.revive();
+    return saver.dispose;
+  }, [saver]);
   return [saver, state];
 }
 

@@ -22,6 +22,7 @@ import {
 } from '../../test/storage';
 import type * as Storage from '../lib/storage';
 import { listBlobNames, readJson, writeJson } from '../lib/storage';
+import { loadDetail } from '../lib/templates';
 import { getRevision, publishTemplate } from './template-revisions';
 
 // Record the registrations instead of letting the package (in "test mode") warn about them.
@@ -295,6 +296,46 @@ describe('POST /api/templates/{id}/publish', () => {
     expect(detail.draft).toMatchObject({ name: 'Their edit', revision: 4 });
     expect(detail.hasUnpublishedChanges).toBe(true);
     expect(etagOf(response)).toBe(theirEtag);
+  });
+
+  it('still succeeds when moving the draft on fails after the revision is written', async () => {
+    const { draft, etag } = await editedTemplate();
+    const draftBlob = blobNames.templateDraft(draft.id);
+    hooks.beforeWrite = async () => {
+      // The revision write goes through; the draft write after it fails (storage busy).
+      hooks.beforeWrite = async (blobName) => {
+        if (blobName === draftBlob) throw new Error('ServerBusy');
+      };
+    };
+
+    const response = await publish(draft.id, etag);
+    // A failure here would make the user publish again, as a duplicate revision 4.
+    expect(response.status).toBe(200);
+    const detail = TemplateDetailSchema.parse(response.jsonBody);
+    expect(detail.revisions.map((r) => r.revision)).toEqual([3, 2, 1]);
+    expect(detail.draft.revision).toBe(4);
+    expect(detail.hasUnpublishedChanges).toBe(false);
+    // The draft was not rewritten, so its ETag (the one the editor holds) still works.
+    expect(etagOf(response)).toBe(etag);
+    expect(await revisionNumbers(draft.id)).toHaveLength(3);
+  });
+
+  it('numbers revisions past 9 in order (blob listings sort rev-10 before rev-2)', async () => {
+    const draft = draftTemplate({ revision: 12 });
+    const etag = await storeTemplate(
+      draft,
+      Array.from({ length: 11 }, (_, i) => i + 1),
+    );
+    expect((await loadDetail(draft.id))?.detail.draft.revision).toBe(12);
+
+    const response = await publish(draft.id, etag, { changeNote: 'Twelfth' });
+    expect(response.status).toBe(200);
+    expect((await stored(blobNames.templateRevision(draft.id, 12)))?.changeNote).toBe('Twelfth');
+    const detail = TemplateDetailSchema.parse(response.jsonBody);
+    expect(detail.revisions.map((r) => r.revision)).toEqual([
+      12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+    ]);
+    expect(detail.draft.revision).toBe(13);
   });
 
   it('400 for a malformed id, 404 for an unknown template', async () => {

@@ -1,4 +1,4 @@
-import { useDndContext, useDroppable } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { sectionNumber, type Section } from '@modig/shared';
@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import { ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from 'lucide-react';
 import { memo, useId, useMemo, type KeyboardEvent } from 'react';
 import { ActionMenu } from './ActionMenu';
-import { bodyDndId, dragData, rowDndId, sectionDndId, type DragData } from './dnd';
+import { bodyDndId, rowDndId, sectionDndId, type DragData } from './dnd';
 import { EditableRow } from './EditableRow';
 import {
   GRID,
@@ -19,6 +19,7 @@ import {
 } from './layout';
 import { ColumnLabels, DragHandle, IssueNote, SpareRows } from './parts';
 import type { DocumentActions } from './useDocumentActions';
+import type { DragKind } from './useDocumentDnd';
 
 type Props = {
   section: Section;
@@ -29,6 +30,11 @@ type Props = {
   itemIssues: ReadonlyMap<string, string[]>;
   /** Only the header (and its row count) while this section is being dragged. */
   collapsed: boolean;
+  /**
+   * What is being dragged. A prop, not dnd-kit's context: that changes on every pointer move and
+   * would re-render all 90 rows each time.
+   */
+  dragKind: DragKind;
   actions: DocumentActions;
 };
 
@@ -40,10 +46,10 @@ export const EditableSection = memo(function EditableSection({
   issues,
   itemIssues,
   collapsed,
+  dragKind,
   actions,
 }: Props) {
-  const { active } = useDndContext();
-  const activeType = dragData(active)?.type;
+  const activeType = dragKind;
   const sectionData: DragData = { type: 'section', sectionId: section.id };
   const {
     attributes,
@@ -100,7 +106,7 @@ export const EditableSection = memo(function EditableSection({
           label={`Move section ${number}`}
           className={clsx(
             'top-2',
-            active
+            dragKind
               ? 'opacity-0'
               : 'opacity-0 group-focus-within/header:opacity-100 group-hover/header:opacity-100 pointer-coarse:opacity-100',
           )}
@@ -119,7 +125,7 @@ export const EditableSection = memo(function EditableSection({
               value={section.title}
               onChange={(event) => actions.setTitle(section.id, event.target.value)}
               onKeyDown={onTitleKeyDown}
-              className="h-8 min-w-0 flex-1 rounded-sm bg-transparent px-2 text-[0.9375rem] font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-500 focus:bg-surface focus-visible:outline-1 focus-visible:-outline-offset-1"
+              className="h-8 min-w-0 flex-1 rounded-sm bg-transparent px-2 text-[0.9375rem] font-semibold text-ellipsis text-ink-900 placeholder:font-normal placeholder:text-ink-500 focus:bg-surface focus-visible:outline-1 focus-visible:-outline-offset-1"
             />
             {collapsed && (
               <span className="shrink-0 px-2 text-xs text-ink-500">
@@ -178,6 +184,7 @@ export const EditableSection = memo(function EditableSection({
               sectionIndex={index}
               rowIndex={rowIndex}
               issues={itemIssues.get(item.id)}
+              dragKind={dragKind}
               actions={actions}
             />
           ))}

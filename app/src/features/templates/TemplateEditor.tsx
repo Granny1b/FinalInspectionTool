@@ -1,7 +1,7 @@
 import {
   APP_NAME,
   CONFLICT_MESSAGE,
-  hasUnpublishedChanges,
+  sameTemplateContent,
   validateForPublish,
   type PublishIssue,
   type Section,
@@ -10,9 +10,11 @@ import {
   type TemplateDraftInput,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, Upload } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Button } from '../../components/Button';
+import { ExternalLink, RefreshCw, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button, ButtonLink } from '../../components/Button';
+import { ApiRequestError, SIGNED_OUT_MESSAGE } from '../../lib/api';
+import { LOGIN_PAGE } from '../../lib/auth';
 import { useSettings } from '../../lib/useSettings';
 import { Badge } from './Badge';
 import { Callout } from './Callout';
@@ -22,6 +24,7 @@ import { TemplateDocument } from './document/TemplateDocument';
 import { PublishDialog, type FlushResult } from './PublishDialog';
 import { BackLink } from './PublishedTemplateView';
 import {
+  fetchTemplate,
   publishDraft,
   saveDraft,
   templateKeys,
@@ -84,9 +87,41 @@ export function TemplateEditor({ loaded, onReload }: Props) {
       markListStale();
       return saved.etag;
     },
+    // After saves that failed on the way, a 412 may be our own doing: was one of them stored?
+    reconcile: async () => {
+      const { detail, etag } = await fetchTemplate(id);
+      setServer((current) => ({
+        ...current,
+        revision: detail.draft.revision,
+        hasUnpublishedChanges: detail.hasUnpublishedChanges,
+      }));
+      return { etag, value: draftInput(detail.draft) };
+    },
+    equals: sameTemplateContent,
   });
-  const dirty = saveState.status !== 'saved';
-  const leaveGuard = useLeaveGuard(dirty, saver.flush);
+
+  // A cover photo that is still uploading counts as unsaved: leaving or publishing waits for it,
+  // and closing the tab gets the browser's warning.
+  const uploadRef = useRef<Promise<unknown> | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const trackUpload = useCallback((upload: Promise<unknown>) => {
+    uploadRef.current = upload;
+    setUploading(true);
+    const done = () => {
+      if (uploadRef.current !== upload) return;
+      uploadRef.current = null;
+      setUploading(false);
+    };
+    upload.then(done, done);
+  }, []);
+  /** Saves everything, once a photo being uploaded is in the draft; false if saving failed. */
+  const saveAll = useCallback(async () => {
+    await uploadRef.current?.catch(() => undefined);
+    return saver.flush();
+  }, [saver]);
+
+  const dirty = saveState.status !== 'saved' || uploading;
+  const leaveGuard = useLeaveGuard(dirty, saveAll);
 
   const update = useCallback(
     (patch: Partial<TemplateDraftInput>) => {
@@ -114,6 +149,14 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   const [published, setPublished] = useState<number | null>(null);
   const [confirmingReload, setConfirmingReload] = useState(false);
   const [reloadFailed, setReloadFailed] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+
+  // A publish leaves nothing new to publish, so the Publish button is disabled under the keyboard
+  // focus: the "Published" notice takes the focus instead.
+  useEffect(() => {
+    if (published !== null) noticeRef.current?.focus();
+  }, [published]);
 
   const conflict = saveState.status === 'conflict' || publishConflict;
   const unpublished = dirty || server.hasUnpublishedChanges;
@@ -127,22 +170,51 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   }
 
   async function flushForPublish(): Promise<FlushResult> {
-    if (await saver.flush()) return 'saved';
-    return saver.getState().status === 'conflict' ? 'conflict' : 'failed';
+    if (await saveAll()) return { status: 'saved' };
+    const state = saver.getState();
+    if (state.status === 'conflict') return { status: 'conflict' };
+    return { status: 'failed', message: state.status === 'error' ? state.message : null };
   }
 
   async function publish(changeNote: string) {
-    const { data: detail, etag } = await publishDraft(id, saver.etag(), changeNote);
+    const revision = server.revision;
+    const { detail, etag } = await publishDraft(id, saver.etag(), changeNote).then(
+      ({ data, etag: draftEtag }) => ({ detail: data, etag: draftEtag }),
+      (failure: unknown) => publishedAnyway(failure, revision),
+    );
     // The draft continues under a new ETag. Take it over only if that draft is still exactly what
     // we have: if someone saved between the publish's writes, the next autosave must hit the
     // conflict instead of overwriting their work.
-    const local: Template = { ...detail.draft, ...draftRef.current };
-    if (!hasUnpublishedChanges(local, detail.draft)) saver.setEtag(etag);
+    if (sameTemplateContent(detail.draft, draftRef.current)) saver.setEtag(etag);
     setServer(serverState(detail));
     setChecking(false);
     setPublished(detail.revisions[0]?.revision ?? null);
     markListStale();
   }
+
+  /**
+   * A publish whose answer was lost (network, timeout, 5xx) may have gone through, and trying again
+   * would then get a 412 that blames someone else. So check: if revision N now exists and the draft
+   * is still exactly ours, it did. Otherwise the original failure stands.
+   */
+  async function publishedAnyway(failure: unknown, revision: number): Promise<LoadedTemplate> {
+    const refused =
+      failure instanceof ApiRequestError && failure.status < 500 && failure.status !== 412;
+    if (refused) throw failure;
+    const current = await fetchTemplate(id).catch(() => null);
+    const latest = current?.detail.revisions[0]?.revision;
+    if (
+      current &&
+      latest === revision &&
+      sameTemplateContent(current.detail.draft, draftRef.current)
+    ) {
+      return current;
+    }
+    throw failure;
+  }
+
+  /** Reload, asking first when it would discard unsaved changes. */
+  const askReload = () => (dirty ? setConfirmingReload(true) : void reload());
 
   async function reload() {
     setConfirmingReload(false);
@@ -170,7 +242,14 @@ export function TemplateEditor({ loaded, onReload }: Props) {
 
       <header className="sticky top-14 z-20 mt-2 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-ink-200 bg-canvas py-3 lg:top-0">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight text-ink-900">{title}</h1>
+          {/* Focusable from script: it takes the focus when the "Published" notice is dismissed. */}
+          <h1
+            ref={titleRef}
+            tabIndex={-1}
+            className="truncate text-xl font-semibold tracking-tight text-ink-900 outline-none"
+          >
+            {title}
+          </h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge>Draft · Rev {server.revision}</Badge>
             {latestRevision === null ? (
@@ -186,6 +265,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             state={saveState}
             conflict={publishConflict}
             onRetry={() => void saver.flush()}
+            onReload={askReload}
           />
           {/* Nothing to publish when the draft equals the latest revision (the badges say so). */}
           <Button onClick={openPublish} disabled={!unpublished || conflict}>
@@ -201,10 +281,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             tone="error"
             role="alert"
             actions={
-              <Button
-                variant="secondary"
-                onClick={() => (dirty ? setConfirmingReload(true) : void reload())}
-              >
+              <Button variant="secondary" onClick={askReload}>
                 <RefreshCw size={16} aria-hidden="true" />
                 Reload
               </Button>
@@ -218,7 +295,20 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           </Callout>
         )}
         {saveState.status === 'error' && !saveState.willRetry && (
-          <Callout tone="error" role="alert">
+          <Callout
+            tone="error"
+            role="alert"
+            actions={
+              // Signed out: sign in again in another tab, so this one keeps the unsaved changes.
+              saveState.message === SIGNED_OUT_MESSAGE && (
+                <ButtonLink to={LOGIN_PAGE} target="_blank" variant="secondary">
+                  Sign in
+                  <ExternalLink size={14} aria-hidden="true" />
+                  <span className="sr-only">(opens a new tab)</span>
+                </ButtonLink>
+              )
+            }
+          >
             <strong className="font-semibold">Couldn’t save:</strong> {saveState.message}
           </Callout>
         )}
@@ -237,10 +327,20 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           </Callout>
         )}
         {published !== null && (
-          <Callout tone="success" role="status" onDismiss={() => setPublished(null)}>
-            <strong className="font-semibold">Published revision {published}.</strong> New
-            inspections use it from now on.
-          </Callout>
+          <div ref={noticeRef} tabIndex={-1} className="outline-none">
+            <Callout
+              tone="success"
+              role="status"
+              onDismiss={() => {
+                setPublished(null);
+                // Not the Publish button: it is disabled until there is something new.
+                titleRef.current?.focus();
+              }}
+            >
+              <strong className="font-semibold">Published revision {published}.</strong> New
+              inspections use it from now on.
+            </Callout>
+          </div>
         )}
       </div>
 
@@ -255,6 +355,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           takenModels={takenModels}
           nameError={checking && nameBlank ? 'The template needs a name.' : undefined}
           onChange={update}
+          onUpload={trackUpload}
         />
         <RevisionHistory templateId={id} revisions={server.revisions} />
       </div>

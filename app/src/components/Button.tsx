@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import type { ButtonHTMLAttributes } from 'react';
+import type { ComponentProps } from 'react';
 import { Link, type LinkProps } from 'react-router';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
@@ -20,7 +20,8 @@ function classes(variant: Variant, className?: string): string {
   );
 }
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant };
+/** Includes `ref` (React 19 passes it as a prop). */
+type ButtonProps = ComponentProps<'button'> & { variant?: Variant };
 
 export function Button({ variant = 'primary', className, type = 'button', ...props }: ButtonProps) {
   return <button type={type} className={classes(variant, className)} {...props} />;

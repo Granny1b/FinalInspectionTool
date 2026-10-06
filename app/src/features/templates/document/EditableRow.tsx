@@ -1,4 +1,3 @@
-import { useDndContext } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { rowLetter, rowRef, type Item } from '@modig/shared';
@@ -6,10 +5,11 @@ import clsx from 'clsx';
 import { Copy, Images, Trash2 } from 'lucide-react';
 import { memo, useId, type KeyboardEvent } from 'react';
 import { ActionMenu } from './ActionMenu';
-import { dragData, rowDndId, type DragData } from './dnd';
+import { rowDndId, type DragData } from './dnd';
 import { GRID, ISSUE_OUTLINE, REF_CELL, ROW_CONTROLS, ROW_LINE, TEXT_CELL } from './layout';
 import { DragHandle, GuideMark, IconButton, IssueNote, PaperCells } from './parts';
 import type { DocumentActions } from './useDocumentActions';
+import type { DragKind } from './useDocumentDnd';
 
 /** Shown on hover and while focus is inside the row (keyboard); always on touch screens. */
 const REVEAL =
@@ -23,6 +23,8 @@ type Props = {
   sectionIndex: number;
   rowIndex: number;
   issues: string[] | undefined;
+  /** What is being dragged (see EditableSection). */
+  dragKind: DragKind;
   actions: DocumentActions;
 };
 
@@ -33,10 +35,10 @@ export const EditableRow = memo(function EditableRow({
   sectionIndex,
   rowIndex,
   issues,
+  dragKind,
   actions,
 }: Props) {
-  const { active } = useDndContext();
-  const dragging = active !== null;
+  const dragging = dragKind !== null;
   const data: DragData = { type: 'row', sectionId, itemId: item.id };
   const {
     attributes,
@@ -50,7 +52,7 @@ export const EditableRow = memo(function EditableRow({
     id: rowDndId(item.id),
     data,
     // While a section is dragged, rows must not be drop targets for it.
-    disabled: { droppable: dragData(active)?.type === 'section' },
+    disabled: { droppable: dragKind === 'section' },
   });
   const ref = rowRef(sectionIndex, rowIndex);
   const issueId = useId();
@@ -66,7 +68,10 @@ export const EditableRow = memo(function EditableRow({
       }
     } else if (event.key === 'Backspace' && textarea.value === '') {
       event.preventDefault();
+      // Only a fresh press deletes: holding Backspace to clear a row stops once it is empty.
+      if (event.repeat) return;
       actions.deleteRow(item.id);
+      swallowHeldBackspace();
     } else if (
       (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
       !event.shiftKey &&
@@ -105,7 +110,7 @@ export const EditableRow = memo(function EditableRow({
           {/* An invisible copy of the text sizes the grid cell, so the textarea grows with it. */}
           <div
             data-value={item.text}
-            className="grid min-w-0 flex-1 text-sm leading-6 after:invisible after:col-start-1 after:row-start-1 after:px-2 after:py-2 after:wrap-break-word after:whitespace-pre-wrap after:content-[attr(data-value)_'_']"
+            className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] text-sm leading-6 after:invisible after:col-start-1 after:row-start-1 after:px-2 after:py-2 after:wrap-break-word after:whitespace-pre-wrap after:content-[attr(data-value)_'_']"
           >
             <textarea
               data-item-text={item.id}
@@ -186,6 +191,24 @@ function GuideComingSoon({ rowRef }: { rowRef: string }) {
       </span>
     </span>
   );
+}
+
+/**
+ * A held Backspace deletes one row only. Its auto-repeats would go on to eat the field that gets
+ * focus next (the end of the previous row, then that row too), so they are ignored until the key
+ * is released. Listening on the window also covers a section title getting the focus.
+ */
+function swallowHeldBackspace() {
+  const swallow = (event: globalThis.KeyboardEvent) => {
+    if (event.key === 'Backspace' && event.repeat) event.preventDefault();
+  };
+  const stop = (event: globalThis.KeyboardEvent) => {
+    if (event.key !== 'Backspace') return;
+    window.removeEventListener('keydown', swallow, true);
+    window.removeEventListener('keyup', stop, true);
+  };
+  window.addEventListener('keydown', swallow, true);
+  window.addEventListener('keyup', stop, true);
 }
 
 /**

@@ -124,12 +124,11 @@ async function checkModel(modelCode: string, templateId?: string): Promise<void>
     loadSettings(),
     findTemplateForModel(modelCode, templateId),
   ]);
-  if (!settings?.machineModels.some((model) => model.code === modelCode)) {
-    throw new BadRequestError(`Unknown machine model "${modelCode}".`);
-  }
+  const model = settings?.machineModels.find((candidate) => candidate.code === modelCode);
+  if (!model) throw new BadRequestError(`Unknown machine model "${modelCode}".`);
   if (other) {
     throw new ConflictError(
-      `"${other.draft.name}" is already the template for ${modelCode}: ` +
+      `"${other.draft.name}" is already the template for ${model.name}: ` +
         'there is one template per machine model.',
     );
   }

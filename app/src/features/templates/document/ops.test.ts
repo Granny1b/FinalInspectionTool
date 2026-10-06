@@ -16,6 +16,8 @@ import {
   moveRow,
   moveSection,
   renameSection,
+  restoreRow,
+  restoreSection,
   setRowText,
   singleLine,
 } from './ops';
@@ -114,6 +116,17 @@ describe('sections', () => {
     expect(deleteSection([{ id: 'only', title: '', items: [] }], 'only')).toEqual([]);
   });
 
+  it('restoreSection puts a deleted section back as it was (undo), at a clamped index', () => {
+    const before = fixture();
+    const section = before[0]!;
+    const deleted = deleteSection(before, 'sA');
+    const restored = restoreSection(deleted, 0, section);
+    expect(restored).toEqual(before);
+    expect(restored[0]).toBe(section);
+    expect(layout(restoreSection(deleted, 9, section))).toBe('sB:b1,b2 | sC: | sA:a1,a2,a3');
+    expect(restoreSection(before, 0, section)).toBe(before); // already there
+  });
+
   it('moveSection moves up and down, keeps ids and clamps out-of-range targets', () => {
     const before = fixture();
     expect(moveSection(before, 'sB', 0).map((s) => s.id)).toEqual(['sB', 'sA', 'sC']);
@@ -189,6 +202,17 @@ describe('rows', () => {
     expect(layout(deleteRow(before, 'a2'))).toBe('sA:a1,a3 | sB:b1,b2 | sC:');
     expect(layout(deleteRow(deleteRow(before, 'b1'), 'b2'))).toBe('sA:a1,a2,a3 | sB: | sC:');
     expect(deleteRow(before, 'nope')).toBe(before);
+  });
+
+  it('restoreRow puts a deleted row back with its id, text and guide (undo)', () => {
+    const before = fixture();
+    const row = before[0]!.items[1]!;
+    const deleted = deleteRow(before, 'a2');
+    expect(restoreRow(deleted, 'sA', 1, row)).toEqual(before);
+    expect(restoreRow(deleted, 'sA', 1, row)[0]!.items[1]).toBe(row);
+    expect(layout(restoreRow(deleted, 'sA', 9, row))).toBe('sA:a1,a3,a2 | sB:b1,b2 | sC:');
+    expect(restoreRow(deleted, 'nope', 0, row)).toBe(deleted); // its section is gone
+    expect(restoreRow(before, 'sB', 0, row)).toBe(before); // already there: ids stay unique
   });
 });
 

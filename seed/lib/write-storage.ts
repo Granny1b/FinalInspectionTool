@@ -157,28 +157,40 @@ async function seedTemplate(
 }
 
 /**
- * The template for `modelCode`: normally one with a draft. Failing that, a published revision
- * whose template has no draft, which is an import that stopped between its two writes.
+ * The template for `modelCode`: normally one with a draft for that model, or whose first published
+ * revision was for it (an admin may have moved the seeded template to another model since; its
+ * revisions never change). Failing that, a published revision whose template has no draft, which
+ * is an import that stopped between its two writes.
  */
 async function findTemplate(
   templates: ContainerClient,
   modelCode: string,
 ): Promise<{ templateId: string; revisionWithoutDraft?: Template } | undefined> {
   const drafts: string[] = [];
+  const firstRevision = new Map<string, number>();
   const latestRevision = new Map<string, number>();
   for await (const { name } of templates.listBlobsFlat()) {
     const [templateId = '', file = ''] = name.split('/');
     if (name === blobNames.templateDraft(templateId)) drafts.push(templateId);
     const revision = Number(blobNames.templateRevisionPattern.exec(file)?.[1] ?? 0);
     if (revision > 0 && name === blobNames.templateRevision(templateId, revision)) {
+      firstRevision.set(templateId, Math.min(revision, firstRevision.get(templateId) ?? revision));
       latestRevision.set(templateId, Math.max(revision, latestRevision.get(templateId) ?? 0));
     }
   }
 
+  const modelOf = async (blobName: string) => {
+    const parsed = TemplateSchema.pick({ modelCode: true }).safeParse(
+      (await readJson(templates.getBlockBlobClient(blobName)))?.json,
+    );
+    return parsed.success ? parsed.data.modelCode : undefined;
+  };
   for (const templateId of drafts) {
-    const draft = await readJson(templates.getBlockBlobClient(blobNames.templateDraft(templateId)));
-    const parsed = TemplateSchema.pick({ modelCode: true }).safeParse(draft?.json);
-    if (parsed.success && parsed.data.modelCode === modelCode) return { templateId };
+    if ((await modelOf(blobNames.templateDraft(templateId))) === modelCode) return { templateId };
+    const first = firstRevision.get(templateId);
+    if (first && (await modelOf(blobNames.templateRevision(templateId, first))) === modelCode) {
+      return { templateId };
+    }
   }
   for (const [templateId, revision] of latestRevision) {
     if (drafts.includes(templateId)) continue;

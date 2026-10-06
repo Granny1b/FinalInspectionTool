@@ -1,7 +1,8 @@
 /**
  * Direct access to the Azurite that `npm run dev` starts (default ports), never
  * STORAGE_CONNECTION_STRING. The seed check reads what the seed wrote; the template tests write
- * throwaway templates here so that none of them changes the seeded one, and delete them after.
+ * throwaway templates here, so they neither depend on nor change the seeded one, and delete them
+ * after.
  */
 import { BlobServiceClient } from '@azure/storage-blob';
 import {
@@ -30,13 +31,26 @@ async function writeTemplate(blobName: string, template: Template): Promise<void
   });
 }
 
-/** The seeded RigiMill MG draft, or null while the seed (started by `npm run dev`) is running. */
-export async function findSeededDraft(): Promise<Template | null> {
+/**
+ * The RigiMill MG checklist the seed imported, as its published revision 2: that never changes,
+ * whatever admins have done to the draft since (edited, published, moved to another model).
+ * `complete` once the seed has also written the draft, its last write. Null before the seed (run
+ * by `npm run dev`) has written it.
+ */
+export async function findSeededRevision(): Promise<{
+  revision: Template;
+  complete: boolean;
+} | null> {
   if (!(await templates.exists())) return null;
-  for await (const blob of templates.listBlobsFlat()) {
-    if (!blob.name.endsWith('/draft.json')) continue;
-    const template = await readTemplate(blob.name);
-    if (template.modelCode === 'RMMG') return template;
+  const names = new Set<string>();
+  for await (const blob of templates.listBlobsFlat()) names.add(blob.name);
+  for (const name of names) {
+    const id = name.split('/')[0] ?? '';
+    if (name !== blobNames.templateRevision(id, 2)) continue;
+    const revision = await readTemplate(name);
+    if (revision.modelCode === 'RMMG' && revision.updatedBy.startsWith('seed')) {
+      return { revision, complete: names.has(blobNames.templateDraft(id)) };
+    }
   }
   return null;
 }

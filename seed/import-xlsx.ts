@@ -107,7 +107,7 @@ function printReport({ createdContainers, settings, template }: SeedReport): voi
   const id = template.templateId;
   const draftPath = `${CONTAINERS.templates}/${blobNames.templateDraft(id)}`;
   if (template.action === 'skipped') {
-    console.log(`Template    already seeded: ${draftPath} exists for this model; left untouched`);
+    console.log(`Template    already seeded: ${draftPath} exists; left untouched`);
     return;
   }
   const revisionPath = `${CONTAINERS.templates}/${blobNames.templateRevision(id, template.publishedRevision)}`;

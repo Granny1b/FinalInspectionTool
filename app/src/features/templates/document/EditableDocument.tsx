@@ -2,7 +2,7 @@ import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { rowRef, sectionNumber, type Section } from '@modig/shared';
 import clsx from 'clsx';
-import { GripVertical, ListChecks, Plus } from 'lucide-react';
+import { GripVertical, ListChecks, Plus, Undo2, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../../../components/Button';
@@ -11,7 +11,7 @@ import { sectionDndId } from './dnd';
 import { EditableSection } from './EditableSection';
 import type { IssueIndex } from './issues';
 import { findRow, findSection } from './ops';
-import { useDocumentActions } from './useDocumentActions';
+import { useDocumentActions, type Deleted } from './useDocumentActions';
 import { useDocumentDnd, type DragState } from './useDocumentDnd';
 
 type Props = {
@@ -24,11 +24,13 @@ type Props = {
 export function EditableDocument({ sections, onChange, spareRowsPerSection, issues }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState<Deleted | null>(null);
   const actions = useDocumentActions({
     sections,
     onChange,
     rootRef,
     confirmDelete: setConfirmingDelete,
+    onDeleted: setDeleted,
   });
   const { drag, shown, contextProps } = useDocumentDnd(sections, actions);
 
@@ -69,6 +71,7 @@ export function EditableDocument({ sections, onChange, spareRowsPerSection, issu
                   issues={issues.sections.get(section.id)}
                   itemIssues={issues.items}
                   collapsed={drag?.kind === 'section' && drag.sectionId === section.id}
+                  dragKind={drag?.kind ?? null}
                   actions={actions}
                 />
               ))}
@@ -111,7 +114,58 @@ export function EditableDocument({ sections, onChange, spareRowsPerSection, issu
           }}
         />
       )}
+
+      <UndoBar
+        deleted={deleted}
+        onUndo={(last) => {
+          setDeleted(null);
+          actions.undoDelete(last);
+        }}
+        onDismiss={() => setDeleted(null)}
+      />
     </div>
+  );
+}
+
+type UndoBarProps = {
+  deleted: Deleted | null;
+  onUndo: (deleted: Deleted) => void;
+  onDismiss: () => void;
+};
+
+/**
+ * "Row 1.c deleted · Undo" at the bottom of the window until the next change to the structure;
+ * not timed. The live region stays mounted so screen readers announce the message when it appears.
+ */
+function UndoBar({ deleted, onUndo, onDismiss }: UndoBarProps) {
+  return createPortal(
+    <div
+      role="status"
+      className="pointer-events-none fixed inset-x-0 bottom-6 z-30 flex justify-center px-4"
+    >
+      {deleted && (
+        <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-ink-200 bg-surface py-1.5 pr-1.5 pl-4 text-sm text-ink-900 shadow-lg">
+          <span className="mr-2">{deleted.label} deleted.</span>
+          <button
+            type="button"
+            onClick={() => onUndo(deleted)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 font-medium text-brand-700 transition-colors hover:bg-brand-50"
+          >
+            <Undo2 size={15} aria-hidden="true" />
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss"
+            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </div>,
+    document.body,
   );
 }
 

@@ -82,11 +82,13 @@ The calls with product, security or cost impact. Each is explained in its sectio
 - **A signed-in user without a role who reaches `login.html` is forwarded to `/forbidden.html`.**
   Signing in again would only loop. Locally the SWA CLI answers such users with 401 (→ login)
   rather than Azure's 403, so this also keeps local dev from looping.
-- **`apiFetch` leaves the app only for SWA's own answers.** An expired session (a redirect, or a
-  401 without an `ApiError` body) goes to `/login.html`; a 403 without one (no app role) goes to
-  `/forbidden.html`. A JSON `ApiError` 401 or 403 comes from a function and is thrown for the page
-  to show. Navigating on the API's own 401 would loop, because the login page sends every role
-  holder straight back to `/`.
+- **`apiFetch` leaves the app only for SWA's own answers, and only on a read.** An expired session
+  (a redirect, or a 401 without an `ApiError` body) sends a read to `/login.html`; a 403 without
+  one (no app role) to `/forbidden.html`. A write (phase 2) throws instead ("You were signed out.
+  Sign in again in a new tab, then try again."): the page may hold unsaved work whose leave warning
+  can keep it open, and a save that never settled would hang the editor for good. A JSON
+  `ApiError` 401 or 403 comes from a function and is thrown for the page to show. Navigating on the
+  API's own 401 would loop, because the login page sends every role holder straight back to `/`.
 - **Sign-out uses a relative `post_logout_redirect_uri=/login.html`.** The SWA CLI builds the
   redirect as origin + that value, so an absolute URL ended on a broken address locally. Sign-in
   keeps an absolute return URL, which keeps users on the host they came from.
@@ -123,8 +125,11 @@ The calls with product, security or cost impact. Each is explained in its sectio
 - **`changeNote` and `updatedBy` name the actual workbook file** ("Imported from
   Final_Inspection_rev_2.xlsm", "seed (Final_Inspection_rev_2.xlsm)").
 - **The template name comes from the RMMG model name:** "Final inspection – RigiMill MG".
-- **"Already imported" means a `templates/*/draft.json` with `modelCode: RMMG` exists.**
-  `rev-N.json` is written before `draft.json`, so an existing draft means the import completed. A
+- **"Already imported" means a template with a draft whose model, or whose first published
+  revision's model, is RMMG.** Since phase 2 an admin can move a template to another model; its
+  first revision never changes, so the seeded template is still recognised and not imported a
+  second time. `rev-N.json` is written before `draft.json`, so an existing draft means the import
+  completed. A
   revision whose template has no draft is an import that stopped in between; the next run writes
   the draft from that stored revision (parsing the workbook again would mint new item ids). Writes
   never overwrite. The seed assumes a single writer: two first runs at the same moment could each
@@ -160,7 +165,7 @@ The calls with product, security or cost impact. Each is explained in its sectio
   background) to `#646e7a` (4.8:1); ink-300 and ink-400 are for borders, icons and decorative
   markers only.
 - **`apiFetch` returns a promise that never settles when it navigates to the login or forbidden
-  page.** The page is unloading; settling would only flash an error state.
+  page** (reads only, see Auth). The page is unloading; settling would only flash an error state.
 - **`apiFetch`'s `schema` is typed structurally (`{ parse }`).** A non-JSON 2xx and a schema
   mismatch both become `ApiRequestError('internal')`, so the UI deals with one error type.
 - **`/api/me` is cached forever (`staleTime: Infinity`).** Roles only change at the next sign-in.
@@ -199,8 +204,8 @@ The calls with product, security or cost impact. Each is explained in its sectio
 - **The frontend's source maps are deployed** (`sourcemap: true`). They sit behind the role check
   like the bundle, contain no secrets and make production stack traces readable.
 - **Planned actions are visible but disabled, labelled with their phase** (New inspection: phase 3,
-  New template: phase 2, Export CSV: phase 6). The settings form says "a later phase" because the
-  brief schedules no phase for it.
+  Export CSV: phase 6; New template arrived in phase 2). The settings form says "a later phase"
+  because the brief schedules no phase for it.
 - **Inspectors see Templates without actions.** Insights and Settings are hidden from their
   navigation and guarded by `RequireRole` (UI only; the API checks again).
 - **The Settings page carries the brief's invite how-to:** portal steps, the
@@ -403,8 +408,13 @@ The calls with product, security or data impact. Each is explained in its sectio
 - Publishing races: the first `rev-N` write wins and the loser gets 412; someone who saves between
   the publish's two writes keeps their draft (API).
 - Publishing a draft identical to the latest revision is blocked in the UI only (Editor).
-- Autosave stops at the first 412 until Reload; network and server errors retry; other refusals
-  are shown and not retried (Editor).
+- Autosave stops at the first 412 until Reload, unless the 412 turns out to be its own save whose
+  answer was lost; network and server errors retry; other refusals are shown and not retried
+  (Editor).
+- A save after the session ended is shown as a failed save with a Sign in link, not a jump to the
+  login page (Editor; changes a phase 1 decision under Auth).
+- Deleting a row or section can be undone until the next change to the structure; nothing else
+  can (Checklist document).
 - An upload URL lets any role holder write one new image blob for 10 minutes, of any size or type
   (Photos).
 - Replaced or removed cover photos stay in storage; there is no delete endpoint (Photos).
@@ -416,23 +426,28 @@ The calls with product, security or data impact. Each is explained in its sectio
   the deployed config is unchanged (Tooling).
 - Vite keeps idle connections open, working around a race in the SWA CLI's dev proxy that made
   modules load empty (Tooling).
-- The end-to-end tests write throwaway templates straight into the local Azurite and expect the
-  seeded RigiMill MG untouched (Tests).
+- The end-to-end tests write throwaway templates straight into the local Azurite and never depend
+  on the seeded RigiMill MG's content (Tests).
 
 ### API and storage
 
 - **A model change to a model another template uses is 409 `conflict`**, like creating a second
-  template for it; an unknown model stays 400. The contract table said 400 for both.
+  template for it; an unknown model stays 400. The contract table said 400 for both. The message
+  names the model as the editor shows it ("RigiMill MG"), not its code.
 - **The model is validated on save only when it changes,** so a model later removed from the
   settings never makes its template unsaveable.
-- **Save and publish compare `If-Match` with the draft's ETag before any other check,** so an
-  outdated editor always gets 412, never a validation error. The conditional write stays the
-  real guard.
+- **Save and publish compare `If-Match` with the draft's ETag before the model and publish
+  checks,** so an outdated editor gets 412, never a model or publish error. Only a malformed body
+  (and, on save, duplicate ids) is refused first: those are client bugs whatever the version. The
+  conditional write stays the real guard.
 - **Publish writes `rev-N.json` (create-only), then moves the draft on to N+1 (`If-Match`).** If
   someone saved in between, that 412 is tolerated: the revision stands and their draft is kept.
   Losing the race for `rev-N` itself (someone published the same draft first) is a 412. A second
   publish that reads the draft between the first one's two writes publishes the same content
-  again as N+1: harmless, and inherent in this order.
+  again as N+1: harmless, and inherent in this order. **Once `rev-N` is written, nothing turns the
+  publish into a failure:** any other error moving the draft on is logged and the publish still
+  answers 200. A failure there would make the user try again, and the unchanged ETag would let
+  that publish the same content again as N+1.
 - **The draft moved on by a publish gets the publish time and publisher as `updatedAt/By`.**
   Drafts never carry a change note; a blank note is not stored.
 - **Publishing an unchanged draft is not refused by the API.** The editor disables Publish
@@ -470,6 +485,10 @@ The calls with product, security or data impact. Each is explained in its sectio
   not restricted.
 - **An upload URL cannot limit size or content type.** It is issued to role holders only and
   covers one new blob name.
+- **A read URL serves an inline JPEG whatever the uploader stored** (`rsct=image/jpeg`,
+  `rscd=inline` in the SAS). Otherwise an uploaded web page or `attachment; filename=…` would be
+  served as such from the storage account's domain. Phase 5's annotated PNGs will need
+  `image/png`, chosen by blob name.
 - **Photos are scaled in the browser** (`createImageBitmap` with the camera orientation, white
   background for transparent PNGs, at most 1600 px, JPEG 0.8) and PUT with `credentials: 'omit'`.
 - **Read URLs are cached for 10 minutes**, under their 15-minute lifetime.
@@ -502,6 +521,15 @@ The calls with product, security or data impact. Each is explained in its sectio
   title does nothing; sections are deleted from the ⋯ menu, with a confirmation if they have rows.
 - **After deleting a row, focus goes to the end of the previous row,** else the start of the next,
   else the section title. A duplicate gets the focus.
+- **Only a fresh Backspace press deletes an empty row.** Holding Backspace to clear a row stops
+  once it is empty, and after a delete the key's auto-repeats are ignored until it is released:
+  otherwise they went on to eat the previous row's text and delete that row too.
+- **The last deleted row or section can be put back with Undo** ("Row 1.c deleted · Undo" at the
+  bottom of the window), with the same ids, so its history in results and KPIs stays whole. It is
+  offered until the next change to the structure (add, duplicate, move, delete), not timed, and
+  not for an empty row or an empty untitled section (Enter then Backspace would show it all the
+  time). There is no undo for anything else: text fields have the browser's own, and a confirm
+  per row would slow a 90-row checklist down.
 - **`↑` / `↓` leave a row only from its first or last visual line,** measured on an off-screen
   copy of the field.
 - **Duplicates are deep copies with new ids**; guide image ids are copied as they are (the images
@@ -517,6 +545,13 @@ The calls with product, security or data impact. Each is explained in its sectio
   element that already has focus, e.g. the ⋯ of a section that just moved).
 - **Performance:** rows and sections are memoised and the actions object is stable, so a keystroke
   re-renders one section and one row (measured: 6.6 ms median from key to frame on 90 rows).
+  Rows and sections learn what is being dragged from a prop, not dnd-kit's `useDndContext`, which
+  changes on every pointer move and re-rendered all 90 rows each time (janky drags and slow edge
+  scrolling on a tablet). Now a pointer move re-renders only the dragged row.
+- **A long unbroken word (a URL, a part number) wraps inside its row;** the text column is capped
+  at the cell's width, so it never widens the page. A long section title ends in "…" until
+  focused.
+- **Drag handles rest at ink-500** (5.2:1 on white): a control, so WCAG 1.4.11's 3:1 applies.
 - **A row drag works on a working copy** and shows moves between sections live; the drop is one
   change and one autosave. Dropping outside any target keeps what is shown.
 - **Dragging a section folds only that section to its header.** Folding all of them moved the
@@ -547,6 +582,22 @@ The calls with product, security or data impact. Each is explained in its sectio
 - **Save errors:** 412 → conflict, autosave stops until Reload; network, 5xx, 408 and 429 → retried
   after 1, 2, 5, 10 and then every 30 s; any other refusal → its message is shown and not retried
   (the next change or Retry tries again).
+- **A 412 after saves that failed on the way is checked first.** A save can be stored with its
+  answer lost (dropped connection, timeout, a 500 after the write); the retry then sends the old
+  ETag and gets 412 for the app's own save. So the autosaver reads the draft: if it equals one of
+  the values that failed, it takes that ETag over and carries on; anything else is the conflict.
+  A 412 after a save that got its answer is a conflict at once, without the extra read.
+- **Saves and publishes give up after 30 s** (SWA's gateway gives up at 45 s), so a request that
+  hangs becomes a retried or shown failure instead of an endless "Saving…".
+- **A failed publish is checked the same way:** after a network error, a timeout, a 5xx or a 412,
+  the editor reads the template; if the revision it was publishing now exists and the draft is
+  still its own, the publish went through and is shown as done.
+- **A save after the session ended** (signed out in another tab, the session ran out, the role
+  removed) is a failed save that is not retried: "You were signed out. Sign in again in a new tab,
+  then try again.", with a Sign in link that opens a new tab, so this one keeps the unsaved
+  changes. Retry then saves. Leaving asks, and Publish shows the same reason.
+- **The publish dialog gives the save's own reason when saving first fails** (e.g. the model was
+  taken meanwhile); only a network failure says "Check your connection".
 - **From a save's answer only the ETag, the revision number and "unpublished changes" are taken
   over,** never the content: the user may have typed on.
 - **After a publish, the draft's new ETag is taken over only if the published draft equals what
@@ -556,7 +607,10 @@ The calls with product, security or data impact. Each is explained in its sectio
   editor's own saves). Reload loads it again and reopens the editor; a failed background refresh
   never closes an open editor.
 - **Leaving:** a link in the app saves first and only asks if saving fails or conflicts; closing
-  the tab with unsaved changes gets the browser's warning.
+  the tab with unsaved changes gets the browser's warning. A cover photo still uploading counts as
+  unsaved: a link waits for it and saves it, and closing the tab warns. Once the editor has closed
+  its autosave stops for good, so a change that comes in late (an upload finishing) is never saved
+  with an outdated ETag.
 - **Reload asks before discarding unsaved changes.** During a conflict the editor stays editable,
   so text can still be copied.
 - **Publish is disabled when there is nothing new;** the badges say why.
@@ -596,20 +650,28 @@ The calls with product, security or data impact. Each is explained in its sectio
 - **The save status is a polite live region; conflict and failed-save banners are alerts.**
   Retry moves focus to the status, so it doesn't fall to the page when the button disappears. The
   "Published revision N" notice stays until dismissed (no timed messages).
+- **A conflict offers Reload next to "Not saved" in the sticky header too:** the banner is at the
+  top of the page, out of view while editing far down the checklist. The page doesn't scroll to
+  it, which would pull the user away from the row they are typing in.
+- **Keyboard focus never falls to the page:** after a publish the notice takes it (Publish is then
+  disabled), the page title after the notice is dismissed; the cover photo button stays focusable
+  while uploading (`aria-disabled`), and Remove hands the focus to it.
 - **A malformed id and an unknown template both show "This template doesn't exist".**
 
 ### Tests and tooling
 
-- **Each editing e2e test writes its own throwaway template into the local Azurite and deletes it
-  afterwards** (with its cover photos). Its model code `E2E` is not in the settings, so it never
-  takes a model from the New template dialog. Tests run in parallel and the seeded RigiMill MG is
-  only read.
-- **The e2e tests expect the seed data untouched** (RigiMill MG at revision 2, 90 rows). After
-  publishing or editing it locally, delete `.azurite/` before running them.
+- **Each e2e test writes its own throwaway templates into the local Azurite and deletes them
+  afterwards** (with their cover photos): a draft, or one published as revision 1 for the list
+  and the inspector's view. Their model code `E2E` is not in the settings, so they never take a
+  model from the New template dialog. Tests run in parallel and depend on no seeded content, so
+  editing or publishing the seeded RigiMill MG locally never breaks them.
+- **The New template test creates a template for a real model** (the first free one) and deletes
+  it in a `finally` that covers every step after Create. It needs one machine model without a
+  template.
 - **A Playwright global setup waits for the seed,** which runs next to the servers and can finish
   after they answer.
-- **The seed check still reads Azurite directly:** it checks what the seed wrote, and the
-  template tests go through the API and the UI.
+- **The seed check reads Azurite directly, and reads the published revision 2,** which never
+  changes, rather than the draft admins edit.
 - **The inspector's 403s are checked through port 4280** with the inspector's own sign-in (draft
   read, save and publish).
 - **e2e timeouts are 60 s per test and 10 s per assertion.** A cold page load from the Vite dev
@@ -627,5 +689,9 @@ The calls with product, security or data impact. Each is explained in its sectio
   `connect-src`. The deployed config keeps the Azure-only policy; verified that it blocks the
   local upload and that the copy allows it, with no other CSP violations.
 - **The root `tsconfig.json` includes the DOM library,** for the e2e tests' in-page callbacks.
-- **Not done:** Vite warns that the main chunk is 593 kB (182 kB gzipped). Loading the editor
+- **The e2e tests also cover the review's fixes:** a held Backspace, Undo of a delete, a long
+  word at tablet width, the section ⋯ menu and its confirmation, saving before following a link,
+  the tab-close warning, a lost save answer, a save after signing out, and leaving during a photo
+  upload. Each was checked to fail on the code before the fix.
+- **Not done:** Vite warns that the main chunk is 598 kB (183 kB gzipped). Loading the editor
   route on demand would trim it; the API bundle is 2.9 MB since the functions use the storage SDKs.

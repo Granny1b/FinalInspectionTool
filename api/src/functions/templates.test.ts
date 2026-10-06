@@ -244,9 +244,12 @@ describe('POST /api/templates', () => {
     await storeTemplate(draftTemplate({ modelCode: 'RMMG' }), [1]);
     const response = await create({ name: 'Another RigiMill MG', modelCode: 'RMMG' });
     expect(response.status).toBe(409);
-    expect(errorOf(response)).toMatchObject({
+    // The model's name, as the editor shows it, not its code.
+    expect(errorOf(response)).toEqual({
       error: 'conflict',
-      message: expect.stringContaining('one template per machine model'),
+      message:
+        '"Final inspection – RigiMill MG" is already the template for RigiMill MG: ' +
+        'there is one template per machine model.',
     });
   });
 });
@@ -444,6 +447,21 @@ describe('PUT /api/templates/{id}', () => {
     const response = await put(template.id, { ...editable(template), modelCode: 'RMMT' }, etag);
     expect(response.status).toBe(409);
     expect((await storedDraft(template.id))?.data.modelCode).toBe('RMMG');
+  });
+
+  it('412, not a model error, for a stale save that also changes the model', async () => {
+    const { template, etag } = await seeded();
+    await storeTemplate(draftTemplate({ modelCode: 'RMMT' }));
+    const first = await put(template.id, { ...editable(template), name: 'First' }, etag);
+    const before = await storedDraft(template.id);
+    expect(before?.etag).toBe(etagOf(first));
+
+    // An outdated editor must see the conflict, whatever else is wrong with its save.
+    for (const modelCode of ['RMMT', 'NOPE']) {
+      const stale = await put(template.id, { ...editable(template), modelCode }, etag);
+      expect(stale.status).toBe(412);
+    }
+    expect(await storedDraft(template.id)).toEqual(before);
   });
 
   it('still saves a template whose model has since been removed from the settings', async () => {

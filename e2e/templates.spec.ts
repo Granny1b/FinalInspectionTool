@@ -1,20 +1,31 @@
-import { CONFLICT_MESSAGE, TemplateDetailSchema, type Template } from '@modig/shared';
+import {
+  CONFLICT_MESSAGE,
+  TemplateDetailSchema,
+  TemplateListSchema,
+  type Template,
+} from '@modig/shared';
 import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
 import { signIn } from './support/auth';
 import { createTemplate, deleteTemplate } from './support/storage';
 
 const ADMIN = 'anna.andersson@modig.se';
-const SEEDED = 'Final inspection – RigiMill MG';
 
 /**
- * Each editing test gets its own throwaway template (written straight into the local Azurite and
- * deleted afterwards), so the tests can run in parallel and the seeded RigiMill MG stays as
- * imported for the read-only checks.
+ * Each test gets its own throwaway templates (written straight into the local Azurite and deleted
+ * afterwards), so the tests can run in parallel and never depend on the seeded RigiMill MG, which
+ * a developer may have edited locally. `template` is a draft never published; `published` has
+ * revision 1 with the same content.
  */
-const test = base.extend<{ template: Template }>({
+const test = base.extend<{ template: Template; published: Template }>({
   // eslint-disable-next-line no-empty-pattern -- Playwright fixtures take an object pattern first
   template: async ({}, use, testInfo) => {
     const template = await createTemplate(`E2E – ${testInfo.title}`);
+    await use(template);
+    await deleteTemplate(template.id);
+  },
+  // eslint-disable-next-line no-empty-pattern -- as above
+  published: async ({}, use, testInfo) => {
+    const template = await createTemplate(`E2E published – ${testInfo.title}`, true);
     await use(template);
     await deleteTemplate(template.id);
   },
@@ -29,9 +40,14 @@ async function savedDraft(request: APIRequestContext, id: string): Promise<Templ
 
 const rowIds = (template: Template) =>
   template.sections.map((section) => section.items.map((item) => item.id));
+const rowTexts = (template: Template) =>
+  template.sections.map((section) => section.items.map((item) => item.text));
+const sectionIds = (template: Template) => template.sections.map((section) => section.id);
 const rowText = (page: Page, itemId: string) => page.locator(`[data-item-text="${itemId}"]`);
-/** "Saved", "Unsaved changes", "Saving…", "Not saved" or "Couldn’t save — Retry". */
+/** "Saved", "Unsaved changes", "Saving…", "Not saved — Reload" or "Couldn’t save — Retry". */
 const saveStatus = (page: Page) => page.locator('main header [role="status"]');
+/** The "← Templates" link above the editor. */
+const backLink = (page: Page) => page.getByRole('main').getByRole('link', { name: 'Templates' });
 
 async function openEditor(page: Page, template: Template): Promise<void> {
   await page.goto(`/templates/${template.id}`);
@@ -45,25 +61,48 @@ async function appendToRow(page: Page, itemId: string, text: string): Promise<vo
   await page.keyboard.type(text);
 }
 
+/** A held key: keydowns at the auto-repeat rate, all but the first with `repeat` set. */
+async function holdBackspace(page: Page, keydowns: number): Promise<void> {
+  for (let i = 0; i < keydowns; i++) {
+    await page.keyboard.down('Backspace');
+    await page.waitForTimeout(30);
+  }
+  await page.keyboard.up('Backspace');
+}
+
+/** A 2000 × 1500 PNG drawn in the page. */
+async function photo(page: Page) {
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2000;
+    canvas.height = 1500;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#0b7db3';
+    context.fillRect(0, 0, 2000, 1500);
+    context.fillStyle = '#ffffff';
+    context.fillRect(500, 500, 1000, 500);
+    return canvas.toDataURL('image/png').split(',')[1]!;
+  });
+  return { name: 'machine.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') };
+}
+
 test.describe('an admin', () => {
   test.beforeEach(({ context }) => signIn(context, ADMIN, ['admin']));
 
-  test('sees the seeded template in the list and opens it in the editor', async ({ page }) => {
+  test('sees the templates in the list and opens one in the editor', async ({
+    page,
+    published,
+  }) => {
     await page.goto('/templates');
-    const seeded = page.getByRole('row', { name: new RegExp(SEEDED) });
-    await expect(seeded.getByRole('cell')).toHaveText([
-      new RegExp(SEEDED),
-      'RigiMill MG',
-      'Rev 2',
-      '90',
-      /./,
-    ]);
+    const row = page.getByRole('row', { name: published.name });
+    // E2E is not in the settings, so the model column shows the code itself.
+    await expect(row.getByRole('cell')).toHaveText([published.name, 'E2E', 'Rev 1', '6', /./]);
     await expect(page.getByRole('button', { name: 'New template' })).toBeVisible();
 
-    await seeded.getByRole('link', { name: SEEDED }).click();
-    await expect(page.getByRole('heading', { level: 1, name: SEEDED })).toBeVisible();
-    await expect(page.locator('[data-item-text]')).toHaveCount(90);
-    await expect(page.getByText('Published Rev 2')).toBeVisible();
+    await row.getByRole('link', { name: published.name }).click();
+    await expect(page.getByRole('heading', { level: 1, name: published.name })).toBeVisible();
+    await expect(page.locator('[data-item-text]')).toHaveCount(6);
+    await expect(page.getByText('Published Rev 1')).toBeVisible();
   });
 
   test('an edited row is autosaved and still there after a reload', async ({ page, template }) => {
@@ -112,6 +151,68 @@ test.describe('an admin', () => {
     await expect(saveStatus(page)).toHaveText('Saved');
   });
 
+  test('holding Backspace empties a row, but never deletes it or the rows above', async ({
+    page,
+    template,
+  }) => {
+    const [a, b, c] = template.sections[0]!.items;
+    await openEditor(page, template);
+
+    // Held past the point where 1.c is empty: it stays, empty and focused.
+    await appendToRow(page, c!.id, '');
+    await holdBackspace(page, c!.text.length + 6);
+    await expect(rowText(page, c!.id)).toHaveValue('');
+    await expect(rowText(page, c!.id)).toBeFocused();
+
+    // A fresh press on the empty row deletes it; the repeats of that press leave 1.b alone.
+    await holdBackspace(page, 8);
+    await expect(rowText(page, c!.id)).toHaveCount(0);
+    await expect(rowText(page, b!.id)).toBeFocused();
+    await expect(rowText(page, b!.id)).toHaveValue(b!.text);
+    await expect
+      .poll(async () => rowTexts(await savedDraft(page.request, template.id))[0])
+      .toEqual([a!.text, b!.text]);
+  });
+
+  test('a deleted row can be put back with Undo, keeping its id', async ({ page, template }) => {
+    const [, b] = template.sections[0]!.items;
+    await openEditor(page, template);
+
+    await page.locator(`#row-${b!.id}`).hover();
+    await page.getByRole('button', { name: 'Delete row 1.b' }).click();
+    await expect(rowText(page, b!.id)).toHaveCount(0);
+    const undo = page.getByRole('status').filter({ hasText: 'Row 1.b deleted.' });
+    await expect(undo).toBeVisible();
+    await expect
+      .poll(async () => (await savedDraft(page.request, template.id)).sections[0]!.items.length)
+      .toBe(2);
+
+    await undo.getByRole('button', { name: 'Undo' }).click();
+    await expect(rowText(page, b!.id)).toBeFocused();
+    await expect(rowText(page, b!.id)).toHaveValue(b!.text);
+    await expect(undo).toBeHidden();
+    await expect
+      .poll(async () => rowIds(await savedDraft(page.request, template.id)))
+      .toEqual(rowIds(template));
+  });
+
+  test('a long unbroken word wraps inside its row instead of widening the page', async ({
+    page,
+    template,
+  }) => {
+    await page.setViewportSize({ width: 834, height: 1112 });
+    await openEditor(page, template);
+    const row = rowText(page, template.sections[0]!.items[0]!.id);
+    await row.fill(`Spindle - Part ${'X'.repeat(150)}`);
+    const [scrollWidth, clientWidth] = await page.evaluate(() => [
+      document.documentElement.scrollWidth,
+      document.documentElement.clientWidth,
+    ]);
+    expect(scrollWidth).toBe(clientWidth);
+    // It grew to several lines instead.
+    expect(await row.evaluate((field) => field.scrollHeight)).toBeGreaterThan(60);
+  });
+
   test('a row dragged into another section moves there with its id', async ({ page, template }) => {
     const [one, two] = template.sections;
     const [a1, b1, moved] = one!.items;
@@ -155,6 +256,75 @@ test.describe('an admin', () => {
       ]);
   });
 
+  test('section menu: move, delete asks first when it has rows, an empty one goes at once', async ({
+    page,
+    template,
+  }) => {
+    const [one, two] = template.sections;
+    await openEditor(page, template);
+
+    await page.getByRole('button', { name: 'Section 1 actions' }).click();
+    await page.getByRole('menuitem', { name: 'Move down' }).click();
+    await expect(page.getByRole('textbox', { name: 'Section 1 title' })).toHaveValue(two!.title);
+    await expect(page.locator(`[data-section-menu="${one!.id}"]`)).toBeFocused();
+    await expect
+      .poll(async () => sectionIds(await savedDraft(page.request, template.id)))
+      .toEqual([two!.id, one!.id]);
+
+    // A section with rows asks first; Cancel keeps it.
+    await page.getByRole('button', { name: 'Section 1 actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    const confirm = page.getByRole('dialog', { name: 'Delete section 1?' });
+    await expect(confirm).toContainText(`“${two!.title}” and its 3 rows`);
+    await confirm.getByRole('button', { name: 'Cancel' }).click();
+    await expect(confirm).toBeHidden();
+    await expect(page.locator(`#section-${two!.id}`)).toBeVisible();
+    await expect(page.locator(`[data-section-menu="${two!.id}"]`)).toBeFocused();
+
+    await page.getByRole('button', { name: 'Section 1 actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await confirm.getByRole('button', { name: 'Delete section' }).click();
+    await expect(page.locator(`#section-${two!.id}`)).toHaveCount(0);
+    await expect
+      .poll(async () => sectionIds(await savedDraft(page.request, template.id)))
+      .toEqual([one!.id]);
+
+    // An empty section goes without asking.
+    await page.getByRole('button', { name: 'Add section' }).click();
+    await page.getByRole('button', { name: 'Section 2 actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Section 2 title' })).toHaveCount(0);
+    await expect(saveStatus(page)).toHaveText('Saved');
+    expect(sectionIds(await savedDraft(page.request, template.id))).toEqual([one!.id]);
+  });
+
+  test('following a link saves first; closing the tab with unsaved changes warns', async ({
+    page,
+    template,
+  }) => {
+    const row = template.sections[0]!.items[0]!;
+    await openEditor(page, template);
+    await appendToRow(page, row.id, ' [left at once]');
+    await expect(saveStatus(page)).toHaveText('Unsaved changes');
+    // Before the 1 s debounce has run out.
+    await backLink(page).click();
+    await page.waitForURL(/\/templates$/);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect((await savedDraft(page.request, template.id)).sections[0]!.items[0]!.text).toBe(
+      `${row.text} [left at once]`,
+    );
+
+    await openEditor(page, template);
+    await appendToRow(page, row.id, '!');
+    await expect(saveStatus(page)).toHaveText('Unsaved changes');
+    const warning = page.waitForEvent('dialog');
+    await page.close({ runBeforeUnload: true });
+    const shown = await warning;
+    expect(shown.type()).toBe('beforeunload');
+    await shown.dismiss();
+  });
+
   test('publishing freezes the draft as a revision with a change note', async ({
     page,
     template,
@@ -168,7 +338,10 @@ test.describe('an admin', () => {
     await dialog.getByLabel('Change note (optional)').fill('First release for the new line');
     await dialog.getByRole('button', { name: 'Publish revision 1' }).click();
 
-    await expect(page.getByText('Published revision 1.')).toBeVisible();
+    // Publish is disabled now (nothing new): the notice takes the keyboard focus.
+    const notice = page.getByRole('status').filter({ hasText: 'Published revision 1.' });
+    await expect(notice).toBeVisible();
+    await expect(page.locator(':focus')).toContainText('Published revision 1.');
     const history = page.getByRole('region', { name: 'Revision history' });
     await expect(history.getByRole('listitem')).toHaveCount(1);
     await expect(history.getByRole('listitem')).toContainText([
@@ -176,6 +349,8 @@ test.describe('an admin', () => {
     ]);
     await expect(page.getByText('Published Rev 1')).toBeVisible();
     await expect(page.getByText('Draft · Rev 2')).toBeVisible();
+    await notice.getByRole('button', { name: 'Dismiss' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: template.name })).toBeFocused();
 
     // Later edits go into the draft; the published revision stays as it was.
     await appendToRow(page, row.id, ' (changed)');
@@ -205,7 +380,9 @@ test.describe('an admin', () => {
       await appendToRow(bobPage, b!.id, ' [Bob]');
       const banner = bobPage.getByRole('alert').filter({ hasText: CONFLICT_MESSAGE });
       await expect(banner).toBeVisible();
-      await expect(saveStatus(bobPage)).toHaveText('Not saved');
+      await expect(banner.getByRole('button', { name: 'Reload' })).toBeVisible();
+      // Reload is next to the status too, in case the banner is scrolled out of view.
+      await expect(saveStatus(bobPage)).toHaveText(/^Not saved —\s*Reload$/);
       await expect(bobPage.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
       const saved = await savedDraft(page.request, template.id);
       expect(saved.sections[0]!.items.map((item) => item.text)).toEqual([
@@ -214,7 +391,7 @@ test.describe('an admin', () => {
         template.sections[0]!.items[2]!.text,
       ]);
 
-      await banner.getByRole('button', { name: 'Reload' }).click();
+      await saveStatus(bobPage).getByRole('button', { name: 'Reload' }).click();
       await bobPage
         .getByRole('dialog', { name: 'Discard your changes?' })
         .getByRole('button', { name: 'Discard and reload' })
@@ -228,25 +405,59 @@ test.describe('an admin', () => {
     }
   });
 
+  test('a save whose answer is lost is not mistaken for a conflict', async ({ page, template }) => {
+    const row = template.sections[0]!.items[0]!;
+    await openEditor(page, template);
+    // The first save reaches the server and is stored, but its answer never arrives.
+    let lost = false;
+    await page.route(`**/api/templates/${template.id}`, async (route) => {
+      if (route.request().method() !== 'PUT' || lost) return route.continue();
+      lost = true;
+      await route.fetch();
+      await route.abort('connectionreset');
+    });
+
+    await appendToRow(page, row.id, ' EDIT-ONE');
+    await expect(saveStatus(page)).toHaveText(/Couldn’t save/);
+    await page.keyboard.type(' EDIT-TWO');
+    // The retry (with the ETag from before) gets a 412, which turns out to be our own save.
+    await expect(saveStatus(page)).toHaveText('Saved');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect((await savedDraft(page.request, template.id)).sections[0]!.items[0]!.text).toBe(
+      `${row.text} EDIT-ONE EDIT-TWO`,
+    );
+  });
+
+  test('a save after the session ended keeps the changes and saves once signed in again', async ({
+    page,
+    context,
+    template,
+  }) => {
+    const row = template.sections[0]!.items[0]!;
+    await openEditor(page, template);
+    // Signed out in another tab, or the session ran out.
+    await context.clearCookies();
+
+    await appendToRow(page, row.id, ' [after sign-out]');
+    const banner = page.getByRole('alert').filter({ hasText: 'You were signed out.' });
+    await expect(banner).toBeVisible();
+    await expect(banner.getByRole('link', { name: /Sign in/ })).toHaveAttribute('target', '_blank');
+    await expect(saveStatus(page)).toHaveText(/Couldn’t save/);
+    await expect(page).toHaveURL(new RegExp(`/templates/${template.id}$`));
+
+    await signIn(context, ADMIN, ['admin']);
+    await saveStatus(page).getByRole('button', { name: 'Retry' }).click();
+    await expect(saveStatus(page)).toHaveText('Saved');
+    await expect(banner).toBeHidden();
+    expect((await savedDraft(page.request, template.id)).sections[0]!.items[0]!.text).toBe(
+      `${row.text} [after sign-out]`,
+    );
+  });
+
   test('a cover photo is resized, uploaded and shown', async ({ page, template }) => {
     await openEditor(page, template);
-    // A 2000 × 1500 PNG; the browser scales it to 1600 px on the long edge before uploading.
-    const png = await page.evaluate(() => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 2000;
-      canvas.height = 1500;
-      const context = canvas.getContext('2d')!;
-      context.fillStyle = '#0b7db3';
-      context.fillRect(0, 0, 2000, 1500);
-      context.fillStyle = '#ffffff';
-      context.fillRect(500, 500, 1000, 500);
-      return canvas.toDataURL('image/png').split(',')[1]!;
-    });
-    await page.locator('input[type="file"]').setInputFiles({
-      name: 'machine.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from(png, 'base64'),
-    });
+    // The browser scales the 2000 × 1500 photo to 1600 px on the long edge before uploading.
+    await page.locator('input[type="file"]').setInputFiles(await photo(page));
 
     const cover = page.getByRole('img', { name: 'Cover photo' });
     await expect
@@ -257,18 +468,52 @@ test.describe('an admin', () => {
     expect((await savedDraft(page.request, template.id)).coverImageId).toEqual(expect.any(String));
   });
 
+  test('leaving while a cover photo uploads waits for it and saves it', async ({
+    page,
+    template,
+  }) => {
+    await openEditor(page, template);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/devstoreaccount1/images/**', async (route) => {
+      if (route.request().method() === 'PUT') await held;
+      await route.continue();
+    });
+
+    await page.locator('input[type="file"]').setInputFiles(await photo(page));
+    await expect(page.getByText('Uploading…')).toBeVisible();
+    await backLink(page).click();
+    // Still in the editor while the photo is on its way.
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(new RegExp(`/templates/${template.id}$`));
+
+    release();
+    await page.waitForURL(/\/templates$/);
+    expect((await savedDraft(page.request, template.id)).coverImageId).toEqual(expect.any(String));
+  });
+
   test('a new template starts empty; an empty row blocks publishing and links to it', async ({
     page,
   }) => {
     await page.goto('/templates');
     await page.getByRole('button', { name: 'New template' }).click();
     const dialog = page.getByRole('dialog', { name: 'New template' });
-    // One template per model: RigiMill MG has one already.
-    await expect(dialog.getByRole('option', { name: 'RigiMill MG (RMMG)' })).toHaveCount(0);
+    // One template per model: models that have one are not offered.
+    const list = await page.request.get('/api/templates');
+    for (const { modelCode } of TemplateListSchema.parse(await list.json())) {
+      await expect(dialog.getByRole('option', { name: `(${modelCode})` })).toHaveCount(0);
+    }
+    // Delete what the test creates, even if a step after the click fails.
+    const created = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/templates',
+    );
     await dialog.getByRole('button', { name: 'Create template' }).click();
-    await page.waitForURL(/\/templates\/[A-Za-z0-9]{16}$/);
-    const id = new URL(page.url()).pathname.split('/').at(-1)!;
+    let id: string | undefined;
     try {
+      id = ((await (await created).json()) as { draft: { id: string } }).draft.id;
+      await page.waitForURL(`**/templates/${id}`);
       await expect(page.getByRole('heading', { name: 'No sections yet' })).toBeVisible();
       await expect(page.getByText('Draft · Rev 1')).toBeVisible();
 
@@ -291,7 +536,7 @@ test.describe('an admin', () => {
       await expect(empty).not.toHaveAttribute('aria-invalid');
       await expect(saveStatus(page)).toHaveText('Saved');
     } finally {
-      await deleteTemplate(id);
+      if (id) await deleteTemplate(id);
     }
   });
 });
@@ -299,14 +544,17 @@ test.describe('an admin', () => {
 test.describe('an inspector', () => {
   test.beforeEach(({ context }) => signIn(context, 'sam.andersson@modig.se', ['inspector']));
 
-  test('sees the published checklist read-only and cannot change drafts', async ({ page }) => {
+  test('sees the published checklist read-only and cannot change drafts', async ({
+    page,
+    published,
+  }) => {
     await page.goto('/templates');
-    await expect(page.getByRole('row', { name: new RegExp(SEEDED) })).toBeVisible();
+    await expect(page.getByRole('row', { name: published.name })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New template' })).toHaveCount(0);
 
-    await page.getByRole('link', { name: SEEDED }).click();
-    await expect(page.getByRole('heading', { level: 1, name: SEEDED })).toBeVisible();
-    await expect(page.getByText('Rev 2', { exact: true })).toBeVisible();
+    await page.getByRole('link', { name: published.name }).click();
+    await expect(page.getByRole('heading', { level: 1, name: published.name })).toBeVisible();
+    await expect(page.getByText('Rev 1', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'Loading area' })).toBeVisible();
     await expect(page.locator('main').locator('input, textarea, select')).toHaveCount(0);
     await expect(
@@ -314,7 +562,7 @@ test.describe('an inspector', () => {
     ).toHaveCount(0);
 
     // Through the SWA CLI with the inspector's own sign-in: the API refuses every draft call.
-    const id = new URL(page.url()).pathname.split('/').at(-1)!;
+    const id = published.id;
     const ifMatch = { 'If-Match': '"0x0"' };
     const refused = [
       await page.request.get(`/api/templates/${id}`),

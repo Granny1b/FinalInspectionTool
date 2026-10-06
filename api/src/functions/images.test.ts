@@ -131,6 +131,28 @@ describe('GET /api/images/{id}/url', () => {
     expect((await putJpeg(url)).status).toBe(403);
   });
 
+  it('serves an inline JPEG whatever type and disposition the uploader stored', async () => {
+    // The upload URL can't restrict what is PUT: someone could store a web page or a download.
+    const { imageId, sasUrl } = await uploadUrl();
+    const page = await fetch(sasUrl, {
+      method: 'PUT',
+      headers: {
+        'x-ms-blob-type': 'BlockBlob',
+        'Content-Type': 'text/html',
+        'x-ms-blob-content-disposition': 'attachment; filename="update.exe"',
+      },
+      body: '<h1>Not a photo</h1><script>alert(1)</script>',
+    });
+    expect(page.status).toBe(201);
+
+    const { url } = ImageReadUrlResponseSchema.parse((await readUrl(imageId)).jsonBody);
+    expect(new URL(url).searchParams.get('rsct')).toBe('image/jpeg');
+    const served = await fetch(url);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(served.headers.get('Content-Disposition')).toBe('inline');
+  });
+
   it('404 for an image that was never uploaded', async () => {
     const { imageId } = await uploadUrl(); // a URL was issued, but nothing was PUT
     const response = await readUrl(imageId);

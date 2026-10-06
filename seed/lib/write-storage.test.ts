@@ -136,6 +136,25 @@ describe('writeSeed', () => {
     expect(after.json).toEqual(edited);
   });
 
+  it('still knows the seeded template after an admin moved it to another model', async () => {
+    const first = await writeSeed(storage, parsed, options);
+    const draftBlob = templates.getBlockBlobClient(
+      blobNames.templateDraft(first.template.templateId),
+    );
+    const moved = JSON.stringify({
+      ...TemplateSchema.parse((await readBlob(draftBlob)).json),
+      modelCode: 'RMMT',
+    });
+    await draftBlob.upload(moved, Buffer.byteLength(moved));
+    const before = await templateBlobNames();
+
+    for (let run = 0; run < 2; run++) {
+      const report = await writeSeed(storage, parsed, options);
+      expect(report.template).toEqual({ action: 'skipped', templateId: first.template.templateId });
+    }
+    expect(await templateBlobNames()).toEqual(before);
+  });
+
   it('is not stopped by a template for another model', async () => {
     await templates.createIfNotExists();
     const other = JSON.stringify({ modelCode: 'HHVSingle' });

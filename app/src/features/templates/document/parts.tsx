@@ -137,7 +137,7 @@ export function DragHandle({ label, className, ref, ...props }: DragHandleProps)
       type="button"
       aria-label={label}
       className={clsx(
-        'absolute -left-7 flex h-7 w-6 cursor-grab touch-none items-center justify-center rounded text-ink-400 transition-opacity hover:bg-ink-100 hover:text-ink-700 focus-visible:opacity-100 active:cursor-grabbing',
+        'absolute -left-7 flex h-7 w-6 cursor-grab touch-none items-center justify-center rounded text-ink-500 transition-opacity hover:bg-ink-100 hover:text-ink-700 focus-visible:opacity-100 active:cursor-grabbing',
         className,
       )}
       {...props}

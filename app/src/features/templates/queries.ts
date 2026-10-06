@@ -24,6 +24,12 @@ export const templateKeys = {
 
 const templatePath = (id: string) => `/api/templates/${encodeURIComponent(id)}`;
 
+/**
+ * Saves and publishes give up after this long, so a request that hangs becomes a failure that is
+ * retried or shown (SWA's gateway itself gives up at 45 s).
+ */
+const WRITE_TIMEOUT_MS = 30_000;
+
 /** A template's draft with the ETag every save and publish must send back. */
 export type LoadedTemplate = { detail: TemplateDetail; etag: string };
 
@@ -46,16 +52,19 @@ export function useTemplates() {
   });
 }
 
+/** The draft with its ETag, revision history and publish state (admins). */
+export async function fetchTemplate(id: string, signal?: AbortSignal): Promise<LoadedTemplate> {
+  const { data, etag } = withEtag(
+    await apiFetch(templatePath(id), { schema: TemplateDetailSchema, signal }),
+  );
+  return { detail: data, etag };
+}
+
 /** The draft for the editor (admins). */
 export function useTemplateDetail(id: string) {
   return useQuery({
     queryKey: templateKeys.detail(id),
-    queryFn: async ({ signal }): Promise<LoadedTemplate> => {
-      const { data, etag } = withEtag(
-        await apiFetch(templatePath(id), { schema: TemplateDetailSchema, signal }),
-      );
-      return { detail: data, etag };
-    },
+    queryFn: ({ signal }) => fetchTemplate(id, signal),
     // The editor copies the draft into its own state when it opens. A cached copy would carry an
     // ETag the editor's own autosaves have since replaced, so every visit loads afresh.
     gcTime: 0,
@@ -109,6 +118,7 @@ export async function saveDraft(id: string, input: TemplateDraftInput, ifMatch: 
       body: input,
       ifMatch,
       schema: SaveTemplateResponseSchema,
+      signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
     }),
   );
 }
@@ -122,6 +132,7 @@ export async function publishDraft(id: string, ifMatch: string, changeNote: stri
       body: note ? { changeNote: note } : {},
       ifMatch,
       schema: TemplateDetailSchema,
+      signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
     }),
   );
 }

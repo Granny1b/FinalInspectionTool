@@ -63,7 +63,7 @@ export async function apiFetch<T = unknown>(
     signal,
   });
 
-  if (res.type === 'opaqueredirect') return navigateAway(LOGIN_PAGE);
+  if (res.type === 'opaqueredirect') return sessionEnded(method, 401);
 
   const payload = await readJson(res);
   const apiError = ApiErrorSchema.safeParse(payload);
@@ -72,8 +72,9 @@ export async function apiFetch<T = unknown>(
   // user is signed in without an app role. One *with* it comes from a function and is thrown for
   // the page to show. The pre-login pages send role holders straight back to '/', so navigating
   // on the API's own 401 would loop whenever the SWA gate and the API's checks disagree.
-  if (!apiError.success && res.status === 401) return navigateAway(LOGIN_PAGE);
-  if (!apiError.success && res.status === 403) return navigateAway(FORBIDDEN_PAGE);
+  if (!apiError.success && (res.status === 401 || res.status === 403)) {
+    return sessionEnded(method, res.status);
+  }
 
   if (!res.ok) {
     if (res.status === 412) {
@@ -130,11 +131,24 @@ function fallbackError(status: number): ApiError {
   return { error: codes[status] ?? 'internal', message };
 }
 
+/** What a save gets when the session ended: unsaved work stays on the page, with a way back. */
+export const SIGNED_OUT_MESSAGE =
+  'You were signed out. Sign in again in a new tab, then try again.';
+const NO_ACCESS_MESSAGE = 'Your account no longer has access to this app.';
+
 /**
- * Leaves the SPA for a static auth page. The returned promise never settles: the page is
- * unloading, and settling would only flash an error state on the way out.
+ * SWA turned the request away: the session has ended (401) or the user has no app role (403).
+ * A read leaves the SPA for the static auth page; its promise never settles, because the page is
+ * unloading and settling would only flash an error state on the way out. A write is thrown
+ * instead: the page may hold unsaved work, whose leave warning can keep the page open, and a
+ * request that never settled would then leave the save hanging for good.
  */
-function navigateAway(page: string): Promise<never> {
-  window.location.assign(page);
+function sessionEnded(method: string, status: 401 | 403): Promise<never> {
+  if (method !== 'GET') {
+    throw status === 401
+      ? new ApiRequestError(401, { error: 'unauthorized', message: SIGNED_OUT_MESSAGE })
+      : new ApiRequestError(403, { error: 'forbidden', message: NO_ACCESS_MESSAGE });
+  }
+  window.location.assign(status === 401 ? LOGIN_PAGE : FORBIDDEN_PAGE);
   return new Promise<never>(() => {});
 }

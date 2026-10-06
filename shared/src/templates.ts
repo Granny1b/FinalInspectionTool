@@ -155,14 +155,16 @@ export function validateForPublish(template: Pick<Template, 'name' | 'sections'>
 // Unpublished changes
 // ---------------------------------------------------------------------------------------------
 
-/** The content that a published revision freezes; metadata (dates, who, status) is ignored. */
-function publishedContent(t: {
+/** What a published revision freezes: everything but metadata (dates, who, status, revision). */
+type TemplateContent = {
   name: string;
   modelCode: string;
   coverImageId?: string | undefined;
   printSettings: PrintSettings;
   sections: Section[];
-}): string {
+};
+
+function publishedContent(t: TemplateContent): string {
   // Built field by field so key order (and therefore the string) is stable.
   return JSON.stringify([
     t.name,
@@ -178,8 +180,12 @@ function publishedContent(t: {
   ]);
 }
 
+/** True when two templates (or a template and the editor's draft input) have the same content. */
+export function sameTemplateContent(a: TemplateContent, b: TemplateContent): boolean {
+  return publishedContent(a) === publishedContent(b);
+}
+
 /** True when the draft differs from the latest published revision (or nothing is published). */
 export function hasUnpublishedChanges(draft: Template, latestPublished: Template | null): boolean {
-  if (!latestPublished) return true;
-  return publishedContent(draft) !== publishedContent(latestPublished);
+  return !latestPublished || !sameTemplateContent(draft, latestPublished);
 }
