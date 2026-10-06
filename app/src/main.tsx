@@ -1,3 +1,5 @@
+// Must stay first: configures zod before any schema is built (see the module).
+import './lib/zodJitless';
 import '@fontsource-variable/inter';
 import './index.css';
 import { QueryClientProvider } from '@tanstack/react-query';

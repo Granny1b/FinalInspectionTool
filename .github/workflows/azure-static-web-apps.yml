@@ -1,0 +1,124 @@
+# Checks pushes to main and pull requests into main; deploys main to Azure Static Web Apps.
+#
+# The app and API are built here and deployed prebuilt (skip_app_build / skip_api_build): the SWA
+# build service (Oryx) cannot resolve the npm workspace package @modig/shared.
+# Pull requests get no preview environment: previews would share the production app settings and
+# therefore the production storage account (see stagingEnvironmentPolicy in infra/main.bicep).
+name: CI and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per branch or PR at a time. Superseded PR runs are cancelled; runs on main queue instead,
+# so a deploy is never cut off halfway and the newest commit is always the last one deployed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    name: Check and build
+    # Pinned: ubuntu-latest moves to 26.04 in November 2026; move deliberately.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # Deploy only main (push or manual run), and only once the token secret exists, so a fresh
+      # fork or repo stays green. Secrets can't be read in a job-level `if`, hence this flag; it
+      # holds whether the secret is set, never its value.
+      DEPLOY: ${{ github.ref == 'refs/heads/main' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN != '' }}
+    outputs:
+      deploy: ${{ env.DEPLOY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # Also downloads the Azure Functions Core Tools binary (an api devDependency); no opt-out exists.
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      # The runner image ships the Bicep CLI. Errors fail the job; warnings are only printed.
+      - name: Lint Bicep
+        run: bicep lint infra/main.bicep
+      - run: npm test
+      # Produces app/dist (static site incl. staticwebapp.config.json) and api/deploy (bundled API).
+      - run: npm run build
+      - name: Upload build output
+        if: env.DEPLOY == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: |
+            app/dist
+            api/deploy
+          if-no-files-found: error
+          retention-days: 7
+      - name: Explain skipped deploy
+        if: github.ref == 'refs/heads/main' && env.DEPLOY != 'true'
+        run: >-
+          echo "::notice title=Deploy skipped::Repository secret AZURE_STATIC_WEB_APPS_API_TOKEN is
+          not set. See README, Deploy to Azure."
+
+  deploy:
+    name: Deploy to Azure
+    needs: ci
+    if: needs.ci.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # No checkout: this deploys exactly the output that passed CI, and no npm package code runs in
+      # the job that holds the deployment token.
+      - uses: actions/download-artifact@v8
+        with:
+          name: site
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: upload
+          app_location: app/dist
+          output_location: ''
+          skip_app_build: true
+          api_location: api/deploy
+          skip_api_build: true
+
+  e2e:
+    name: End-to-end tests (non-blocking)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    # Non-blocking for now: it boots the whole local stack (Azurite, Functions host, Vite, SWA CLI)
+    # and has yet to prove stable on hosted runners. Once it has, delete this line and add e2e to
+    # the deploy job's `needs`.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7

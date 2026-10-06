@@ -8,7 +8,9 @@ export function RoleBadge({ roles }: { roles: readonly string[] }) {
     <span
       className={clsx(
         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
-        isAdmin ? 'bg-brand-50 text-brand-700 ring-brand-200' : 'bg-ink-100 text-ink-600 ring-ink-200',
+        isAdmin
+          ? 'bg-brand-50 text-brand-700 ring-brand-200'
+          : 'bg-ink-100 text-ink-600 ring-ink-200',
       )}
     >
       {isAdmin ? 'Admin' : 'Inspector'}

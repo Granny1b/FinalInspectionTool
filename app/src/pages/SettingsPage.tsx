@@ -41,8 +41,8 @@ export function SettingsPage() {
               and the role <Code>inspector</Code> or <Code>admin</Code>.
             </li>
             <li>
-              Set how long the link is valid (at most 168 hours — invitations expire within 7
-              days), generate it and send it to them.
+              Set how long the link is valid (at most 168 hours — invitations expire within 7 days),
+              generate it and send it to them.
             </li>
             <li>They open the link and sign in with that Microsoft account.</li>
           </ol>
@@ -52,7 +52,7 @@ export function SettingsPage() {
             <code>{INVITE_COMMAND}</code>
           </pre>
 
-          <ul className="mt-6 space-y-1 border-t border-ink-100 pt-5 text-sm text-ink-500">
+          <ul className="mt-6 list-disc space-y-1 border-t border-ink-100 pt-5 pl-5 text-sm text-ink-500 marker:text-ink-300">
             <li>At most 25 people can be invited to the app.</li>
             <li>A changed role applies the next time that person signs in.</li>
             <li>
@@ -66,12 +66,10 @@ export function SettingsPage() {
           title="Machine models, location & print"
           description="The model list, the default location for new inspections, and the company name and logo on printed reports."
         >
-          <div className="flex justify-start">
-            <PlannedAction>
-              <Pencil size={16} />
-              Edit settings
-            </PlannedAction>
-          </div>
+          <PlannedAction align="start">
+            <Pencil size={16} />
+            Edit settings
+          </PlannedAction>
         </Card>
       </div>
     </>
@@ -102,7 +100,7 @@ function Card({ icon: Icon, title, description, children }: CardProps) {
 
 function Role({ name, summary }: { name: string; summary: string }) {
   return (
-    <div className="rounded-lg border border-ink-200 bg-ink-50 px-4 py-3">
+    <div className="rounded-lg border border-ink-200 px-4 py-3">
       <dt>
         <Code>{name}</Code>
       </dt>

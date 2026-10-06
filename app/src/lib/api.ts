@@ -3,10 +3,11 @@
  * missing roles, error shapes and ETags are handled the same everywhere.
  */
 import { ApiErrorSchema, CONFLICT_MESSAGE, type ApiError } from '@modig/shared';
+import { FORBIDDEN_PAGE, LOGIN_PAGE } from './auth';
 
 type ApiErrorCode = ApiError['error'];
 
-/** Anything with a zod-style `parse`; keeps the app independent of the zod package itself. */
+/** Anything with a zod-style `parse`, such as the schemas in @modig/shared. */
 export type Parser<T> = { parse(data: unknown): T };
 
 export type ApiFetchOptions<T> = {
@@ -43,9 +44,6 @@ export class ApiRequestError extends Error {
 
 const INVALID_JSON = Symbol('invalid JSON');
 
-export const LOGIN_PAGE = '/login.html';
-export const FORBIDDEN_PAGE = '/forbidden.html';
-
 export async function apiFetch<T = unknown>(
   path: string,
   { method = 'GET', body, schema, ifMatch, signal }: ApiFetchOptions<T> = {},
@@ -78,7 +76,10 @@ export async function apiFetch<T = unknown>(
     if (res.status === 412) {
       throw new ApiRequestError(412, { error: 'precondition_failed', message: CONFLICT_MESSAGE });
     }
-    throw new ApiRequestError(res.status, apiError.success ? apiError.data : fallbackError(res.status));
+    throw new ApiRequestError(
+      res.status,
+      apiError.success ? apiError.data : fallbackError(res.status),
+    );
   }
 
   if (payload === INVALID_JSON) {

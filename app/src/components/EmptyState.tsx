@@ -16,7 +16,7 @@ export function EmptyState({ icon: Icon, title, hint, action }: Props) {
         <Icon size={22} strokeWidth={1.75} />
       </div>
       <h2 className="mt-5 text-base font-semibold text-ink-900">{title}</h2>
-      <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-500">{hint}</p>
+      <p className="mx-auto mt-1.5 max-w-md text-sm text-balance text-ink-500">{hint}</p>
       {action && <div className="mt-7 flex justify-center">{action}</div>}
     </section>
   );

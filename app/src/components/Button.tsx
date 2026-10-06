@@ -6,7 +6,8 @@ type Variant = 'primary' | 'secondary' | 'ghost';
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-brand-600 text-white shadow-xs hover:bg-brand-700',
-  secondary: 'border border-ink-200 bg-surface text-ink-800 shadow-xs hover:border-ink-300 hover:bg-ink-50',
+  secondary:
+    'border border-ink-200 bg-surface text-ink-800 shadow-xs hover:border-ink-300 hover:bg-ink-50',
   ghost: 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
 };
 
@@ -26,6 +27,10 @@ export function Button({ variant = 'primary', className, type = 'button', ...pro
 }
 
 /** An in-app link that looks like a button. */
-export function ButtonLink({ variant = 'primary', className, ...props }: LinkProps & { variant?: Variant }) {
+export function ButtonLink({
+  variant = 'primary',
+  className,
+  ...props
+}: LinkProps & { variant?: Variant }) {
   return <Link className={classes(variant, className)} {...props} />;
 }

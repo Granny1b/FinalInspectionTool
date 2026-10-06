@@ -18,11 +18,14 @@ export function RequireRole({ role }: { role: Role }) {
 
   return (
     <>
-      <PageHeader title={`${ROLE_NAMES[role]} only`} description="You don't have access to this page." />
+      <PageHeader
+        title={`${ROLE_NAMES[role]} only`}
+        description="You don't have access to this page."
+      />
       <EmptyState
         icon={LockKeyhole}
         title={`This page is for Quality ${ROLE_NAMES[role].toLowerCase()}`}
-        hint="If you need it for your work, ask a Quality admin to change your role."
+        hint="Ask a Quality admin if you need access for your work."
         action={
           <ButtonLink to="/inspections" variant="secondary">
             <ArrowLeft size={16} />

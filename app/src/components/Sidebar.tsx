@@ -36,7 +36,7 @@ type Props = {
 
 /** Logo, navigation and the signed-in user. Used by the desktop sidebar and the mobile drawer. */
 export function Sidebar({ me, onNavigate, onClose }: Props) {
-  const adminHeadingId = useId();
+  const adminLabelId = useId();
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-ink-100 px-5">
@@ -57,13 +57,14 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
         <NavList items={MAIN_NAV} onNavigate={onNavigate} />
         {hasRole(me.roles, 'admin') && (
           <>
-            <h2
-              id={adminHeadingId}
+            {/* A list label, not a heading: the sidebar comes before the page's <h1>. */}
+            <p
+              id={adminLabelId}
               className="mt-7 mb-2 px-3 text-xs font-medium tracking-wide text-ink-400 uppercase"
             >
               Admin
-            </h2>
-            <NavList items={ADMIN_NAV} onNavigate={onNavigate} labelledBy={adminHeadingId} />
+            </p>
+            <NavList items={ADMIN_NAV} onNavigate={onNavigate} labelledBy={adminLabelId} />
           </>
         )}
       </nav>

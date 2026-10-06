@@ -14,3 +14,5 @@ coverage/
 test-results/
 playwright-report/
 .DS_Store
+# Compiled ARM output of `bicep build`; main.bicep is the source
+infra/*.json

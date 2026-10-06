@@ -7,3 +7,4 @@ test-results
 .azurite
 package-lock.json
 *.xlsm
+final-inspection-claude-code-prompt.md

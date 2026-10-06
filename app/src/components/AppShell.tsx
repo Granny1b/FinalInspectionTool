@@ -43,9 +43,10 @@ export function AppShell() {
 
   return (
     <>
+      {/* Parked above the viewport until focused; sr-only/not-sr-only would reset its padding. */}
       <a
         href="#main"
-        className="sr-only rounded-md bg-surface px-4 py-2 text-sm font-medium text-ink-900 shadow-md focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
+        className="fixed top-3 left-3 z-50 -translate-y-16 rounded-md bg-surface px-4 py-2 text-sm font-medium text-ink-900 shadow-md transition-transform focus:translate-y-0 motion-reduce:transition-none"
       >
         Skip to content
       </a>
