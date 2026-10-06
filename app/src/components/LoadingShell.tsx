@@ -11,7 +11,7 @@ export function LoadingShell() {
       </p>
       <div className={SIDEBAR_FRAME}>
         <div className="flex h-16 shrink-0 items-center border-b border-ink-100 px-5">
-          <Logo className="h-8" />
+          <Logo className="h-10" />
         </div>
         <div className="space-y-2 px-3 py-5">
           <Bone className="h-9" />
@@ -24,7 +24,7 @@ export function LoadingShell() {
       <div className={MOBILE_BAR}>
         {/* Where the menu button will be, so the logo doesn't jump when the shell loads. */}
         <div className="size-10" />
-        <Logo className="h-7" />
+        <Logo className="h-9" />
       </div>
       <div className={CONTENT_OFFSET}>
         <div className={CONTENT_FRAME}>

@@ -41,7 +41,7 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
     // A landmark, so the user panel (and Sign out) is reachable by landmark navigation too.
     <aside aria-label="Sidebar" className="flex h-full flex-col bg-surface">
       <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-ink-100 px-5">
-        <Logo className="h-8" />
+        <Logo className="h-10" />
         {onClose && (
           <button
             type="button"

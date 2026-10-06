@@ -53,7 +53,7 @@ export function MobileNav({ me }: { me: Me }) {
         >
           <Menu size={20} />
         </button>
-        <Logo className="h-7" />
+        <Logo className="h-9" />
       </header>
 
       <dialog

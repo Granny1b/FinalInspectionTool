@@ -174,10 +174,11 @@ The calls with product, security or cost impact. Each is explained in its sectio
   or style.** The CSP then needs no `'unsafe-inline'`. `auth.css` mirrors a few tokens by hand
   because the Tailwind build sits behind sign-in. For the same reason those pages don't load Inter:
   they use it only if it is installed, otherwise the system font.
-- **There is one `/modig-logo.svg`, made anonymous in the SWA config**, rather than a copy in
-  `login-assets`, so replacing the logo means replacing one file (plus `favicon.svg`).
-- **The placeholder logo is drawn with stroke paths, no SVG `<text>`**, so it renders the same on
-  every machine.
+- **The logo is the official `MODIG_LOGO_BLACK-1.png`, renamed to `app/public/modig-logo.png`**
+  (Vite serves only `public/`). The app, both sign-in pages and later the print view all load this
+  one file, which is anonymous in the SWA config. `favicon.png` (64 px) is the logo's blue swoosh
+  cut from the same file. The logo is shown 40 px high in the sidebar so the wordmark stays
+  legible.
 - **The CSP has `style-src 'self'` without `'unsafe-inline'`.** Tailwind ships as an external file
   and React sets style props through the CSSOM, which CSP does not block (verified: zero
   violations).

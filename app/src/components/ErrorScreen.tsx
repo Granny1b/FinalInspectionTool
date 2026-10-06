@@ -11,7 +11,7 @@ export function ErrorScreen({ title, message, actions }: Props) {
     <main className="flex min-h-dvh items-center justify-center p-6">
       <title>{`${title} · ${APP_NAME}`}</title>
       <div className="w-full max-w-sm rounded-xl border border-ink-200 bg-surface p-8 text-center shadow-xs">
-        <Logo className="mx-auto h-8" />
+        <Logo className="mx-auto h-10" />
         <div className="mx-auto mt-8 flex size-11 items-center justify-center rounded-full bg-nok-bg text-nok-fg ring-1 ring-nok-border">
           <TriangleAlert size={20} strokeWidth={1.75} />
         </div>

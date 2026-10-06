@@ -164,8 +164,8 @@ e2e/      Playwright tests
 
 Branding lives in the colour, spacing, font and radius tokens in `app/src/index.css`. The
 pre-login pages (`app/public/login-assets/auth.css`) mirror a few of them by hand, so change both.
-`app/public/modig-logo.svg` and `app/public/favicon.svg` are placeholders; replace them with the
-official artwork and keep the file names.
+`app/public/modig-logo.png` is the official Modig logo and `app/public/favicon.png` is the blue
+swoosh cut from it. To change the logo, replace the PNG and keep the file name.
 
 ## Storage layout
 
