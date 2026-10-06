@@ -8,7 +8,13 @@ const CI = Boolean(process.env.CI);
  */
 export default defineConfig({
   testDir: 'e2e',
+  // Runs once the web server answers: waits for the seed.
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
+  // The app comes unbundled from the Vite dev server through the SWA CLI: a cold page load takes
+  // about 4 s, longer while other tests load pages at the same time.
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   forbidOnly: CI,
   retries: CI ? 1 : 0,
   reporter: CI ? [['github'], ['html', { open: 'never' }]] : [['list']],

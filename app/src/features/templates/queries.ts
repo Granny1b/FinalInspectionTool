@@ -1,0 +1,161 @@
+/**
+ * Server state for templates (brief §8), all through apiFetch and the shared schemas.
+ * Query keys live here so invalidation after create/save/publish is in one place.
+ */
+import {
+  SaveTemplateResponseSchema,
+  TemplateDetailSchema,
+  TemplateListSchema,
+  TemplateSchema,
+  type CreateTemplateRequest,
+  type PublishIssue,
+  type TemplateDetail,
+  type TemplateDraftInput,
+} from '@modig/shared';
+import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
+import { apiFetch, ApiRequestError, type ApiResponse } from '../../lib/api';
+
+export const templateKeys = {
+  list: ['templates', 'list'] as const,
+  detail: (id: string) => ['templates', 'detail', id] as const,
+  revision: (id: string, revision: number) => ['templates', 'revision', id, revision] as const,
+};
+
+const templatePath = (id: string) => `/api/templates/${encodeURIComponent(id)}`;
+
+/** A template's draft with the ETag every save and publish must send back. */
+export type LoadedTemplate = { detail: TemplateDetail; etag: string };
+
+function withEtag<T>({ data, etag }: ApiResponse<T>): { data: T; etag: string } {
+  // The API sends one with every draft; without it no save could ever succeed.
+  if (!etag) {
+    throw new ApiRequestError(500, {
+      error: 'internal',
+      message: 'The server did not say which version of the template this is.',
+    });
+  }
+  return { data, etag };
+}
+
+export function useTemplates() {
+  return useQuery({
+    queryKey: templateKeys.list,
+    queryFn: async ({ signal }) =>
+      (await apiFetch('/api/templates', { schema: TemplateListSchema, signal })).data,
+  });
+}
+
+/** The draft for the editor (admins). */
+export function useTemplateDetail(id: string) {
+  return useQuery({
+    queryKey: templateKeys.detail(id),
+    queryFn: async ({ signal }): Promise<LoadedTemplate> => {
+      const { data, etag } = withEtag(
+        await apiFetch(templatePath(id), { schema: TemplateDetailSchema, signal }),
+      );
+      return { detail: data, etag };
+    },
+    // The editor copies the draft into its own state when it opens. A cached copy would carry an
+    // ETag the editor's own autosaves have since replaced, so every visit loads afresh.
+    gcTime: 0,
+  });
+}
+
+/** A published revision; immutable, so it never goes stale. Idle while `revision` is null. */
+export function useTemplateRevision(id: string, revision: number | null) {
+  return useQuery({
+    queryKey: templateKeys.revision(id, revision ?? 0),
+    queryFn:
+      revision === null
+        ? skipToken
+        : async ({ signal }) =>
+            (
+              await apiFetch(`${templatePath(id)}/revisions/${revision}`, {
+                schema: TemplateSchema,
+                signal,
+              })
+            ).data,
+    staleTime: Infinity,
+  });
+}
+
+export function useCreateTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (request: CreateTemplateRequest): Promise<LoadedTemplate> => {
+      const { data, etag } = withEtag(
+        await apiFetch('/api/templates', {
+          method: 'POST',
+          body: request,
+          schema: TemplateDetailSchema,
+        }),
+      );
+      return { detail: data, etag };
+    },
+    onSuccess: (created) => {
+      // The editor opens straight from this answer instead of loading it again.
+      queryClient.setQueryData(templateKeys.detail(created.detail.draft.id), created);
+      return queryClient.invalidateQueries({ queryKey: templateKeys.list });
+    },
+  });
+}
+
+/** PUT of the draft (autosave). Resolves to the saved draft and its new ETag. */
+export async function saveDraft(id: string, input: TemplateDraftInput, ifMatch: string) {
+  return withEtag(
+    await apiFetch(templatePath(id), {
+      method: 'PUT',
+      body: input,
+      ifMatch,
+      schema: SaveTemplateResponseSchema,
+    }),
+  );
+}
+
+/** Publishes the draft the user is looking at (`ifMatch`). */
+export async function publishDraft(id: string, ifMatch: string, changeNote: string) {
+  const note = changeNote.trim();
+  return withEtag(
+    await apiFetch(`${templatePath(id)}/publish`, {
+      method: 'POST',
+      body: note ? { changeNote: note } : {},
+      ifMatch,
+      schema: TemplateDetailSchema,
+    }),
+  );
+}
+
+const PublishIssuesSchema = z.array(
+  z.object({
+    target: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('template') }),
+      z.object({ kind: z.literal('section'), sectionId: z.string() }),
+      z.object({ kind: z.literal('item'), sectionId: z.string(), itemId: z.string() }),
+    ]),
+    message: z.string(),
+  }),
+);
+
+/** The publish problems a 400 from …/publish carries in `details`, if that's what it is. */
+export function publishIssuesOf(error: unknown): PublishIssue[] | null {
+  if (!(error instanceof ApiRequestError) || error.status !== 400) return null;
+  const parsed = PublishIssuesSchema.safeParse(error.details);
+  return parsed.success && parsed.data.length > 0 ? parsed.data : null;
+}
+
+/** 404, or 400 for an id that can't exist: either way there is nothing at this address. */
+export function isMissing(error: unknown): boolean {
+  return error instanceof ApiRequestError && (error.status === 404 || error.status === 400);
+}
+
+export function isConflict(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 412;
+}
+
+/** What to tell the user when a request failed (apiFetch already words a 412 as a conflict). */
+export function errorMessage(error: unknown): string {
+  return error instanceof ApiRequestError
+    ? error.message
+    : "Couldn't reach the server. Check your connection and try again.";
+}

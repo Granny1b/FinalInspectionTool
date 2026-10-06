@@ -1,9 +1,11 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    // DOM: the e2e tests also run callbacks inside the page (page.evaluate).
+    "lib": ["ES2023", "DOM"],
     "allowJs": true,
     "checkJs": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "*.js", "e2e"]
+  "include": ["*.ts", "*.js", "e2e", "scripts"]
 }

@@ -1,3 +1,4 @@
+import { BlobServiceClient } from '@azure/storage-blob';
 import {
   CONTAINERS,
   DEVIATIONS_TABLE,
@@ -9,6 +10,7 @@ import {
 import { beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { ConflictError, PreconditionFailedError } from './http';
 import {
+  AZURITE_CORS_RULE,
   containerClient,
   deviationsTable,
   ensureStorage,
@@ -121,6 +123,27 @@ describe('ensureStorage', () => {
       process.env[STORAGE_CONNECTION_STRING_ENV] = saved;
     }
     await expect(fresh.ensureStorage()).resolves.toBeUndefined();
+  });
+
+  it('sets the blob CORS rule on Azurite, so the browser can use SAS URLs locally', async () => {
+    const service = BlobServiceClient.fromConnectionString(inject('storageConnectionString'));
+    await service.setProperties({ cors: [] });
+    vi.resetModules();
+    const fresh = await import('./storage');
+    await fresh.ensureStorage();
+
+    expect((await service.getProperties()).cors).toEqual([AZURITE_CORS_RULE]);
+    // What the browser asks before PUTting a photo from the app's origin.
+    const preflight = await fetch(containerClient(config).getBlobClient('x.jpg').url, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'http://localhost:4280',
+        'Access-Control-Request-Method': 'PUT',
+        'Access-Control-Request-Headers': 'content-type,x-ms-blob-type',
+      },
+    });
+    expect(preflight.status).toBe(200);
+    expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:4280');
   });
 
   it('names the missing setting when there is no connection string', async () => {

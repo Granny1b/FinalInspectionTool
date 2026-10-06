@@ -17,14 +17,23 @@ export function principal(userDetails: string, roles: string[]): ClientPrincipal
 }
 
 export function request(
-  options: { principal?: ClientPrincipal; headers?: Record<string, string>; body?: string } = {},
+  options: {
+    principal?: ClientPrincipal;
+    headers?: Record<string, string>;
+    body?: string;
+    /** Defaults to GET, or PUT when there is a body. */
+    method?: string;
+    /** Route parameters, e.g. `{ id }` for `templates/{id}`. */
+    params?: Record<string, string>;
+  } = {},
 ): HttpRequest {
   const headers = { ...options.headers };
   if (options.principal) headers[CLIENT_PRINCIPAL_HEADER] = encodePrincipal(options.principal);
   return new HttpRequest({
-    method: options.body === undefined ? 'GET' : 'PUT',
+    method: options.method ?? (options.body === undefined ? 'GET' : 'PUT'),
     url: 'http://localhost/api/test',
     headers,
+    params: options.params,
     body: options.body === undefined ? undefined : { string: options.body },
   });
 }

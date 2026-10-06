@@ -4,7 +4,7 @@
  * subclass; anything else is logged and answered with a bare 500 (no stack traces to clients).
  */
 import type { HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { CONFLICT_MESSAGE, hasRole, type ApiError, type Role } from '@modig/shared';
+import { CONFLICT_MESSAGE, hasRole, IdSchema, type ApiError, type Role } from '@modig/shared';
 import type { z } from 'zod';
 import { getUser, type User } from './auth';
 
@@ -113,6 +113,13 @@ export async function readJsonBody<T>(req: HttpRequest, schema: z.ZodType<T>): P
   if (!result.success) {
     throw new BadRequestError('The request body is invalid.', result.error.issues);
   }
+  return result.data;
+}
+
+/** The `{id}` route parameter. Only well-formed ids get near a blob path. */
+export function idParam(req: HttpRequest): string {
+  const result = IdSchema.safeParse(req.params.id);
+  if (!result.success) throw new BadRequestError('The id in the URL is not valid.');
   return result.data;
 }
 

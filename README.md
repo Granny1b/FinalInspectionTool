@@ -7,7 +7,7 @@ walk-round, transcribe the results, and finalise a printable report. Every devia
 central table for KPIs. It runs on Azure Static Web Apps (Free) with managed Functions, Blob
 Storage and Table Storage: no database, about 1 SEK a month.
 
-## Status: phase 1 of 6 (foundation)
+## Status: phase 2 of 6 (templates)
 
 Working now:
 
@@ -15,17 +15,25 @@ Working now:
   users with the role `inspector` or `admin` get past `/login.html`; signed-in users without a
   role see a "You don't have access yet" page. Pages and `/api/*` are locked alike.
 - **App shell.** Sidebar with Inspections and Templates, plus Insights and Settings for admins; a
-  drawer on tablets. The pages are placeholders whose actions say which phase delivers them.
-  Settings explains how to invite users.
-- **API.** `GET /api/me` (name, email, roles), plus the building blocks later endpoints use: role
-  checks, JSON errors, zod-validated JSON blobs with ETag concurrency.
+  drawer on tablets. Inspections, Insights and Settings are still placeholders whose actions say
+  which phase delivers them. Settings explains how to invite users.
+- **Templates (phase 2).** The template list; a new template for a machine model that has none;
+  the template editor, which looks like the printed checklist and is edited in place (sections and
+  rows, drag and drop, automatic 1.a numbering, cover photo, spare rows); autosave of the draft
+  with conflict detection; publishing immutable revisions with a change note; the revision
+  history; and read-only views of any published revision. Inspectors see the latest published
+  revision of each template, read-only. See [Editing templates](#editing-templates).
+- **API.** `/api/me`, the template endpoints, settings and photo upload/download URLs (see
+  [API](#api)), with role checks, JSON errors and ETag concurrency on every save.
 - **Seed.** The RigiMill MG checklist (6 sections, 90 checkpoints) and the six machine models are
-  imported from `seed/Final_Inspection_rev_2.xlsm` into storage. The template is not visible in the
-  UI until phase 2.
+  imported from `seed/Final_Inspection_rev_2.xlsm` into storage.
 - **Local dev, infrastructure and CI/CD.** One `npm run dev`, a Bicep file, and a GitHub Actions
   workflow that checks every pull request and deploys `main`.
 
-Next phases: 2 template editor · 3 inspections · 4 print · 5 guides and annotations · 6 insights.
+Not yet: the Guide action on a row (phase 5), printing a template (phase 4), inspections (phase
+3), insights (phase 6) and editing the settings.
+
+Next phases: 3 inspections · 4 print · 5 guides and annotations · 6 insights.
 
 ## Prerequisites
 
@@ -87,16 +95,87 @@ Stop with Ctrl+C and free the port.
 Always use port 4280. Only the SWA CLI applies the sign-in and role rules: the Functions host on
 7071 trusts any `x-ms-client-principal` header. In dev mode the CLI does not apply the
 Content-Security-Policy, the security headers or `navigationFallback` (Vite serves the pages).
-To check those, run the built app:
+To check those, run the built app, each command in a terminal of its own:
 
 ```bash
 npm run build
-npm start -w @modig/api          # Functions host on 7071 (run Azurite too if a call needs storage)
-npx swa start app/dist --swa-config-location app/dist --api-devserver-url http://127.0.0.1:7071
+npm run dev:blob                  # Azurite, with the data in .azurite/ (run npm run seed once
+npm run dev:table                 #   if it is new)
+npm start -w @modig/api           # Functions host on 7071, running the built api/dist/index.cjs
+node scripts/local-swa-config.mjs
+npx swa start app/dist --swa-config-location .swa-local --api-devserver-url http://127.0.0.1:7071
 ```
+
+The deployed Content-Security-Policy lets the browser load and upload photos only on
+`https://*.blob.core.windows.net`; locally they are on Azurite at `http://127.0.0.1:10000`, so
+the policy would block the cover photo. `scripts/local-swa-config.mjs` writes
+`.swa-local/staticwebapp.config.json` (git-ignored): a copy of the built config that also allows
+Azurite. `app/public` and `app/dist` keep the Azure-only policy, and that is what gets deployed.
+Use port 4280 here too: Azurite accepts the browser's photo uploads only from the dev origins.
 
 This `swa start` prints "Error reading workflow configuration": it expects a different layout in
 the GitHub workflow file. The warning is harmless.
+
+## Editing templates
+
+Templates are for admins; inspectors see the latest published revision of each, read-only. There
+is one template per machine model: **New template** offers the models that don't have one yet.
+
+- **Draft and revisions.** Every template has one draft, which admins edit, and numbered
+  revisions, which never change once published. New inspections (phase 3) use the latest
+  revision. The header shows the draft's revision number, the latest published one and whether
+  the draft has unpublished changes.
+- **Autosave.** Changes are saved to the draft about a second after you stop typing; the header
+  says _Unsaved changes_, _Saving…_ or _Saved_. A save that fails on the way (network, server) is
+  retried, and _Retry_ saves at once. Closing the tab with unsaved changes asks first; following a link in the app saves
+  first.
+- **Conflicts.** Every save says which version of the draft it is based on. If another admin saved
+  in between, nothing is overwritten: the editor shows "Someone else changed this – reload to see
+  the latest version.", stops saving and offers **Reload**.
+- **Publish.** **Publish** freezes the draft as the next revision, with an optional change note.
+  A template needs a name and a section; every section needs a title and a row, and no row may be
+  empty. Otherwise Publish lists the problems, with links that jump to each, and marks them in
+  red.
+- **Revision history.** Next to the front page: each revision with its date, who published it and
+  the note. **View** opens that revision read-only.
+- **Front page.** Name, machine model, spare rows per section (the empty lettered lines printed
+  after each section for handwritten findings, previewed in the checklist) and a cover photo. The
+  photo is scaled down in the browser to 1600 px on the long edge before it is uploaded.
+
+In the checklist:
+
+| To                                          | Do                                                                |
+| ------------------------------------------- | ----------------------------------------------------------------- |
+| Add a row below                             | `Enter` in a row; **+ Add row** at the end of a section           |
+| Start a new section's rows                  | `Enter` in its title                                              |
+| Delete an empty row                         | `Backspace` in it                                                 |
+| Move between rows                           | `↑` / `↓` from the first or last line of a row                    |
+| Duplicate or delete a row                   | The icons that appear on hover or focus; on a tablet, its **⋯**   |
+| Rename, duplicate, move or delete a section | Its **⋯** menu (deleting a section with rows asks first)          |
+| Move a row or section                       | Drag its handle (⠿, left of it), also between sections            |
+| Move it with the keyboard                   | `Tab` to the handle, `Space`, arrow keys, `Space` (`Esc` cancels) |
+
+Numbers (section 3, row 3.c) follow the position and change as rows move; each row keeps its
+identity, which is what later phases key results and statistics on.
+
+## API
+
+Managed Functions under `/api`, all JSON. Every function checks the role itself; errors are
+`{ error, message, details? }`. Saves and publishing need the draft's `ETag` in `If-Match` and get
+`412` if someone else changed it.
+
+| Method and route                        | Role      | What                                                             |
+| --------------------------------------- | --------- | ---------------------------------------------------------------- |
+| `GET /api/me`                           | inspector | Name, email and roles of the signed-in user                      |
+| `GET /api/settings`                     | inspector | Machine models, default location, company name                   |
+| `GET /api/templates`                    | inspector | All templates: latest published revision, unpublished changes    |
+| `POST /api/templates`                   | admin     | New template for a machine model without one                     |
+| `GET /api/templates/{id}`               | admin     | The draft, its revision history and its `ETag`                   |
+| `PUT /api/templates/{id}`               | admin     | Save the draft (`If-Match`)                                      |
+| `POST /api/templates/{id}/publish`      | admin     | Publish the draft as the next revision (`If-Match`, change note) |
+| `GET /api/templates/{id}/revisions/{n}` | inspector | A published revision (cached by the browser: it never changes)   |
+| `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                   |
+| `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                |
 
 ## Seed data
 
@@ -142,8 +221,14 @@ because it usually means the command that produced it failed.
   stops it afterwards; locally it reuses a stack you already started. The tests cover the sign-in
   redirect for pages and the API, the anonymous pre-login files (and that an encoded `../` cannot
   reach the app through them), the sign-in link, the inspector and admin navigation, the no-access
-  page, a deep link, signing out, and that the seed imported the RigiMill MG template. They sign
-  in by setting the SWA CLI's `StaticWebAppsAuthCookie` directly.
+  page, a deep link, signing out and the seed. For templates: the list, autosave across a reload,
+  `Enter` and `Backspace`, dragging a row into another section, publishing with a change note, two
+  admins in conflict, a cover photo upload, a new template whose empty row blocks publishing, and
+  the inspector's read-only view (the API refuses their saves with 403). They sign in by setting
+  the SWA CLI's `StaticWebAppsAuthCookie` directly. Each editing test writes its own throwaway
+  template into the local Azurite and deletes it afterwards, so the seeded RigiMill MG is only
+  read. The tests expect it as seeded (published revision 2, 90 rows): if you have published or
+  edited it locally, stop `npm run dev` and delete `.azurite/` first.
 
 CI (`.github/workflows/azure-static-web-apps.yml`) runs `typecheck`, `lint`, `format:check`, a
 Bicep lint, `test` and `build` on every pull request and push to `main`. The end-to-end tests run
@@ -160,6 +245,7 @@ shared/   zod schemas and types, numbering (3.c, D-01), roles, storage names: us
 seed/     Excel import of the RigiMill MG checklist and machine models
 infra/    main.bicep: Static Web App and storage account
 e2e/      Playwright tests
+scripts/  local-swa-config.mjs: the SWA config for checking the built app locally
 ```
 
 Branding lives in the colour, spacing, font and radius tokens in `app/src/index.css`. The
@@ -185,6 +271,14 @@ table deviations                         one row per deviation, the source for K
 ```
 
 IDs are 16-character alphanumeric nanoids. Names are defined in `shared/src/storage.ts`.
+
+Photos never pass through the API. The browser asks `/api/images/upload-url` for a new image id
+and a URL that can only write that one blob, valid for 10 minutes, and uploads the scaled-down
+JPEG straight to the `images` container. To show it, it asks for a read-only URL valid for 15
+minutes. Template drafts and revisions store only the image id (`coverImageId`). Replacing or
+removing a cover photo leaves the old file in storage. Locally the API sets Azurite's blob CORS
+rule for the dev origins (ports 4280 and 5173) on its first storage call; in Azure the rule comes
+from the Bicep file.
 
 ## Auth model and roles
 

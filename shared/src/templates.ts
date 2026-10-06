@@ -4,7 +4,7 @@
  * Used by the API (to enforce) and the editor (to show problems before the user hits Publish).
  */
 import { z } from 'zod';
-import { indexItems } from './numbering';
+import { rowRef } from './numbering';
 import {
   IdSchema,
   ModelCodeSchema,
@@ -114,7 +114,8 @@ export type PublishIssue = {
 
 /**
  * Everything that must hold before a draft becomes an immutable revision. Drafts may be
- * incomplete while being edited; a printed checklist may not.
+ * incomplete while being edited; a printed checklist may not. Problems come in document order,
+ * so a list of them reads top to bottom like the checklist.
  */
 export function validateForPublish(template: Pick<Template, 'name' | 'sections'>): PublishIssue[] {
   const issues: PublishIssue[] = [];
@@ -124,8 +125,8 @@ export function validateForPublish(template: Pick<Template, 'name' | 'sections'>
   if (template.sections.length === 0) {
     issues.push({ target: { kind: 'template' }, message: 'Add at least one section.' });
   }
-  template.sections.forEach((section, index) => {
-    const label = `Section ${index + 1}`;
+  template.sections.forEach((section, sectionIndex) => {
+    const label = `Section ${sectionIndex + 1}`;
     if (!section.title.trim()) {
       issues.push({
         target: { kind: 'section', sectionId: section.id },
@@ -138,15 +139,15 @@ export function validateForPublish(template: Pick<Template, 'name' | 'sections'>
         message: `${label} has no rows.`,
       });
     }
+    section.items.forEach((item, rowIndex) => {
+      if (!item.text.trim()) {
+        issues.push({
+          target: { kind: 'item', sectionId: section.id, itemId: item.id },
+          message: `Row ${rowRef(sectionIndex, rowIndex)} is empty.`,
+        });
+      }
+    });
   });
-  for (const item of indexItems(template.sections)) {
-    if (!item.text.trim()) {
-      issues.push({
-        target: { kind: 'item', sectionId: item.sectionId, itemId: item.itemId },
-        message: `Row ${item.ref} is empty.`,
-      });
-    }
-  }
   return issues;
 }
 

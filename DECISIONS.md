@@ -390,3 +390,242 @@ The calls with product, security or cost impact. Each is explained in its sectio
   user's document and is not reformatted.
 - **`infra/*.json` is git-ignored.** `bicep build` writes the compiled ARM template next to
   `main.bicep`, and only the Bicep source should be committed.
+
+## Phase 2 – Templates
+
+### Worth reviewing first
+
+The calls with product, security or data impact. Each is explained in its section below.
+
+- Changing a template's model to one another template uses answers 409, not the contract's 400
+  (API).
+- One template per model is checked by scanning drafts, not enforced atomically (API).
+- Publishing races: the first `rev-N` write wins and the loser gets 412; someone who saves between
+  the publish's two writes keeps their draft (API).
+- Publishing a draft identical to the latest revision is blocked in the UI only (Editor).
+- Autosave stops at the first 412 until Reload; network and server errors retry; other refusals
+  are shown and not retried (Editor).
+- An upload URL lets any role holder write one new image blob for 10 minutes, of any size or type
+  (Photos).
+- Replaced or removed cover photos stay in storage; there is no delete endpoint (Photos).
+- Inspectors see only published revisions, but the list's row count and "last edited" come from
+  the draft (Editor).
+- The CSP still allows any `https://*.blob.core.windows.net`. Phase 1 planned to pin it to the
+  storage account once uploads exist; they now do (Photos).
+- The built app is checked locally with a copy of the SWA config whose CSP also allows Azurite;
+  the deployed config is unchanged (Tooling).
+- Vite keeps idle connections open, working around a race in the SWA CLI's dev proxy that made
+  modules load empty (Tooling).
+- The end-to-end tests write throwaway templates straight into the local Azurite and expect the
+  seeded RigiMill MG untouched (Tests).
+
+### API and storage
+
+- **A model change to a model another template uses is 409 `conflict`**, like creating a second
+  template for it; an unknown model stays 400. The contract table said 400 for both.
+- **The model is validated on save only when it changes,** so a model later removed from the
+  settings never makes its template unsaveable.
+- **Save and publish compare `If-Match` with the draft's ETag before any other check,** so an
+  outdated editor always gets 412, never a validation error. The conditional write stays the
+  real guard.
+- **Publish writes `rev-N.json` (create-only), then moves the draft on to N+1 (`If-Match`).** If
+  someone saved in between, that 412 is tolerated: the revision stands and their draft is kept.
+  Losing the race for `rev-N` itself (someone published the same draft first) is a 412. A second
+  publish that reads the draft between the first one's two writes publishes the same content
+  again as N+1: harmless, and inherent in this order.
+- **The draft moved on by a publish gets the publish time and publisher as `updatedAt/By`.**
+  Drafts never carry a change note; a blank note is not stored.
+- **Publishing an unchanged draft is not refused by the API.** The editor disables Publish
+  instead.
+- **Ids must be unique: section ids among sections, row ids across the whole template** (results
+  and KPIs key on the row id). A section and a row may share an id.
+- **The revision history is read from the `rev-N` blobs themselves** (published at/by =
+  `updatedAt/By`), in parallel; the list reads only each template's latest revision. No index
+  blob to keep in sync.
+- **A template folder with revisions but no draft** (an interrupted seed) is left out of the list
+  and is 404; the next seed run completes it.
+- **The list is sorted by name with a Swedish collation** (`Intl.Collator('sv')`, numeric), then by
+  id.
+- **Malformed route parameters are 400; well-formed but missing is 404.** A revision number must
+  be a plain positive integer ("3", not "03", "3.0" or "-1").
+- **Without `config/settings.json`, `GET /api/settings` is 404** ("run the seed") and every model
+  counts as unknown.
+- **One template per model is checked by scanning the drafts, not atomically.** Two admins
+  creating one for the same model at the same moment could both succeed; accepted for a handful
+  of admins.
+- **8 function registrations, one per route,** with GET/POST and GET/PUT dispatched inside the
+  function; well under SWA's limit of 40.
+- **Published revisions are served with `Cache-Control: private, max-age=31536000, immutable`**
+  (successes only). Settings have no ETag yet (no settings editing). Create answers 201 without a
+  `Location` header; `upload-url` answers 200 (the browser's upload creates the image).
+- **API test files run one after another** (`fileParallelism: false`): the endpoint tests reset
+  the shared test Azurite before each test. Publish races are tested deterministically by
+  running a second admin's write between the publish's two writes.
+
+### Photos
+
+- **Upload URL: create and write on that one blob, 10 minutes; read URL: read only, 15 minutes,
+  issued only if the blob exists.** No start time (no clock-skew window); the expiry is whole
+  seconds so `expiresAt` equals the SAS. The account is https-only in Azure, so the protocol is
+  not restricted.
+- **An upload URL cannot limit size or content type.** It is issued to role holders only and
+  covers one new blob name.
+- **Photos are scaled in the browser** (`createImageBitmap` with the camera orientation, white
+  background for transparent PNGs, at most 1600 px, JPEG 0.8) and PUT with `credentials: 'omit'`.
+- **Read URLs are cached for 10 minutes**, under their 15-minute lifetime.
+- **Replacing or removing a cover photo leaves the old blob.** There is no delete endpoint and
+  the cost is negligible.
+- **`upload-url` runs `ensureStorage()`** although it makes no storage call, so the `images`
+  container and, locally, Azurite's CORS rule exist before the browser uploads.
+- **Locally the API sets Azurite's blob CORS rule** (the Bicep rule, for origins
+  `localhost:4280`, `127.0.0.1:4280` and `localhost:5173`) once per process, replacing any other
+  rules on the emulator.
+- **The CSP still allows any `https://*.blob.core.windows.net`** in `img-src` and `connect-src`.
+  Pinning it to the one storage account needs CI to fill in the host from the deployment; not
+  done yet.
+
+### Checklist document
+
+- **One sheet laid out like the printed checklist.** The Comment / Status / Resp columns appear
+  when the sheet is at least 52rem wide (a container query, not a viewport breakpoint), so they
+  are hidden on tablets.
+- **Rows show only their letter; the section number is in the header.** Labels and screen reader
+  announcements use the full ref ("Row 3.c text").
+- **Spare rows are previewed faint and hidden from screen readers** (one sentence says how many),
+  before **+ Add row**, so the lettering continues as on paper.
+- **Row actions (Guide, Duplicate, Delete) appear on hover and on keyboard focus; on touch
+  screens each row has one ⋯ menu instead.** Three icons on 90 rows of a tablet were noise.
+- **The Guide action is shown disabled, with "Guide: coming in phase 5".**
+- **A row is one line of text:** `Enter` never inserts a line break and pasted line breaks become
+  spaces. The field grows with its text (a CSS grid trick, no measuring in script).
+- **`Enter` in a section title goes to its first row, or creates it.** `Backspace` in an empty
+  title does nothing; sections are deleted from the ⋯ menu, with a confirmation if they have rows.
+- **After deleting a row, focus goes to the end of the previous row,** else the start of the next,
+  else the section title. A duplicate gets the focus.
+- **`↑` / `↓` leave a row only from its first or last visual line,** measured on an off-screen
+  copy of the field.
+- **Duplicates are deep copies with new ids**; guide image ids are copied as they are (the images
+  never change). A duplicated section keeps its title.
+- **Menus use the native popover API and confirmations a native `<dialog>`,** for focus handling,
+  Escape and light dismiss without a library. The first enabled menu item is focused as the menu
+  opens, and an open menu follows its button while the page scrolls (closing on scroll closed
+  menus that had just opened). The confirm button's danger style is local: `Button` has no
+  danger variant.
+- **The section ⋯ menu sits at the end of the title on a wide sheet and with the row controls on
+  a narrow one.** The sheet has no maximum width; the page decides.
+- **Focus moves after the edit has rendered,** then scrolls into view (`focus()` doesn't scroll an
+  element that already has focus, e.g. the ⋯ of a section that just moved).
+- **Performance:** rows and sections are memoised and the actions object is stable, so a keystroke
+  re-renders one section and one row (measured: 6.6 ms median from key to frame on 90 rows).
+- **A row drag works on a working copy** and shows moves between sections live; the drop is one
+  change and one autosave. Dropping outside any target keeps what is shown.
+- **Dragging a section folds only that section to its header.** Folding all of them moved the
+  dragged header away from the pointer whenever the page could not scroll far enough.
+- **The keyboard moves a dragged item one place per arrow key** (a custom coordinate getter):
+  dnd-kit's geometric one skipped or repeated rows once the page had scrolled. Very fast key
+  repeat while the page scrolls can lose a step, never misplace the item.
+- **With the keyboard, a row entering a section from below lands after its last row, from above
+  before its first.** With the pointer it goes by the dragged row's position against the hovered
+  row's middle.
+- **Drag ids are prefixed (`section:`, `row:`, `body:`), and each section's rows area is a drop
+  target,** so ids never collide and an empty section accepts rows.
+- **Pointer and keyboard sensors only;** drag handles have `touch-action: none`, so a finger drags
+  them on a tablet and scrolls everywhere else.
+- **Screen reader announcements are our own** ("Picked up row 1.c.", "Dropped as row 2.c."):
+  dnd-kit's defaults read internal ids.
+- **Read-only documents are separate, simpler markup** (headings and lists, no drag and drop).
+- **Publish problems are shown as an outline, a tint, an icon and text** (not colour only), linked
+  to the field with `aria-describedby`.
+- **During a drag, letters stay with the rows until the drop renumbers them;** the floating copy
+  shows where the row currently sits in the working copy. Cosmetic, left as is.
+
+### Editor
+
+- **Autosave is a small framework-free scheduler** (`createAutosaver`, tested with fake timers)
+  with a React binding: about 1 s after the last change, one request at a time, changes made
+  meanwhile merged into the next save, `If-Match` chained from each answer.
+- **Save errors:** 412 → conflict, autosave stops until Reload; network, 5xx, 408 and 429 → retried
+  after 1, 2, 5, 10 and then every 30 s; any other refusal → its message is shown and not retried
+  (the next change or Retry tries again).
+- **From a save's answer only the ETag, the revision number and "unpublished changes" are taken
+  over,** never the content: the user may have typed on.
+- **After a publish, the draft's new ETag is taken over only if the published draft equals what
+  the editor holds.** Otherwise someone saved in between, and the next autosave must hit the
+  conflict instead of overwriting them.
+- **Every visit loads the draft afresh** (no cache: a cached ETag would be outdated by the
+  editor's own saves). Reload loads it again and reopens the editor; a failed background refresh
+  never closes an open editor.
+- **Leaving:** a link in the app saves first and only asks if saving fails or conflicts; closing
+  the tab with unsaved changes gets the browser's warning.
+- **Reload asks before discarding unsaved changes.** During a conflict the editor stays editable,
+  so text can still be copied.
+- **Publish is disabled when there is nothing new;** the badges say why.
+- **Publish checks the draft first** and lists problems with "Go to it" links instead of the form;
+  then it saves pending changes and publishes with the current ETag. Problems the server reports
+  are shown the same way; a 412 closes the dialog and shows the conflict.
+- **After a publish attempt with problems, they stay marked and update as you type** until the
+  next successful publish.
+- **Problems are listed in document order** (`validateForPublish` in shared now walks each section
+  and its rows), so the list reads like the checklist.
+- **A template-level problem jumps to the name field when the name is blank,** otherwise to Add
+  section.
+- **"Unpublished changes" shows from the first keystroke** (unsaved changes or the server's flag).
+- **The editor's header is sticky;** while the editor is open the page has a matching
+  `scroll-padding-top`, because Chrome ignores `scroll-margin` for `scrollIntoView('nearest')`.
+- **Front page card and revision history side by side from 1280 px, stacked below;** the
+  checklist always gets the full width.
+- **The model list disables models that have their own template;** a saved model no longer in the
+  settings stays selectable as "CODE (not in the settings)".
+- **New template offers only models without a template.** The name defaults to "Final
+  inspection – {model}" and follows the model until edited.
+- **Spare rows accept whole numbers in the schema's range (0–30);** anything else reverts on blur.
+- **"Who" is the stored email,** with dates in en-GB ("6 Oct 2026, 14:32"), so a Swedish browser
+  doesn't mix Swedish month names into the English UI.
+- **The list is a table whose whole row is a link.** Inspectors don't see New template or the
+  unpublished badge; row count and "last edited" come from the draft for both roles.
+- **Inspectors at `/templates/:id` get the latest published revision, read-only** ("Not published
+  yet" if there is none). Revision pages are open to both roles.
+- **Saves and publishes mark the template list stale without refetching it,** which would
+  otherwise cost a request per autosave.
+- **New shared app components:** `Dialog`, `Field`, `PageStates`, and `lib/format`,
+  `lib/useSettings`, `lib/images`, for phase 3 to reuse. A `Dialog` is closed by its caller
+  through its ref (focus returns to the opener), ignores Escape while busy and, holding a form,
+  doesn't close on a backdrop click. The reload and leave confirmations reuse the checklist's
+  `ConfirmDialog`.
+- **Input borders are ink-500 at 80 %** (about 3.4:1), meeting WCAG 1.4.11's 3:1 for controls.
+- **The save status is a polite live region; conflict and failed-save banners are alerts.**
+  Retry moves focus to the status, so it doesn't fall to the page when the button disappears. The
+  "Published revision N" notice stays until dismissed (no timed messages).
+- **A malformed id and an unknown template both show "This template doesn't exist".**
+
+### Tests and tooling
+
+- **Each editing e2e test writes its own throwaway template into the local Azurite and deletes it
+  afterwards** (with its cover photos). Its model code `E2E` is not in the settings, so it never
+  takes a model from the New template dialog. Tests run in parallel and the seeded RigiMill MG is
+  only read.
+- **The e2e tests expect the seed data untouched** (RigiMill MG at revision 2, 90 rows). After
+  publishing or editing it locally, delete `.azurite/` before running them.
+- **A Playwright global setup waits for the seed,** which runs next to the servers and can finish
+  after they answer.
+- **The seed check still reads Azurite directly:** it checks what the seed wrote, and the
+  template tests go through the API and the UI.
+- **The inspector's 403s are checked through port 4280** with the inspector's own sign-in (draft
+  read, save and publish).
+- **e2e timeouts are 60 s per test and 10 s per assertion.** A cold page load from the Vite dev
+  server through the SWA CLI takes about 4 s, more while tests run in parallel.
+- **The drag test lets go over section 2's Add row button,** a spot that does not move while rows
+  shift, and waits for the placeholder before dropping. A tall viewport keeps dnd-kit's
+  auto-scroll out of it.
+- **Vite keeps idle connections open (`keepAliveTimeout = 0`).** The SWA CLI proxies over
+  keep-alive connections it never closes (its agent has no timeout, so Node ignores the server's
+  5 s hint). When Vite closed one as the CLI reused it, the CLI answered an empty 200 and the app
+  failed to start. Measured over 100 parallel cold page loads: dozens of empty modules before,
+  none of 10 139 responses after.
+- **`scripts/local-swa-config.mjs` writes `.swa-local/staticwebapp.config.json`** for checking the
+  built app: the built config with Azurite (`http://127.0.0.1:10000`) added to `img-src` and
+  `connect-src`. The deployed config keeps the Azure-only policy; verified that it blocks the
+  local upload and that the copy allows it, with no other CSP violations.
+- **The root `tsconfig.json` includes the DOM library,** for the e2e tests' in-page callbacks.
+- **Not done:** Vite warns that the main chunk is 593 kB (182 kB gzipped). Loading the editor
+  route on demand would trim it; the API bundle is 2.9 MB since the functions use the storage SDKs.

@@ -8,7 +8,12 @@
  */
 import { text } from 'node:stream/consumers';
 import { TableClient } from '@azure/data-tables';
-import { BlobServiceClient, isRestError, type ContainerClient } from '@azure/storage-blob';
+import {
+  BlobServiceClient,
+  isRestError,
+  type CorsRule,
+  type ContainerClient,
+} from '@azure/storage-blob';
 import {
   CONTAINERS,
   DEVIATIONS_TABLE,
@@ -18,7 +23,12 @@ import {
 import { z } from 'zod';
 import { ConflictError, PreconditionFailedError } from './http';
 
-type Clients = { blobService: BlobServiceClient; deviations: TableClient };
+type Clients = {
+  blobService: BlobServiceClient;
+  deviations: TableClient;
+  /** Plain http means the local Azurite emulator: Azure storage is https-only. */
+  azurite: boolean;
+};
 let clients: Clients | undefined;
 
 /** Created on first use so a missing setting fails the request that needs storage, not startup. */
@@ -32,12 +42,13 @@ function getClients(): Clients {
     );
   }
   const blobService = BlobServiceClient.fromConnectionString(connectionString);
+  const azurite = blobService.url.startsWith('http://');
   const deviations = TableClient.fromConnectionString(connectionString, DEVIATIONS_TABLE, {
     // Azurite speaks plain http, which the Tables SDK refuses unless allowed. Blob and table
     // endpoints share a protocol in every real setup.
-    allowInsecureConnection: blobService.url.startsWith('http://'),
+    allowInsecureConnection: azurite,
   });
-  clients = { blobService, deviations };
+  clients = { blobService, deviations, azurite };
   return clients;
 }
 
@@ -52,8 +63,9 @@ export function deviationsTable(): TableClient {
 let ensured: Promise<void> | undefined;
 
 /**
- * Creates every container and the deviations table if missing, once per process. Bicep creates
- * them in Azure; this is the safety net for a fresh or wiped local Azurite.
+ * Creates every container and the deviations table if missing, once per process, and on Azurite
+ * sets the blob CORS rule. Bicep does both in Azure; this is the safety net for a fresh or wiped
+ * local Azurite.
  */
 export function ensureStorage(): Promise<void> {
   ensured ??= createAll().catch((error: unknown) => {
@@ -63,10 +75,24 @@ export function ensureStorage(): Promise<void> {
   return ensured;
 }
 
+/**
+ * Locally the browser uploads and downloads images on Azurite (127.0.0.1:10000) from the app's
+ * origin, with SAS URLs from the API. Mirrors the production rule in infra/main.bicep.
+ */
+export const AZURITE_CORS_RULE: CorsRule = {
+  allowedOrigins: 'http://localhost:4280,http://127.0.0.1:4280,http://localhost:5173',
+  allowedMethods: 'GET,HEAD,PUT,OPTIONS',
+  allowedHeaders: '*',
+  exposedHeaders: 'ETag,Content-Length,Content-Type,Last-Modified,x-ms-*',
+  maxAgeInSeconds: 3600,
+};
+
 async function createAll(): Promise<void> {
+  const { blobService, azurite } = getClients();
   await Promise.all([
     ...Object.values(CONTAINERS).map((name) => containerClient(name).createIfNotExists()),
     deviationsTable().createTable(), // no-op when it exists
+    ...(azurite ? [blobService.setProperties({ cors: [AZURITE_CORS_RULE] })] : []),
   ]);
 }
 

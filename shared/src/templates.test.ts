@@ -60,6 +60,21 @@ describe('validateForPublish', () => {
     ]);
     expect(issues[0]!.target).toEqual({ kind: 'section', sectionId: 's2' });
   });
+
+  it('lists the problems in document order', () => {
+    const issues = validateForPublish({
+      name: 'x',
+      sections: [
+        { id: 's1', title: 'Loading area', items: [{ id: 'i1', text: '' }] },
+        { id: 's2', title: '', items: [{ id: 'i2', text: '' }] },
+      ],
+    });
+    expect(issues.map((i) => i.message)).toEqual([
+      'Row 1.a is empty.',
+      'Section 2 needs a title.',
+      'Row 2.a is empty.',
+    ]);
+  });
 });
 
 describe('hasUnpublishedChanges', () => {
