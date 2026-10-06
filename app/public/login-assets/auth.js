@@ -1,21 +1,23 @@
 // Behaviour for the pre-login pages (login.html, forbidden.html). Plain JS without a bundler:
 // these pages are served to anonymous visitors and must not load the app bundle. It lives in
-// its own file so the Content-Security-Policy needs no 'unsafe-inline'.
+// its own file so the Content-Security-Policy needs no 'unsafe-inline'. Type-checked with
+// app/tsconfig.public.json.
+
+/** @typedef {{ userDetails?: string, userRoles?: string[] }} ClientPrincipal */
 
 const APP_ROLES = ['inspector', 'admin'];
 const page = document.body.dataset.page;
 
-// Absolute return URLs keep the user on the host they came from (default or custom domain).
+// An absolute return URL keeps the user on the host they came from (default or custom domain).
+// Sign-out stays relative (see forbidden.html): the SWA CLI breaks an absolute logout return URL.
 setHref(
   'sign-in',
   `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(`${location.origin}/`)}`,
 );
-setHref(
-  'sign-out',
-  `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(`${location.origin}/login.html`)}`,
-);
 
 const principal = await getPrincipal();
+// Exact match, as the SWA CLI's route check does: forwarding a user that the gate then refuses
+// would bounce between this page and '/' forever. Roles are invited in lowercase.
 const hasAppRole = principal?.userRoles?.some((role) => APP_ROLES.includes(role)) ?? false;
 
 if (hasAppRole) {
@@ -29,7 +31,10 @@ if (hasAppRole) {
   else location.replace('/login.html');
 }
 
-/** The SWA client principal, or null when signed out (or when /.auth/me is unavailable). */
+/**
+ * The SWA client principal, or null when signed out (or when /.auth/me is unavailable).
+ * @returns {Promise<ClientPrincipal | null>}
+ */
 async function getPrincipal() {
   try {
     const res = await fetch('/.auth/me', { cache: 'no-store' });
@@ -41,15 +46,22 @@ async function getPrincipal() {
   }
 }
 
+/**
+ * @param {string} id
+ * @param {string} href
+ */
 function setHref(id, href) {
   const link = document.getElementById(id);
-  if (link) link.href = href;
+  if (link instanceof HTMLAnchorElement) link.href = href;
 }
 
+/** @param {string | undefined} email */
 function showSignedInAs(email) {
   const slot = document.getElementById('signed-in-email');
-  if (!email || !slot) return;
+  const signedInAs = document.getElementById('signed-in-as');
+  const fallback = document.getElementById('signed-in-fallback');
+  if (!email || !slot || !signedInAs || !fallback) return;
   slot.textContent = email;
-  document.getElementById('signed-in-as').hidden = false;
-  document.getElementById('signed-in-fallback').hidden = true;
+  signedInAs.hidden = false;
+  fallback.hidden = true;
 }

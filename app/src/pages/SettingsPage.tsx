@@ -32,13 +32,13 @@ export function SettingsPage() {
           </dl>
 
           <h3 className="mt-7 text-sm font-semibold text-ink-900">Invite someone</h3>
-          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-ink-600 marker:text-ink-400">
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-ink-600 marker:text-ink-500">
             <li>
               In the Azure portal, open the Static Web App and go to <Path>Role management</Path>.
             </li>
             <li>
               Select <Path>Invite</Path>, choose <Path>Microsoft Entra ID</Path>, enter their email
-              and the role <Code>inspector</Code> or <Code>admin</Code>.
+              and the role <Code>inspector</Code> or <Code>admin</Code>, in lowercase.
             </li>
             <li>
               Set how long the link is valid (at most 168 hours — invitations expire within 7 days),
@@ -48,7 +48,13 @@ export function SettingsPage() {
           </ol>
 
           <h3 className="mt-7 text-sm font-semibold text-ink-900">Or from a terminal</h3>
-          <pre className="mt-2 overflow-x-auto rounded-lg bg-ink-900 px-4 py-3 font-mono text-xs leading-relaxed text-ink-100">
+          {/* Focusable, so keyboard users can scroll it sideways on narrow screens. */}
+          <pre
+            tabIndex={0}
+            role="region"
+            aria-label="Invite command"
+            className="mt-2 overflow-x-auto rounded-lg bg-ink-900 px-4 py-3 font-mono text-xs leading-relaxed text-ink-100"
+          >
             <code>{INVITE_COMMAND}</code>
           </pre>
 

@@ -23,11 +23,12 @@ param swaName string = 'swa-modig-final-inspection'
 @maxLength(24)
 param storageAccountName string = 'stmodigfi${uniqueString(resourceGroup().id)}'
 
-@description('Extra origins allowed by blob CORS for browser uploads/downloads via SAS URLs (Vite dev server, SWA CLI). Pass [] to allow only the deployed site.')
-param devOrigins string[] = [
-  'http://localhost:5173'
-  'http://localhost:4280'
-]
+@description('Extra origins allowed by blob CORS for browser uploads/downloads via SAS URLs, besides the deployed site. Local development uses Azurite, so none by default.')
+param devOrigins string[] = []
+
+@secure()
+@description('Optional Application Insights connection string. Managed Functions log only to Application Insights, so without it API errors are not recorded anywhere. Empty: no logging.')
+param appInsightsConnectionString string = ''
 
 @description('Tags applied to every resource.')
 param tags object = {
@@ -155,9 +156,16 @@ resource deviationsTable 'Microsoft.Storage/storageAccounts/tableServices/tables
 resource appSettings 'Microsoft.Web/staticSites/config@2025-03-01' = {
   parent: swa
   name: 'appsettings'
-  properties: {
-    STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
-  }
+  properties: union(
+    {
+      STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+    },
+    // Set here, not with the portal's "Enable Application Insights": that setting would be
+    // removed by the next deployment (see above).
+    empty(appInsightsConnectionString)
+      ? {}
+      : { APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsConnectionString }
+  )
 }
 
 // ---------- Outputs (no secrets) ----------

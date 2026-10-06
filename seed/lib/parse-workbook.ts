@@ -3,7 +3,8 @@
  * the caller loads the workbook and decides what to do with the result.
  *
  * Hard problems (nothing sensible to import) throw; oddities that still give a usable template
- * (a letter out of sequence, a missing "Rev: N") become `warnings`.
+ * (a letter out of sequence, a row skipped for its column B, a missing "Rev: N") become
+ * `warnings`.
  */
 import type { Cell, Workbook, Worksheet } from 'exceljs';
 import {
@@ -49,6 +50,8 @@ export function parseWorkbook(workbook: Workbook): ParsedWorkbook {
  * The brief's rule, literally: a section header row has an integer in column B and the title in
  * column D; item rows have a letter in column B and the checkpoint text in column D. Lettered rows
  * with an empty column D are spare lines for handwritten findings — now a print setting (brief §6).
+ * Text in column D next to anything else in B ("b.", a note) is skipped with a warning, never
+ * silently.
  */
 function parseChecklist(ws: Worksheet, warnings: string[]): Section[] {
   const sections: Section[] = [];
@@ -70,8 +73,19 @@ function parseChecklist(ws: Worksheet, warnings: string[]): Section[] {
       return;
     }
 
+    if (!text) return; // a spare line or an empty row
     const letter = cellText(marker).toLowerCase();
-    if (!ROW_LETTER.test(letter) || !text) return;
+    if (/^\d+$/.test(letter)) {
+      throw new Error(
+        `${where}: section number "${letter}" in column B is stored as text; make it a number`,
+      );
+    }
+    if (!ROW_LETTER.test(letter)) {
+      warnings.push(
+        `${where}: skipped "${text}": column B "${cellText(marker)}" is neither a section number nor a row letter`,
+      );
+      return;
+    }
 
     const section = sections.at(-1);
     if (!section) {

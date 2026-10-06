@@ -81,11 +81,22 @@ describe('apiFetch', () => {
     expect(assign).toHaveBeenCalledWith('/login.html');
   });
 
-  it('sends a 401 to the login page', async () => {
-    fetchMock.mockResolvedValue(json(401, { error: 'unauthorized', message: 'Sign in' }));
+  it("sends SWA's own 401 (no ApiError body) to the login page", async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 401 }));
 
     expect(await settled(apiFetch('/api/me'))).toBe('pending');
     expect(assign).toHaveBeenCalledWith('/login.html');
+  });
+
+  it("throws the API's own 401 instead of navigating (no loop via the login page)", async () => {
+    fetchMock.mockResolvedValue(json(401, { error: 'unauthorized', message: 'Please sign in.' }));
+
+    await expect(apiFetch('/api/me')).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 401,
+      code: 'unauthorized',
+    });
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("sends SWA's own 403 (no app role) to the forbidden page", async () => {

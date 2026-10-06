@@ -19,13 +19,19 @@ const IsoDate = z.iso.date();
 // Machine models & settings
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Machine model short code ("RMMG"). It is the deviations table's PartitionKey, which rejects
+ * `/`, `\`, `#`, `?` and control characters: letters and digits only, wherever it appears.
+ */
+export const ModelCodeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(32)
+  .regex(/^[A-Za-z0-9]+$/, 'Model code must be letters and digits');
+
 export const MachineModelSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .min(1)
-    .max(32)
-    .regex(/^[A-Za-z0-9]+$/, 'Model code must be letters and digits'),
+  code: ModelCodeSchema,
   name: z.string().trim().min(1).max(100),
 });
 export type MachineModel = z.infer<typeof MachineModelSchema>;
@@ -130,7 +136,7 @@ export const TemplateSchema = z.object({
   id: IdSchema,
   /** "Final inspection – RigiMill MG" */
   name: z.string().max(200),
-  modelCode: z.string().min(1).max(32),
+  modelCode: ModelCodeSchema,
   /** Published revision number; a draft carries last published + 1. */
   revision: z.number().int().min(1),
   status: TemplateStatusSchema,
@@ -186,7 +192,8 @@ export type ExtraDeviation = z.infer<typeof ExtraDeviationSchema>;
 
 export const InspectionFrontSchema = z.object({
   machineName: z.string().max(200),
-  modelCode: z.string().max(32),
+  /** Known from the start: an inspection is always created from a template. */
+  modelCode: ModelCodeSchema,
   serialNumber: z.string().max(100),
   participants: z.array(z.string().max(200)),
   location: z.string().max(200),
@@ -240,7 +247,7 @@ export const DeviationRowSchema = z.object({
   inspectionNumber: z.string(),
   serialNumber: z.string(),
   machineName: z.string(),
-  modelCode: z.string(),
+  modelCode: ModelCodeSchema,
   templateId: IdSchema,
   templateRevision: z.number().int(),
   itemId: z.string(),

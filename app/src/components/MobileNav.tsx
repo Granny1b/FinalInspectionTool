@@ -1,6 +1,7 @@
 import type { Me } from '@modig/shared';
 import { Menu } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { MOBILE_BAR } from './layout';
 import { Logo } from './Logo';
 import { Sidebar } from './Sidebar';
 
@@ -40,7 +41,7 @@ export function MobileNav({ me }: { me: Me }) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-ink-200 bg-surface px-2 sm:px-4 lg:hidden">
+      <header className={MOBILE_BAR}>
         <button
           ref={menuButtonRef}
           type="button"
@@ -68,7 +69,7 @@ export function MobileNav({ me }: { me: Me }) {
         onClick={(event) => {
           if (event.target === event.currentTarget) close();
         }}
-        className="m-0 h-dvh max-h-none w-72 max-w-[85vw] bg-surface p-0 shadow-xl transition-transform duration-200 ease-out backdrop:bg-ink-950/30 motion-reduce:transition-none lg:hidden starting:open:-translate-x-full"
+        className="m-0 h-dvh max-h-none w-72 max-w-[85vw] overscroll-contain bg-surface p-0 shadow-xl transition-transform duration-200 ease-out backdrop:bg-ink-950/30 motion-reduce:transition-none lg:hidden starting:open:-translate-x-full"
       >
         <Sidebar me={me} onNavigate={close} onClose={close} />
       </dialog>

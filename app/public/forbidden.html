@@ -25,11 +25,14 @@
           <li>
             Ask a Quality admin to invite your work email as <em>inspector</em> or <em>admin</em>.
           </li>
-          <li>Open the invitation link within 7 days and sign in with that same account.</li>
+          <li>
+            Open the invitation link before it expires (at most 7 days) and sign in with that same
+            account.
+          </li>
           <li>Already accepted an invitation? Sign out and sign in again to pick up your role.</li>
         </ol>
 
-        <!-- The script upgrades this link to an absolute return URL; this href works without JS. -->
+        <!-- Relative return path on purpose: the SWA CLI turns an absolute one into a broken URL. -->
         <a id="sign-out" class="button" href="/.auth/logout?post_logout_redirect_uri=/login.html">
           Sign out and use another account
         </a>

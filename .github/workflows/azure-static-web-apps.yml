@@ -43,8 +43,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      # Also downloads the Azure Functions Core Tools binary (an api devDependency); no opt-out exists.
-      - run: npm ci
+      # --ignore-scripts skips the Azure Functions Core Tools download (~600 MB zip, 1.3 GB unpacked),
+      # which only the e2e job needs. Nothing here needs install scripts (esbuild loads its binary
+      # from its platform package), and none run in the job that builds the deployed output.
+      - run: npm ci --ignore-scripts
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
@@ -108,6 +110,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # With install scripts: this job runs `func start`, so it needs the Core Tools binary.
       - run: npm ci
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium

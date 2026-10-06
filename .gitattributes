@@ -1,0 +1,3 @@
+# LF everywhere, also on Windows clones (core.autocrlf=true): Prettier checks for LF.
+* text=auto eol=lf
+*.xlsm binary

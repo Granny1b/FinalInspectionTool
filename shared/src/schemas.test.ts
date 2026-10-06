@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ID_LENGTH, ID_PATTERN, newId } from './ids';
-import { AnnotationSchema, InspectionSchema, TemplateSchema } from './schemas';
+import { AnnotationSchema, InspectionSchema, ModelCodeSchema, TemplateSchema } from './schemas';
 import { blobNames, deviationKeys } from './storage';
 
 const now = '2026-10-06T09:00:00.000Z';
@@ -49,6 +49,21 @@ describe('TemplateSchema', () => {
 
   it('rejects unsafe ids (they become blob paths)', () => {
     expect(TemplateSchema.safeParse({ ...template, id: '../etc' }).success).toBe(false);
+  });
+
+  it('rejects model codes that cannot be a Table Storage PartitionKey', () => {
+    expect(TemplateSchema.safeParse({ ...template, modelCode: 'RM/MG' }).success).toBe(false);
+  });
+});
+
+describe('ModelCodeSchema', () => {
+  it('allows letters and digits only', () => {
+    for (const code of ['RMMG', 'HHVSingle', 'IM8']) {
+      expect(ModelCodeSchema.safeParse(code).success).toBe(true);
+    }
+    for (const code of ['', 'RM/MG', 'RM#MG', 'RM?MG', 'RM\\MG', 'RM MG', 'A\u0001']) {
+      expect(ModelCodeSchema.safeParse(code).success).toBe(false);
+    }
   });
 });
 
@@ -102,6 +117,8 @@ describe('InspectionSchema', () => {
     };
     expect(InspectionSchema.safeParse(inspection).success).toBe(true);
     expect(InspectionSchema.safeParse({ ...inspection, number: 'X-1' }).success).toBe(false);
+    const badModel = { ...inspection, front: { ...inspection.front, modelCode: 'RM/MG' } };
+    expect(InspectionSchema.safeParse(badModel).success).toBe(false);
   });
 });
 

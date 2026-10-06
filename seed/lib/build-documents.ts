@@ -7,7 +7,6 @@ import {
   DEFAULT_SPARE_ROWS_PER_SECTION,
   SettingsSchema,
   TemplateSchema,
-  type MachineModel,
   type Settings,
   type Template,
 } from '@modig/shared';
@@ -47,15 +46,20 @@ export function buildTemplateDocuments(
     updatedBy: `${SEED_USER} (${options.sourceFile})`,
   } satisfies Template);
 
-  // The change note describes the published revision, not the next one being drafted.
+  return { published, draft: draftOf(published) };
+}
+
+/**
+ * The draft that follows a published revision: the same content, `status: draft` and revision
+ * N + 1. The change note describes the published revision, not the next one being drafted.
+ */
+export function draftOf(published: Template): Template {
   const { changeNote: _changeNote, ...content } = published;
-  const draft = TemplateSchema.parse({
+  return TemplateSchema.parse({
     ...content,
     status: 'draft',
     revision: published.revision + 1,
   } satisfies Template);
-
-  return { published, draft };
 }
 
 export function buildSettings(parsed: ParsedWorkbook, now: string): Settings {
@@ -66,16 +70,4 @@ export function buildSettings(parsed: ParsedWorkbook, now: string): Settings {
     updatedAt: now,
     updatedBy: SEED_USER,
   } satisfies Settings);
-}
-
-/**
- * Workbook models whose code is not in the stored list yet. Models already stored are left
- * alone, so a renamed model is never reverted by re-running the seed.
- */
-export function missingModels(
-  stored: readonly MachineModel[],
-  fromWorkbook: readonly MachineModel[],
-): MachineModel[] {
-  const storedCodes = new Set(stored.map((m) => m.code));
-  return fromWorkbook.filter((m) => !storedCodes.has(m.code));
 }

@@ -9,6 +9,7 @@ import {
   type Settings,
 } from '@modig/shared';
 import { parseRealWorkbook, REAL_WORKBOOK_FILE } from '../test/real-workbook';
+import { buildTemplateDocuments, draftOf } from './build-documents';
 import type { ParsedWorkbook } from './parse-workbook';
 import { connectStorage, writeSeed, type Storage } from './write-storage';
 
@@ -52,7 +53,7 @@ describe('writeSeed', () => {
     expect(report.createdContainers).toEqual(Object.values(CONTAINERS));
     expect(report.settings).toEqual({
       action: 'created',
-      addedModelCodes: ['HHVSingle', 'HHVDUO', 'MILLEX', 'RMMT', 'RMMG', 'IM'],
+      modelCodes: ['HHVSingle', 'HHVDUO', 'MILLEX', 'RMMT', 'RMMG', 'IM'],
     });
     if (report.template.action !== 'created') throw new Error('expected a new template');
     const { templateId } = report.template;
@@ -103,57 +104,86 @@ describe('writeSeed', () => {
 
     expect(second).toEqual({
       createdContainers: [],
-      settings: { action: 'unchanged', addedModelCodes: [] },
+      settings: { action: 'unchanged' },
       template: { action: 'skipped', templateId: first.template.templateId },
     });
     expect(await Promise.all((await templateBlobNames()).map(etagOf))).toEqual(before);
     expect((await settingsBlob.getProperties()).etag).toBe(settingsBefore);
   });
 
-  it('adds missing models to existing settings without overwriting admin edits', async () => {
+  it('never touches existing settings, so removed and recoded models stay that way', async () => {
     await writeSeed(storage, parsed, options);
     const stored = await readBlob(settingsBlob);
     const edited: Settings = {
       ...SettingsSchema.parse(stored.json),
       machineModels: [
         { code: 'RMMG', name: 'RigiMill MG Gen 2' },
-        { code: 'XYZ', name: 'Custom machine' },
+        { code: 'RMT', name: 'RigiMill MT' },
       ],
       defaultLocation: 'Göteborg, Sweden',
       updatedBy: 'admin@modig.se',
     };
     const body = JSON.stringify(edited);
-    await settingsBlob.upload(body, Buffer.byteLength(body), {
+    const { etag } = await settingsBlob.upload(body, Buffer.byteLength(body), {
       conditions: { ifMatch: stored.etag },
     });
 
     const report = await writeSeed(storage, parsed, options);
 
-    expect(report.settings).toEqual({
-      action: 'merged',
-      addedModelCodes: ['HHVSingle', 'HHVDUO', 'MILLEX', 'RMMT', 'IM'],
-    });
-    const merged = SettingsSchema.parse((await readBlob(settingsBlob)).json);
-    expect(merged.machineModels.map((m) => `${m.code}=${m.name}`)).toEqual([
-      'RMMG=RigiMill MG Gen 2',
-      'XYZ=Custom machine',
-      'HHVSingle=HHV3',
-      'HHVDUO=HHV3 DUO',
-      'MILLEX=Mill-Ex',
-      'RMMT=RigiMill MT',
-      'IM=IM8',
-    ]);
-    expect(merged.defaultLocation).toBe('Göteborg, Sweden');
+    expect(report.settings).toEqual({ action: 'unchanged' });
+    const after = await readBlob(settingsBlob);
+    expect(after.etag).toBe(etag);
+    expect(after.json).toEqual(edited);
   });
 
-  it('refuses to merge into settings that are not valid', async () => {
-    await storage.blobService.getContainerClient(CONTAINERS.config).createIfNotExists();
-    const invalid = '{"machineModels":"nope"}';
-    await settingsBlob.upload(invalid, Buffer.byteLength(invalid));
+  it('is not stopped by a template for another model', async () => {
+    await templates.createIfNotExists();
+    const other = JSON.stringify({ modelCode: 'HHVSingle' });
+    await templates
+      .getBlockBlobClient(blobNames.templateDraft('otherModel000001'))
+      .upload(other, Buffer.byteLength(other));
 
-    await expect(writeSeed(storage, parsed, options)).rejects.toThrow(
-      /config\/settings\.json is not valid settings/,
+    const report = await writeSeed(storage, parsed, options);
+
+    expect(report.template.action).toBe('created');
+  });
+
+  it('completes an import that stopped after the published revision, with its item ids', async () => {
+    const crashedId = 'crashedTemplate1';
+    const { published } = buildTemplateDocuments(parsed, {
+      templateId: crashedId,
+      sourceFile: REAL_WORKBOOK_FILE,
+      now: options.now.toISOString(),
+    });
+    await templates.createIfNotExists();
+    const body = JSON.stringify(published);
+    await templates
+      .getBlockBlobClient(blobNames.templateRevision(crashedId, 2))
+      .upload(body, Buffer.byteLength(body));
+
+    const report = await writeSeed(storage, parsed, options);
+
+    expect(report.template).toEqual({
+      action: 'resumed',
+      templateId: crashedId,
+      publishedRevision: 2,
+      draftRevision: 3,
+    });
+    expect(await templateBlobNames()).toEqual([
+      blobNames.templateDraft(crashedId),
+      blobNames.templateRevision(crashedId, 2),
+    ]);
+    const draft = TemplateSchema.parse(
+      (await readBlob(templates.getBlockBlobClient(blobNames.templateDraft(crashedId)))).json,
     );
+    expect(draft).toEqual(draftOf(published));
+    expect(draft.sections).toEqual(published.sections);
+
+    // And the next run sees a finished import.
+    expect((await writeSeed(storage, parsed, options)).template).toEqual({
+      action: 'skipped',
+      templateId: crashedId,
+    });
   });
 });
 

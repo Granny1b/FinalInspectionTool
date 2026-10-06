@@ -51,6 +51,22 @@ CLI shows its own mock sign-in form instead of Microsoft's:
 
 Sign in without either role to see the no-access page. Stop everything with Ctrl+C.
 
+The mock form loads jQuery and Bootstrap from a CDN (`ajax.aspnetcdn.com`). If it does nothing
+(offline, or the CDN is blocked), sign in from the browser console on <http://localhost:4280>
+instead and reload. The cookie is all the form sets:
+
+```js
+document.cookie = `StaticWebAppsAuthCookie=${btoa(
+  JSON.stringify({
+    identityProvider: 'aad',
+    userId: 'local-anna',
+    userDetails: 'anna.andersson@modig.se',
+    userRoles: ['anonymous', 'authenticated', 'admin'],
+    claims: [],
+  }),
+)}; path=/`;
+```
+
 ### What `npm run dev` starts
 
 | Prefix          | What                                                                                  | Port         |
@@ -79,6 +95,9 @@ npm start -w @modig/api          # Functions host on 7071 (run Azurite too if a 
 npx swa start app/dist --swa-config-location app/dist --api-devserver-url http://127.0.0.1:7071
 ```
 
+This `swa start` prints "Error reading workflow configuration": it expects a different layout in
+the GitHub workflow file. The warning is harmless.
+
 ## Seed data
 
 `npm run dev` runs the seed every time. To run it on its own:
@@ -88,15 +107,17 @@ npm run seed -- --dry-run   # parse and validate the workbook, print a summary, 
 npm run seed                # write into local Azurite (it must be running)
 ```
 
-It is idempotent: containers and the `deviations` table are created when missing,
-`config/settings.json` only gains machine models whose code is missing, and the RigiMill MG
-template is imported only if none exists yet (published revision 2, continuing the workbook's
-"Rev: 2", plus a draft at revision 3). To start over locally, stop `npm run dev`, delete `.azurite/`
-and start it again.
+It is idempotent and never changes what already exists. Containers, the `deviations` table and
+`config/settings.json` are created when missing; after that the settings belong to the admins and
+the seed leaves them alone. The RigiMill MG template is imported only if none exists yet
+(published revision 2, continuing the workbook's "Rev: 2", plus a draft at revision 3); an import
+that was interrupted between those two writes is completed on the next run. To start over
+locally, stop `npm run dev`, delete `.azurite/` and start it again.
 
 `STORAGE_CONNECTION_STRING` points the seed at another storage account (see
 [Deploy to Azure](#deploy-to-azure)). Set it only for that one command, and never `export` it in
-the shell you run `npm run dev` from.
+the shell you run `npm run dev` from. Unset means local Azurite; set but empty stops the seed,
+because it usually means the command that produced it failed.
 
 ## Scripts
 
@@ -119,9 +140,10 @@ the shell you run `npm run dev` from.
 - **End-to-end tests** (`npm run test:e2e`): Playwright with Chromium, against
   <http://localhost:4280>. If nothing is running there, Playwright starts `npm run dev` itself and
   stops it afterwards; locally it reuses a stack you already started. The tests cover the sign-in
-  redirect for pages and the API, the sign-in link, the inspector and admin navigation, the
-  no-access page, a deep link, and that the seed imported the RigiMill MG template. They sign in by
-  setting the SWA CLI's `StaticWebAppsAuthCookie` directly.
+  redirect for pages and the API, the anonymous pre-login files (and that an encoded `../` cannot
+  reach the app through them), the sign-in link, the inspector and admin navigation, the no-access
+  page, a deep link, signing out, and that the seed imported the RigiMill MG template. They sign
+  in by setting the SWA CLI's `StaticWebAppsAuthCookie` directly.
 
 CI (`.github/workflows/azure-static-web-apps.yml`) runs `typecheck`, `lint`, `format:check`, a
 Bicep lint, `test` and `build` on every pull request and push to `main`. The end-to-end tests run
@@ -140,7 +162,8 @@ infra/    main.bicep: Static Web App and storage account
 e2e/      Playwright tests
 ```
 
-Branding lives in one place: the colour, font and radius tokens in `app/src/index.css`.
+Branding lives in the colour, spacing, font and radius tokens in `app/src/index.css`. The
+pre-login pages (`app/public/login-assets/auth.css`) mirror a few of them by hand, so change both.
 `app/public/modig-logo.svg` and `app/public/favicon.svg` are placeholders; replace them with the
 official artwork and keep the file names.
 
@@ -167,14 +190,15 @@ IDs are 16-character alphanumeric nanoids. Names are defined in `shared/src/stor
 
 - Static Web Apps built-in authentication with Microsoft Entra ID (`/.auth/login/aad`). There is
   no user table and there are no passwords. Other providers (GitHub, X) are switched off.
-- Two roles, assigned with Static Web Apps invitations: **`inspector`** creates and fills in
-  inspections; **`admin`** can also edit templates, see insights and change settings. On the Free
-  plan any Microsoft account can sign in, so access depends only on these roles, never on
-  "authenticated". At most 25 invited users.
+- Two roles, assigned with Static Web Apps invitations and always written in lowercase:
+  **`inspector`** creates and fills in inspections; **`admin`** can also edit templates, see
+  insights and change settings. On the Free plan any Microsoft account can sign in, so access
+  depends only on these roles, never on "authenticated". At most 25 invited users.
 - `app/public/staticwebapp.config.json` locks everything, including `/api/*`, to the two roles.
-  The only anonymous paths are `/login.html`, `/forbidden.html`, `/login-assets/*`, the logo and
-  the favicon. Without a session you are redirected to `/login.html`; with a session but no role
-  you get the no-access page.
+  The only anonymous paths are `/login.html`, `/forbidden.html`, `/login-assets/auth.js`,
+  `/login-assets/auth.css`, the logo and the favicon, each with its own exact route: an anonymous
+  wildcard such as `/login-assets/*` can be escaped with an encoded `../`. Without a session you
+  are redirected to `/login.html`; with a session but no role you get the no-access page.
 - Every function checks the role again (`endpoint({ role })` in `api/src/lib/http.ts`). Users are
   identified by their lowercased email, and the display name is derived from it, because Static
   Web Apps passes no name claim to managed functions.
@@ -199,15 +223,19 @@ app settings, i.e. a public preview URL with read/write access to the real inspe
   `az login`, then `az account set --subscription "<subscription name or id>"`.
 - [GitHub CLI](https://cli.github.com/), signed in (`gh auth login`), run from your clone of this
   repository.
-- Node 22 and `npm ci` done in the clone (for the one-time seed).
+- Node 22 and `npm ci --ignore-scripts` done in the clone, for the one-time seed
+  (`--ignore-scripts` skips the 1.3 GB Functions Core Tools download, which the seed doesn't need).
 
-The commands below are for bash (Linux, macOS, WSL or Azure Cloud Shell).
+The commands below are for bash (Linux, macOS, WSL or Azure Cloud Shell). Run them all in one
+terminal: the later steps use the variables `RG`, `SWA`, `STORAGE` and `SWA_URL` from step 1, and
+stop with a message if one is missing.
 
 ### 1. Create the resource group and deploy the infrastructure
 
-The storage account takes the resource group's region, so the inspection data stays in Sweden.
-Static Web Apps is offered only in a few regions (not Sweden); `westeurope` is the closest and the
-default. To see where it is offered today:
+The storage account takes the resource group's region, so the inspection data is stored in
+Sweden (the API that reads and writes it runs with the Static Web App in West Europe). Static Web
+Apps is offered only in a few regions (not Sweden); `westeurope` is the closest and the default.
+To see where it is offered today:
 
 ```bash
 az provider show --namespace Microsoft.Web \
@@ -234,21 +262,33 @@ echo "$SWA_URL"
 ```
 
 Other parameters (all optional): `location`, `storageAccountName` (globally unique; defaults to
-`stmodigfi` + a hash of the resource group), `swaName`, `devOrigins` (extra blob CORS origins,
-default `http://localhost:5173` and `http://localhost:4280`; pass `'devOrigins=[]'` to allow only
-the deployed site) and `tags`. Re-running the deployment is safe.
+`stmodigfi` + a hash of the resource group), `swaName`, `devOrigins` (extra blob CORS origins
+besides the deployed site; none by default), `appInsightsConnectionString` (see below) and `tags`.
+
+Re-running the deployment is safe as long as you pass the same parameters each time, so keep your
+overrides with the command. An omitted or changed `storageAccountName` or `swaName` creates a new,
+empty resource and points the app at it; an omitted `devOrigins`, `tags` or
+`appInsightsConnectionString` reverts to the default.
 
 > **App settings are owned by the Bicep file.** Each deployment replaces _all_ app settings of the
 > Static Web App, so a setting added in the portal disappears on the next run. Add new settings to
 > `infra/main.bicep` instead.
+
+**API logs (optional).** Managed Functions write their logs only to Application Insights, so
+without it an API error is not recorded anywhere you can read. To turn logging on, create an
+Application Insights resource (billed by data ingested, with a monthly free allowance) and pass
+its connection string on every deployment:
+`--parameters appInsightsConnectionString="<connection string>"`. Don't use the portal's _Enable
+Application Insights_ switch: the setting it adds is removed by the next deployment.
 
 ### 2. Give GitHub the deployment token
 
 The token goes straight from Azure into the repository secret, without being printed:
 
 ```bash
-az staticwebapp secrets list --name "$SWA" --resource-group "$RG" \
-  --query properties.apiKey --output tsv \
+: "${RG:?run step 1 in this shell first}" "${SWA:?run step 1 in this shell first}" &&
+  az staticwebapp secrets list --name "$SWA" --resource-group "$RG" \
+    --query properties.apiKey --output tsv \
   | gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN
 ```
 
@@ -271,12 +311,14 @@ workspace package `@modig/shared`.
 ### 4. Seed production storage (once)
 
 Imports the RigiMill MG template and the machine models from `seed/Final_Inspection_rev_2.xlsm`.
-It only creates what is missing, so running it twice does no harm. The connection string goes
-straight into the command's environment and is not printed:
+It only creates what is missing and never changes existing data, so running it twice does no
+harm. The connection string goes straight into the command's environment and is not printed. If
+`az` fails, the seed stops instead of falling back to local storage:
 
 ```bash
-STORAGE_CONNECTION_STRING="$(az storage account show-connection-string \
-  --name "$STORAGE" --resource-group "$RG" --query connectionString --output tsv)" \
+: "${RG:?run step 1 in this shell first}" "${STORAGE:?run step 1 in this shell first}" &&
+  STORAGE_CONNECTION_STRING="$(az storage account show-connection-string \
+    --name "$STORAGE" --resource-group "$RG" --query connectionString --output tsv)" \
   npm run seed
 ```
 
@@ -290,11 +332,13 @@ assigned with Static Web Apps invitations:
 
 - **Portal**: Static Web App → _Settings_ → _Role management_ → _Invite_. Provider _Microsoft
   Entra ID_, the person's email, domain = the site's hostname, role `inspector` or `admin`,
-  expiry in hours. Send them the generated link; they open it and sign in with that account.
+  expiry in hours. Write the role in lowercase. Send them the generated link; they open it and
+  sign in with that account.
 - **CLI**:
 
   ```bash
-  SWA_HOST=${SWA_URL#https://}
+  : "${RG:?run step 1 first}" "${SWA:?run step 1 first}" "${SWA_URL:?run step 1 first}" &&
+  SWA_HOST=${SWA_URL#https://} &&
   az staticwebapp users invite --name "$SWA" --resource-group "$RG" \
     --authentication-provider AAD --user-details anna.andersson@example.com \
     --roles inspector --domain "$SWA_HOST" --invitation-expiration-in-hours 168 \
@@ -315,21 +359,29 @@ portal under _Role management_. A user who gets a new role should sign out and i
 Anonymous requests must never reach the app or the API:
 
 ```bash
-for path in / /templates /login.html /api/me /.auth/login/github; do
-  printf '%-22s ' "$path"
-  curl --silent --output /dev/null --write-out '%{http_code} %{redirect_url}\n' "$SWA_URL$path"
+: "${SWA_URL:?run step 1 in this shell first}" &&
+for path in / /templates /login.html /api/me /.auth/login/github /login-assets/..%2findex.html; do
+  printf '%-30s ' "$path"
+  curl --silent --path-as-is --output /dev/null \
+    --write-out '%{http_code} %{redirect_url}\n' "$SWA_URL$path"
 done
 ```
 
 Expected:
 
 ```text
-/                      302 https://<host>/login.html
-/templates             302 https://<host>/login.html
-/login.html            200
-/api/me                302 https://<host>/login.html
-/.auth/login/github    404
+/                              302 https://<host>/login.html
+/templates                     302 https://<host>/login.html
+/login.html                    200
+/api/me                        302 https://<host>/login.html
+/.auth/login/github            404
+/login-assets/..%2findex.html  302 https://<host>/login.html
 ```
+
+Two lines allow some leeway. `/.auth/login/github` may also answer 200 without a redirect if
+Azure serves its navigation fallback there; only a 302 to github.com means the provider block is
+broken. `/login-assets/..%2findex.html` may also be refused with 400 or 404; only a 200 means the
+app can be reached without signing in.
 
 Then sign in through the site with an invited account and with a non-invited one (the latter must
 land on the "You don't have access yet" page).
@@ -339,28 +391,31 @@ land on the "You don't have access yet" page).
 Deployment token (the old one stops working at once):
 
 ```bash
-az staticwebapp secrets reset-api-key --name "$SWA" --resource-group "$RG" --output none
-az staticwebapp secrets list --name "$SWA" --resource-group "$RG" \
-  --query properties.apiKey --output tsv \
+: "${RG:?run step 1 in this shell first}" "${SWA:?run step 1 in this shell first}" &&
+  az staticwebapp secrets reset-api-key --name "$SWA" --resource-group "$RG" --output none &&
+  az staticwebapp secrets list --name "$SWA" --resource-group "$RG" \
+    --query properties.apiKey --output tsv \
   | gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN
 ```
 
 Storage account key: the app setting is built from `key1` at deployment time, so renew it and
-re-run the deployment right away (the API fails until the new setting is in place):
+re-run the deployment right away (the API fails until the new setting is in place). Use the same
+`--parameters` as in step 1; the command below shows the defaults:
 
 ```bash
-# --output none: the command otherwise prints the new keys
-az storage account keys renew --account-name "$STORAGE" --resource-group "$RG" --key key1 \
-  --output none
-az deployment group create --resource-group "$RG" --name modig-final-inspection \
-  --template-file infra/main.bicep --parameters swaLocation=westeurope
+: "${RG:?run step 1 in this shell first}" "${STORAGE:?run step 1 in this shell first}" &&
+  # --output none: the command otherwise prints the new keys
+  az storage account keys renew --account-name "$STORAGE" --resource-group "$RG" --key key1 \
+    --output none &&
+  az deployment group create --resource-group "$RG" --name modig-final-inspection \
+    --template-file infra/main.bicep --parameters swaLocation=westeurope # + step-1 overrides
 ```
 
 ## Estimated monthly cost
 
-Azure list prices in SEK, excluding VAT, as of October 2026; storage in Sweden Central. Usage
-assumes ~1 GB stored (mostly photos), ~10 000 blob write/list operations and ~50 000 reads per
-month.
+Azure list prices in SEK, excluding VAT, as of October 2026; storage in Sweden Central, the API in
+West Europe. Usage assumes ~1 GB stored (mostly photos, including 7 days of soft-deleted
+overwrites), ~10 000 blob write/list operations and ~50 000 reads per month.
 
 | Item                                                | Price                            | Per month   |
 | --------------------------------------------------- | -------------------------------- | ----------- |
@@ -370,6 +425,7 @@ month.
 | Blob reads: 50 000                                  | 0.0399 SEK/10 000                | 0.20 SEK    |
 | Table storage (deviations): < 0.01 GB, < 10 000 ops | 0.4485 SEK/GB, 0.0036 SEK/10 000 | < 0.01 SEK  |
 | Data transfer out (first 100 GB free)               | 0                                | 0 SEK       |
+| Inter-region transfer, storage → API: < 0.5 GB JSON | 0.1993 SEK/GB                    | < 0.1 SEK   |
 | **Total**                                           |                                  | **≈ 1 SEK** |
 
 That is far below the 50 SEK/month target: even ten times the usage (10 GB, 100 000 writes,

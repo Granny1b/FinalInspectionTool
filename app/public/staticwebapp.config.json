@@ -7,20 +7,23 @@
     { "route": "/.auth/login/github", "statusCode": 404 },
     { "route": "/.auth/login/twitter", "statusCode": 404 },
     { "route": "/.auth/login/x", "statusCode": 404 },
-    {
-      "route": "/logout",
-      "redirect": "/.auth/logout?post_logout_redirect_uri=/login.html"
-    },
     { "route": "/login.html", "allowedRoles": ["anonymous"] },
     { "route": "/forbidden.html", "allowedRoles": ["anonymous"] },
-    { "route": "/login-assets/*", "allowedRoles": ["anonymous"] },
+    { "route": "/login-assets/auth.js", "allowedRoles": ["anonymous"] },
+    { "route": "/login-assets/auth.css", "allowedRoles": ["anonymous"] },
     { "route": "/modig-logo.svg", "allowedRoles": ["anonymous"] },
     { "route": "/favicon.svg", "allowedRoles": ["anonymous"] },
     { "route": "/*", "allowedRoles": ["inspector", "admin"] }
   ],
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/api/*", "/assets/*", "/login-assets/*", "/*.{css,js,json,map,svg,png,ico,txt}"]
+    "exclude": [
+      "/api/*",
+      "/.auth/*",
+      "/assets/*",
+      "/login-assets/*",
+      "/*.{css,js,json,map,svg,png,ico,txt}"
+    ]
   },
   "responseOverrides": {
     "401": { "statusCode": 302, "redirect": "/login.html" },

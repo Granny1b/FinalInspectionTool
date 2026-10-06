@@ -22,6 +22,10 @@ async function signIn(context: BrowserContext, email: string, appRoles: string[]
   ]);
 }
 
+async function hasSession(context: BrowserContext): Promise<boolean> {
+  return (await context.cookies()).some((cookie) => cookie.name === 'StaticWebAppsAuthCookie');
+}
+
 const mainNav = (page: Page) => page.getByRole('navigation', { name: 'Main' });
 // The closed mobile drawer holds a second, hidden copy of the sidebar.
 const userName = (page: Page, name: string) =>
@@ -41,6 +45,16 @@ test.describe('anonymous visitor', () => {
     const response = await request.get('/api/me', { maxRedirects: 0 });
     expect(response.status()).toBe(302);
     expect(response.headers()['location']).toMatch(/\/login\.html$/);
+  });
+
+  test('gets the pre-login assets, but not the app bundle through them', async ({ request }) => {
+    for (const asset of ['/login-assets/auth.js', '/login-assets/auth.css']) {
+      expect((await request.get(asset, { maxRedirects: 0 })).status()).toBe(200);
+    }
+    // An encoded "../" must not turn an anonymous route into a way past the role check.
+    const traversal = await request.get('/login-assets/..%2findex.html', { maxRedirects: 0 });
+    expect(traversal.status()).toBe(302);
+    expect(traversal.headers()['location']).toMatch(/\/login\.html$/);
   });
 
   test('signs in with Microsoft Entra ID', async ({ page, baseURL }) => {
@@ -116,5 +130,29 @@ test.describe('signed in', () => {
     await expect(
       page.getByRole('link', { name: 'Sign out and use another account' }),
     ).toBeVisible();
+  });
+
+  test('signing out from the sidebar ends on the sign-in page', async ({ page, context }) => {
+    await signIn(context, 'Sam.Andersson@modig.se', ['inspector']);
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Sign out' }).filter({ visible: true }).click();
+
+    await expect(page).toHaveURL(/\/login\.html$/);
+    await expect(page.getByRole('heading', { name: 'Final Inspection' })).toBeVisible();
+    expect(await hasSession(context)).toBe(false);
+  });
+
+  test('signing out from the no-access page ends on the sign-in page', async ({
+    page,
+    context,
+  }) => {
+    await signIn(context, 'visitor@example.com', []);
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: "You don't have access yet" })).toBeVisible();
+    await page.getByRole('link', { name: 'Sign out and use another account' }).click();
+
+    await expect(page).toHaveURL(/\/login\.html$/);
+    await expect(page.getByRole('heading', { name: 'Final Inspection' })).toBeVisible();
+    expect(await hasSession(context)).toBe(false);
   });
 });

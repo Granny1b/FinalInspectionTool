@@ -63,14 +63,17 @@ export async function apiFetch<T = unknown>(
     signal,
   });
 
-  if (res.type === 'opaqueredirect' || res.status === 401) return navigateAway(LOGIN_PAGE);
+  if (res.type === 'opaqueredirect') return navigateAway(LOGIN_PAGE);
 
   const payload = await readJson(res);
   const apiError = ApiErrorSchema.safeParse(payload);
 
-  // A 403 without our JSON error body comes from SWA itself (signed in, but no app role).
-  // A 403 *with* one is the API refusing a single action, which the page should show instead.
-  if (res.status === 403 && !apiError.success) return navigateAway(FORBIDDEN_PAGE);
+  // A 401/403 without our JSON error body comes from SWA itself: the session has expired, or the
+  // user is signed in without an app role. One *with* it comes from a function and is thrown for
+  // the page to show. The pre-login pages send role holders straight back to '/', so navigating
+  // on the API's own 401 would loop whenever the SWA gate and the API's checks disagree.
+  if (!apiError.success && res.status === 401) return navigateAway(LOGIN_PAGE);
+  if (!apiError.success && res.status === 403) return navigateAway(FORBIDDEN_PAGE);
 
   if (!res.ok) {
     if (res.status === 412) {

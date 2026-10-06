@@ -1,12 +1,13 @@
 /**
  * One-off import of the RigiMill MG checklist and the machine models from the Excel workbook
- * (brief §2). Safe to re-run: it only creates what is missing.
+ * (brief §2). Safe to re-run: it only creates what is missing and never changes existing data.
  *
  *   npm run seed -w @modig/seed                          local Azurite (UseDevelopmentStorage=true)
  *   npm run seed -w @modig/seed -- --dry-run             parse, validate and summarise; write nothing
  *   npm run seed -w @modig/seed -- path/to/workbook.xlsm another copy of the workbook
  *
- * STORAGE_CONNECTION_STRING selects another storage account (e.g. the one in Azure).
+ * STORAGE_CONNECTION_STRING selects another storage account (e.g. the one in Azure). Unset means
+ * local Azurite; set but empty is an error.
  */
 import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,11 +53,17 @@ async function main(): Promise<void> {
     return;
   }
 
-  // `||`, not `??`: an empty variable (common in .env files) also means "use local Azurite".
-  const connectionString = process.env[STORAGE_CONNECTION_STRING_ENV] || LOCAL_CONNECTION_STRING;
-  const storage = connectStorage(connectionString);
+  // Only an unset variable means local Azurite. An empty one is usually a failed
+  // `$(az ...)` in the production seed command, which must not quietly seed Azurite instead.
+  const configured = process.env[STORAGE_CONNECTION_STRING_ENV];
+  if (configured !== undefined && configured.trim() === '') {
+    throw new Error(
+      `${STORAGE_CONNECTION_STRING_ENV} is set but empty (did the command that produced it fail?). Unset it to use local Azurite.`,
+    );
+  }
+  const storage = connectStorage(configured ?? LOCAL_CONNECTION_STRING);
   console.log(`\nStorage     ${describeStorage(storage)}`);
-  if (!process.env[STORAGE_CONNECTION_STRING_ENV]) {
+  if (configured === undefined) {
     console.log(`            (${STORAGE_CONNECTION_STRING_ENV} not set: using local Azurite)`);
   }
   try {
@@ -92,21 +99,24 @@ function printReport({ createdContainers, settings, template }: SeedReport): voi
   console.log(
     `Containers  ${createdContainers.length ? `created ${createdContainers.join(', ')}` : 'all present'}`,
   );
-  const settingsLine = {
-    created: `created with models ${settings.addedModelCodes.join(', ')}`,
-    merged: `added missing models ${settings.addedModelCodes.join(', ')}`,
-    unchanged: 'unchanged (all models present)',
-  }[settings.action];
-  console.log(`Settings    ${settingsLine}`);
+  console.log(
+    settings.action === 'created'
+      ? `Settings    created with models ${settings.modelCodes.join(', ')}`
+      : 'Settings    already exist; left untouched',
+  );
   const id = template.templateId;
   const draftPath = `${CONTAINERS.templates}/${blobNames.templateDraft(id)}`;
-  if (template.action === 'created') {
-    const revisionPath = `${CONTAINERS.templates}/${blobNames.templateRevision(id, template.publishedRevision)}`;
-    console.log(`Template    created ${revisionPath} (published)`);
-    console.log(`            created ${draftPath} (draft, revision ${template.draftRevision})`);
-  } else {
+  if (template.action === 'skipped') {
     console.log(`Template    already seeded: ${draftPath} exists for this model; left untouched`);
+    return;
   }
+  const revisionPath = `${CONTAINERS.templates}/${blobNames.templateRevision(id, template.publishedRevision)}`;
+  if (template.action === 'created') {
+    console.log(`Template    created ${revisionPath} (published)`);
+  } else {
+    console.log(`Template    completing an import that stopped after ${revisionPath}:`);
+  }
+  console.log(`            created ${draftPath} (draft, revision ${template.draftRevision})`);
 }
 
 /** Turn "connection refused" into what to do about it. */

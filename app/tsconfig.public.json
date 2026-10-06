@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  // The pre-login script is plain JS (no bundler), checked here. This file stays outside public/,
+  // which Vite copies to dist verbatim.
+  "include": ["public/login-assets/*.js"]
+}

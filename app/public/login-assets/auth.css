@@ -4,12 +4,10 @@
  */
 :root {
   --brand-50: #effafe;
-  --brand-500: #29abe2;
   --brand-600: #0b7db3;
   --brand-700: #0c6894;
   --ink-200: #e3e7ec;
-  --ink-400: #98a2ad;
-  --ink-500: #6a7480;
+  --ink-500: #646e7a;
   --ink-600: #4c5561;
   --ink-900: #161b21;
   --canvas: #f6f7f9;
@@ -129,7 +127,7 @@ h1 {
 }
 
 :focus-visible {
-  outline: 2px solid var(--brand-500);
+  outline: 2px solid var(--brand-600);
   outline-offset: 2px;
 }
 
@@ -191,5 +189,5 @@ h1 {
 .footer {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--ink-400);
+  color: var(--ink-500);
 }

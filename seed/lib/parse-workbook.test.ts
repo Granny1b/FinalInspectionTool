@@ -139,11 +139,38 @@ describe('parseWorkbook — rules', () => {
     ]);
   });
 
+  it('skips rows with text but no section number or letter, and names them in a warning', () => {
+    const parsed = parseWorkbook(
+      workbook({
+        checklist: [
+          [1, 'Loading area'],
+          ['a', 'First'],
+          [null, 'A note'],
+          ['b', 'Second'],
+          ['c.', 'Third'],
+        ],
+      }),
+    );
+    expect(parsed.sections[0]?.items.map((i) => i.text)).toEqual(['First', 'Second']);
+    expect(parsed.warnings).toEqual([
+      expect.stringContaining('skipped "A note": column B "" is neither'),
+      expect.stringContaining('skipped "Third": column B "c." is neither'),
+    ]);
+  });
+
   it('falls back to revision 1 and the default location, with warnings', () => {
     const parsed = parseWorkbook(workbook({ front: [['Machine name']] }));
     expect(parsed.publishedRevision).toBe(1);
     expect(parsed.defaultLocation).toBe(DEFAULT_LOCATION);
     expect(parsed.warnings).toHaveLength(2);
+  });
+
+  it('does not take a Location label merged over two rows as its own value', () => {
+    const wb = workbook({ front: [['Location'], [], ['Kalmar, Sweden'], ['Rev: 2']] });
+    wb.getWorksheet(SHEETS.front)?.mergeCells('E1:E2');
+    const parsed = parseWorkbook(wb);
+    expect(parsed.defaultLocation).toBe(DEFAULT_LOCATION);
+    expect(parsed.warnings).toEqual([expect.stringContaining('no value under a "Location" label')]);
   });
 
   it('warns when the status list differs from the app', () => {
@@ -175,6 +202,18 @@ describe('parseWorkbook — rules', () => {
       /section 1 "Loading area" has no items/,
     ],
     ['an item before any section', { checklist: [['a', 'Robot']] }, /before the first section/],
+    [
+      'a section number stored as text',
+      {
+        checklist: [
+          [1, 'Loading area'],
+          ['a', 'First'],
+          ['2', 'Tool Arena'],
+          ['a', 'Robot'],
+        ],
+      },
+      /section number "2" in column B is stored as text/,
+    ],
     ['no sections at all', { checklist: [] }, /no section header rows/],
     [
       'duplicate model codes',

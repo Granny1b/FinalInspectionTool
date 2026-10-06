@@ -130,4 +130,12 @@ describe('ETag helpers', () => {
   it('rejects a save without If-Match', () => {
     expect(() => requireIfMatch(request())).toThrow(BadRequestError);
   });
+
+  it('rejects "*" and lists, which would skip the version check', () => {
+    for (const value of ['*', 'W/*', '"0x8DC1", "0x8DC2"']) {
+      expect(() => requireIfMatch(request({ headers: { 'If-Match': value } }))).toThrow(
+        BadRequestError,
+      );
+    }
+  });
 });

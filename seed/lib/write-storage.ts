@@ -1,7 +1,7 @@
 /**
  * Writes the seed into blob/table storage. Idempotent, so `npm run dev` can run it every time:
- * containers and the table are created when missing, settings only gain missing models, and the
- * RigiMill MG template is imported once.
+ * containers, the table and the settings are created when missing, and the RigiMill MG template
+ * is imported once. Nothing that already exists is changed. Assumes a single writer.
  *
  * Uses the Azure SDKs directly — the API's storage helpers live in another workspace.
  */
@@ -19,14 +19,13 @@ import {
   CONTAINERS,
   DEVIATIONS_TABLE,
   newId,
-  SettingsSchema,
   TemplateSchema,
+  type Template,
 } from '@modig/shared';
 import {
   buildSettings,
   buildTemplateDocuments,
-  missingModels,
-  SEED_USER,
+  draftOf,
   TEMPLATE_MODEL_CODE,
 } from './build-documents';
 import type { ParsedWorkbook } from './parse-workbook';
@@ -35,9 +34,15 @@ export type Storage = { blobService: BlobServiceClient; deviations: TableClient 
 
 export type SeedReport = {
   createdContainers: string[];
-  settings: { action: 'created' | 'merged' | 'unchanged'; addedModelCodes: string[] };
+  settings: { action: 'created'; modelCodes: string[] } | { action: 'unchanged' };
   template:
-    | { action: 'created'; templateId: string; publishedRevision: number; draftRevision: number }
+    | {
+        /** `resumed`: an earlier run stopped between the revision and the draft; now completed. */
+        action: 'created' | 'resumed';
+        templateId: string;
+        publishedRevision: number;
+        draftRevision: number;
+      }
     | { action: 'skipped'; templateId: string };
 };
 
@@ -89,37 +94,23 @@ export async function writeSeed(
   return { createdContainers, settings, template };
 }
 
-/** Create settings on first run; afterwards only append models whose code is missing. */
+/**
+ * Create the settings on the first run only. After that they belong to the admins and are never
+ * touched, so a model they removed or recoded stays that way.
+ */
 async function seedSettings(
   config: ContainerClient,
   parsed: ParsedWorkbook,
   now: string,
 ): Promise<SeedReport['settings']> {
-  const blob = config.getBlockBlobClient(blobNames.settings);
-  const stored = await readJson(blob);
-  if (!stored) {
-    await writeJson(blob, buildSettings(parsed, now), { ifNoneMatch: '*' });
-    return { action: 'created', addedModelCodes: parsed.models.map((m) => m.code) };
+  const settings = buildSettings(parsed, now);
+  try {
+    await writeJson(config.getBlockBlobClient(blobNames.settings), settings, { ifNoneMatch: '*' });
+  } catch (error) {
+    if (isRestError(error) && error.code === 'BlobAlreadyExists') return { action: 'unchanged' };
+    throw error;
   }
-
-  const current = SettingsSchema.safeParse(stored.json);
-  if (!current.success) {
-    const problems = current.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
-    throw new Error(
-      `${blobPath(blob)} is not valid settings (${problems.join('; ')}); fix or delete it and run the seed again`,
-    );
-  }
-  const added = missingModels(current.data.machineModels, parsed.models);
-  if (added.length === 0) return { action: 'unchanged', addedModelCodes: [] };
-
-  const merged = SettingsSchema.parse({
-    ...current.data,
-    machineModels: [...current.data.machineModels, ...added],
-    updatedAt: now,
-    updatedBy: SEED_USER,
-  });
-  await writeJson(blob, merged, { ifMatch: stored.etag });
-  return { action: 'merged', addedModelCodes: added.map((m) => m.code) };
+  return { action: 'created', modelCodes: settings.machineModels.map((m) => m.code) };
 }
 
 /** Import the template unless a RigiMill MG template already exists (whatever its content). */
@@ -129,21 +120,33 @@ async function seedTemplate(
   sourceFile: string,
   now: string,
 ): Promise<SeedReport['template']> {
-  const existingId = await findTemplateId(templates, TEMPLATE_MODEL_CODE);
-  if (existingId) return { action: 'skipped', templateId: existingId };
+  const create = { ifNoneMatch: '*' };
+  const existing = await findTemplate(templates, TEMPLATE_MODEL_CODE);
+  if (existing?.revisionWithoutDraft) {
+    // Built from the stored revision, not the workbook: parsing again would mint new item ids.
+    const published = existing.revisionWithoutDraft;
+    const draft = draftOf(published);
+    await writeJson(templates.getBlockBlobClient(blobNames.templateDraft(draft.id)), draft, create);
+    return {
+      action: 'resumed',
+      templateId: draft.id,
+      publishedRevision: published.revision,
+      draftRevision: draft.revision,
+    };
+  }
+  if (existing) return { action: 'skipped', templateId: existing.templateId };
 
   const { published, draft } = buildTemplateDocuments(parsed, {
     templateId: newId(),
     sourceFile,
     now,
   });
-  const create = { ifNoneMatch: '*' };
   await writeJson(
     templates.getBlockBlobClient(blobNames.templateRevision(published.id, published.revision)),
     published,
     create,
   );
-  // Written last: an existing draft is what marks the import as done (see findTemplateId).
+  // Written last: an existing draft is what marks the import as done (see findTemplate).
   await writeJson(templates.getBlockBlobClient(blobNames.templateDraft(draft.id)), draft, create);
   return {
     action: 'created',
@@ -153,17 +156,37 @@ async function seedTemplate(
   };
 }
 
-/** Id of the template whose draft is for `modelCode`, if there is one. */
-async function findTemplateId(
+/**
+ * The template for `modelCode`: normally one with a draft. Failing that, a published revision
+ * whose template has no draft, which is an import that stopped between its two writes.
+ */
+async function findTemplate(
   templates: ContainerClient,
   modelCode: string,
-): Promise<string | undefined> {
+): Promise<{ templateId: string; revisionWithoutDraft?: Template } | undefined> {
+  const drafts: string[] = [];
+  const latestRevision = new Map<string, number>();
   for await (const { name } of templates.listBlobsFlat()) {
-    const [templateId = ''] = name.split('/');
-    if (name !== blobNames.templateDraft(templateId)) continue;
-    const draft = await readJson(templates.getBlockBlobClient(name));
+    const [templateId = '', file = ''] = name.split('/');
+    if (name === blobNames.templateDraft(templateId)) drafts.push(templateId);
+    const revision = Number(blobNames.templateRevisionPattern.exec(file)?.[1] ?? 0);
+    if (revision > 0 && name === blobNames.templateRevision(templateId, revision)) {
+      latestRevision.set(templateId, Math.max(revision, latestRevision.get(templateId) ?? 0));
+    }
+  }
+
+  for (const templateId of drafts) {
+    const draft = await readJson(templates.getBlockBlobClient(blobNames.templateDraft(templateId)));
     const parsed = TemplateSchema.pick({ modelCode: true }).safeParse(draft?.json);
-    if (parsed.success && parsed.data.modelCode === modelCode) return templateId;
+    if (parsed.success && parsed.data.modelCode === modelCode) return { templateId };
+  }
+  for (const [templateId, revision] of latestRevision) {
+    if (drafts.includes(templateId)) continue;
+    const blob = templates.getBlockBlobClient(blobNames.templateRevision(templateId, revision));
+    const parsed = TemplateSchema.safeParse((await readJson(blob))?.json);
+    if (parsed.success && parsed.data.id === templateId && parsed.data.modelCode === modelCode) {
+      return { templateId, revisionWithoutDraft: parsed.data };
+    }
   }
   return undefined;
 }

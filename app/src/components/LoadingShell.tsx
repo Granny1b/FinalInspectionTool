@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { CONTENT_FRAME, CONTENT_OFFSET, SIDEBAR_FRAME } from './layout';
+import { CONTENT_FRAME, CONTENT_OFFSET, MOBILE_BAR, SIDEBAR_FRAME } from './layout';
 import { Logo } from './Logo';
 
 /** Skeleton of the shell shown while /api/me loads, laid out exactly like the real one. */
@@ -21,7 +21,9 @@ export function LoadingShell() {
           <Bone className="h-10" />
         </div>
       </div>
-      <div className="flex h-14 items-center border-b border-ink-200 bg-surface px-4 lg:hidden">
+      <div className={MOBILE_BAR}>
+        {/* Where the menu button will be, so the logo doesn't jump when the shell loads. */}
+        <div className="size-10" />
         <Logo className="h-7" />
       </div>
       <div className={CONTENT_OFFSET}>

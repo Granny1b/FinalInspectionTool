@@ -9,14 +9,12 @@
  * require of 'util' is not supported"). The `.cjs` extension makes the worker require() it even
  * though package.json says "type": "module".
  */
-import console from 'node:console';
 import { copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import process from 'node:process';
 import * as esbuild from 'esbuild';
 
 const apiDir = join(import.meta.dirname, '..');
-const at = (path) => join(apiDir, path);
+const at = (/** @type {string} */ path) => join(apiDir, path);
 
 /** @type {import('esbuild').BuildOptions} */
 const options = {

@@ -7,7 +7,7 @@ import {
   TemplateSchema,
 } from '@modig/shared';
 import { parseRealWorkbook, REAL_WORKBOOK_FILE } from '../test/real-workbook';
-import { buildSettings, buildTemplateDocuments, missingModels } from './build-documents';
+import { buildSettings, buildTemplateDocuments } from './build-documents';
 import type { ParsedWorkbook } from './parse-workbook';
 
 const now = '2026-10-06T09:00:00.000Z';
@@ -61,16 +61,5 @@ describe('buildTemplateDocuments', () => {
       updatedAt: now,
       updatedBy: 'seed',
     });
-  });
-});
-
-describe('missingModels', () => {
-  it('returns only models whose code is not stored, ignoring renamed ones', () => {
-    const stored = [{ code: 'RMMG', name: 'RigiMill MG (renamed)' }];
-    const fromWorkbook = [
-      { code: 'RMMT', name: 'RigiMill MT' },
-      { code: 'RMMG', name: 'RigiMill MG' },
-    ];
-    expect(missingModels(stored, fromWorkbook)).toEqual([{ code: 'RMMT', name: 'RigiMill MT' }]);
   });
 });

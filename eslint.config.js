@@ -31,13 +31,7 @@ export default tseslint.config(
   },
   // Node code: api, seed, tooling, e2e
   {
-    files: [
-      'api/**/*.ts',
-      'seed/**/*.ts',
-      'e2e/**/*.ts',
-      'scripts/**/*.{js,mjs,ts}',
-      '*.{js,mjs,ts}',
-    ],
+    files: ['api/**/*.ts', 'seed/**/*.ts', 'e2e/**/*.ts', 'api/scripts/**/*.mjs', '*.{js,mjs,ts}'],
     languageOptions: { globals: { ...globals.node } },
   },
   // Browser code: the React app

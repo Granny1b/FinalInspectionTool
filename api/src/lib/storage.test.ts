@@ -48,6 +48,14 @@ describe('readJson / writeJson', () => {
     );
   });
 
+  it('names the blob when its content is not JSON', async () => {
+    const name = blobName();
+    await containerClient(config).getBlockBlobClient(name).upload('{nope', 5);
+    await expect(readJson(config, name, MachineModelSchema)).rejects.toThrow(
+      `config/${name} is not valid JSON`,
+    );
+  });
+
   it('creates only once with ifNoneMatch "*"', async () => {
     const name = blobName();
     await writeJson(config, name, model, { ifNoneMatch: '*' });
@@ -99,6 +107,19 @@ describe('ensureStorage', () => {
   it('is idempotent across processes (everything already exists)', async () => {
     vi.resetModules();
     const fresh = await import('./storage');
+    await expect(fresh.ensureStorage()).resolves.toBeUndefined();
+  });
+
+  it('retries after a failure instead of caching it', async () => {
+    vi.resetModules();
+    const fresh = await import('./storage');
+    const saved = process.env[STORAGE_CONNECTION_STRING_ENV];
+    delete process.env[STORAGE_CONNECTION_STRING_ENV];
+    try {
+      await expect(fresh.ensureStorage()).rejects.toThrow('is not set');
+    } finally {
+      process.env[STORAGE_CONNECTION_STRING_ENV] = saved;
+    }
     await expect(fresh.ensureStorage()).resolves.toBeUndefined();
   });
 

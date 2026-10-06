@@ -38,7 +38,8 @@ type Props = {
 export function Sidebar({ me, onNavigate, onClose }: Props) {
   const adminLabelId = useId();
   return (
-    <div className="flex h-full flex-col bg-surface">
+    // A landmark, so the user panel (and Sign out) is reachable by landmark navigation too.
+    <aside aria-label="Sidebar" className="flex h-full flex-col bg-surface">
       <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-ink-100 px-5">
         <Logo className="h-8" />
         {onClose && (
@@ -60,7 +61,7 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
             {/* A list label, not a heading: the sidebar comes before the page's <h1>. */}
             <p
               id={adminLabelId}
-              className="mt-7 mb-2 px-3 text-xs font-medium tracking-wide text-ink-400 uppercase"
+              className="mt-7 mb-2 px-3 text-xs font-medium tracking-wide text-ink-500 uppercase"
             >
               Admin
             </p>
@@ -70,7 +71,7 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
       </nav>
 
       <UserPanel me={me} />
-    </div>
+    </aside>
   );
 }
 

@@ -88,7 +88,13 @@ export async function readJson<T>(
   if (!download.readableStreamBody || !download.etag) {
     throw new Error(`${container}/${blobName}: download returned no body or ETag`);
   }
-  const result = schema.safeParse(JSON.parse(await text(download.readableStreamBody)));
+  let json: unknown;
+  try {
+    json = JSON.parse(await text(download.readableStreamBody));
+  } catch (cause) {
+    throw new Error(`${container}/${blobName} is not valid JSON`, { cause });
+  }
+  const result = schema.safeParse(json);
   if (!result.success) {
     // Stored data we cannot trust is a server problem (500), not the caller's.
     throw new Error(`${container}/${blobName} is invalid:\n${z.prettifyError(result.error)}`);

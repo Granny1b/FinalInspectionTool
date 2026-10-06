@@ -15,7 +15,7 @@
     "dev:table": "azurite-table --location .azurite --silent --disableTelemetry",
     "dev:seed": "wait-on --timeout 60s tcp:127.0.0.1:10000 tcp:127.0.0.1:10002 && npm run seed",
     "dev:api-build": "npm run watch -w @modig/api",
-    "dev:api": "wait-on --timeout 120s file:api/dist/index.cjs tcp:127.0.0.1:10000 tcp:127.0.0.1:10002 && cd api && nodemon --watch dist --ext cjs --delay 1 --signal SIGTERM --exec \"func start --port 7071\"",
+    "dev:api": "wait-on --timeout 120s file:api/dist/index.cjs tcp:127.0.0.1:10000 tcp:127.0.0.1:10002 && cd api && nodemon --exitcrash --watch dist --ext cjs --delay 1 --signal SIGTERM --exec \"func start --port 7071\"",
     "dev:app": "npm run dev -w @modig/app",
     "dev:swa": "wait-on --timeout 180s tcp:localhost:5173 http-get://127.0.0.1:7071/admin/host/status && swa start",
     "build": "npm run build --workspaces --if-present",

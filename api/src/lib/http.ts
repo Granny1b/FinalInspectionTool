@@ -126,5 +126,10 @@ export function requireIfMatch(req: HttpRequest): string {
   const value = req.headers.get('if-match')?.trim();
   if (!value) throw new BadRequestError('The If-Match header is required.');
   // Proxies that compress responses may weaken the ETag; the blob only knows the strong form.
-  return value.startsWith('W/') ? value.slice(2) : value;
+  const etag = value.startsWith('W/') ? value.slice(2) : value;
+  // One ETag from an earlier read: "*" or a list would let a save skip the version check.
+  if (etag === '*' || etag.includes(',')) {
+    throw new BadRequestError('If-Match must be the ETag from an earlier read.');
+  }
+  return etag;
 }
