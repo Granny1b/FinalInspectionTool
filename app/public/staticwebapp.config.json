@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json.schemastore.org/staticwebapp.config.json",
+  "platform": {
+    "apiRuntime": "node:22"
+  },
+  "routes": [
+    { "route": "/.auth/login/github", "statusCode": 404 },
+    { "route": "/.auth/login/twitter", "statusCode": 404 },
+    { "route": "/.auth/login/x", "statusCode": 404 },
+    {
+      "route": "/logout",
+      "redirect": "/.auth/logout?post_logout_redirect_uri=/login.html"
+    },
+    { "route": "/login.html", "allowedRoles": ["anonymous"] },
+    { "route": "/forbidden.html", "allowedRoles": ["anonymous"] },
+    { "route": "/login-assets/*", "allowedRoles": ["anonymous"] },
+    { "route": "/modig-logo.svg", "allowedRoles": ["anonymous"] },
+    { "route": "/favicon.svg", "allowedRoles": ["anonymous"] },
+    { "route": "/*", "allowedRoles": ["inspector", "admin"] }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/assets/*", "/login-assets/*", "/*.{css,js,json,map,svg,png,ico,txt}"]
+  },
+  "responseOverrides": {
+    "401": { "statusCode": 302, "redirect": "/login.html" },
+    "403": { "rewrite": "/forbidden.html" }
+  },
+  "globalHeaders": {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://*.blob.core.windows.net; font-src 'self'; connect-src 'self' https://*.blob.core.windows.net; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Frame-Options": "DENY",
+    "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+  }
+}

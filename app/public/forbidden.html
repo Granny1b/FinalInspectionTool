@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>No access yet · Modig Final Inspection</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/login-assets/auth.css" />
+    <script type="module" src="/login-assets/auth.js"></script>
+  </head>
+  <body data-page="forbidden">
+    <main class="auth">
+      <div class="card">
+        <img class="logo" src="/modig-logo.svg" alt="Modig Machine Tool" width="140" height="40" />
+        <h1>You don't have access yet</h1>
+        <p class="lead">
+          <span id="signed-in-as" hidden>You're signed in as <strong id="signed-in-email"></strong>, but</span>
+          <span id="signed-in-fallback">Your account is signed in, but</span>
+          it hasn't been invited to Final Inspection.
+        </p>
+
+        <ol class="steps">
+          <li>Ask a Quality admin to invite your work email as <em>inspector</em> or <em>admin</em>.</li>
+          <li>Open the invitation link within 7 days and sign in with that same account.</li>
+          <li>Already accepted an invitation? Sign out and sign in again to pick up your role.</li>
+        </ol>
+
+        <!-- The script upgrades this link to an absolute return URL; this href works without JS. -->
+        <a id="sign-out" class="button" href="/.auth/logout?post_logout_redirect_uri=/login.html">
+          Sign out and use another account
+        </a>
+        <p class="note">
+          If Microsoft signs you straight back in, choose “Use another account” or use a private
+          window.
+        </p>
+      </div>
+      <p class="footer">Modig Machine Tool · Quality</p>
+    </main>
+  </body>
+</html>

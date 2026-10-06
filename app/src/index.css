@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens — the one place to tweak branding (brief §7).
+ * The default Tailwind palette is switched off so every colour in the app comes from here.
+ * The static pre-login pages (public/login-assets/auth.css) mirror a few of these values by hand.
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+
+  /* Modig cyan. 500 is the brand colour; 600 is the darkest shade that still reads as the brand
+     and carries white text at WCAG AA (4.5:1), so it is the primary button colour. */
+  --color-brand-50: #effafe;
+  --color-brand-100: #dcf2fb;
+  --color-brand-200: #b7e5f7;
+  --color-brand-300: #82d2f0;
+  --color-brand-400: #4bbde8;
+  --color-brand-500: #29abe2;
+  --color-brand-600: #0b7db3;
+  --color-brand-700: #0c6894;
+  --color-brand-800: #105679;
+  --color-brand-900: #134864;
+  --color-brand-950: #0c2e42;
+
+  /* Ink: slightly cool neutrals for text, borders and quiet surfaces. */
+  --color-ink-50: #f8f9fb;
+  --color-ink-100: #f1f3f6;
+  --color-ink-200: #e3e7ec;
+  --color-ink-300: #cdd3da;
+  --color-ink-400: #98a2ad;
+  --color-ink-500: #6a7480;
+  --color-ink-600: #4c5561;
+  --color-ink-700: #363e48;
+  --color-ink-800: #232930;
+  --color-ink-900: #161b21;
+  --color-ink-950: #0b0e12;
+
+  /* Layout surfaces: white cards on a very light grey app background. */
+  --color-canvas: #f6f7f9;
+  --color-surface: #ffffff;
+
+  /* Inspection statuses — muted, never neon. NOK red doubles as the error colour. */
+  --color-ok-bg: #edf7f1;
+  --color-ok-fg: #1e7044;
+  --color-ok-border: #b8dfc8;
+  --color-nok-bg: #fdf1f0;
+  --color-nok-fg: #b42318;
+  --color-nok-border: #f2c6c1;
+  --color-na-bg: #f1f3f5;
+  --color-na-fg: #58616c;
+  --color-na-border: #d6dbe0;
+
+  --font-sans:
+    'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-canvas text-ink-900 antialiased;
+  }
+
+  /* One cyan focus ring for everything focusable, shown for keyboard users only. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+
+  /* Tailwind v4 resets the cursor on buttons to the default arrow. */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}

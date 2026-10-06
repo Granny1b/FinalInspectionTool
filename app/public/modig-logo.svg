@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 40" width="140" height="40" role="img" aria-labelledby="title">
+  <!-- Placeholder logo: replace with the official Modig artwork, keeping this file name. The app and the sign-in pages both load /modig-logo.svg. -->
+  <title id="title">Modig Machine Tool</title>
+  <path fill="#29ABE2" d="M3 34C6 17 19 6.5 37 4.5C23 9.5 13 19.5 9.5 34Z"/>
+  <path fill="#82D2F0" d="M13.5 34C16 24 23.5 16.5 33.5 13C26 18.5 21.5 25.5 19.5 34Z"/>
+  <path fill="none" stroke="#161B21" stroke-width="3.6" stroke-linejoin="round" d="M44 23V6L52.5 16.54L61 6V23M67.4 14.5A8.5 8.5 0 1 1 84.4 14.5A8.5 8.5 0 1 1 67.4 14.5ZM90.8 6H97.6A8.5 8.5 0 0 1 97.6 23H90.8ZM112.5 6V23M133.72 8.81A8.5 8.5 0 1 0 135.9 14.5H128.42"/>
+  <path fill="none" stroke="#6A7480" stroke-width="1.1" stroke-linejoin="round" d="M44 35V30L46.5 33.1L49 30V35M53.29 35L55.54 30L57.79 35M54.19 33.2H56.89M66.34 30.73A2.5 2.5 0 1 0 66.34 34.27M70.86 30V35M74.96 30V35M70.86 32.5H74.96M79.25 30V35M83.53 35V30L87.63 35V30M95.42 30H91.92V35H95.42M91.92 32.5H94.89M105.74 30H109.74M107.74 30V35M114.03 32.5A2.5 2.5 0 1 1 119.03 32.5A2.5 2.5 0 1 1 114.03 32.5ZM123.31 32.5A2.5 2.5 0 1 1 128.31 32.5A2.5 2.5 0 1 1 123.31 32.5ZM132.6 30V35H135.9"/>
+</svg>

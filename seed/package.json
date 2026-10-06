@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "description": "One-off import of the RigiMill MG checklist and machine models from Final_Inspection_rev_2.xlsm into blob storage (brief §2).",
+  "scripts": {
+    "seed": "tsx import-xlsx.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
   "dependencies": {
     "@azure/data-tables": "^13.3.2",
     "@azure/storage-blob": "^12.34.0",
