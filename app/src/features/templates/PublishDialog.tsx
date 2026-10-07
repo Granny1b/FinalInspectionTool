@@ -6,7 +6,8 @@ import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
 import { Field, INPUT } from '../../components/Field';
 import { focusIssue, templateIssueField } from './publishIssues';
-import { errorMessage, isConflict, publishIssuesOf } from './queries';
+import { errorMessage, isConflict } from '../../lib/api';
+import { publishIssuesOf } from './queries';
 
 /** How saving pending edits went; `message` says why it failed, when known. */
 export type FlushResult =

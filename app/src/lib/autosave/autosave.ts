@@ -1,5 +1,5 @@
 /**
- * Autosave for a document saved with ETags (brief §5.2):
+ * Autosave for a document saved with ETags (brief §5.2 templates, §5.3 inspections):
  * - saves `delayMs` after the last change (debounce);
  * - one request in flight at a time; changes made meanwhile become one follow-up save;
  * - the latest value always ends up saved, or the failure stays visible;

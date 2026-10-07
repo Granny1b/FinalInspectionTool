@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { ApiRequestError } from '../../lib/api';
+import { ApiRequestError, errorMessage } from '../api';
 import {
   createAutosaver,
   type AutosaveOptions,
@@ -7,7 +7,6 @@ import {
   type Autosaver,
   type SaveErrorKind,
 } from './autosave';
-import { errorMessage } from './queries';
 
 /**
  * One autosaver for the lifetime of the component, and its state as React state. The options are

@@ -135,12 +135,17 @@ export type WriteConditions = {
   ifNoneMatch?: '*';
 };
 
+export type WriteOptions = WriteConditions & {
+  /** Replaces the blob's metadata. Names and values must be ASCII (they travel as headers). */
+  metadata?: Record<string, string>;
+};
+
 /** Writes `data` as a JSON blob and returns the new ETag. */
 export async function writeJson(
   container: ContainerName,
   blobName: string,
   data: unknown,
-  conditions: WriteConditions = {},
+  { metadata, ...conditions }: WriteOptions = {},
 ): Promise<string> {
   await ensureStorage();
   const body = JSON.stringify(data);
@@ -149,6 +154,7 @@ export async function writeJson(
     .upload(body, Buffer.byteLength(body), {
       blobHTTPHeaders: { blobContentType: 'application/json' },
       conditions,
+      metadata,
     })
     .catch(toConditionError);
   if (!etag) throw new Error(`${container}/${blobName}: upload returned no ETag`);

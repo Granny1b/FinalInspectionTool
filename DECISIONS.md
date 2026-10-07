@@ -695,3 +695,285 @@ The calls with product, security or data impact. Each is explained in its sectio
   upload. Each was checked to fail on the code before the fix.
 - **Not done:** Vite warns that the main chunk is 598 kB (183 kB gzipped). Loading the editor
   route on demand would trim it; the API bundle is 2.9 MB since the functions use the storage SDKs.
+
+## Phase 3 – Inspections
+
+### Worth reviewing first
+
+The calls with product, data or KPI impact. Each is explained in its section below.
+
+- Finalise asks for more than the brief's "every row has a status": the front page needs a
+  machine name and serial number, and every extra deviation a description (Contract).
+- A save whose deviation-table update fails still succeeds; the table catches up at the next
+  save. Finalise and Reopen update the table first and refuse with 503 if they can't (Deviation
+  table).
+- Beyond the contract: if Finalise or Reopen updated the table but then lost the race for the
+  inspection itself, the table is synced back from the stored inspection (Deviation table).
+- A deviation row's `createdAt` is when the deviation was first recorded and survives later
+  saves; a deviation removed and added again gets a new one (Deviation table).
+- `resp` is stored in the table exactly as typed. KPIs that group by it (phase 6) must trim and
+  ignore case (Deviation table).
+- Inspection numbers are unique but not gapless, and the counter never goes back a year (API).
+- An inspection without a photo of its own shares the template's cover photo (API).
+- A new error code, `unavailable` (503): nothing was changed, send the same request again (API).
+- Fields a client may not set are ignored, not refused (API).
+- A held key never marks a run of rows; **Set remaining to OK** has no confirmation (it only
+  fills rows without a status) (Checklist sheet).
+- The Deviation Summary is a tab next to the checklist, not a side panel (Inspection pages).
+- Creating an inspection has no client timeout, so a slow create is never retried into a second
+  inspection (Inspection pages).
+- The e2e tests read the deviations table straight from Azurite with `@azure/data-tables`, which
+  the root `package.json` doesn't list yet (Tests and tooling).
+- `npm run dev` starts the SWA CLI through `scripts/swa-start.mjs`, which trims its environment
+  to an allow-list, and Vite now listens on `127.0.0.1`: a page load in dev went from about 6 s
+  to about 1.2 s (Tests and tooling).
+
+### Contract (shared)
+
+- **The snapshot keeps the template's name and print settings as well as its sections**
+  (`templateSnapshot: { name, sections, printSettings }`; the brief has sections only). Printing
+  an inspection (phase 4) must never depend on the live template.
+- **Inspections carry server-owned `createdAt/By` and `updatedAt/By`** (emails), like templates.
+  The list shows when an inspection last changed; the deviation rows need nothing more.
+- **Finalise rules (`validateForFinalise`)**: every row has a status (brief §5.3), the front page
+  has a machine name and serial number (a report must say which machine it is about), and every
+  extra deviation has a description. Problems are listed front page first, then rows in
+  checklist order, then extra deviations, each with a target the page can jump to.
+- **The list row (`InspectionSummary`) also carries `filled` and `total`,** so the list can show
+  "87 / 90 rows" for inspections in progress.
+- **`ApiError` gained the code `unavailable` (503)**: a storage step failed before anything
+  changed, so the same request can be retried. `internal` would have hidden that.
+
+### API and storage
+
+- **The list is one blob listing with metadata.** Every write stores the inspection's list row in
+  one metadata entry, `summary`: the row without its id (the blob name is the id) as
+  `encodeURIComponent(JSON)`, because metadata must be ASCII. `JSON.stringify` also escapes lone
+  surrogates, on which `encodeURIComponent` alone throws.
+- **A blob without a usable summary is read in full** (missing, not encoded, not JSON or failing
+  the schema, e.g. from an older version). Listing never rewrites metadata; the next save does.
+  There is no version key: an outdated summary simply fails validation. A corrupt inspection
+  reached this way makes the list a logged 500 naming the blob, as for templates.
+- **List order:** year, then sequence, both descending and parsed from the number (FI-2026-10000
+  before FI-2026-0010), then id; a number that doesn't parse goes last.
+- **Numbering (`config/inspection-counter.json`):** the counter is written conditionally on the
+  version just read. Losing the race (412 or 409) means read again: up to 5 retries after the
+  first attempt, with random waits of at most 100, 200, 400, 800 and 1600 ms, then 503 "Too many
+  inspections are being created at once. Try again." A missing counter is created with
+  `ifNoneMatch '*'`; an unreadable one is a 500, never a silent restart at 0001. The year is
+  Swedish time.
+- **The counter never goes back a year.** If it already holds a later year than this instance's
+  clock (skew at New Year), it keeps counting in that year; restarting the earlier year would
+  hand out numbers again.
+- **The number is taken last,** after the body, the template and its published revision are
+  checked, so a refused create never uses one up. A failed write after that skips the number:
+  numbers are unique, not gapless.
+- **Create** answers 404 for an unknown template (also one whose draft is missing, as in phase 2) and 409 "Publish the template first." when it has no published revision. It does not touch
+  the table: a new inspection has no deviations.
+- **The machine photo defaults to the revision's cover photo** when the create request has none
+  (images never change, so sharing the id is safe). A save without `photoId` removes the photo,
+  as `coverImageId` does on templates.
+- **Save check order:** a malformed body (400), unknown inspection (404), outdated `If-Match`
+  (412), finalised (409 "This inspection is finalised – an admin must reopen it."), then the id
+  checks (400). The id checks need the stored snapshot, so an outdated page always sees the
+  conflict first.
+- **Results must be keyed by rows of the snapshot; extra deviation ids must be unique and never
+  equal a row id,** because both become RowKeys in the table. The errors name the ids.
+- **Fields a client may not set are ignored, not refused:** zod strips unknown keys, and number,
+  snapshot, revision, model, state and audit fields always come from the stored inspection.
+- **Finalise and Reopen also set `updatedAt/By`** (the blob changes); `finalisedAt` equals that
+  `updatedAt`. Asking for the state the inspection is already in syncs the table again and
+  answers 200 with the stored body and ETag; it still needs the current `If-Match` (412 first, as
+  everywhere).
+- **Five new registrations, 13 in all:** `functions/inspections.ts` (list, create, read, save),
+  `functions/inspection-state.ts` (finalise, reopen) and `functions/resp-suggestions.ts`.
+- **`writeJson` takes optional blob metadata;** existing callers are unchanged.
+- **API tests:** `resetStorage()` also clears inspections, the counter and every deviation row,
+  row by row (deleting the table would defeat `ensureStorage`'s once-per-process memo).
+  `sampleInspection()` builds a valid inspection.
+
+### Deviation table
+
+- **Each write makes the table equal `deriveDeviations(inspection)`:** one range query reads the
+  inspection's rows (RowKeys from `{id}_` up to, not including, ``{id}` ``: the backtick is the
+  character after the underscore; built with the SDK's `odata` template), all 17 columns are
+  compared, and only new or changed rows are written (upsert, Replace) and vanished ones deleted.
+  Unchanged saves write nothing; most autosaves touch zero or one row.
+- **Batches of at most 100 actions in the model's partition, upserts before deletes.** Each batch
+  is atomic; a sync over 100 changes that fails part-way leaves the earlier batches applied until
+  the retry or next write, which converges because the sync is idempotent.
+- **Order:** a save writes the blob first (the truth), then the table; a table failure is logged
+  (`context.warn`) and the save still answers 200. Finalise and Reopen write the table first (its
+  `finalised` flag decides what the KPIs count), then the blob; a table failure is logged
+  (`context.error`) and answers 503 "The deviation records could not be updated, so nothing was
+  changed. Try again."
+- **Beyond the contract:** if the blob write of a finalise or reopen fails after the table was
+  updated (a 412 race or any other error), the table is synced again from the stored blob, best
+  effort, before the error is returned. Otherwise the table could claim `finalised = true` for an
+  inspection in progress.
+- **`createdAt` is the time of the sync that first wrote the row,** as an ISO string, kept on
+  later saves, so KPIs over time don't move with every edit.
+- **Column types:** `templateRevision` a number, `finalised` a boolean, `inspectionDate`
+  (YYYY-MM-DD) and `createdAt` (ISO, UTC) strings; both sort correctly as text for range
+  filters.
+- **`resp` is stored untrimmed,** mirroring `deriveDeviations`. Only the suggestions trim.
+- **Resp suggestions** filter on the server (`resp ne ''`) and select only `resp`. Values are
+  trimmed; spellings differing only in case count as one name, offered in the spelling most rows
+  use (the first found on a tie), sorted with a Swedish collation; at most 500, after sorting.
+
+### Checklist sheet
+
+- **Keys on a focused row:** `1`/`O` OK, `2`/`N` NOK, `3`/`A` N/A, `0`/`Backspace`/`Delete`
+  clear, `↓`/`J` and `↑`/`K` move (across sections), `Home`/`End` first and last, `C` comment,
+  `G` the guide note. Ctrl, Alt and Meta combinations are always the browser's; Shift still counts
+  for character keys (digits need it on some layouts) but Shift with a named key is the browser's.
+- **OK and N/A by key move to the next row; NOK stays** so the comment follows at once. On the
+  last row the focus stays.
+- **A held key repeats moves only.** Setting or clearing a status takes a press per row, so a key
+  held a little too long never marks a run of rows.
+- **Clearing** (a key, or clicking the selected segment again) also drops the severity; comment
+  and resp stay. A row left with nothing is removed from `results` rather than stored as `{}`.
+- **Severity shows "Minor" but is stored only once picked;** `deriveDeviations` already defaults
+  to minor.
+- **Tab order: row → comment → resp → severity (NOK rows) → next row.** Severity comes last so the
+  common NOK flow (2, C, comment, Tab, resp, Enter) never passes it, and it is drawn on the line
+  below, under the status, so the visual order matches. Status segments and the guide icon are
+  not tab stops.
+- **Enter in the comment or resp moves to the next row** (at the end of the checklist, back to
+  the row); a select keeps Enter. Escape in any field returns to the row. Keys typed in a field
+  are never shortcuts.
+- **Every row is `tabIndex` 0 (not a roving tab index),** so native Tab and Shift+Tab give the
+  order above without custom handling. A section's **Set remaining to OK** is a Tab stop between
+  sections.
+- **Set remaining to OK** fills only rows without a status, in one change, without a
+  confirmation. It stays focusable when nothing is left (`aria-disabled`) and its accessible name
+  includes the count.
+- **Resp suggestions use the browser's `<datalist>`,** one per sheet. In Chrome its popup takes the
+  first Enter (pick) or Escape (close); the next press reaches the sheet.
+- **Layout by the sheet's own width (container queries):** from 56rem one line per row in the
+  print's column order; from 34rem the checkpoint above Comment | Status | Resp; narrower, stacked.
+  Controls are 44 px on touch screens and narrow sheets, 32 px with a mouse on a wide sheet.
+- **Resp is 10rem wide** (the integrator widened it from 8rem): "El-avdelningen" was cut off in
+  its input on desktop and tablet.
+- **Fields are underlined, not boxed;** 180 boxes were heavy, and lines read like the paper's
+  writing lines. The focused field gets the full box and ring. On wide sheets the column labels
+  replace the placeholders.
+- **Scrolling:** moving the focus scrolls by the smallest amount (`scrollIntoView` 'nearest';
+  plain `focus()` centres the row in Chrome), with about one row of look-ahead below
+  (`scroll-margin-bottom`). The page keeps rows clear of its sticky header.
+- **Never colour only:** statuses are symbol + text; a NOK row has a red bar and its pressed
+  "✗ NOK" segment; the selected segment's ring is at 80 % strength (60 % was under 3:1). The focus
+  ring is drawn inside the row and overrides the red problem outline.
+- **Screen readers:** each row is a labelled group ("Row 3.c …") described by its status; one
+  polite live region announces "3.c NOK" and "Section 2: 13 rows set to OK"; section titles are
+  headings with a hidden "Section N:".
+- **The guide icon** (camera with photos, info without) and `G` show "Guide viewer arrives in
+  phase 5."
+- **Read-only (finalised) is separate, simpler markup** with the same grid; rows stay focusable
+  from script for jump links.
+- **Performance:** rows and sections are memoised and the actions object is stable, so a change
+  re-renders one row and its section. Measured in a production build on 180 rows: 1.9 ms of
+  script per status key (p95 2.6 ms).
+- **`SEVERITY_LABELS` (Minor, Major, Critical) lives in `checklist/status.ts`;** the Deviation
+  Summary reuses it. A candidate for shared.
+
+### Inspection pages
+
+- **Tabs, not a side panel:** "Checklist | Deviations (n)". A side panel would squeeze the sheet
+  below its one-line layout on most screens; the tabs sit in the sticky header, so the live count
+  is always in view.
+- **The front page is the top of the Checklist tab** (brief: "Front page card at the top"), so a
+  front-page problem jumps there.
+- **The sticky header's height is measured** and set as the page's `scroll-padding-top`; a fixed
+  value broke when a long machine name or a narrow window wrapped the header.
+- **Each tab keeps its scroll position;** jump links switch the tab at once, then focus and centre
+  their target. **Continue at 3.b** focuses the first row without a status, so transcription
+  resumes without tabbing through the front page.
+- **Print is shown disabled** but focusable, with "Print / Save PDF: coming in phase 4".
+- **The save status is hidden on a finalised inspection** unless something is still unsaved.
+- **List filters live in the address** (`?q=&model=&state=`, replacing the history entry) and are
+  applied at once (`flushSync`): as a router transition, fast typing kept only the first letter
+  and a quick second change undid the first.
+- **Search** is case-insensitive (Swedish), every word must appear in the number, machine or serial
+  number, and å/ä/ö are not folded (they are letters of their own in Swedish). The model filter
+  offers the models that have inspections, plus one from a shared link.
+- **New inspection is one page,** not a wizard: checklist radios (published templates only; a
+  single one is preselected), then the front page. It is checked with the shared create schema;
+  errors show after the first attempt and the first bad field gets the focus.
+- **The template's cover photo is shown as the default photo;** without a photo of its own the
+  request omits it and the server applies the cover. You can't create without a photo when the
+  template has one; remove it on the inspection afterwards.
+- **Create waits for a photo upload and has no client timeout** (SWA's gateway ends a hung
+  request at 45 s), so a slow create that went through is never repeated. Saves, finalise and
+  reopen keep phase 2's 30 s timeout.
+- **Location defaults to the settings' default** (even if an admin emptied it), the brief's
+  "Kalmar, Sweden" only when the settings can't load; the date to today's local date (not UTC). The
+  date field passes on only complete dates and shows the last valid one again when left.
+- **Participants are chips:** Enter, a comma, a semicolon or a line break adds a name (a pasted
+  list splits); leaving the field adds what was typed; duplicates (ignoring case) are skipped;
+  each name is cut at 200 characters.
+- **The model is read-only text** on the front page: it comes from the template and never changes.
+  A finalised front page is a definition list with "—" for empty fields.
+- **Deviation Summary:** a table (scrolls sideways on phones). Row deviations are read-only there;
+  their ref jumps to the row. Extra deviations are edited in place (Enter never adds a line
+  break); removing one asks only if something was typed, then focus goes to **Add extra
+  deviation**. A new extra deviation gets the focus in its description. Ids are `newId()`.
+- **Resp suggestions** are the history merged with this inspection's own values, trimmed,
+  de-duplicated ignoring case and sorted (Swedish).
+- **Finalise checks locally first** and lists problems without saving; after an attempt they stay
+  marked and update as you type, with a **Show problems** callout. The confirmation names the
+  number, rows and deviations, then saves pending changes (waiting for a photo upload) and
+  finalises the version on screen.
+- **Finalise and Reopen outcomes:** problems from the server (400) are listed the same way; 503
+  shows "Finalise didn't complete – try again." with **Try again**; after a 412, a network error, a
+  timeout or another 5xx the page reads the inspection again and counts it as done if it is in the
+  wanted state with this content (a lost answer), otherwise a 412 shows the conflict.
+- **Focus:** after Finalise or Reopen the notice takes the focus (the button it came from is
+  swapped), the title after the notice is dismissed; the dialog's busy button is `aria-disabled`.
+- **Inspectors never see Reopen;** the API refuses them as well (403).
+- **Shared pieces moved:** the autosave scheduler, its hook, the leave guard and the save status
+  went from `features/templates` to `app/src/lib/autosave/` (tests unchanged and green);
+  `errorMessage`, `isMissing` and `isConflict` to `lib/api.ts`. Templates changed only imports.
+- **`MachinePhoto` repeats about 25 lines of the template's `CoverPhoto`** to say "machine photo";
+  a label prop on `CoverPhoto` would remove the copy. Not done: outside the builder's area.
+- **Performance:** the front page card, the Deviation Summary (whose deviations keep their
+  identity while unchanged) and the header parts are memoised, the hint bar is a constant
+  element. Production build: 1.5 ms of main-thread work per status key, 5.0 ms per comment
+  keystroke.
+- **Every visit loads the inspection afresh** (`gcTime` 0) and Reload remounts the page, as in
+  phase 2.
+
+### Tests and tooling
+
+- **`e2e/inspections.spec.ts`: six tests.** Each gets its own throwaway template, published as
+  revision 1 with model `E2E`, and deletes it and its inspections, with their deviation rows,
+  afterwards. Inspections are created through the API with the test's own sign-in, except in the
+  test of the create form. Tests run in parallel and never depend on the seeded RigiMill MG.
+- **The deviation table is checked in Azurite itself** (`e2e/support/storage.ts`): no endpoint
+  exposes the rows. It uses `@azure/data-tables`, which resolves from the API workspace; the root
+  `package.json` should list it next to `@azure/storage-blob`.
+- **The keyboard test uses key presses only** once the first row has the focus, and checks the
+  stored results exactly, so a shortcut leaking from a text field would fail it.
+- **The SWA CLI starts with a trimmed environment (`scripts/swa-start.mjs`).** A page load in dev
+  took about 6 s through it but 0.6 s straight from Vite. Profiling showed why: SWA CLI 2.0.10
+  copies the whole of `process.env` about a hundred times per request (its logger reads the
+  environment again for every debug line, even with debug output off), so with the ~190
+  variables of this shell each proxied module cost about 35 ms of CPU. The launcher deletes every
+  variable not on an allow-list (path, home and temp folders, the Windows shell, locale,
+  terminal, proxies, `NODE_*`, `SWA_*`), then runs the CLI's own `swa` bin in the same process with
+  `start`: no extra process, so Ctrl+C and Playwright's shutdown work as before. A missing
+  variable the CLI turns out to need goes on the allow-list.
+- **Vite listens on `127.0.0.1` and the CLI proxies to `http://127.0.0.1:5173`.** For a `localhost`
+  dev server URL the CLI runs `wait-on` against it before proxying every request (about 30 ms
+  each here); phase 1 already did the same for the API URL. A fixed address also avoids
+  `localhost` resolving to `::1` first on some machines.
+- **Measured:** a cold page load through port 4280 went from 5.5–6 s to 1.1–1.4 s; HMR still
+  connects through the CLI; 40 parallel cold loads started the app every time with no empty
+  module (phase 2's keep-alive race). The whole e2e suite (35 tests, 2 workers, fresh stack)
+  went from 4.2 to 1.6 minutes, and ran three times in a row without a failure or a retry.
+- **The finalise test loads the admin's page while the inspector's loads,** and the conflict test
+  loads both inspectors' pages at once: page loads remain the slowest step of a test.
+- **Existing specs needed no change:** none relied on the inspections placeholder.
+- **The production build was checked by hand** (built app and `api/deploy` behind `swa start`
+  with the local config copy): creating with a photo, filling in, finalising and a deep link, with
+  no CSP violations and no console errors. As in phase 2, that is not part of the suite.

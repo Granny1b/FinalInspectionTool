@@ -300,6 +300,8 @@ export const API_ERROR_CODES = [
   'conflict',
   'precondition_failed',
   'internal',
+  /** 503: a storage step failed and nothing was changed, so the same request can be retried. */
+  'unavailable',
 ] as const;
 export const ApiErrorSchema = z.object({
   error: z.enum(API_ERROR_CODES),

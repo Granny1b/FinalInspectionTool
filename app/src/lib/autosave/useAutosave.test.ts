@@ -1,6 +1,6 @@
 import { CONFLICT_MESSAGE } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
-import { ApiRequestError, SIGNED_OUT_MESSAGE } from '../../lib/api';
+import { ApiRequestError, SIGNED_OUT_MESSAGE } from '../api';
 import { createAutosaver } from './autosave';
 import { classifySaveError } from './useAutosave';
 

@@ -57,6 +57,13 @@ export class PreconditionFailedError extends HttpError {
   }
 }
 
+/** A storage step failed before anything changed: the client can send the same request again. */
+export class ServiceUnavailableError extends HttpError {
+  constructor(message: string) {
+    super(503, 'unavailable', message);
+  }
+}
+
 export type EndpointHandler = (
   req: HttpRequest,
   context: InvocationContext,

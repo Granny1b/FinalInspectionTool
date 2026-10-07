@@ -4,9 +4,9 @@ import { ImagePlus, LoaderCircle, Trash2 } from 'lucide-react';
 import { memo, useRef, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Field, INPUT } from '../../components/Field';
+import { errorMessage } from '../../lib/api';
 import { ImageError, uploadImage } from '../../lib/images';
 import { CoverPhoto, FrontPageFrame } from './FrontPage';
-import { errorMessage } from './queries';
 
 /** The name input; publish problems about the name jump here. */
 export const TEMPLATE_NAME_ID = 'template-name';

@@ -19,7 +19,9 @@ const keepIdleConnectionsOpen: Plugin = {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), keepIdleConnectionsOpen],
-  // `npm run dev` puts the SWA CLI (port 4280) in front of this server, so the port must be fixed.
-  server: { port: 5173, strictPort: true },
+  // `npm run dev` puts the SWA CLI (port 4280) in front of this server, so the address must be
+  // fixed. 127.0.0.1, not localhost: for a localhost URL the CLI probes the server with wait-on
+  // before proxying every single request, about 50 ms each, which made a page load take 6 s.
+  server: { host: '127.0.0.1', port: 5173, strictPort: true },
   build: { outDir: 'dist', sourcemap: true },
 });

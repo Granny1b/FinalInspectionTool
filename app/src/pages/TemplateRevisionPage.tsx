@@ -3,13 +3,9 @@ import { useParams } from 'react-router';
 import { LoadError, PageLoading } from '../components/PageStates';
 import { Badge } from '../features/templates/Badge';
 import { PublishedTemplateView } from '../features/templates/PublishedTemplateView';
-import {
-  errorMessage,
-  isMissing,
-  useTemplateRevision,
-  useTemplates,
-} from '../features/templates/queries';
+import { useTemplateRevision, useTemplates } from '../features/templates/queries';
 import { TemplateNotFound } from '../features/templates/TemplateNotFound';
+import { errorMessage, isMissing } from '../lib/api';
 import { useCurrentUser } from '../lib/useMe';
 
 /** Same rule as the API: a positive integer without leading zeros. */

@@ -14,6 +14,9 @@ import { ExternalLink, RefreshCw, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ButtonLink } from '../../components/Button';
 import { ApiRequestError, SIGNED_OUT_MESSAGE } from '../../lib/api';
+import { SaveStatus } from '../../lib/autosave/SaveStatus';
+import { useAutosave } from '../../lib/autosave/useAutosave';
+import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
 import { LOGIN_PAGE } from '../../lib/auth';
 import { useSettings } from '../../lib/useSettings';
 import { Badge } from './Badge';
@@ -32,10 +35,7 @@ import {
   type LoadedTemplate,
 } from './queries';
 import { RevisionHistory } from './RevisionHistory';
-import { SaveStatus } from './SaveStatus';
 import { TemplateSettingsCard } from './TemplateSettingsCard';
-import { useAutosave } from './useAutosave';
-import { useLeaveGuard } from './useLeaveGuard';
 
 type Props = {
   /** Read once, when the editor opens; from then on the editor's own state is the truth. */

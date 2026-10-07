@@ -1,14 +1,17 @@
 /**
  * Direct access to the Azurite that `npm run dev` starts (default ports), never
- * STORAGE_CONNECTION_STRING. The seed check reads what the seed wrote; the template tests write
- * throwaway templates here, so they neither depend on nor change the seeded one, and delete them
- * after.
+ * STORAGE_CONNECTION_STRING. The seed check reads what the seed wrote; the template and inspection
+ * tests write throwaway templates here, so they neither depend on nor change the seeded one, and
+ * delete them and their inspections after. The inspection tests also read the deviations table
+ * here: no endpoint exposes it.
  */
+import { odata, TableClient } from '@azure/data-tables';
 import { BlobServiceClient } from '@azure/storage-blob';
 import {
   blobNames,
   CONTAINERS,
   DEFAULT_SPARE_ROWS_PER_SECTION,
+  DEVIATIONS_TABLE,
   newId,
   TemplateSchema,
   type Template,
@@ -18,6 +21,8 @@ const LOCAL_STORAGE = 'UseDevelopmentStorage=true';
 const storage = BlobServiceClient.fromConnectionString(LOCAL_STORAGE);
 const templates = storage.getContainerClient(CONTAINERS.templates);
 const images = storage.getContainerClient(CONTAINERS.images);
+const inspections = storage.getContainerClient(CONTAINERS.inspections);
+const deviations = TableClient.fromConnectionString(LOCAL_STORAGE, DEVIATIONS_TABLE);
 
 async function readTemplate(blobName: string): Promise<Template> {
   const content = await templates.getBlobClient(blobName).downloadToBuffer();
@@ -127,5 +132,32 @@ export async function deleteTemplate(id: string): Promise<void> {
     ...[...covers].map((imageId) =>
       images.getBlobClient(blobNames.image(imageId)).deleteIfExists(),
     ),
+  ]);
+}
+
+/** A deviation table row as stored: PartitionKey, RowKey and the brief's columns. */
+export type StoredDeviationRow = { partitionKey: string; rowKey: string } & Record<string, unknown>;
+
+/**
+ * One inspection's rows in the deviations table, by RowKey (`{inspectionId}_{key}`), without the
+ * service's own etag and timestamp. Any partition: a test may not know the model.
+ */
+export async function deviationRows(inspectionId: string): Promise<StoredDeviationRow[]> {
+  const rows: StoredDeviationRow[] = [];
+  // '`' follows '_', so the range is exactly the RowKeys that start with `{inspectionId}_`.
+  const filter = odata`RowKey ge ${`${inspectionId}_`} and RowKey lt ${`${inspectionId}\``}`;
+  for await (const entity of deviations.listEntities({ queryOptions: { filter } })) {
+    const { etag: _etag, timestamp: _timestamp, partitionKey, rowKey, ...columns } = entity;
+    rows.push({ partitionKey: partitionKey!, rowKey: rowKey!, ...columns });
+  }
+  return rows.sort((a, b) => a.rowKey.localeCompare(b.rowKey));
+}
+
+/** Deletes an inspection's blob and its deviation rows. */
+export async function deleteInspection(id: string): Promise<void> {
+  const rows = await deviationRows(id);
+  await Promise.all([
+    inspections.getBlobClient(blobNames.inspection(id)).deleteIfExists(),
+    ...rows.map((row) => deviations.deleteEntity(row.partitionKey, row.rowKey)),
   ]);
 }

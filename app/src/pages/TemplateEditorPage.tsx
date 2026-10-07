@@ -8,14 +8,13 @@ import { LoadError, PageLoading } from '../components/PageStates';
 import { Badge } from '../features/templates/Badge';
 import { BackLink, PublishedTemplateView } from '../features/templates/PublishedTemplateView';
 import {
-  errorMessage,
-  isMissing,
   useTemplateDetail,
   useTemplateRevision,
   useTemplates,
 } from '../features/templates/queries';
 import { TemplateEditor } from '../features/templates/TemplateEditor';
 import { TemplateNotFound } from '../features/templates/TemplateNotFound';
+import { errorMessage, isMissing } from '../lib/api';
 import { useCurrentUser } from '../lib/useMe';
 
 /** /templates/:id — admins edit the draft; inspectors see the latest published revision. */

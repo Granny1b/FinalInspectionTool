@@ -131,6 +131,22 @@ function fallbackError(status: number): ApiError {
   return { error: codes[status] ?? 'internal', message };
 }
 
+/** 404, or 400 for an id that can't exist: either way there is nothing at this address. */
+export function isMissing(error: unknown): boolean {
+  return error instanceof ApiRequestError && (error.status === 404 || error.status === 400);
+}
+
+export function isConflict(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 412;
+}
+
+/** What to tell the user when a request failed (apiFetch already words a 412 as a conflict). */
+export function errorMessage(error: unknown): string {
+  return error instanceof ApiRequestError
+    ? error.message
+    : "Couldn't reach the server. Check your connection and try again.";
+}
+
 /** What a save gets when the session ended: unsaved work stays on the page, with a way back. */
 export const SIGNED_OUT_MESSAGE =
   'You were signed out. Sign in again in a new tab, then try again.';

@@ -7,7 +7,7 @@ walk-round, transcribe the results, and finalise a printable report. Every devia
 central table for KPIs. It runs on Azure Static Web Apps (Free) with managed Functions, Blob
 Storage and Table Storage: no database, about 1 SEK a month.
 
-## Status: phase 2 of 6 (templates)
+## Status: phase 3 of 6 (inspections)
 
 Working now:
 
@@ -15,25 +15,32 @@ Working now:
   users with the role `inspector` or `admin` get past `/login.html`; signed-in users without a
   role see a "You don't have access yet" page. Pages and `/api/*` are locked alike.
 - **App shell.** Sidebar with Inspections and Templates, plus Insights and Settings for admins; a
-  drawer on tablets. Inspections, Insights and Settings are still placeholders whose actions say
-  which phase delivers them. Settings explains how to invite users.
+  drawer on tablets. Insights and Settings are still placeholders whose actions say which phase
+  delivers them. Settings explains how to invite users.
 - **Templates (phase 2).** The template list; a new template for a machine model that has none;
   the template editor, which looks like the printed checklist and is edited in place (sections and
   rows, drag and drop, automatic 1.a numbering, cover photo, spare rows); autosave of the draft
   with conflict detection; publishing immutable revisions with a change note; the revision
   history; and read-only views of any published revision. Inspectors see the latest published
   revision of each template, read-only. See [Editing templates](#editing-templates).
-- **API.** `/api/me`, the template endpoints, settings and photo upload/download URLs (see
-  [API](#api)), with role checks, JSON errors and ETag concurrency on every save.
+- **Inspections (phase 3).** The inspection list with search and filters; a new inspection from a
+  model's latest published checklist, which it keeps as a frozen copy; the front page; the
+  checklist, filled in from the keyboard; the live Deviation Summary with extra deviations;
+  autosave with conflict detection; Finalise, which locks it, and Reopen for admins. Every
+  deviation is mirrored into the `deviations` table for the KPIs of phase 6. See
+  [Inspections](#inspections).
+- **API.** `/api/me`, the template and inspection endpoints, settings, "Resp" suggestions and
+  photo upload/download URLs (see [API](#api)), with role checks, JSON errors and ETag
+  concurrency on every save.
 - **Seed.** The RigiMill MG checklist (6 sections, 90 checkpoints) and the six machine models are
   imported from `seed/Final_Inspection_rev_2.xlsm` into storage.
 - **Local dev, infrastructure and CI/CD.** One `npm run dev`, a Bicep file, and a GitHub Actions
   workflow that checks every pull request and deploys `main`.
 
-Not yet: the Guide action on a row (phase 5), printing a template (phase 4), inspections (phase
-3), insights (phase 6) and editing the settings.
+Not yet: printing (phase 4: the inspection's **Print** button is shown disabled), guides on a row
+(phase 5: rows that have one show its icon), insights (phase 6) and editing the settings.
 
-Next phases: 3 inspections · 4 print · 5 guides and annotations · 6 insights.
+Next phases: 4 print · 5 guides and annotations · 6 insights.
 
 ## Prerequisites
 
@@ -87,7 +94,10 @@ document.cookie = `StaticWebAppsAuthCookie=${btoa(
 | `swa`           | Static Web Apps CLI: the URL you open. Auth, roles and routes, proxying 5173 and 7071 | **4280**     |
 
 Before it starts, `predev` creates `api/local.settings.json` from
-`api/local.settings.example.json` if it is missing. If any process fails (for example because a
+`api/local.settings.example.json` if it is missing. The `swa` line runs
+`scripts/swa-start.mjs`, which starts the SWA CLI with only the environment variables it needs:
+the CLI copies its whole environment for every request it proxies, which made a page load take
+seconds in a crowded shell. If any process fails (for example because a
 port is already taken), everything stops, so you never work against half a stack. The exception
 is port 4280: if only that one is taken, the `swa` line asks whether to use another port and waits.
 Stop with Ctrl+C and free the port.
@@ -122,7 +132,7 @@ Templates are for admins; inspectors see the latest published revision of each, 
 is one template per machine model: **New template** offers the models that don't have one yet.
 
 - **Draft and revisions.** Every template has one draft, which admins edit, and numbered
-  revisions, which never change once published. New inspections (phase 3) use the latest
+  revisions, which never change once published. New inspections use the latest
   revision. The header shows the draft's revision number, the latest published one and whether
   the draft has unpublished changes.
 - **Autosave.** Changes are saved to the draft about a second after you stop typing; the header
@@ -163,11 +173,93 @@ In the checklist:
 Numbers (section 3, row 3.c) follow the position and change as rows move; each row keeps its
 identity, which is what later phases key results and statistics on.
 
+## Inspections
+
+Inspectors and admins create and fill in inspections; only admins reopen a finalised one.
+
+- **New inspection.** **New inspection** on the list: pick the machine model's checklist (only
+  templates with a published revision are offered) and fill in the front page: machine name and
+  serial number (both required), participants (`Enter`, a comma or a semicolon adds a name),
+  location (the default from the settings), date (today) and a photo (the template's cover photo
+  unless you add another). **Create inspection** gives it the next number, `FI-2026-0042`
+  (counting restarts every year, Swedish time), and opens it.
+- **A frozen checklist.** The inspection keeps its own copy of the template's latest published
+  revision. Later edits and revisions of the template never change it; the header shows which
+  revision it follows.
+- **The list.** Number, machine, serial number, model, date, state (with rows filled while in
+  progress) and the number of NOK rows, newest first. Search by number, machine or serial number,
+  and filter by model and state; the filters are kept in the address, so they survive opening an
+  inspection and coming back.
+- **The page.** A sticky header with the number, machine, state, revision, save status, **Print**
+  (phase 4), **Finalise** (or **Reopen**), the tabs _Checklist_ and _Deviations (n)_, and the
+  progress, e.g. `87 / 104 rows filled · 6 NOK`. _Continue at 3.b_ jumps to the first row without
+  a status. The front page sits at the top of the Checklist tab and can be edited until the
+  inspection is finalised.
+
+### Filling in the checklist
+
+The checklist looks like the printed one. Each row has OK / NOK / N/A, a comment and _Resp_
+(responsible person or department, suggested from earlier deviations). A NOK row gets a red bar and
+a severity (minor unless you pick another). Click a row, or use _Continue at_, then:
+
+| Key                          | Does                                                              |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `1` or `O`                   | OK, then on to the next row                                       |
+| `2` or `N`                   | NOK; stays on the row for its comment                             |
+| `3` or `A`                   | N/A, then on to the next row                                      |
+| `0`, `Backspace` or `Delete` | Clears the status (so does clicking the selected one again)       |
+| `↓` / `J`, `↑` / `K`         | Next / previous row, across sections (`Home`, `End`: first, last) |
+| `C`                          | Into the comment                                                  |
+| `Tab`                        | Row → comment → resp → severity (NOK rows) → next row             |
+| `Enter` in comment or resp   | On to the next row                                                |
+| `Esc` in a field             | Back to the row                                                   |
+
+Keys typed in a field are text, never shortcuts. **Set remaining to OK** on a section header marks
+every row of that section that has no status yet as OK: mark the exceptions, then fill the rest.
+A row with a guide shows its icon; the guide viewer comes in phase 5.
+
+### Deviations, saving, finalising
+
+- **Deviation Summary.** The _Deviations_ tab lists every NOK row in checklist order, then the
+  extra deviations: `D-01 | ref | checkpoint | comment | severity | resp`, updated as you type. A
+  row's ref jumps to it in the checklist. **Add extra deviation** adds a finding that isn't tied to
+  a row; it is edited in place and removed with its bin icon (which asks first if anything was
+  typed).
+- **Autosave and conflicts.** As in the template editor: saved about a second after you stop,
+  _Saved_ in the header, failed saves retried, a warning before leaving with unsaved changes. If
+  someone else saved the inspection in between, nothing is overwritten: the page shows "Someone
+  else changed this – reload to see the latest version.", stops saving and offers **Reload**.
+- **Finalise.** Every row needs a status, and the front page a machine name and serial number;
+  an extra deviation needs a description. Otherwise **Finalise** lists the problems, each a link
+  to the place to fix it, and marks them in red until they are fixed. Then it saves what is
+  pending and locks the inspection: the page becomes read-only and the API refuses changes. If
+  the server could not update the deviation records, nothing is locked and **Try again** sends it
+  again.
+- **Reopen.** Admins only: makes a finalised inspection editable again; it counts as in progress
+  until it is finalised again.
+
+### The deviation table
+
+Every inspection's deviations are copied into the table `deviations`, the source of the KPIs
+(brief §4): one row per deviation, PartitionKey = model code, RowKey =
+`{inspectionId}_{itemId or extraId}`, with the inspection's number, machine, serial number,
+template revision, the row's section, ref and text, comment, resp, severity, date, `finalised`
+and `createdAt` (when the deviation was first recorded). Each write brings the table in line with
+the inspection: new and changed rows are written, rows of deviations that are gone (a NOK set
+back to OK, a removed extra deviation) are deleted, unchanged rows are left alone.
+
+- A **save** writes the inspection first, then the table. If the table update fails, the save
+  still succeeds and the next save repairs the table.
+- **Finalise** and **Reopen** update the table first (its `finalised` flag decides what the KPIs
+  count), then the inspection. If the table update fails, nothing changes and the request can
+  simply be sent again.
+
 ## API
 
 Managed Functions under `/api`, all JSON. Every function checks the role itself; errors are
-`{ error, message, details? }`. Saves and publishing need the draft's `ETag` in `If-Match` and get
-`412` if someone else changed it.
+`{ error, message, details? }`. Saves, publishing, finalising and reopening need the document's
+`ETag` in `If-Match` and get `412` if someone else changed it. A `503` with `unavailable` means
+nothing was changed and the same request can be sent again.
 
 | Method and route                        | Role      | What                                                             |
 | --------------------------------------- | --------- | ---------------------------------------------------------------- |
@@ -179,6 +271,13 @@ Managed Functions under `/api`, all JSON. Every function checks the role itself;
 | `PUT /api/templates/{id}`               | admin     | Save the draft (`If-Match`)                                      |
 | `POST /api/templates/{id}/publish`      | admin     | Publish the draft as the next revision (`If-Match`, change note) |
 | `GET /api/templates/{id}/revisions/{n}` | inspector | A published revision (cached by the browser: it never changes)   |
+| `GET /api/inspections`                  | inspector | All inspections as list rows, newest number first                |
+| `POST /api/inspections`                 | inspector | New inspection from a template's latest published revision       |
+| `GET /api/inspections/{id}`             | inspector | One inspection and its `ETag`                                    |
+| `PUT /api/inspections/{id}`             | inspector | Save front page, results and extra deviations (`If-Match`)       |
+| `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                 |
+| `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                       |
+| `GET /api/resp-suggestions`             | inspector | "Resp" values used in earlier deviations, for autocomplete       |
 | `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                   |
 | `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                |
 
@@ -233,10 +332,18 @@ because it usually means the command that produced it failed.
   warning, publishing with a change note, two admins in conflict, a lost save answer, a save after
   signing out, a cover photo upload (also leaving while it uploads), a new template whose empty
   row blocks publishing, and the inspector's read-only view (the API refuses their saves with
-  403). They sign in by setting the SWA CLI's `StaticWebAppsAuthCookie` directly. Each test
-  writes its own throwaway templates into the local Azurite and deletes them afterwards, so local
-  edits to the seeded RigiMill MG never break them. The New template test needs one machine model
-  that has no template yet.
+  403). For inspections: creating one from the front page form and finding it in the list; a
+  whole checklist filled in from the keyboard (status keys, moving between rows, the comment,
+  the Tab order, Escape, Enter, clearing, Set remaining to OK, the progress) and still there
+  after a reload; the Deviation Summary's order
+  and an extra deviation; the deviation table, read straight from Azurite (every column, the
+  `finalised` flag, a row deleted when NOK becomes OK); Finalise blocked by a missing row, its
+  jump link, the locked page and the API's 409; Reopen refused to an inspector (403) and done by
+  an admin; an inspection unchanged after its template publishes a new revision; and two
+  inspectors in conflict. They sign in by setting the SWA CLI's `StaticWebAppsAuthCookie`
+  directly. Each test writes its own throwaway templates into the local Azurite and deletes them
+  afterwards with their inspections and deviation rows, so local edits to the seeded RigiMill MG
+  never break them. The New template test needs one machine model that has no template yet.
 
 CI (`.github/workflows/azure-static-web-apps.yml`) runs `typecheck`, `lint`, `format:check`, a
 Bicep lint, `test` and `build` on every pull request and push to `main`. The end-to-end tests run
@@ -253,7 +360,8 @@ shared/   zod schemas and types, numbering (3.c, D-01), roles, storage names: us
 seed/     Excel import of the RigiMill MG checklist and machine models
 infra/    main.bicep: Static Web App and storage account
 e2e/      Playwright tests
-scripts/  local-swa-config.mjs: the SWA config for checking the built app locally
+scripts/  swa-start.mjs: the SWA CLI for npm run dev; local-swa-config.mjs: the SWA config for
+          checking the built app locally
 ```
 
 Branding lives in the colour, spacing, font and radius tokens in `app/src/index.css`. The
@@ -270,7 +378,7 @@ latest version."
 ```text
 templates/{templateId}/draft.json        draft being edited
 templates/{templateId}/rev-{n}.json      published revisions, never changed
-inspections/{inspectionId}.json
+inspections/{inspectionId}.json          with its list row in the blob's metadata
 images/{imageId}.jpg                     photos (originals)
 images/{imageId}.annotated.png           annotations flattened for print
 config/settings.json                     machine models, default location, company name

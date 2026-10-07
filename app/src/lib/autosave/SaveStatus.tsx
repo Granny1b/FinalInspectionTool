@@ -7,7 +7,7 @@ const ACTION = 'rounded-sm font-medium underline underline-offset-2 hover:text-i
 
 type Props = {
   state: AutosaveState;
-  /** Publishing found that someone else changed the draft (the banner explains). */
+  /** Another request (publish, finalise) found that someone else changed it (a banner explains). */
   conflict: boolean;
   onRetry: () => void;
   /** The way out of a conflict, here too: the banner may be scrolled out of view. */
@@ -15,8 +15,8 @@ type Props = {
 };
 
 /**
- * "Saving… / Saved / Unsaved changes / Couldn't save — Retry / Not saved — Reload", next to the
- * Publish button.
+ * "Saving… / Saved / Unsaved changes / Couldn't save — Retry / Not saved — Reload", in the page's
+ * sticky header.
  */
 export function SaveStatus({ state, conflict, onRetry, onReload }: Props) {
   const ref = useRef<HTMLDivElement>(null);

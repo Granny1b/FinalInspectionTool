@@ -6,7 +6,8 @@ import { useNavigate } from 'react-router';
 import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
 import { Field, INPUT } from '../../components/Field';
-import { errorMessage, useCreateTemplate } from './queries';
+import { errorMessage } from '../../lib/api';
+import { useCreateTemplate } from './queries';
 
 type Props = {
   /** Models that don't have a template yet (one template per model, brief §1). */

@@ -17,7 +17,7 @@
     "dev:api-build": "npm run watch -w @modig/api",
     "dev:api": "wait-on --timeout 120s file:api/dist/index.cjs tcp:127.0.0.1:10000 tcp:127.0.0.1:10002 && cd api && nodemon --exitcrash --watch dist --ext cjs --delay 1 --signal SIGTERM --exec \"func start --port 7071\"",
     "dev:app": "npm run dev -w @modig/app",
-    "dev:swa": "wait-on --timeout 180s tcp:localhost:5173 http-get://127.0.0.1:7071/admin/host/status && swa start",
+    "dev:swa": "wait-on --timeout 180s tcp:127.0.0.1:5173 http-get://127.0.0.1:7071/admin/host/status && node scripts/swa-start.mjs",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces",
     "lint": "eslint .",
@@ -29,6 +29,7 @@
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test"
   },
   "devDependencies": {
+    "@azure/data-tables": "^13.3.2",
     "@azure/static-web-apps-cli": "^2.0.10",
     "@azure/storage-blob": "^12.34.0",
     "@eslint/js": "^10.0.1",

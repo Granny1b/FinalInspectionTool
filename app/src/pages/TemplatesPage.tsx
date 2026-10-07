@@ -6,8 +6,9 @@ import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
 import { LoadError, PageLoading } from '../components/PageStates';
 import { CreateTemplateDialog } from '../features/templates/CreateTemplateDialog';
-import { errorMessage, useTemplates } from '../features/templates/queries';
+import { useTemplates } from '../features/templates/queries';
 import { TemplateList } from '../features/templates/TemplateList';
+import { errorMessage } from '../lib/api';
 import { useCurrentUser } from '../lib/useMe';
 import { useSettings } from '../lib/useSettings';
 

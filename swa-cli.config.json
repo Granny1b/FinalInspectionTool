@@ -3,7 +3,7 @@
   "configurations": {
     "modig": {
       "appLocation": "app",
-      "appDevserverUrl": "http://localhost:5173",
+      "appDevserverUrl": "http://127.0.0.1:5173",
       "apiDevserverUrl": "http://127.0.0.1:7071",
       "swaConfigLocation": "app/public",
       "port": 4280,

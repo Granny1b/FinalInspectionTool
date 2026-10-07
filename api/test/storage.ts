@@ -6,27 +6,38 @@ import {
   blobNames,
   CONTAINERS,
   newId,
+  snapshotTemplate,
   STORAGE_CONNECTION_STRING_ENV,
+  type Inspection,
   type MachineModel,
   type Settings,
   type Template,
 } from '@modig/shared';
 import { inject } from 'vitest';
-import { containerClient, ensureStorage, writeJson } from '../src/lib/storage';
+import { containerClient, deviationsTable, ensureStorage, writeJson } from '../src/lib/storage';
 
 export function useTestStorage(): void {
   process.env[STORAGE_CONNECTION_STRING_ENV] = inject('storageConnectionString');
 }
 
 /**
- * Deletes every template and the settings. Safe only because the api project runs its test
- * files one at a time (vitest.config.ts): no other file is using them meanwhile.
+ * Deletes every template, inspection and deviation row, the settings and the inspection counter.
+ * Safe only because the api project runs its test files one at a time (vitest.config.ts): no
+ * other file is using them meanwhile.
  */
 export async function resetStorage(): Promise<void> {
   await ensureStorage();
-  const templates = containerClient(CONTAINERS.templates);
-  for await (const blob of templates.listBlobsFlat()) await templates.deleteBlob(blob.name);
-  await containerClient(CONTAINERS.config).getBlobClient(blobNames.settings).deleteIfExists();
+  for (const name of [CONTAINERS.templates, CONTAINERS.inspections]) {
+    const container = containerClient(name);
+    for await (const blob of container.listBlobsFlat()) await container.deleteBlob(blob.name);
+  }
+  const config = containerClient(CONTAINERS.config);
+  await config.getBlobClient(blobNames.settings).deleteIfExists();
+  await config.getBlobClient(blobNames.inspectionCounter).deleteIfExists();
+  const table = deviationsTable();
+  for await (const { partitionKey, rowKey } of table.listEntities()) {
+    await table.deleteEntity(partitionKey!, rowKey!);
+  }
 }
 
 export const MODELS: MachineModel[] = [
@@ -97,4 +108,34 @@ export async function storeTemplate(draft: Template, revisions: number[] = []): 
     );
   }
   return writeJson(CONTAINERS.templates, blobNames.templateDraft(draft.id), draft);
+}
+
+/** An in-progress inspection, nothing filled in, of `template` (default: published revision 2). */
+export function sampleInspection(
+  overrides: Partial<Inspection> = {},
+  template = draftTemplate({ status: 'published', revision: 2 }),
+): Inspection {
+  return {
+    id: newId(),
+    number: 'FI-2026-0007',
+    templateId: template.id,
+    templateRevision: template.revision,
+    templateSnapshot: snapshotTemplate(template),
+    front: {
+      machineName: 'RigiMill MG #7',
+      modelCode: template.modelCode,
+      serialNumber: 'SN-1007',
+      participants: ['Sam Andersson'],
+      location: 'Kalmar, Sweden',
+      date: '2026-10-07',
+    },
+    results: {},
+    extraDeviations: [],
+    state: 'in_progress',
+    createdAt: '2026-10-07T08:00:00.000Z',
+    createdBy: 'sam.andersson@modig.se',
+    updatedAt: '2026-10-07T08:00:00.000Z',
+    updatedBy: 'sam.andersson@modig.se',
+    ...overrides,
+  };
 }
