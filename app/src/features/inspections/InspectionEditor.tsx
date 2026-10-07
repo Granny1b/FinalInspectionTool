@@ -1,6 +1,5 @@
 import {
   APP_NAME,
-  CONFLICT_MESSAGE,
   deriveDeviations,
   hasRole,
   indexItems,
@@ -14,21 +13,24 @@ import {
   type RowResult,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Lock, LockOpen, Printer, RefreshCw } from 'lucide-react';
+import { Lock, LockOpen, Printer } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Button, ButtonLink } from '../../components/Button';
-import { ApiRequestError, errorMessage, isConflict, SIGNED_OUT_MESSAGE } from '../../lib/api';
-import { LOGIN_PAGE } from '../../lib/auth';
+import { BackLink } from '../../components/BackLink';
+import { Button } from '../../components/Button';
+import { Callout } from '../../components/Callout';
+import { ApiRequestError, errorMessage, isConflict } from '../../lib/api';
+import type { AutosaveState } from '../../lib/autosave/autosave';
+import { AutosaveAlerts } from '../../lib/autosave/AutosaveAlerts';
+import { LeaveDialog } from '../../lib/autosave/LeaveDialog';
 import { SaveStatus } from '../../lib/autosave/SaveStatus';
 import { useAutosave } from '../../lib/autosave/useAutosave';
 import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
+import { useReload } from '../../lib/autosave/useReload';
+import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { formatDateTime } from '../../lib/format';
 import { useCurrentUser } from '../../lib/useMe';
 import { modelName, useSettings } from '../../lib/useSettings';
-import { Callout } from '../templates/Callout';
-import { ConfirmDialog } from '../templates/document/ConfirmDialog';
-import { BackLink } from '../templates/PublishedTemplateView';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
 import { DeviationSummary } from './DeviationSummary';
 import { draftOf, sameDraft } from './draft';
@@ -46,6 +48,8 @@ import {
   type FocusTarget,
   type InspectionTab,
 } from './issues';
+import { inspectionsListHref } from './listFilter';
+import type { PendingParticipant } from './ParticipantsField';
 import {
   changeState,
   fetchInspection,
@@ -75,9 +79,10 @@ type ServerState = Pick<Inspection, 'state' | 'finalisedAt' | 'finalisedBy'>;
 type DialogState = { change: 'finalise'; issues: FinaliseIssue[] } | { change: 'reopen' };
 
 const NO_ISSUES: FinaliseIssue[] = [];
-// One element each for the page's lifetime: React skips them when the page re-renders per key.
+/** What the header says while a participant's name is typed but not yet added. */
+const TYPING: AutosaveState = { status: 'pending' };
+// One element for the page's lifetime: React skips it when the page re-renders per key.
 const SHORTCUT_HINTS = <ShortcutHints />;
-const BACK_LINK = <BackLink to="/inspections" label="Inspections" />;
 
 /**
  * One inspection (brief §5.3): the front page, the checklist filled in from the keyboard and the
@@ -94,6 +99,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const settings = useSettings();
   const respHistory = useRespHistory();
   const idPrefix = useId();
+  // Back to the list as it was left (search and filters); one element for the page's lifetime.
+  const [backLink] = useState(() => <BackLink to={inspectionsListHref()} label="Inspections" />);
 
   const [draft, setDraft] = useState<InspectionDraftInput>(() => draftOf(inspection));
   // The latest draft, for event handlers that run before React re-renders.
@@ -120,28 +127,24 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     equals: sameDraft,
   });
 
-  // A machine photo that is still uploading counts as unsaved: leaving or finalising waits for
-  // it, and closing the tab gets the browser's warning.
-  const uploadRef = useRef<Promise<unknown> | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const trackUpload = useCallback((upload: Promise<unknown>) => {
-    uploadRef.current = upload;
-    setUploading(true);
-    const done = () => {
-      if (uploadRef.current !== upload) return;
-      uploadRef.current = null;
-      setUploading(false);
-    };
-    upload.then(done, done);
-  }, []);
-  /** Saves everything, once a photo being uploaded is in the front page; false if saving failed. */
+  // A machine photo that is still uploading counts as unsaved, and so does a participant's name
+  // that is typed but not yet added (it isn't in the draft until then).
+  const { uploading, trackUpload, saveAll: saveUploaded } = useUploadTracking(saver);
+  const [participantPending, setParticipantPending] = useState(false);
+  const commitParticipant = useRef<(() => void) | null>(null);
+  const pendingParticipant = useMemo<PendingParticipant>(
+    () => ({ onPendingChange: setParticipantPending, commitRef: commitParticipant }),
+    [],
+  );
+  /** Saves everything, typed participant and photo included; false if saving failed. */
   const saveAll = useCallback(async () => {
-    await uploadRef.current?.catch(() => undefined);
-    return saver.flush();
-  }, [saver]);
+    commitParticipant.current?.();
+    return saveUploaded();
+  }, [saveUploaded]);
 
-  const dirty = saveState.status !== 'saved' || uploading;
+  const dirty = saveState.status !== 'saved' || uploading || participantPending;
   const leaveGuard = useLeaveGuard(dirty, saveAll);
+  const reload = useReload(dirty, onReload);
 
   const update = useCallback(
     (patch: Partial<InspectionDraftInput>) => {
@@ -206,8 +209,15 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     () => (nextItemId && nextRef ? { itemId: nextItemId, ref: nextRef } : null),
     [nextItemId, nextRef],
   );
-  // History plus this inspection's own names; same list → same array (stable datalists).
-  const respKey = JSON.stringify(respSuggestions(respHistory.data, draft));
+  // History plus this inspection's own names, taken when a Resp field is left: the text being
+  // typed must not be offered to its own field (it would come first, as a prefix of the name it
+  // was going to complete). Same list → same array (stable datalists).
+  const [respNames, setRespNames] = useState(draft);
+  const commitRespNames = useCallback(() => setRespNames(draftRef.current), []);
+  const respKey = useMemo(
+    () => JSON.stringify(respSuggestions(respHistory.data, respNames)),
+    [respHistory.data, respNames],
+  );
   const suggestions = useMemo(() => JSON.parse(respKey) as string[], [respKey]);
 
   // Tabs keep their own scroll position, so going back to the checklist returns to the row.
@@ -253,9 +263,11 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     field?.scrollIntoView({ block: 'nearest' });
   }, [update]);
   const removeExtraDeviation = useCallback(
-    (extraId: string) =>
-      update({ extraDeviations: removeExtra(draftRef.current.extraDeviations, extraId) }),
-    [update],
+    (extraId: string) => {
+      update({ extraDeviations: removeExtra(draftRef.current.extraDeviations, extraId) });
+      commitRespNames();
+    },
+    [update, commitRespNames],
   );
 
   const headerRef = useRef<HTMLElement>(null);
@@ -265,14 +277,20 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const [notice, setNotice] = useState<StateChange | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [stateConflict, setStateConflict] = useState(false);
-  const [confirmingReload, setConfirmingReload] = useState(false);
-  const [reloadFailed, setReloadFailed] = useState(false);
   const printHintId = useId();
+  const continueId = `${idPrefix}-continue`;
 
   // Finalise and Reopen swap places under the keyboard focus: the notice takes it instead.
   useEffect(() => {
     if (notice) noticeRef.current?.focus();
   }, [notice]);
+
+  // On open the keyboard starts at "Continue at 3.b" (when there is one), so a single Enter
+  // resumes transcribing. Without a row to continue at, the focus stays where it was. The id never
+  // changes, so this runs once, when the page opens.
+  useEffect(() => {
+    document.getElementById(continueId)?.focus({ preventScroll: true });
+  }, [continueId]);
 
   const conflict = saveState.status === 'conflict' || stateConflict;
 
@@ -343,21 +361,20 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     markListStale();
   }
 
-  /** Reload, asking first when it would discard unsaved changes. */
-  const askReload = () => (dirty ? setConfirmingReload(true) : void reload());
-
-  async function reload() {
-    setConfirmingReload(false);
-    setReloadFailed(!(await onReload()));
-  }
-
   const modelLabel = modelName(settings.data?.machineModels, inspection.front.modelCode);
   const machine = draft.front.machineName.trim();
 
   return (
-    <div>
+    // A Resp field that is left adds its name to the suggestions (React's onBlur bubbles).
+    <div
+      onBlur={(event) => {
+        if (event.target instanceof HTMLInputElement && event.target.hasAttribute('list')) {
+          commitRespNames();
+        }
+      }}
+    >
       <title>{`${number}${machine ? ` · ${machine}` : ''} · ${APP_NAME}`}</title>
-      {BACK_LINK}
+      {backLink}
 
       <header
         ref={headerRef}
@@ -395,10 +412,10 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             {(!finalised || saveState.status !== 'saved') && (
               <div className="mr-2">
                 <SaveStatus
-                  state={saveState}
+                  state={participantPending && saveState.status === 'saved' ? TYPING : saveState}
                   conflict={stateConflict}
                   onRetry={() => void saver.flush()}
-                  onReload={askReload}
+                  onReload={reload.askReload}
                 />
               </div>
             )}
@@ -450,47 +467,19 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             {...progress}
             nextEmpty={finalised ? null : nextEmpty}
             onContinue={goToRow}
+            continueId={continueId}
           />
         </div>
       </header>
 
       <div className="mt-6 space-y-3 empty:hidden">
-        {conflict && (
-          <Callout
-            tone="error"
-            role="alert"
-            actions={
-              <Button variant="secondary" onClick={askReload}>
-                <RefreshCw size={16} aria-hidden="true" />
-                Reload
-              </Button>
-            }
-          >
-            <strong className="font-semibold">{CONFLICT_MESSAGE}</strong>{' '}
-            {dirty
-              ? 'Your changes since then are not saved, and autosave is paused.'
-              : 'Autosave is paused.'}
-            {reloadFailed && ' Reloading failed: check your connection and try again.'}
-          </Callout>
-        )}
-        {saveState.status === 'error' && !saveState.willRetry && (
-          <Callout
-            tone="error"
-            role="alert"
-            actions={
-              // Signed out: sign in again in another tab, so this one keeps the unsaved changes.
-              saveState.message === SIGNED_OUT_MESSAGE && (
-                <ButtonLink to={LOGIN_PAGE} target="_blank" variant="secondary">
-                  Sign in
-                  <ExternalLink size={14} aria-hidden="true" />
-                  <span className="sr-only">(opens a new tab)</span>
-                </ButtonLink>
-              )
-            }
-          >
-            <strong className="font-semibold">Couldn’t save:</strong> {saveState.message}
-          </Callout>
-        )}
+        <AutosaveAlerts
+          conflict={conflict}
+          dirty={dirty}
+          state={saveState}
+          reloadFailed={reload.failed}
+          onReload={reload.askReload}
+        />
         {issues.length > 0 && (
           <Callout
             tone="error"
@@ -546,6 +535,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
           errors={frontErrors}
           onChange={updateFront}
           onUpload={trackUpload}
+          pendingParticipant={pendingParticipant}
         />
         <section aria-labelledby={`${idPrefix}-checklist`} className="mt-10">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
@@ -610,28 +600,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
           onClose={() => setDialog(null)}
         />
       )}
-      {confirmingReload && (
-        <ConfirmDialog
-          title="Discard your changes?"
-          message="Reloading shows the latest saved version. Your changes that weren’t saved are lost."
-          confirmLabel="Discard and reload"
-          onConfirm={() => void reload()}
-          onCancel={() => setConfirmingReload(false)}
-        />
-      )}
-      {leaveGuard.asking && (
-        <ConfirmDialog
-          title="Leave without saving?"
-          message={
-            conflict
-              ? 'Someone else changed this inspection, so your latest changes couldn’t be saved. They are lost if you leave.'
-              : 'Your latest changes couldn’t be saved yet. They are lost if you leave now.'
-          }
-          confirmLabel="Leave"
-          onConfirm={leaveGuard.leave}
-          onCancel={leaveGuard.stay}
-        />
-      )}
+      {reload.dialog}
+      <LeaveDialog guard={leaveGuard} conflict={conflict} noun="inspection" />
     </div>
   );
 }

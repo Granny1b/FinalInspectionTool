@@ -33,6 +33,8 @@ const hooks = vi.hoisted(() => ({
   failSync: false,
   /** Runs once, just before the next blob write, the way a concurrent save could. */
   beforeWrite: undefined as (() => Promise<void>) | undefined,
+  /** Runs once, just before the next deviation sync, the way a slow table could. */
+  beforeSync: undefined as (() => Promise<void>) | undefined,
 }));
 vi.mock('../lib/deviations', async (importOriginal) => {
   const actual = await importOriginal<typeof Deviations>();
@@ -40,6 +42,9 @@ vi.mock('../lib/deviations', async (importOriginal) => {
     ...actual,
     syncDeviations: async (...args: Parameters<typeof actual.syncDeviations>) => {
       if (hooks.failSync) throw new Error('Table storage is down');
+      const hook = hooks.beforeSync;
+      hooks.beforeSync = undefined;
+      await hook?.();
       return actual.syncDeviations(...args);
     },
   };
@@ -65,7 +70,21 @@ beforeEach(resetStorage);
 afterEach(() => {
   hooks.failSync = false;
   hooks.beforeWrite = undefined;
+  hooks.beforeSync = undefined;
 });
+
+/** Holds the next deviation sync until `release()`; `reached` resolves once it is waiting. */
+function holdNextSync(): { reached: Promise<void>; release: () => void } {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let arrive!: () => void;
+  const reached = new Promise<void>((resolve) => (arrive = resolve));
+  hooks.beforeSync = async () => {
+    arrive();
+    await released;
+  };
+  return { reached, release };
+}
 
 const etagOf = (response: HttpResponseInit) => new Headers(response.headers).get('ETag');
 const errorOf = (response: HttpResponseInit): ApiError => ApiErrorSchema.parse(response.jsonBody);
@@ -311,6 +330,55 @@ describe('POST /api/inspections/{id}/finalise', () => {
     expect(await finalisedFlags()).toEqual(allFlags(inspection, false));
     const row = await deviationsTable().getEntity('RMMG', `${inspection.id}_${a!.id}`);
     expect(row.comment).toBe('Theirs');
+  });
+
+  describe('with a save whose table sync is slow', () => {
+    /** An all-OK inspection; the slow save marks its first row NOK. */
+    async function slowSave() {
+      const { inspection, etag } = await storedInspection((ids) =>
+        Object.fromEntries(ids.map((id) => [id, { status: 'OK' }])),
+      );
+      const [a] = inspection.templateSnapshot.sections[0]!.items;
+      const held = holdNextSync();
+      const save = saveInspection(
+        request({
+          principal: inspector,
+          params: { id: inspection.id },
+          body: JSON.stringify({
+            front: inspection.front,
+            results: { ...inspection.results, [a!.id]: { status: 'NOK', comment: 'Late' } },
+            extraDeviations: inspection.extraDeviations,
+          }),
+          headers: { 'If-Match': etag },
+        }),
+        context(),
+      );
+      await held.reached; // the save's blob is written, its table sync is on its way
+      const saved = (await loadInspection(inspection.id))!;
+      return { inspection: saved.data, etag: saved.etag, save, release: held.release };
+    }
+
+    it('keeps the rows finalised when the sync lands after the finalise', async () => {
+      const { inspection, etag, save, release } = await slowSave();
+      expect((await finalise(inspection.id, etag)).status).toBe(200);
+      release();
+      expect((await save).status).toBe(200);
+
+      expect((await loadInspection(inspection.id))?.data.state).toBe('finalised');
+      expect(await finalisedFlags()).toEqual(allFlags(inspection, true));
+    });
+
+    it('keeps the rows finalised when the sync lands between its sync and its write', async () => {
+      const { inspection, etag, save, release } = await slowSave();
+      hooks.beforeWrite = async () => {
+        release();
+        expect((await save).status).toBe(200);
+      };
+      expect((await finalise(inspection.id, etag)).status).toBe(200);
+
+      expect((await loadInspection(inspection.id))?.data.state).toBe('finalised');
+      expect(await finalisedFlags()).toEqual(allFlags(inspection, true));
+    });
   });
 
   it('400 without If-Match, 404 for an unknown inspection, 400 for a malformed id', async () => {

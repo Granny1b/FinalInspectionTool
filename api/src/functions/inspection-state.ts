@@ -8,7 +8,8 @@
  * Both update the deviation table first (its `finalised` flag decides what the KPIs count), then
  * the blob. A failed table update answers 503 with nothing changed, so the client simply sends
  * the same request again. Both are idempotent: asking for the state the inspection is already in
- * syncs the table again and answers 200.
+ * syncs the table again and answers 200. After the blob write, the table is synced once more and
+ * checked against the blob, in case a save's slow sync landed in between (`syncSettled`).
  */
 import { app, type HttpRequest, type InvocationContext } from '@azure/functions';
 import { validateForFinalise, type Inspection } from '@modig/shared';
@@ -26,6 +27,7 @@ import {
 import {
   inspectionNotFound,
   loadInspection,
+  syncSettled,
   writeInspection,
   type StoredInspection,
 } from '../lib/inspections';
@@ -79,26 +81,31 @@ async function loadCurrent(
 
 /** Already in the requested state (e.g. a retry): make sure the table agrees, answer as before. */
 async function unchanged(stored: StoredInspection, context: InvocationContext) {
-  await syncOrUnavailable(stored.data, context);
+  await orUnavailable(syncSettled(stored.data, stored.etag, context), stored.data.id, context);
   return json(200, stored.data, etagHeader(stored.etag));
 }
 
 /**
  * Table first, then blob. If the blob write fails (someone saved in between: 412), the table is
- * already ahead of the blob, so it is synced again from what the blob now holds.
+ * already ahead of the blob, so it is synced again from what the blob now holds. After a
+ * successful write it is synced once more, best effort: a save's sync that was still on its way
+ * may have landed between the first sync and the write.
  */
 async function commit(changed: Inspection, ifMatch: string, context: InvocationContext) {
-  await syncOrUnavailable(changed, context);
+  await orUnavailable(syncDeviations(changed), changed.id, context);
   const etag = await writeInspection(changed, { ifMatch }).catch(async (error: unknown) => {
     await resyncFromBlob(changed.id, context);
     throw error;
   });
+  await syncSettled(changed, etag, context).catch((error: unknown) => {
+    context.warn(`Re-syncing the deviations of inspection ${changed.id} failed`, error);
+  });
   return json(200, changed, etagHeader(etag));
 }
 
-async function syncOrUnavailable(inspection: Inspection, context: InvocationContext) {
-  await syncDeviations(inspection).catch((error: unknown) => {
-    context.error(`Syncing the deviations of inspection ${inspection.id} failed`, error);
+async function orUnavailable(sync: Promise<void>, id: string, context: InvocationContext) {
+  await sync.catch((error: unknown) => {
+    context.error(`Syncing the deviations of inspection ${id} failed`, error);
     throw new ServiceUnavailableError(
       'The deviation records could not be updated, so nothing was changed. Try again.',
     );
@@ -109,7 +116,7 @@ async function syncOrUnavailable(inspection: Inspection, context: InvocationCont
 async function resyncFromBlob(id: string, context: InvocationContext): Promise<void> {
   try {
     const latest = await loadInspection(id);
-    if (latest) await syncDeviations(latest.data);
+    if (latest) await syncSettled(latest.data, latest.etag, context);
   } catch (error) {
     context.warn(`Re-syncing the deviations of inspection ${id} failed`, error);
   }

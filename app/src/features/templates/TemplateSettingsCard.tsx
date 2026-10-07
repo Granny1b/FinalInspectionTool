@@ -1,12 +1,9 @@
 import { PrintSettingsSchema, type MachineModel, type TemplateDraftInput } from '@modig/shared';
 import clsx from 'clsx';
-import { ImagePlus, LoaderCircle, Trash2 } from 'lucide-react';
-import { memo, useRef, useState } from 'react';
-import { Button } from '../../components/Button';
+import { memo, useState } from 'react';
 import { Field, INPUT } from '../../components/Field';
-import { errorMessage } from '../../lib/api';
-import { ImageError, uploadImage } from '../../lib/images';
-import { CoverPhoto, FrontPageFrame } from './FrontPage';
+import { PhotoField } from '../../components/PhotoField';
+import { FrontPageFrame } from './FrontPage';
 
 /** The name input; publish problems about the name jump here. */
 export const TEMPLATE_NAME_ID = 'template-name';
@@ -57,8 +54,10 @@ export const TemplateSettingsCard = memo(function TemplateSettingsCard({
 
   return (
     <FrontPageFrame revisionLabel={`Rev: ${revision} (draft)`}>
-      <CoverImageField
+      <PhotoField
         imageId={coverImageId}
+        noun="cover photo"
+        labels={{ add: 'Add cover photo', replace: 'Replace', remove: 'Remove' }}
         onChange={(imageId) => onChange({ coverImageId: imageId })}
         onUpload={onUpload}
       />
@@ -141,92 +140,5 @@ function SpareRowsField({ value, onChange }: { value: number; onChange: (n: numb
         />
       )}
     </Field>
-  );
-}
-
-function CoverImageField({
-  imageId,
-  onChange,
-  onUpload,
-}: {
-  imageId: string | undefined;
-  onChange: (imageId: string | undefined) => void;
-  onUpload: (upload: Promise<void>) => void;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const pickRef = useRef<HTMLButtonElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function upload(file: File) {
-    setUploading(true);
-    setError(null);
-    try {
-      onChange(await uploadImage(file));
-    } catch (failure) {
-      setError(failure instanceof ImageError ? failure.message : errorMessage(failure));
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  return (
-    <div>
-      <CoverPhoto imageId={imageId}>
-        {uploading && (
-          <div className="absolute inset-0 flex items-center justify-center gap-2 bg-surface/80 text-sm font-medium text-ink-700">
-            <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />
-            Uploading…
-          </div>
-        )}
-      </CoverPhoto>
-      <div className="mt-2.5 flex flex-wrap gap-2">
-        {/* aria-disabled, not disabled: a disabled button would drop the keyboard focus. */}
-        <Button
-          ref={pickRef}
-          variant="secondary"
-          className="h-8 px-2.5 aria-disabled:opacity-50"
-          aria-disabled={uploading || undefined}
-          onClick={() => {
-            if (!uploading) fileRef.current?.click();
-          }}
-        >
-          <ImagePlus size={15} aria-hidden="true" />
-          {imageId ? 'Replace' : 'Add cover photo'}
-        </Button>
-        {imageId && (
-          <Button
-            variant="ghost"
-            className="h-8 px-2.5"
-            disabled={uploading}
-            onClick={() => {
-              onChange(undefined);
-              // This button disappears; the focus goes to "Add cover photo".
-              pickRef.current?.focus();
-            }}
-          >
-            <Trash2 size={15} aria-hidden="true" />
-            Remove
-          </Button>
-        )}
-      </div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          // Cleared so picking the same file again still fires onChange.
-          event.target.value = '';
-          if (file) onUpload(upload(file));
-        }}
-      />
-      {error && (
-        <p role="alert" className="mt-2 text-xs font-medium text-nok-fg">
-          {error}
-        </p>
-      )}
-    </div>
   );
 }

@@ -180,14 +180,17 @@ export function inspectionProgress(
 // Finalise rules
 // ---------------------------------------------------------------------------------------------
 
-export type FinaliseIssue = {
+/** One problem; a 400 from …/finalise carries the list in `details`. */
+export const FinaliseIssueSchema = z.object({
   /** Where the problem is, so the page can link to it. */
-  target:
-    | { kind: 'front'; field: 'machineName' | 'serialNumber' }
-    | { kind: 'row'; sectionId: string; itemId: string }
-    | { kind: 'extra'; extraId: string };
-  message: string;
-};
+  target: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('front'), field: z.enum(['machineName', 'serialNumber']) }),
+    z.object({ kind: z.literal('row'), sectionId: z.string(), itemId: z.string() }),
+    z.object({ kind: z.literal('extra'), extraId: z.string() }),
+  ]),
+  message: z.string(),
+});
+export type FinaliseIssue = z.infer<typeof FinaliseIssueSchema>;
 
 /**
  * What must hold before an inspection is locked (brief §5.3: every row has a status). A report

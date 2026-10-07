@@ -1,19 +1,28 @@
 import { X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react';
 import type { ControlProps } from '../../components/Field';
 import { addNames, MAX_NAME_LENGTH, splitNames } from './participants';
+
+/** For a page that autosaves: a name typed but not yet added is unsaved work. */
+export type PendingParticipant = {
+  /** Told whether a name is typed but not yet added. */
+  onPendingChange: (pending: boolean) => void;
+  /** Set to a function that adds that name now, e.g. before saving. */
+  commitRef: RefObject<(() => void) | null>;
+};
 
 type Props = {
   control: ControlProps;
   value: string[];
   onChange: (names: string[]) => void;
+  pending?: PendingParticipant;
 };
 
 /**
  * Participants as removable chips. `Enter` (or a comma) adds what was typed; a pasted list is
  * split into names; leaving the field adds a name that was typed but not yet added.
  */
-export function ParticipantsField({ control, value, onChange }: Props) {
+export function ParticipantsField({ control, value, onChange, pending }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
 
@@ -21,6 +30,22 @@ export function ParticipantsField({ control, value, onChange }: Props) {
     const next = addNames(value, names);
     if (next !== value) onChange(next);
   }
+
+  /** Adds the name typed so far. */
+  function commit() {
+    if (!text.trim()) return;
+    add(splitNames(text));
+    setText('');
+  }
+
+  useImperativeHandle(pending?.commitRef, () => commit);
+  const typing = text.trim() !== '';
+  const onPendingChange = pending?.onPendingChange;
+  useEffect(() => {
+    if (!typing || !onPendingChange) return;
+    onPendingChange(true);
+    return () => onPendingChange(false);
+  }, [typing, onPendingChange]);
 
   return (
     <div className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-ink-500/80 bg-surface px-2 py-0.5 shadow-xs transition-colors hover:border-ink-600 has-[input:focus-visible]:border-brand-600 has-[input:focus-visible]:outline-1 has-[input:focus-visible]:outline-brand-600">
@@ -69,11 +94,7 @@ export function ParticipantsField({ control, value, onChange }: Props) {
           add(splitNames(text));
           setText('');
         }}
-        onBlur={() => {
-          if (!text.trim()) return;
-          add(splitNames(text));
-          setText('');
-        }}
+        onBlur={commit}
         className="h-7 min-w-40 flex-1 bg-transparent px-1 text-sm text-ink-900 placeholder:text-ink-500 focus-visible:outline-none"
       />
     </div>

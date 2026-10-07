@@ -100,7 +100,7 @@ export function GuideButton({ guide, rowRef, noteOpen, onClick }: GuideButtonPro
         aria-keyshortcuts="G"
         title={`${label} · G`}
         onClick={onClick}
-        className="flex size-8 items-center justify-center rounded-md text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-800"
+        className="flex size-11 items-center justify-center rounded-md text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-800 @min-[56rem]:pointer-fine:size-8"
       >
         <Icon size={16} aria-hidden="true" />
       </button>

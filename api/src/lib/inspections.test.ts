@@ -96,6 +96,24 @@ describe('nextInspectionNumber', () => {
     expect(await counter()).toEqual({ year: 2026, last: 106 });
   });
 
+  it('carries on from the newest inspection when the counter blob is lost', async () => {
+    const now = new Date('2026-03-01T10:00:00Z');
+    const number = await nextInspectionNumber(now);
+    expect(number).toBe('FI-2026-0001');
+    await writeInspection(sampleInspection({ number }), { ifNoneMatch: '*' });
+    await writeInspection(sampleInspection({ number: 'FI-2025-0042' }), { ifNoneMatch: '*' });
+    await containerClient(config).getBlobClient(blobNames.inspectionCounter).delete();
+
+    expect(await nextInspectionNumber(now)).toBe('FI-2026-0002');
+    expect(await counter()).toEqual({ year: 2026, last: 2 });
+  });
+
+  it('starts the new year at 0001 when the lost counter was in an earlier year', async () => {
+    await writeInspection(sampleInspection({ number: 'FI-2025-0009' }), { ifNoneMatch: '*' });
+    expect(await nextInspectionNumber(new Date('2026-03-01T10:00:00Z'))).toBe('FI-2026-0001');
+    expect(await counter()).toEqual({ year: 2026, last: 1 });
+  });
+
   it('500s on a counter blob it cannot read, rather than starting again at 0001', async () => {
     await writeJson(config, blobNames.inspectionCounter, { year: 2026 });
     await expect(nextInspectionNumber()).rejects.toThrow('inspection-counter.json is invalid');

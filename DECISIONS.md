@@ -253,8 +253,8 @@ The calls with product, security or cost impact. Each is explained in its sectio
 - **The Azure SDKs keep their default retry policies.** Fewer knobs; the volume is tiny.
 - **`ensureStorage()` runs automatically from `readJson`/`writeJson`/`listBlobNames`**, memoised per
   process and cleared on failure. It is a safety net for a fresh Azurite and costs about 5
-  idempotent calls per cold start in Azure. Direct `containerClient()`/`deviationsTable()` users
-  must await it themselves.
+  idempotent calls per cold start in Azure. Direct `containerClient()` users must await it
+  themselves. Since phase 3 the deviations table has its own memo, `ensureTable()` (see there).
 - **Stored data that is not JSON or fails validation is a logged 500 that names the blob, not
   a 400.** It is not the caller's fault.
 - **`writeJson` maps exactly 412 `ConditionNotMet` → `PreconditionFailedError` and 409
@@ -645,7 +645,7 @@ The calls with product, security or data impact. Each is explained in its sectio
   `lib/useSettings`, `lib/images`, for phase 3 to reuse. A `Dialog` is closed by its caller
   through its ref (focus returns to the opener), ignores Escape while busy and, holding a form,
   doesn't close on a backdrop click. The reload and leave confirmations reuse the checklist's
-  `ConfirmDialog`.
+  `ConfirmDialog`. (Phase 3: "ignores Escape" needs `closedby="none"` in Chrome, see there.)
 - **Input borders are ink-500 at 80 %** (about 3.4:1), meeting WCAG 1.4.11's 3:1 for controls.
 - **The save status is a polite live region; conflict and failed-save banners are alerts.**
   Retry moves focus to the status, so it doesn't fall to the page when the button disappears. The
@@ -707,23 +707,28 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - A save whose deviation-table update fails still succeeds; the table catches up at the next
   save. Finalise and Reopen update the table first and refuse with 503 if they can't (Deviation
   table).
+- Every write checks the inspection again after updating the table and updates it again if
+  another write got in meanwhile, so a slow update never leaves the table behind (Deviation
+  table).
 - Beyond the contract: if Finalise or Reopen updated the table but then lost the race for the
   inspection itself, the table is synced back from the stored inspection (Deviation table).
 - A deviation row's `createdAt` is when the deviation was first recorded and survives later
   saves; a deviation removed and added again gets a new one (Deviation table).
 - `resp` is stored in the table exactly as typed. KPIs that group by it (phase 6) must trim and
   ignore case (Deviation table).
-- Inspection numbers are unique but not gapless, and the counter never goes back a year (API).
+- Inspection numbers are unique but not gapless, and the counter never goes back a year. A lost
+  counter blob carries on from the highest number in use (API).
 - An inspection without a photo of its own shares the template's cover photo (API).
 - A new error code, `unavailable` (503): nothing was changed, send the same request again (API).
 - Fields a client may not set are ignored, not refused (API).
 - A held key never marks a run of rows; **Set remaining to OK** has no confirmation (it only
-  fills rows without a status) (Checklist sheet).
+  fills rows without a status). It is not a Tab stop: `R` on a row does the same (Checklist
+  sheet).
 - The Deviation Summary is a tab next to the checklist, not a side panel (Inspection pages).
 - Creating an inspection has no client timeout, so a slow create is never retried into a second
   inspection (Inspection pages).
-- The e2e tests read the deviations table straight from Azurite with `@azure/data-tables`, which
-  the root `package.json` doesn't list yet (Tests and tooling).
+- The e2e tests read the deviations table straight from Azurite with `@azure/data-tables`, a root
+  devDependency (Tests and tooling).
 - `npm run dev` starts the SWA CLI through `scripts/swa-start.mjs`, which trims its environment
   to an allow-list, and Vite now listens on `127.0.0.1`: a page load in dev went from about 6 s
   to about 1.2 s (Tests and tooling).
@@ -759,17 +764,26 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **Numbering (`config/inspection-counter.json`):** the counter is written conditionally on the
   version just read. Losing the race (412 or 409) means read again: up to 5 retries after the
   first attempt, with random waits of at most 100, 200, 400, 800 and 1600 ms, then 503 "Too many
-  inspections are being created at once. Try again." A missing counter is created with
-  `ifNoneMatch '*'`; an unreadable one is a 500, never a silent restart at 0001. The year is
-  Swedish time.
+  inspections are being created at once. Try again." An unreadable counter is a 500, never a
+  silent restart at 0001. The year is Swedish time.
+- **A missing counter is seeded from the highest number in use** (the list's one blob listing),
+  then created with `ifNoneMatch '*'`, so a counter blob lost to a manual delete, a cleared
+  container or a migration without `config/` never hands out a number again. Without inspections
+  (a first run) it starts at 0001; a seed from an earlier year starts the new year at 0001. A
+  corrupt inspection met on the way makes the create a 500, as for the list.
 - **The counter never goes back a year.** If it already holds a later year than this instance's
   clock (skew at New Year), it keeps counting in that year; restarting the earlier year would
   hand out numbers again.
 - **The number is taken last,** after the body, the template and its published revision are
   checked, so a refused create never uses one up. A failed write after that skips the number:
   numbers are unique, not gapless.
-- **Create** answers 404 for an unknown template (also one whose draft is missing, as in phase 2) and 409 "Publish the template first." when it has no published revision. It does not touch
-  the table: a new inspection has no deviations.
+- **Create** answers 404 for an unknown template (also one whose draft is missing, as in
+  phase 2) and 409 "Publish the template first." when it has no published revision. It does not
+  touch the table: a new inspection has no deviations.
+- **The template list carries the published revision's name and model** (`publishedName`,
+  `publishedModelCode`, additive to `TemplateSummary`): the new-inspection picker and form show
+  what the inspection will copy, not a draft change an admin hasn't published yet. The template
+  list (phase 2) still shows the draft's.
 - **The machine photo defaults to the revision's cover photo** when the create request has none
   (images never change, so sharing the id is safe). A save without `photoId` removes the photo,
   as `coverImageId` does on templates.
@@ -789,7 +803,7 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   `functions/inspection-state.ts` (finalise, reopen) and `functions/resp-suggestions.ts`.
 - **`writeJson` takes optional blob metadata;** existing callers are unchanged.
 - **API tests:** `resetStorage()` also clears inspections, the counter and every deviation row,
-  row by row (deleting the table would defeat `ensureStorage`'s once-per-process memo).
+  row by row (deleting the table would defeat `ensureTable`'s once-per-process memo).
   `sampleInspection()` builds a valid inspection.
 
 ### Deviation table
@@ -811,6 +825,19 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   updated (a 412 race or any other error), the table is synced again from the stored blob, best
   effort, before the error is returned. Otherwise the table could claim `finalised = true` for an
   inspection in progress.
+- **Every write re-checks the blob after syncing (`syncSettled`).** Nothing orders two writers'
+  syncs: a save whose table update was slow (SDK retries, throttling) could land after a newer
+  save's, or after a finalise, and leave a stale row or `finalised = false` for a finalised
+  inspection, which no later save would repair (finalised inspections take no saves). So after
+  its sync each writer reads the blob again and, if the ETag moved on, syncs from the latest
+  version, up to 3 more rounds (then `context.warn`). Finalise and Reopen also sync once more
+  after their blob write, best effort: a save's sync can land between their table-first sync and
+  their write. Costs one blob read per save. Conditional entity ETags alone would not do: a sync
+  that starts after the other writer's reads current ETags and overwrites with stale data.
+- **The table has its own `ensureTable()` memo,** apart from the containers' `ensureStorage()`.
+  With one memo for both, a table outage on a fresh instance failed every blob request (saves,
+  lists, image URLs) with a 500, so "the save still succeeds" held on warm instances only. Only
+  the sync and the resp suggestions need the table.
 - **`createdAt` is the time of the sync that first wrote the row,** as an ISO string, kept on
   later saves, so KPIs over time don't move with every edit.
 - **Column types:** `templateRevision` a number, `finalised` a boolean, `inspectionDate`
@@ -824,9 +851,11 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 ### Checklist sheet
 
 - **Keys on a focused row:** `1`/`O` OK, `2`/`N` NOK, `3`/`A` N/A, `0`/`Backspace`/`Delete`
-  clear, `↓`/`J` and `↑`/`K` move (across sections), `Home`/`End` first and last, `C` comment,
-  `G` the guide note. Ctrl, Alt and Meta combinations are always the browser's; Shift still counts
-  for character keys (digits need it on some layouts) but Shift with a named key is the browser's.
+  clear, `R` the rest of the row's section OK, `↓`/`J` and `↑`/`K` move (across sections),
+  `Home`/`End` first and last, `C` comment, `G` the guide note. Space does nothing: it would
+  scroll the page a screen and the next key would change a row out of view. Ctrl, Alt and Meta
+  combinations are always the browser's; Shift still counts for character keys (digits need it
+  on some layouts) but Shift with a named key is the browser's.
 - **OK and N/A by key move to the next row; NOK stays** so the comment follows at once. On the
   last row the focus stays.
 - **A held key repeats moves only.** Setting or clearing a status takes a press per row, so a key
@@ -843,16 +872,20 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   the row); a select keeps Enter. Escape in any field returns to the row. Keys typed in a field
   are never shortcuts.
 - **Every row is `tabIndex` 0 (not a roving tab index),** so native Tab and Shift+Tab give the
-  order above without custom handling. A section's **Set remaining to OK** is a Tab stop between
-  sections.
+  order above without custom handling, across sections too.
 - **Set remaining to OK** fills only rows without a status, in one change, without a
-  confirmation. It stays focusable when nothing is left (`aria-disabled`) and its accessible name
-  includes the count.
+  confirmation. **It is not a Tab stop (`tabIndex` -1); `R` on a row does the same** and keeps
+  the focus on the row. As a Tab stop between sections it caught the Tab after a section's last
+  field: status keys typed there were lost, and Enter (the hint bar's "Next row") filled the
+  whole next section. `R` is free (Shift+O is already OK, digits need Shift on some layouts) and,
+  like the status keys, takes a press per row. The button stays clickable and focusable by click
+  when nothing is left (`aria-disabled`); its accessible name includes the count.
 - **Resp suggestions use the browser's `<datalist>`,** one per sheet. In Chrome its popup takes the
   first Enter (pick) or Escape (close); the next press reaches the sheet.
 - **Layout by the sheet's own width (container queries):** from 56rem one line per row in the
   print's column order; from 34rem the checkpoint above Comment | Status | Resp; narrower, stacked.
-  Controls are 44 px on touch screens and narrow sheets, 32 px with a mouse on a wide sheet.
+  Controls are 44 px on touch screens and narrow sheets, 32 px with a mouse on a wide sheet; the
+  guide icon too.
 - **Resp is 10rem wide** (the integrator widened it from 8rem): "El-avdelningen" was cut off in
   its input on desktop and tablet.
 - **Fields are underlined, not boxed;** 180 boxes were heavy, and lines read like the paper's
@@ -864,6 +897,10 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **Never colour only:** statuses are symbol + text; a NOK row has a red bar and its pressed
   "✗ NOK" segment; the selected segment's ring is at 80 % strength (60 % was under 3:1). The focus
   ring is drawn inside the row and overrides the red problem outline.
+- **The row's ring and tint follow `:focus`, not `:focus-visible`.** The focused row is where the
+  next key goes, and it is often focused after a click (a status segment, Continue, a jump
+  link), when Chrome doesn't count the focus as visible. Clicks in a row's fields focus the
+  fields, not the row, so this marks only the row the keys act on.
 - **Screen readers:** each row is a labelled group ("Row 3.c …") described by its status; one
   polite live region announces "3.c NOK" and "Section 2: 13 rows set to OK"; section titles are
   headings with a hidden "Section N:".
@@ -889,11 +926,18 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **Each tab keeps its scroll position;** jump links switch the tab at once, then focus and centre
   their target. **Continue at 3.b** focuses the first row without a status, so transcription
   resumes without tabbing through the front page.
+- **Opening an inspection focuses Continue at 3.b** (when there is a row without a status;
+  otherwise the focus stays where it was), so one Enter resumes transcribing; before, the focus
+  was on the page and the first status keys did nothing. No page-level shortcut keys (Alt+1…):
+  Ctrl/Alt/Meta combinations stay the browser's (AltGr on Swedish layouts, tab switching).
 - **Print is shown disabled** but focusable, with "Print / Save PDF: coming in phase 4".
 - **The save status is hidden on a finalised inspection** unless something is still unsaved.
 - **List filters live in the address** (`?q=&model=&state=`, replacing the history entry) and are
   applied at once (`flushSync`): as a router transition, fast typing kept only the first letter
   and a quick second change undid the first.
+- **The pages' own way back to the list keeps its filters:** the list remembers its search in
+  `sessionStorage` (per tab), and "← Inspections" and Cancel on the inspection and new-inspection
+  pages go to it, as the browser's Back does. The sidebar's Inspections is the plain list.
 - **Search** is case-insensitive (Swedish), every word must appear in the number, machine or serial
   number, and å/ä/ö are not folded (they are letters of their own in Swedish). The model filter
   offers the models that have inspections, plus one from a shared link.
@@ -911,7 +955,9 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   date field passes on only complete dates and shows the last valid one again when left.
 - **Participants are chips:** Enter, a comma, a semicolon or a line break adds a name (a pasted
   list splits); leaving the field adds what was typed; duplicates (ignoring case) are skipped;
-  each name is cut at 200 characters.
+  each name is cut at 200 characters. **A name typed but not yet added counts as unsaved** on the
+  inspection page: the header says "Unsaved changes", closing the tab warns, and saving before
+  a link, Back or Finalise adds it first.
 - **The model is read-only text** on the front page: it comes from the template and never changes.
   A finalised front page is a definition list with "—" for empty fields.
 - **Deviation Summary:** a table (scrolls sideways on phones). Row deviations are read-only there;
@@ -919,7 +965,10 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   break); removing one asks only if something was typed, then focus goes to **Add extra
   deviation**. A new extra deviation gets the focus in its description. Ids are `newId()`.
 - **Resp suggestions** are the history merged with this inspection's own values, trimmed,
-  de-duplicated ignoring case and sorted (Swedish).
+  de-duplicated ignoring case and sorted (Swedish). **This inspection's values are taken when a
+  Resp field is left**, not as they are typed: otherwise the half-typed text was offered to its
+  own field, first (a prefix sorts before its completion), and ↓ Enter stored "El" instead of
+  "El-avdelningen", or a value one keystroke old.
 - **Finalise checks locally first** and lists problems without saving; after an attempt they stay
   marked and update as you type, with a **Show problems** callout. The confirmation names the
   number, rows and deviations, then saves pending changes (waiting for a photo upload) and
@@ -934,8 +983,19 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **Shared pieces moved:** the autosave scheduler, its hook, the leave guard and the save status
   went from `features/templates` to `app/src/lib/autosave/` (tests unchanged and green);
   `errorMessage`, `isMissing` and `isConflict` to `lib/api.ts`. Templates changed only imports.
-- **`MachinePhoto` repeats about 25 lines of the template's `CoverPhoto`** to say "machine photo";
-  a label prop on `CoverPhoto` would remove the copy. Not done: outside the builder's area.
+- **Both editors share their chrome** (review): `lib/autosave/useUploadTracking` (a photo upload
+  counts as unsaved), `AutosaveAlerts` (conflict and "Couldn't save" callouts), `useReload` and
+  `LeaveDialog`. `components/PhotoField` is the template's cover photo and the inspection's
+  machine photo, labels from the caller. `BackLink`, `Callout` and `ConfirmDialog` moved to
+  `components/`, so inspection pages don't import the template editor (whose module pulls in
+  dnd-kit). `FinaliseIssueSchema` and `PublishIssueSchema` are zod schemas in shared, the types
+  inferred from them (additive), so the app's parsers can't drift from the server's issues.
+- **Autosave retries at once when the browser comes back online,** instead of after its backoff
+  (up to 30 s).
+- **A busy dialog uses `closedby="none"`.** Chrome lets a page refuse only one Escape per user
+  activation; the second closed the busy Finalise dialog while the request ran, and edits made
+  then either made Finalise fail as "someone else changed this" or showed unsaved text on the
+  locked page. `close()` from script still works.
 - **Performance:** the front page card, the Deviation Summary (whose deviations keep their
   identity while unchanged) and the header parts are memoised, the hint bar is a constant
   element. Production build: 1.5 ms of main-thread work per status key, 5.0 ms per comment
@@ -945,24 +1005,31 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 
 ### Tests and tooling
 
-- **`e2e/inspections.spec.ts`: six tests.** Each gets its own throwaway template, published as
+- **`e2e/inspections.spec.ts`: ten tests.** Each gets its own throwaway template, published as
   revision 1 with model `E2E`, and deletes it and its inspections, with their deviation rows,
   afterwards. Inspections are created through the API with the test's own sign-in, except in the
   test of the create form. Tests run in parallel and never depend on the seeded RigiMill MG.
 - **The deviation table is checked in Azurite itself** (`e2e/support/storage.ts`): no endpoint
-  exposes the rows. It uses `@azure/data-tables`, which resolves from the API workspace; the root
-  `package.json` should list it next to `@azure/storage-blob`.
-- **The keyboard test uses key presses only** once the first row has the focus, and checks the
-  stored results exactly, so a shortcut leaking from a text field would fail it.
+  exposes the rows. It uses `@azure/data-tables`, listed in the root `package.json` next to
+  `@azure/storage-blob`.
+- **The keyboard test uses key presses only** once the page has opened (on Continue), and checks
+  the stored results exactly, so a shortcut leaking from a text field would fail it.
+- **Review tests:** a Tab from a section's last field reaches the next section's row, `R`, the
+  ring on a row focused by a click, Resp suggestions while typing, an unsaved participant (Back
+  saves it, closing warns), the list's filters after "← Inspections", a finalise whose answer is
+  lost, a 503 with Try again, and Escape twice on the busy Finalise dialog; in the API, three
+  slow-sync races (save vs save, save vs finalise either side of its blob write), a lost counter,
+  a table outage on a fresh instance, and a draft whose model differs from its published one.
 - **The SWA CLI starts with a trimmed environment (`scripts/swa-start.mjs`).** A page load in dev
   took about 6 s through it but 0.6 s straight from Vite. Profiling showed why: SWA CLI 2.0.10
   copies the whole of `process.env` about a hundred times per request (its logger reads the
   environment again for every debug line, even with debug output off), so with the ~190
   variables of this shell each proxied module cost about 35 ms of CPU. The launcher deletes every
   variable not on an allow-list (path, home and temp folders, the Windows shell, locale,
-  terminal, proxies, `NODE_*`, `SWA_*`), then runs the CLI's own `swa` bin in the same process with
-  `start`: no extra process, so Ctrl+C and Playwright's shutdown work as before. A missing
-  variable the CLI turns out to need goes on the allow-list.
+  terminal, proxies, `NODE_*`, `SWA_*`, `DEBUG`, `NO_UPDATE_NOTIFIER`), then runs the CLI's own
+  `swa` bin in the same process as `swa start`, plus any arguments given (e.g.
+  `--verbose=silly`): no extra process, so Ctrl+C and Playwright's shutdown work as before. A
+  missing variable the CLI turns out to need goes on the allow-list.
 - **Vite listens on `127.0.0.1` and the CLI proxies to `http://127.0.0.1:5173`.** For a `localhost`
   dev server URL the CLI runs `wait-on` against it before proxying every request (about 30 ms
   each here); phase 1 already did the same for the API URL. A fixed address also avoids

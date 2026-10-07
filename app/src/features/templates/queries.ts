@@ -3,6 +3,7 @@
  * Query keys live here so invalidation after create/save/publish is in one place.
  */
 import {
+  PublishIssueSchema,
   SaveTemplateResponseSchema,
   TemplateDetailSchema,
   TemplateListSchema,
@@ -137,16 +138,7 @@ export async function publishDraft(id: string, ifMatch: string, changeNote: stri
   );
 }
 
-const PublishIssuesSchema = z.array(
-  z.object({
-    target: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('template') }),
-      z.object({ kind: z.literal('section'), sectionId: z.string() }),
-      z.object({ kind: z.literal('item'), sectionId: z.string(), itemId: z.string() }),
-    ]),
-    message: z.string(),
-  }),
-);
+const PublishIssuesSchema = z.array(PublishIssueSchema);
 
 /** The publish problems a 400 from …/publish carries in `details`, if that's what it is. */
 export function publishIssuesOf(error: unknown): PublishIssue[] | null {

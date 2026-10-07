@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
-import { Button } from '../../../components/Button';
+import { Button } from './Button';
 
 type Props = {
   title: string;

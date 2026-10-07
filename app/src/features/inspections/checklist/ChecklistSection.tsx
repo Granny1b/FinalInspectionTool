@@ -31,14 +31,23 @@ export const ChecklistSection = memo(function ChecklistSection({
   return (
     <div id={`section-${section.id}`} className="mt-8 first:mt-0">
       <SectionHeader number={number} title={section.title}>
-        {/* aria-disabled, not disabled, when every row has a status: disabled drops the focus. */}
+        {/*
+          Not a Tab stop: Tab from a section's last row goes on to the next section's first row,
+          and R on a row does the same as this button. aria-disabled, not disabled, when every
+          row has a status: disabled would drop the focus it took from a click.
+        */}
         <button
           type="button"
+          tabIndex={-1}
           aria-disabled={remaining === 0 || undefined}
           aria-label={`Set remaining to OK in section ${number} (${
             remaining === 1 ? '1 row' : `${remaining} rows`
           })`}
-          title={remaining === 0 ? 'Every row in this section has a status' : undefined}
+          title={
+            remaining === 0
+              ? 'Every row in this section has a status'
+              : 'Set remaining to OK · R on a row'
+          }
           onClick={() => actions.setRemainingOk(section.id)}
           className={clsx(
             'inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-ink-500/80 bg-surface px-2.5 text-xs font-medium whitespace-nowrap text-ink-800 shadow-xs transition-colors',

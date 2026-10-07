@@ -30,6 +30,31 @@ export function filterToParams({ query, model, state }: InspectionFilter): URLSe
   return params;
 }
 
+const LIST_SEARCH_KEY = 'inspections.listSearch';
+
+/**
+ * Remembers the list's search and filters for this tab (`filterToParams(…).toString()`), so the
+ * pages' own links back to the list return to them, as the browser's Back does.
+ */
+export function rememberListSearch(search: string): void {
+  try {
+    sessionStorage.setItem(LIST_SEARCH_KEY, search);
+  } catch {
+    // Storage blocked: the links go to the unfiltered list.
+  }
+}
+
+/** The list as last shown in this tab: `/inspections`, with its search and filters if any. */
+export function inspectionsListHref(): string {
+  let search: string | null = null;
+  try {
+    search = sessionStorage.getItem(LIST_SEARCH_KEY);
+  } catch {
+    // Storage blocked.
+  }
+  return search ? `/inspections?${search}` : '/inspections';
+}
+
 export function isFiltered({ query, model, state }: InspectionFilter): boolean {
   return Boolean(query.trim() || model || state);
 }

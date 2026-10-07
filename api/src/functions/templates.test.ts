@@ -161,6 +161,8 @@ describe('GET /api/templates', () => {
         name: 'Final inspection – IM8',
         modelCode: 'IM',
         publishedRevision: null,
+        publishedName: null,
+        publishedModelCode: null,
         draftRevision: 1,
         hasUnpublishedChanges: true,
         itemCount: 0,
@@ -170,6 +172,8 @@ describe('GET /api/templates', () => {
       expect.objectContaining({
         id: mg.id,
         publishedRevision: 2,
+        publishedName: mg.name,
+        publishedModelCode: 'RMMG',
         draftRevision: 3,
         hasUnpublishedChanges: false,
         itemCount: 3,

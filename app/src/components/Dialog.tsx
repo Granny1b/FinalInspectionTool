@@ -9,7 +9,7 @@ type Props = {
   children: ReactNode;
   /** Runs once the dialog has closed (Escape or close()); unmount it then. */
   onClose: () => void;
-  /** While true, Escape doesn't close it (a request is running). */
+  /** While true, Escape and other close requests don't close it (a request is running). */
   busy?: boolean;
   className?: string;
 };
@@ -42,6 +42,10 @@ export function Dialog({
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       onClose={onClose}
+      // Chrome lets a page refuse only one Escape per user activation: the next one closes the
+      // dialog even though `cancel` is prevented. `closedby="none"` ignores close requests, while
+      // close() from script still works; the cancel guard covers browsers without it.
+      closedby={busy ? 'none' : undefined}
       onCancel={(event) => {
         if (busy) event.preventDefault();
       }}

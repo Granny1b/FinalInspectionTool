@@ -92,6 +92,8 @@ export async function loadSummaries(): Promise<TemplateSummary[]> {
         name: draft.name,
         modelCode: draft.modelCode,
         publishedRevision: published?.revision ?? null,
+        publishedName: published?.name ?? null,
+        publishedModelCode: published?.modelCode ?? null,
         draftRevision: draft.revision,
         hasUnpublishedChanges: hasUnpublishedChanges(draft, published),
         itemCount: draft.sections.reduce((count, section) => count + section.items.length, 0),

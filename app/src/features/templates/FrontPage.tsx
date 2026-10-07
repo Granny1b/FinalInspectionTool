@@ -1,9 +1,8 @@
 import type { MachineModel, Template } from '@modig/shared';
-import { ImageOff, LoaderCircle, Mountain } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 import { Logo } from '../../components/Logo';
+import { PhotoFrame } from '../../components/PhotoField';
 import { formatDateTime } from '../../lib/format';
-import { useImageUrl } from '../../lib/images';
 import { modelName } from '../../lib/useSettings';
 
 type FrameProps = {
@@ -36,31 +35,6 @@ export function FrontPageFrame({ revisionLabel, children }: FrameProps) {
   );
 }
 
-/** The cover photo in a 4:3 frame, or a placeholder. */
-export function CoverPhoto({ imageId, children }: { imageId?: string; children?: ReactNode }) {
-  const url = useImageUrl(imageId);
-  return (
-    <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-md border border-ink-200 bg-ink-50">
-      {!imageId ? (
-        <div className="flex flex-col items-center gap-1.5 text-xs text-ink-500">
-          <Mountain size={22} strokeWidth={1.5} aria-hidden="true" className="text-ink-400" />
-          No cover photo
-        </div>
-      ) : url.data ? (
-        <img src={url.data} alt="Cover photo" className="size-full bg-surface object-contain" />
-      ) : url.isError ? (
-        <div className="flex flex-col items-center gap-1.5 px-4 text-center text-xs text-ink-500">
-          <ImageOff size={20} strokeWidth={1.5} aria-hidden="true" className="text-ink-400" />
-          The photo couldn’t be loaded.
-        </div>
-      ) : (
-        <LoaderCircle size={20} aria-label="Loading photo" className="animate-spin text-ink-400" />
-      )}
-      {children}
-    </div>
-  );
-}
-
 /** The front page of a published revision, read-only. */
 export function PublishedFrontPage({
   template,
@@ -71,7 +45,7 @@ export function PublishedFrontPage({
 }) {
   return (
     <FrontPageFrame revisionLabel={`Rev: ${template.revision}`}>
-      <CoverPhoto imageId={template.coverImageId} />
+      <PhotoFrame imageId={template.coverImageId} noun="cover photo" />
       <dl className="grid content-start gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
         <Detail label="Template name" wide>
           {template.name}

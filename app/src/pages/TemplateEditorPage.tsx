@@ -2,11 +2,12 @@ import { hasRole } from '@modig/shared';
 import { FileClock } from 'lucide-react';
 import { useState } from 'react';
 import { useParams } from 'react-router';
+import { BackLink } from '../components/BackLink';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
 import { LoadError, PageLoading } from '../components/PageStates';
 import { Badge } from '../features/templates/Badge';
-import { BackLink, PublishedTemplateView } from '../features/templates/PublishedTemplateView';
+import { PublishedTemplateView } from '../features/templates/PublishedTemplateView';
 import {
   useTemplateDetail,
   useTemplateRevision,

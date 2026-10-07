@@ -69,7 +69,7 @@ export function StateChangeDialog({
       <Dialog
         dialogRef={dialogRef}
         title={`Fix ${issues.length === 1 ? 'one problem' : `${issues.length} problems`} before finalising`}
-        description="A finalised inspection can’t be changed, so every row needs a status first. The problems are marked in red."
+        description="A finalised inspection can’t be changed, so fix these first. They are marked in red."
         onClose={onClose}
       >
         <ul ref={listRef} className="mt-4 max-h-80 space-y-0.5 overflow-y-auto">

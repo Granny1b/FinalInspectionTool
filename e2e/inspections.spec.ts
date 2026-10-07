@@ -167,6 +167,8 @@ test.describe('an inspector', () => {
     await page.waitForURL(/\/inspections\/[A-Za-z0-9]{16}$/);
     const id = new URL(page.url()).pathname.split('/').pop()!;
     inspections.track(id);
+    // The keyboard starts at "Continue at 1.a": one Enter and transcribing begins.
+    await expect(page.getByRole('button', { name: 'Continue at 1.a' })).toBeFocused();
     const { inspection } = await stored(page.request, id);
     expect(inspection).toMatchObject({
       templateId: published.id,
@@ -198,6 +200,7 @@ test.describe('an inspector', () => {
 
     await page.getByRole('main').getByRole('link', { name: 'Inspections' }).click();
     await page.getByRole('searchbox', { name: 'Search inspections' }).fill(published.id);
+    await page.getByRole('combobox', { name: 'State' }).selectOption('in_progress');
     const listed = page.getByRole('row').filter({ hasText: machine });
     await expect(listed.getByRole('cell')).toHaveText([
       inspection.number,
@@ -210,6 +213,16 @@ test.describe('an inspector', () => {
     ]);
     await listed.getByRole('link', { name: inspection.number }).click();
     await expect(page).toHaveURL(new RegExp(`/inspections/${id}$`));
+    await expect(page.getByRole('button', { name: 'Continue at 1.a' })).toBeFocused();
+
+    // The page's own link back returns to the list as it was left, search and filters included.
+    await page.getByRole('main').getByRole('link', { name: 'Inspections' }).click();
+    await expect(page).toHaveURL(new RegExp(`/inspections\\?q=${published.id}&state=in_progress$`));
+    await expect(page.getByRole('searchbox', { name: 'Search inspections' })).toHaveValue(
+      published.id,
+    );
+    await expect(page.getByRole('combobox', { name: 'State' })).toHaveValue('in_progress');
+    await expect(listed).toBeVisible();
   });
 
   test('transcribes the checklist from the keyboard alone; it is autosaved', async ({
@@ -222,8 +235,8 @@ test.describe('an inspector', () => {
     await openInspection(page, loaded);
     await expect(page.getByRole('list', { name: 'Keyboard shortcuts' })).toBeVisible();
 
-    // "Continue at 1.a" starts at the first row without a status.
-    await page.getByRole('button', { name: 'Continue at 1.a' }).focus();
+    // The page opens on "Continue at 1.a", which goes to the first row without a status.
+    await expect(page.getByRole('button', { name: 'Continue at 1.a' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(row(page, a1!)).toBeFocused();
 
@@ -249,6 +262,15 @@ test.describe('an inspector', () => {
     await page.keyboard.press('ArrowDown');
     await expect(severity(page, b1!)).toHaveValue('major');
     await page.keyboard.press('Tab');
+    await expect(row(page, c1!)).toBeFocused();
+
+    // From the last field of a section's last row, Tab goes straight on to the next section.
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    await expect(resp(page, c1!)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(row(page, a2!)).toBeFocused();
+    await page.keyboard.press('k');
     await expect(row(page, c1!)).toBeFocused();
 
     // K and J move up and down; A = N/A, which moves on into the next section.
@@ -290,10 +312,19 @@ test.describe('an inspector', () => {
     await expect(progress(page)).toHaveText('4 / 6 rows filled · 2 NOK');
     await expect(deviationsTab(page)).toHaveText(/^Deviations\s*2$/);
 
-    // Only the rows without a status: 2.a stays NOK.
+    // R on a row sets the rest of its section to OK, as the section's button does: only the rows
+    // without a status, so 2.a stays NOK. The focus stays on the row.
     const sectionOne = page.getByRole('button', { name: /^Set remaining to OK in section 1/ });
     await expect(sectionOne).toHaveAttribute('aria-disabled', 'true');
-    await page.getByRole('button', { name: 'Set remaining to OK in section 2 (2 rows)' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Set remaining to OK in section 2 (2 rows)' }),
+    ).toBeVisible();
+    await expect(row(page, b2!)).toBeFocused();
+    await page.keyboard.press('r');
+    await expect(row(page, b2!)).toBeFocused();
+    await expect(
+      page.getByRole('button', { name: 'Set remaining to OK in section 2 (0 rows)' }),
+    ).toHaveAttribute('aria-disabled', 'true');
     await expect(pressed(page, a2!)).toHaveText('NOK');
     await expect(pressed(page, b2!)).toHaveText('OK');
     await expect(pressed(page, c2!)).toHaveText('OK');
@@ -352,8 +383,11 @@ test.describe('an inspector', () => {
     await openInspection(page, loaded);
     await expect(deviationsTab(page)).toHaveText(/^Deviations\s*0$/);
 
-    // Marked out of order: the summary still lists them in checklist order.
+    // Marked out of order: the summary still lists them in checklist order. A click on a status
+    // leaves the row focused, with its ring, for the next key.
     await segment(page, b2!, 'NOK').click();
+    await expect(row(page, b2!)).toBeFocused();
+    await expect(row(page, b2!)).toHaveCSS('outline-style', 'solid');
     await comment(page, b2!).fill('Coolant nozzle bent');
     await resp(page, b2!).fill('Mekanik');
     await segment(page, c1!, 'NOK').click();
@@ -484,6 +518,153 @@ test.describe('an inspector', () => {
     await deviationsTab(page).click();
     await expect(summaryRows(page).nth(0).getByRole('cell').nth(1)).toHaveText('2.b');
     await expect(summaryRows(page).nth(0).getByRole('cell').nth(0)).toHaveText('D-01');
+  });
+
+  test('Resp suggests names typed in this inspection once their field is left', async ({
+    page,
+    published,
+    inspections,
+  }) => {
+    const [[a1, b1]] = rowIds(published) as [string[]];
+    const loaded = await inspections.create(page.request, published, `Resp – ${published.id}`);
+    await openInspection(page, loaded);
+    const name = `Svets ${published.id}`;
+    const listId = await resp(page, a1!).getAttribute('list');
+    const suggested = () =>
+      page
+        .locator(`datalist[id="${listId}"] option`)
+        .evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
+
+    // The text being typed is never offered to its own field (it would come first).
+    await resp(page, a1!).pressSequentially(name.slice(0, 3));
+    await expect(resp(page, a1!)).toHaveValue(name.slice(0, 3));
+    expect(await suggested()).not.toContain(name.slice(0, 3));
+    await resp(page, a1!).fill(name);
+    expect(await suggested()).not.toContain(name);
+
+    // Once the field is left, the name is offered to the others.
+    await page.keyboard.press('Tab');
+    await expect.poll(suggested).toContain(name);
+    await resp(page, b1!).pressSequentially('Sv');
+    expect(await suggested()).not.toContain('Sv');
+    expect(await suggested()).toContain(name);
+  });
+
+  test('a participant typed but not yet added counts as unsaved', async ({
+    page,
+    published,
+    inspections,
+  }) => {
+    const loaded = await inspections.create(page.request, published, `People – ${published.id}`);
+    const { id, number } = loaded.inspection;
+    await page.goto('/inspections');
+    await page.getByRole('searchbox', { name: 'Search inspections' }).fill(number);
+    await page.getByRole('link', { name: number }).click();
+    await expect(saveStatus(page)).toHaveText('Saved');
+
+    const participants = page.getByLabel('Participants', { exact: true });
+    await participants.pressSequentially('Anna Svensson');
+    await expect(saveStatus(page)).toHaveText('Unsaved changes');
+    // Back in the browser, without leaving the field: the name is added and saved first.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/inspections\?q=/);
+    expect((await stored(page.request, id)).inspection.front.participants).toEqual([
+      'Erik Lund',
+      'Anna Svensson',
+    ]);
+
+    // Closing the tab with a name typed gets the browser's warning.
+    await page.goForward();
+    await page.getByLabel('Participants', { exact: true }).pressSequentially('Lars Ek');
+    await expect(saveStatus(page)).toHaveText('Unsaved changes');
+    const warning = page.waitForEvent('dialog');
+    await page.close({ runBeforeUnload: true });
+    const shown = await warning;
+    expect(shown.type()).toBe('beforeunload');
+    await shown.dismiss();
+  });
+
+  test('a finalise whose answer is lost is not mistaken for a conflict', async ({
+    page,
+    published,
+    inspections,
+  }) => {
+    const loaded = await inspections.create(page.request, published, `Lost – ${published.id}`);
+    const { id, number } = loaded.inspection;
+    const allOk = Object.fromEntries(
+      rowIds(published)
+        .flat()
+        .map((itemId) => [itemId, { status: 'OK' as const }]),
+    );
+    expect((await save(page.request, loaded, allOk)).status()).toBe(200);
+    await openInspection(page, loaded);
+    // The finalise reaches the server and is carried out, but its answer never arrives.
+    let lost = false;
+    await page.route(`**/api/inspections/${id}/finalise`, async (route) => {
+      if (lost) return route.continue();
+      lost = true;
+      await route.fetch();
+      await route.abort('connectionreset');
+    });
+
+    await page.getByRole('button', { name: 'Finalise', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: `Finalise ${number}?` })
+      .getByRole('button', { name: 'Finalise', exact: true })
+      .click();
+    await expect(page.getByRole('status').filter({ hasText: 'Finalised.' })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect((await stored(page.request, id)).inspection.state).toBe('finalised');
+  });
+
+  test('a busy Finalise ignores Escape; a 503 offers Try again', async ({
+    page,
+    published,
+    inspections,
+  }) => {
+    const loaded = await inspections.create(page.request, published, `Busy – ${published.id}`);
+    const { id, number } = loaded.inspection;
+    const allOk = Object.fromEntries(
+      rowIds(published)
+        .flat()
+        .map((itemId) => [itemId, { status: 'OK' as const }]),
+    );
+    expect((await save(page.request, loaded, allOk)).status()).toBe(200);
+    await openInspection(page, loaded);
+    // The first finalise is slow, then answers that the deviation records couldn't be updated.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let refused = false;
+    await page.route(`**/api/inspections/${id}/finalise`, async (route) => {
+      if (refused) return route.continue();
+      refused = true;
+      await held;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'unavailable',
+          message: 'The deviation records could not be updated, so nothing was changed. Try again.',
+        }),
+      });
+    });
+
+    await page.getByRole('button', { name: 'Finalise', exact: true }).click();
+    const confirm = page.getByRole('dialog', { name: `Finalise ${number}?` });
+    await confirm.getByRole('button', { name: 'Finalise', exact: true }).click();
+    await expect(confirm.getByRole('button', { name: 'Finalising…' })).toBeVisible();
+    // Chrome closes a dialog on the second Escape even though the page refuses it, unless the
+    // dialog ignores close requests while busy.
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(confirm).toBeVisible();
+
+    release();
+    await expect(confirm).toContainText('Finalise didn’t complete – try again.');
+    await confirm.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Finalised.' })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect((await stored(page.request, id)).inspection.state).toBe('finalised');
   });
 
   test('two inspectors on one inspection: the outdated save is refused with a reload', async ({

@@ -7,6 +7,7 @@ const HINTS: { keys: string[]; label: string }[] = [
   { keys: ['2', 'N'], label: 'NOK' },
   { keys: ['3', 'A'], label: 'N/A' },
   { keys: ['0'], label: 'Clear' },
+  { keys: ['R'], label: 'Rest of section OK' },
   { keys: ['↓', 'J'], label: 'Down' },
   { keys: ['↑', 'K'], label: 'Up' },
   { keys: ['C'], label: 'Comment' },

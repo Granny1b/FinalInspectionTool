@@ -6,7 +6,7 @@ import { GripVertical, ListChecks, Plus, Undo2, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../../../components/Button';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { sectionDndId } from './dnd';
 import { EditableSection } from './EditableSection';
 import type { IssueIndex } from './issues';

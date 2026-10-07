@@ -58,6 +58,12 @@ export const TemplateSummarySchema = z.object({
   modelCode: ModelCodeSchema,
   /** Latest published revision, or null if the template has never been published. */
   publishedRevision: z.number().int().min(1).nullable(),
+  /**
+   * Name and model of that revision: what a new inspection copies. They differ from `name` and
+   * `modelCode` (the draft's) while an admin's change is unpublished.
+   */
+  publishedName: z.string().nullable(),
+  publishedModelCode: ModelCodeSchema.nullable(),
   /** Revision number the next publish will get (latest published + 1). */
   draftRevision: z.number().int().min(1),
   hasUnpublishedChanges: z.boolean(),
@@ -103,14 +109,17 @@ export type ImageReadUrlResponse = z.infer<typeof ImageReadUrlResponseSchema>;
 // Publish rules
 // ---------------------------------------------------------------------------------------------
 
-export type PublishIssue = {
+/** One problem; a 400 from …/publish carries the list in `details`. */
+export const PublishIssueSchema = z.object({
   /** Where the problem is, so the editor can highlight and scroll to it. */
-  target:
-    | { kind: 'template' }
-    | { kind: 'section'; sectionId: string }
-    | { kind: 'item'; sectionId: string; itemId: string };
-  message: string;
-};
+  target: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('template') }),
+    z.object({ kind: z.literal('section'), sectionId: z.string() }),
+    z.object({ kind: z.literal('item'), sectionId: z.string(), itemId: z.string() }),
+  ]),
+  message: z.string(),
+});
+export type PublishIssue = z.infer<typeof PublishIssueSchema>;
 
 /**
  * Everything that must hold before a draft becomes an immutable revision. Drafts may be

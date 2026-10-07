@@ -95,6 +95,8 @@ type ProgressProps = InspectionProgress & {
   /** The first row without a status, if any; "Continue at 3.b" focuses it. */
   nextEmpty: { itemId: string; ref: string } | null;
   onContinue: (itemId: string) => void;
+  /** The Continue button's id: the page focuses it on open. */
+  continueId?: string;
 };
 
 /**
@@ -107,11 +109,13 @@ export const ProgressSummary = memo(function ProgressSummary({
   nok,
   nextEmpty,
   onContinue,
+  continueId,
 }: ProgressProps) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 pb-2.5 text-sm">
       {nextEmpty && (
         <button
+          id={continueId}
           type="button"
           onClick={() => onContinue(nextEmpty.itemId)}
           className="inline-flex items-center gap-1 rounded-sm font-medium text-brand-700 underline-offset-2 hover:underline"

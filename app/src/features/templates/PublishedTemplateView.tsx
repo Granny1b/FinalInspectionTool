@@ -1,7 +1,6 @@
 import type { Template } from '@modig/shared';
-import { ArrowLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
+import { BackLink } from '../../components/BackLink';
 import { PageHeader } from '../../components/PageHeader';
 import { useSettings } from '../../lib/useSettings';
 import { ChecklistHeading } from './ChecklistHeading';
@@ -35,17 +34,5 @@ export function PublishedTemplateView({ template, back, title, description, badg
         />
       </section>
     </>
-  );
-}
-
-export function BackLink({ to, label }: { to: string; label: string }) {
-  return (
-    <Link
-      to={to}
-      className="inline-flex items-center gap-1.5 rounded-sm text-sm text-ink-500 transition-colors hover:text-ink-900"
-    >
-      <ArrowLeft size={15} aria-hidden="true" />
-      {label}
-    </Link>
   );
 }

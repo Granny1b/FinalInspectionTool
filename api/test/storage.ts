@@ -14,7 +14,13 @@ import {
   type Template,
 } from '@modig/shared';
 import { inject } from 'vitest';
-import { containerClient, deviationsTable, ensureStorage, writeJson } from '../src/lib/storage';
+import {
+  containerClient,
+  deviationsTable,
+  ensureStorage,
+  ensureTable,
+  writeJson,
+} from '../src/lib/storage';
 
 export function useTestStorage(): void {
   process.env[STORAGE_CONNECTION_STRING_ENV] = inject('storageConnectionString');
@@ -26,7 +32,7 @@ export function useTestStorage(): void {
  * other file is using them meanwhile.
  */
 export async function resetStorage(): Promise<void> {
-  await ensureStorage();
+  await Promise.all([ensureStorage(), ensureTable()]);
   for (const name of [CONTAINERS.templates, CONTAINERS.inspections]) {
     const container = containerClient(name);
     for await (const blob of container.listBlobsFlat()) await container.deleteBlob(blob.name);

@@ -181,20 +181,23 @@ Inspectors and admins create and fill in inspections; only admins reopen a final
   templates with a published revision are offered) and fill in the front page: machine name and
   serial number (both required), participants (`Enter`, a comma or a semicolon adds a name),
   location (the default from the settings), date (today) and a photo (the template's cover photo
-  unless you add another). **Create inspection** gives it the next number, `FI-2026-0042`
-  (counting restarts every year, Swedish time), and opens it.
+  unless you add another). The checklist shows the model, name and revision of its latest
+  published revision, which is what the inspection copies. **Create inspection** gives it the
+  next number, `FI-2026-0042` (counting restarts every year, Swedish time; if the counter is ever
+  lost, it carries on from the highest number in use), and opens it.
 - **A frozen checklist.** The inspection keeps its own copy of the template's latest published
   revision. Later edits and revisions of the template never change it; the header shows which
   revision it follows.
 - **The list.** Number, machine, serial number, model, date, state (with rows filled while in
   progress) and the number of NOK rows, newest first. Search by number, machine or serial number,
   and filter by model and state; the filters are kept in the address, so they survive opening an
-  inspection and coming back.
+  inspection and coming back (with the browser's Back or the page's _← Inspections_).
 - **The page.** A sticky header with the number, machine, state, revision, save status, **Print**
   (phase 4), **Finalise** (or **Reopen**), the tabs _Checklist_ and _Deviations (n)_, and the
   progress, e.g. `87 / 104 rows filled · 6 NOK`. _Continue at 3.b_ jumps to the first row without
-  a status. The front page sits at the top of the Checklist tab and can be edited until the
-  inspection is finalised.
+  a status; the page opens with the focus on it, so `Enter` starts transcribing. The front page
+  sits at the top of the Checklist tab and can be edited until the inspection is finalised. A
+  participant's name counts as unsaved until it is added.
 
 ### Filling in the checklist
 
@@ -208,15 +211,18 @@ a severity (minor unless you pick another). Click a row, or use _Continue at_, t
 | `2` or `N`                   | NOK; stays on the row for its comment                             |
 | `3` or `A`                   | N/A, then on to the next row                                      |
 | `0`, `Backspace` or `Delete` | Clears the status (so does clicking the selected one again)       |
+| `R`                          | The rest of the row's section OK (as **Set remaining to OK**)     |
 | `↓` / `J`, `↑` / `K`         | Next / previous row, across sections (`Home`, `End`: first, last) |
 | `C`                          | Into the comment                                                  |
 | `Tab`                        | Row → comment → resp → severity (NOK rows) → next row             |
 | `Enter` in comment or resp   | On to the next row                                                |
 | `Esc` in a field             | Back to the row                                                   |
 
-Keys typed in a field are text, never shortcuts. **Set remaining to OK** on a section header marks
+Keys typed in a field are text, never shortcuts; `Tab` carries on from a section's last row into
+the next section. **Set remaining to OK** on a section header (or `R` on one of its rows) marks
 every row of that section that has no status yet as OK: mark the exceptions, then fill the rest.
-A row with a guide shows its icon; the guide viewer comes in phase 5.
+Resp suggests the names of earlier deviations and the ones already entered in this inspection. A
+row with a guide shows its icon; the guide viewer comes in phase 5.
 
 ### Deviations, saving, finalising
 
@@ -249,7 +255,9 @@ the inspection: new and changed rows are written, rows of deviations that are go
 back to OK, a removed extra deviation) are deleted, unchanged rows are left alone.
 
 - A **save** writes the inspection first, then the table. If the table update fails, the save
-  still succeeds and the next save repairs the table.
+  still succeeds and the next save repairs the table. After updating the table, every write
+  checks that the inspection hasn't changed meanwhile and updates it again if it has, so a slow
+  update never leaves the table behind a newer save, finalise or reopen.
 - **Finalise** and **Reopen** update the table first (its `finalised` flag decides what the KPIs
   count), then the inspection. If the table update fails, nothing changes and the request can
   simply be sent again.

@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { useState } from 'react';
 import { Field, INPUT } from '../../components/Field';
 import { FRONT_FIELD_IDS } from './issues';
-import { ParticipantsField } from './ParticipantsField';
+import { ParticipantsField, type PendingParticipant } from './ParticipantsField';
 
 type Props = {
   front: InspectionFrontInput;
@@ -11,13 +11,21 @@ type Props = {
   modelLabel: string;
   errors: { machineName?: string; serialNumber?: string };
   onChange: (patch: Partial<InspectionFrontInput>) => void;
+  /** The inspection page: a participant typed but not yet added counts as unsaved. */
+  pendingParticipant?: PendingParticipant;
 };
 
 /**
  * The front page's details (brief §2 `Main`): machine name, model, serial number, participants,
  * location and date. Used by the new-inspection form and the inspection's front page card.
  */
-export function FrontPageFields({ front, modelLabel, errors, onChange }: Props) {
+export function FrontPageFields({
+  front,
+  modelLabel,
+  errors,
+  onChange,
+  pendingParticipant,
+}: Props) {
   return (
     <div className="grid content-start gap-x-4 gap-y-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
@@ -59,6 +67,7 @@ export function FrontPageFields({ front, modelLabel, errors, onChange }: Props) 
               control={control}
               value={front.participants}
               onChange={(participants) => onChange({ participants })}
+              pending={pendingParticipant}
             />
           )}
         </Field>

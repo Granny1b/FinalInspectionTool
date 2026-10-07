@@ -1,6 +1,5 @@
 import {
   APP_NAME,
-  CONFLICT_MESSAGE,
   sameTemplateContent,
   validateForPublish,
   type PublishIssue,
@@ -10,22 +9,24 @@ import {
   type TemplateDraftInput,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, RefreshCw, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, ButtonLink } from '../../components/Button';
-import { ApiRequestError, SIGNED_OUT_MESSAGE } from '../../lib/api';
+import { BackLink } from '../../components/BackLink';
+import { Button } from '../../components/Button';
+import { Callout } from '../../components/Callout';
+import { ApiRequestError } from '../../lib/api';
+import { AutosaveAlerts } from '../../lib/autosave/AutosaveAlerts';
+import { LeaveDialog } from '../../lib/autosave/LeaveDialog';
 import { SaveStatus } from '../../lib/autosave/SaveStatus';
 import { useAutosave } from '../../lib/autosave/useAutosave';
 import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
-import { LOGIN_PAGE } from '../../lib/auth';
+import { useReload } from '../../lib/autosave/useReload';
+import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { useSettings } from '../../lib/useSettings';
 import { Badge } from './Badge';
-import { Callout } from './Callout';
 import { ChecklistHeading } from './ChecklistHeading';
-import { ConfirmDialog } from './document/ConfirmDialog';
 import { TemplateDocument } from './document/TemplateDocument';
 import { PublishDialog, type FlushResult } from './PublishDialog';
-import { BackLink } from './PublishedTemplateView';
 import {
   fetchTemplate,
   publishDraft,
@@ -100,28 +101,11 @@ export function TemplateEditor({ loaded, onReload }: Props) {
     equals: sameTemplateContent,
   });
 
-  // A cover photo that is still uploading counts as unsaved: leaving or publishing waits for it,
-  // and closing the tab gets the browser's warning.
-  const uploadRef = useRef<Promise<unknown> | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const trackUpload = useCallback((upload: Promise<unknown>) => {
-    uploadRef.current = upload;
-    setUploading(true);
-    const done = () => {
-      if (uploadRef.current !== upload) return;
-      uploadRef.current = null;
-      setUploading(false);
-    };
-    upload.then(done, done);
-  }, []);
-  /** Saves everything, once a photo being uploaded is in the draft; false if saving failed. */
-  const saveAll = useCallback(async () => {
-    await uploadRef.current?.catch(() => undefined);
-    return saver.flush();
-  }, [saver]);
-
+  // A cover photo that is still uploading counts as unsaved.
+  const { uploading, trackUpload, saveAll } = useUploadTracking(saver);
   const dirty = saveState.status !== 'saved' || uploading;
   const leaveGuard = useLeaveGuard(dirty, saveAll);
+  const reload = useReload(dirty, onReload);
 
   const update = useCallback(
     (patch: Partial<TemplateDraftInput>) => {
@@ -147,8 +131,6 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   const [publishing, setPublishing] = useState<PublishIssue[] | null>(null);
   const [publishConflict, setPublishConflict] = useState(false);
   const [published, setPublished] = useState<number | null>(null);
-  const [confirmingReload, setConfirmingReload] = useState(false);
-  const [reloadFailed, setReloadFailed] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
 
@@ -213,14 +195,6 @@ export function TemplateEditor({ loaded, onReload }: Props) {
     throw failure;
   }
 
-  /** Reload, asking first when it would discard unsaved changes. */
-  const askReload = () => (dirty ? setConfirmingReload(true) : void reload());
-
-  async function reload() {
-    setConfirmingReload(false);
-    setReloadFailed(!(await onReload()));
-  }
-
   const takenModels = useMemo(
     () =>
       new Set(
@@ -265,7 +239,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             state={saveState}
             conflict={publishConflict}
             onRetry={() => void saver.flush()}
-            onReload={askReload}
+            onReload={reload.askReload}
           />
           {/* Nothing to publish when the draft equals the latest revision (the badges say so). */}
           <Button onClick={openPublish} disabled={!unpublished || conflict}>
@@ -276,42 +250,13 @@ export function TemplateEditor({ loaded, onReload }: Props) {
       </header>
 
       <div className="mt-6 space-y-3 empty:hidden">
-        {conflict && (
-          <Callout
-            tone="error"
-            role="alert"
-            actions={
-              <Button variant="secondary" onClick={askReload}>
-                <RefreshCw size={16} aria-hidden="true" />
-                Reload
-              </Button>
-            }
-          >
-            <strong className="font-semibold">{CONFLICT_MESSAGE}</strong>{' '}
-            {dirty
-              ? 'Your changes since then are not saved, and autosave is paused.'
-              : 'Autosave is paused.'}
-            {reloadFailed && ' Reloading failed: check your connection and try again.'}
-          </Callout>
-        )}
-        {saveState.status === 'error' && !saveState.willRetry && (
-          <Callout
-            tone="error"
-            role="alert"
-            actions={
-              // Signed out: sign in again in another tab, so this one keeps the unsaved changes.
-              saveState.message === SIGNED_OUT_MESSAGE && (
-                <ButtonLink to={LOGIN_PAGE} target="_blank" variant="secondary">
-                  Sign in
-                  <ExternalLink size={14} aria-hidden="true" />
-                  <span className="sr-only">(opens a new tab)</span>
-                </ButtonLink>
-              )
-            }
-          >
-            <strong className="font-semibold">Couldn’t save:</strong> {saveState.message}
-          </Callout>
-        )}
+        <AutosaveAlerts
+          conflict={conflict}
+          dirty={dirty}
+          state={saveState}
+          reloadFailed={reload.failed}
+          onReload={reload.askReload}
+        />
         {checking && issues.length > 0 && (
           <Callout
             tone="error"
@@ -382,28 +327,8 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           onClose={() => setPublishing(null)}
         />
       )}
-      {confirmingReload && (
-        <ConfirmDialog
-          title="Discard your changes?"
-          message="Reloading shows the latest saved version. Your changes that weren’t saved are lost."
-          confirmLabel="Discard and reload"
-          onConfirm={() => void reload()}
-          onCancel={() => setConfirmingReload(false)}
-        />
-      )}
-      {leaveGuard.asking && (
-        <ConfirmDialog
-          title="Leave without saving?"
-          message={
-            conflict
-              ? 'Someone else changed this template, so your latest changes couldn’t be saved. They are lost if you leave.'
-              : 'Your latest changes couldn’t be saved yet. They are lost if you leave now.'
-          }
-          confirmLabel="Leave"
-          onConfirm={leaveGuard.leave}
-          onCancel={leaveGuard.stay}
-        />
-      )}
+      {reload.dialog}
+      <LeaveDialog guard={leaveGuard} conflict={conflict} noun="template" />
     </div>
   );
 }

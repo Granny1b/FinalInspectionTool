@@ -1,10 +1,12 @@
 import type { InspectionSummary } from '@modig/shared';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   filterFromParams,
   filterInspections,
   filterToParams,
+  inspectionsListHref,
   isFiltered,
+  rememberListSearch,
   type InspectionFilter,
 } from './listFilter';
 
@@ -94,5 +96,39 @@ describe('filter in the URL', () => {
     expect(isFiltered(all)).toBe(false);
     expect(isFiltered({ ...all, query: '   ' })).toBe(false);
     expect(isFiltered({ ...all, state: 'finalised' })).toBe(true);
+  });
+});
+
+describe('the way back to the list', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns to the search and filters last used in this tab', () => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => stored.set(key, value),
+    });
+    expect(inspectionsListHref()).toBe('/inspections');
+    rememberListSearch(
+      filterToParams({ query: 'rigimill', model: '', state: 'finalised' }).toString(),
+    );
+    expect(inspectionsListHref()).toBe('/inspections?q=rigimill&state=finalised');
+    rememberListSearch('');
+    expect(inspectionsListHref()).toBe('/inspections');
+  });
+
+  it('goes to the plain list when storage is blocked', () => {
+    vi.stubGlobal('sessionStorage', {
+      getItem: () => {
+        throw new DOMException('blocked', 'SecurityError');
+      },
+      setItem: () => {
+        throw new DOMException('blocked', 'SecurityError');
+      },
+    });
+    rememberListSearch('state=finalised');
+    expect(inspectionsListHref()).toBe('/inspections');
   });
 });

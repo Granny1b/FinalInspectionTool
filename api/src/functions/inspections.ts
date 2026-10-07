@@ -16,7 +16,6 @@ import {
   type Inspection,
   type InspectionDraftInput,
 } from '@modig/shared';
-import { syncDeviations } from '../lib/deviations';
 import {
   BadRequestError,
   ConflictError,
@@ -33,6 +32,7 @@ import {
   loadInspection,
   loadSummaries,
   nextInspectionNumber,
+  syncSettled,
   writeInspection,
 } from '../lib/inspections';
 import { loadLatestPublished, loadTemplate, templateNotFound } from '../lib/templates';
@@ -88,7 +88,8 @@ export const getInspection = endpoint({ role: 'inspector' }, async (req) => {
 /**
  * Autosave. Only front page, results and extra deviations come from the client; the snapshot,
  * number, model and state never change here. The blob is written first and is the truth: if the
- * deviation sync fails after it, the save still succeeds and the next write syncs again.
+ * deviation sync fails after it, the save still succeeds and the next write syncs again. The sync
+ * checks the blob afterwards, so a slow one can't undo a newer write's (`syncSettled`).
  */
 export const saveInspection = endpoint({ role: 'inspector' }, async (req, context, user) => {
   const id = idParam(req);
@@ -111,7 +112,7 @@ export const saveInspection = endpoint({ role: 'inspector' }, async (req, contex
     updatedBy: user.email,
   };
   const etag = await writeInspection(inspection, { ifMatch });
-  await syncDeviations(inspection).catch((error: unknown) => {
+  await syncSettled(inspection, etag, context).catch((error: unknown) => {
     context.warn(`Saved inspection ${id}; syncing its deviations failed`, error);
   });
   return json(200, inspection, etagHeader(etag));

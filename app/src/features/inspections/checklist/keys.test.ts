@@ -56,6 +56,20 @@ describe('rowCommand', () => {
     expect(rowCommand(press('g'))).toEqual({ kind: 'guide' });
   });
 
+  it('R sets the rest of the section to OK, one press at a time', () => {
+    expect(rowCommand(press('r'))).toEqual({ kind: 'remaining' });
+    expect(rowCommand(press('R', { shiftKey: true }))).toEqual({ kind: 'remaining' });
+    expect(rowCommand(press('r', { repeat: true }))).toBeNull();
+    expect(rowCommand(press('r', { ctrlKey: true }))).toBeNull();
+  });
+
+  it('swallows Space, held or with Shift, so the page never scrolls the row away', () => {
+    expect(rowCommand(press(' '))).toEqual({ kind: 'none' });
+    expect(rowCommand(press(' ', { shiftKey: true }))).toEqual({ kind: 'none' });
+    expect(rowCommand(press(' ', { repeat: true }))).toEqual({ kind: 'none' });
+    expect(rowCommand(press(' ', { ctrlKey: true }))).toBeNull();
+  });
+
   it.each(['ctrlKey', 'metaKey', 'altKey'] as const)(
     'leaves every key with %s to the browser',
     (modifier) => {
@@ -72,14 +86,14 @@ describe('rowCommand', () => {
   });
 
   it('ignores a held key except for moves', () => {
-    for (const key of ['1', 'n', '3', '0', 'Backspace', 'c', 'g']) {
+    for (const key of ['1', 'n', '3', '0', 'Backspace', 'c', 'g', 'r']) {
       expect(rowCommand(press(key, { repeat: true }))).toBeNull();
     }
     expect(rowCommand(press('ArrowDown', { repeat: true }))).toEqual({ kind: 'move', to: 'next' });
     expect(rowCommand(press('k', { repeat: true }))).toEqual({ kind: 'move', to: 'previous' });
   });
 
-  it.each(['4', 'x', 'Tab', 'Enter', ' ', 'Escape', 'ArrowLeft', 'PageDown', 'F5', 'Dead'])(
+  it.each(['4', 'x', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'PageDown', 'F5', 'Dead'])(
     'ignores %j',
     (key) => {
       expect(rowCommand(press(key))).toBeNull();

@@ -4,6 +4,7 @@ import { FrontPageFrame } from '../templates/FrontPage';
 import { formatCalendarDate } from './dates';
 import { FrontPageFields } from './FrontPageFields';
 import { MachinePhoto, MachinePhotoField } from './MachinePhoto';
+import type { PendingParticipant } from './ParticipantsField';
 
 type Props = {
   front: InspectionFrontInput;
@@ -16,6 +17,8 @@ type Props = {
   onChange: (patch: Partial<InspectionFrontInput>) => void;
   /** A photo upload has started; the promise settles once it is in the front page (or failed). */
   onUpload: (upload: Promise<void>) => void;
+  /** A participant typed but not yet added counts as unsaved. */
+  pendingParticipant: PendingParticipant;
 };
 
 /**
@@ -30,6 +33,7 @@ export const FrontPageCard = memo(function FrontPageCard({
   errors,
   onChange,
   onUpload,
+  pendingParticipant,
 }: Props) {
   return (
     <FrontPageFrame revisionLabel={`Rev: ${templateRevision}`}>
@@ -61,6 +65,7 @@ export const FrontPageCard = memo(function FrontPageCard({
             modelLabel={modelLabel}
             errors={errors}
             onChange={onChange}
+            pendingParticipant={pendingParticipant}
           />
         </>
       )}

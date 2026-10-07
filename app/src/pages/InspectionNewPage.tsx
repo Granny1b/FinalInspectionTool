@@ -1,11 +1,12 @@
 import { DEFAULT_LOCATION } from '@modig/shared';
 import { FileClock } from 'lucide-react';
+import { BackLink } from '../components/BackLink';
 import { ButtonLink } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
 import { LoadError, PageLoading } from '../components/PageStates';
+import { inspectionsListHref } from '../features/inspections/listFilter';
 import { NewInspectionForm } from '../features/inspections/NewInspectionForm';
-import { BackLink } from '../features/templates/PublishedTemplateView';
 import { useTemplates } from '../features/templates/queries';
 import { errorMessage } from '../lib/api';
 import { useSettings } from '../lib/useSettings';
@@ -54,7 +55,7 @@ export function InspectionNewPage() {
 
   return (
     <>
-      <BackLink to="/inspections" label="Inspections" />
+      <BackLink to={inspectionsListHref()} label="Inspections" />
       <div className="mt-2">
         <PageHeader
           title="New inspection"

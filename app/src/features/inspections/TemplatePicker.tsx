@@ -46,11 +46,12 @@ export function TemplatePicker({ templates, models, value, error, onChange }: Pr
               className="mt-0.5 size-4 shrink-0 accent-brand-600"
             />
             <span className="min-w-0">
+              {/* The published revision's model and name: an unpublished change doesn't count. */}
               <span className="block text-sm font-medium text-ink-900">
-                {modelName(models, template.modelCode)}
+                {modelName(models, template.publishedModelCode ?? template.modelCode)}
               </span>
               <span className="mt-0.5 block text-xs text-ink-500">
-                {template.name} · Rev {template.publishedRevision}
+                {template.publishedName ?? template.name} · Rev {template.publishedRevision}
               </span>
             </span>
           </label>

@@ -3,8 +3,8 @@
  * conditional on the blob's ETag (optimistic concurrency, brief §3) and storage's condition
  * failures surface as the matching HttpError, so endpoints can just let them propagate.
  *
- * The JSON helpers call `ensureStorage()` first; code using `containerClient()` or
- * `deviationsTable()` directly should await it too.
+ * The JSON helpers call `ensureStorage()` first; code using `containerClient()` directly should
+ * await it too, and code using `deviationsTable()` should await `ensureTable()`.
  */
 import { text } from 'node:stream/consumers';
 import { TableClient } from '@azure/data-tables';
@@ -60,19 +60,29 @@ export function deviationsTable(): TableClient {
   return getClients().deviations;
 }
 
-let ensured: Promise<void> | undefined;
+let containersEnsured: Promise<void> | undefined;
+let tableEnsured: Promise<void> | undefined;
 
 /**
- * Creates every container and the deviations table if missing, once per process, and on Azurite
- * sets the blob CORS rule. Bicep does both in Azure; this is the safety net for a fresh or wiped
- * local Azurite.
+ * Creates every container if missing, once per process, and on Azurite sets the blob CORS rule.
+ * Bicep does both in Azure; this is the safety net for a fresh or wiped local Azurite. The
+ * deviations table has its own `ensureTable()`, so a table outage never fails blob requests.
  */
 export function ensureStorage(): Promise<void> {
-  ensured ??= createAll().catch((error: unknown) => {
-    ensured = undefined; // let the next request retry, e.g. once Azurite is up
+  containersEnsured ??= createContainers().catch((error: unknown) => {
+    containersEnsured = undefined; // let the next request retry, e.g. once Azurite is up
     throw error;
   });
-  return ensured;
+  return containersEnsured;
+}
+
+/** Creates the deviations table if missing, once per process; as `ensureStorage()` for blobs. */
+export function ensureTable(): Promise<void> {
+  tableEnsured ??= createTable().catch((error: unknown) => {
+    tableEnsured = undefined;
+    throw error;
+  });
+  return tableEnsured;
 }
 
 /**
@@ -87,13 +97,16 @@ export const AZURITE_CORS_RULE: CorsRule = {
   maxAgeInSeconds: 3600,
 };
 
-async function createAll(): Promise<void> {
+async function createContainers(): Promise<void> {
   const { blobService, azurite } = getClients();
   await Promise.all([
     ...Object.values(CONTAINERS).map((name) => containerClient(name).createIfNotExists()),
-    deviationsTable().createTable(), // no-op when it exists
     ...(azurite ? [blobService.setProperties({ cors: [AZURITE_CORS_RULE] })] : []),
   ]);
+}
+
+async function createTable(): Promise<void> {
+  await deviationsTable().createTable(); // no-op when it exists
 }
 
 /** Reads and validates a JSON blob. Returns null when it does not exist. */

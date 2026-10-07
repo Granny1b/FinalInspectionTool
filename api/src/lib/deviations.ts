@@ -7,7 +7,7 @@
  */
 import { odata, type TableEntity, type TransactionAction } from '@azure/data-tables';
 import { deriveDeviations, deviationKeys, type DeviationRow, type Inspection } from '@modig/shared';
-import { deviationsTable, ensureStorage } from './storage';
+import { deviationsTable, ensureTable } from './storage';
 
 type DeviationEntity = TableEntity<DeviationRow>;
 
@@ -41,7 +41,7 @@ const COLUMNS = [
  * a failed sync is repaired by simply syncing again.
  */
 export async function syncDeviations(inspection: Inspection): Promise<void> {
-  await ensureStorage();
+  await ensureTable();
   const partitionKey = inspection.front.modelCode;
   const existing = await loadRows(partitionKey, inspection.id);
   const wanted = deviationEntities(inspection, existing, new Date().toISOString());
@@ -129,7 +129,7 @@ const bySwedishName = new Intl.Collator('sv', { sensitivity: 'base', numeric: tr
  * spelling most deviations use (the first one found on a tie), which nudges people towards it.
  */
 export async function loadRespSuggestions(): Promise<string[]> {
-  await ensureStorage();
+  await ensureTable();
   const uses = new Map<string, number>();
   const entities = deviationsTable().listEntities<{ resp?: unknown }>({
     queryOptions: { filter: odata`resp ne ${''}`, select: ['resp'] },

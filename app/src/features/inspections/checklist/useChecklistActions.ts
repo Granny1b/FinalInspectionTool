@@ -13,8 +13,8 @@ import { withRemainingOk, withSeverity, withStatus, withText, type Results } fro
 
 /** Everything rows and section headers can ask the sheet to do. The object is stable. */
 export type ChecklistActions = {
-  /** A key pressed on a focused row (the guide is the row's own business). */
-  run: (itemId: string, command: Exclude<RowCommand, { kind: 'guide' }>) => void;
+  /** A key pressed on a focused row (the guide and Space are the row's own business). */
+  run: (itemId: string, command: Exclude<RowCommand, { kind: 'guide' | 'none' }>) => void;
   /** A click on a status segment: sets it, or clears it when it was already selected. */
   pick: (itemId: string, status: Status) => void;
   setText: (itemId: string, field: 'comment' | 'resp', value: string) => void;
@@ -70,6 +70,18 @@ export function useChecklistActions(options: Options): ChecklistActions {
       if (target) focusRow(rootRef.current, target);
       return target !== null;
     };
+    const setRemainingOk = (sectionId: string) => {
+      const { sections, results } = latest.current;
+      const index = sections.findIndex((section) => section.id === sectionId);
+      const section = sections[index];
+      if (!section) return;
+      const { results: next, count } = withRemainingOk(results, section);
+      if (count === 0) return;
+      commit(next);
+      latest.current.announce(
+        `Section ${sectionNumber(index)}: ${count === 1 ? '1 row' : `${count} rows`} set to OK`,
+      );
+    };
 
     return {
       run: (itemId, command) => {
@@ -84,6 +96,14 @@ export function useChecklistActions(options: Options): ChecklistActions {
             return void move(itemId, command.to);
           case 'comment':
             return focusComment(rootRef.current, itemId);
+          case 'remaining': {
+            // The focus stays on the row, ready for its next key.
+            const section = latest.current.sections.find((candidate) =>
+              candidate.items.some((item) => item.id === itemId),
+            );
+            if (section) setRemainingOk(section.id);
+            return;
+          }
         }
       },
       pick: (itemId, status) => {
@@ -96,18 +116,7 @@ export function useChecklistActions(options: Options): ChecklistActions {
         commit(withText(latest.current.results, itemId, field, value)),
       setSeverity: (itemId, severity) =>
         commit(withSeverity(latest.current.results, itemId, severity)),
-      setRemainingOk: (sectionId) => {
-        const { sections, results } = latest.current;
-        const index = sections.findIndex((section) => section.id === sectionId);
-        const section = sections[index];
-        if (!section) return;
-        const { results: next, count } = withRemainingOk(results, section);
-        if (count === 0) return;
-        commit(next);
-        latest.current.announce(
-          `Section ${sectionNumber(index)}: ${count === 1 ? '1 row' : `${count} rows`} set to OK`,
-        );
-      },
+      setRemainingOk,
       focusRow: (itemId) => focusRow(rootRef.current, itemId),
       finishRow: (itemId) => {
         if (!move(itemId, 'next')) focusRow(rootRef.current, itemId);

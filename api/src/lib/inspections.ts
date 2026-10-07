@@ -6,6 +6,7 @@
  * one blob listing instead of one read per inspection.
  */
 import { setTimeout as sleep } from 'node:timers/promises';
+import type { InvocationContext } from '@azure/functions';
 import {
   blobNames,
   CONTAINERS,
@@ -19,6 +20,7 @@ import {
   type InspectionCounter,
   type InspectionSummary,
 } from '@modig/shared';
+import { syncDeviations } from './deviations';
 import {
   ConflictError,
   NotFoundError,
@@ -54,6 +56,31 @@ export async function writeInspection(
     ...conditions,
     metadata: summaryMetadata(inspection),
   });
+}
+
+/** Extra syncs after another write moved the inspection on; then the writer gives up and logs. */
+const SETTLE_ROUNDS = 3;
+
+/**
+ * Syncs the deviation table from `synced`, stored as version `etag`, then checks the blob. Nothing
+ * orders two writers' syncs, so a slow sync can land after a newer write's sync and leave the
+ * table behind; whoever syncs last therefore checks that the blob is still the version it synced,
+ * and syncs again from the latest version if not. A sync failure is thrown for the caller.
+ */
+export async function syncSettled(
+  synced: Inspection,
+  etag: string,
+  context: InvocationContext,
+): Promise<void> {
+  await syncDeviations(synced);
+  let last = etag;
+  for (let round = 0; round < SETTLE_ROUNDS; round++) {
+    const latest = await loadInspection(synced.id);
+    if (!latest || latest.etag === last) return;
+    await syncDeviations(latest.data);
+    last = latest.etag;
+  }
+  context.warn(`The deviations of inspection ${synced.id} kept changing while being synced`);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -163,12 +190,13 @@ const stockholmYearFormat = new Intl.DateTimeFormat('en', {
  * Takes the next number from the counter. The counter is written conditionally on the version
  * just read, so two creates at the same moment can never get the same number: the loser reads
  * again and takes the next one. The year is Swedish local time; the sequence restarts each year.
+ * A missing counter is created from the highest number in use (ifNoneMatch '*').
  */
 export async function nextInspectionNumber(now = new Date()): Promise<string> {
   const year = Number(stockholmYearFormat.format(now));
   for (let retry = 0; ; retry++) {
     const stored = await readJson(config, blobNames.inspectionCounter, InspectionCounterSchema);
-    const counter = advance(stored?.data ?? null, year);
+    const counter = advance(stored ? stored.data : await highestExistingNumber(), year);
     try {
       await writeJson(
         config,
@@ -189,6 +217,18 @@ export async function nextInspectionNumber(now = new Date()): Promise<string> {
       await sleep(Math.random() * 50 * 2 ** (retry + 1));
     }
   }
+}
+
+/**
+ * What a missing counter starts from: the newest inspection's number, so a counter blob that was
+ * lost (deleted by hand, a cleared container, a migration without config/) never hands out a
+ * number again. Null when there are no inspections, as on a first run.
+ */
+async function highestExistingNumber(): Promise<InspectionCounter | null> {
+  const [newest] = await loadSummaries(); // year, then sequence, descending; unparseable last
+  if (!newest) return null;
+  const [year, last] = numberParts(newest.number);
+  return year ? { year, last } : null;
 }
 
 /**

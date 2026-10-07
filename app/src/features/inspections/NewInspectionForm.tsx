@@ -16,6 +16,7 @@ import { useTemplateRevision } from '../templates/queries';
 import { localDate } from './dates';
 import { FrontPageFields } from './FrontPageFields';
 import { FRONT_FIELD_IDS } from './issues';
+import { inspectionsListHref } from './listFilter';
 import { MachinePhotoField } from './MachinePhoto';
 import { useCreateInspection } from './queries';
 import { TemplatePicker } from './TemplatePicker';
@@ -105,7 +106,14 @@ export function NewInspectionForm({ templates, models, defaultLocation }: Props)
         />
         <FrontPageFields
           front={front}
-          modelLabel={template ? modelName(models, template.modelCode) : 'From the checklist'}
+          modelLabel={
+            template
+              ? modelName(
+                  models,
+                  revision.data?.modelCode ?? template.publishedModelCode ?? template.modelCode,
+                )
+              : 'From the checklist'
+          }
           errors={errors}
           onChange={update}
         />
@@ -117,7 +125,7 @@ export function NewInspectionForm({ templates, models, defaultLocation }: Props)
         </p>
       )}
       <div className="flex justify-end gap-2">
-        <ButtonLink to="/inspections" variant="secondary">
+        <ButtonLink to={inspectionsListHref()} variant="secondary">
           Cancel
         </ButtonLink>
         <Button type="submit" disabled={create.isPending || uploading}>

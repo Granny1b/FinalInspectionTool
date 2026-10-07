@@ -66,6 +66,7 @@ export const ChecklistRow = memo(function ChecklistRow({
     const command = rowCommand(event);
     if (!command) return;
     event.preventDefault();
+    if (command.kind === 'none') return;
     if (command.kind === 'guide') {
       if (item.guide) showGuideNote();
       return;
@@ -108,7 +109,7 @@ export const ChecklistRow = memo(function ChecklistRow({
         'relative scroll-mt-2 scroll-mb-20',
         ROW_FOCUS,
         status === 'NOK' && NOK_BAR,
-        issue ? ISSUE_OUTLINE : 'focus-within:bg-ink-50 focus-visible:bg-brand-50',
+        issue ? ISSUE_OUTLINE : 'focus-within:bg-ink-50 focus:bg-brand-50',
       )}
     >
       {/* Read when the row takes the focus; hidden, so browse mode doesn't read the status twice. */}

@@ -8,12 +8,14 @@ import {
   type MachineModel,
 } from '@modig/shared';
 import { beforeAll, describe, expect, inject, it, vi } from 'vitest';
+import { sampleInspection } from '../../test/storage';
 import { ConflictError, PreconditionFailedError } from './http';
 import {
   AZURITE_CORS_RULE,
   containerClient,
   deviationsTable,
   ensureStorage,
+  ensureTable,
   listBlobNames,
   readJson,
   writeJson,
@@ -93,17 +95,39 @@ describe('listBlobNames', () => {
   });
 });
 
-describe('ensureStorage', () => {
-  it('creates every container and the deviations table, once per process', async () => {
+describe('ensureStorage / ensureTable', () => {
+  it('creates every container and the deviations table, each once per process', async () => {
     const first = ensureStorage();
     expect(ensureStorage()).toBe(first);
     await first;
+    const table = ensureTable();
+    expect(ensureTable()).toBe(table);
+    await table;
 
     for (const name of Object.values(CONTAINERS)) {
       expect(await containerClient(name).exists()).toBe(true);
     }
     expect(deviationsTable().tableName).toBe(DEVIATIONS_TABLE);
     await expect(deviationsTable().listEntities().next()).resolves.toBeDefined();
+  });
+
+  it('keeps blobs working on a fresh instance while the table is down', async () => {
+    vi.resetModules();
+    const fresh = await import('./storage');
+    const { syncDeviations } = await import('./deviations');
+    const createTable = vi
+      .spyOn(fresh.deviationsTable(), 'createTable')
+      .mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    const name = blobName();
+    const etag = await fresh.writeJson(config, name, model);
+    expect(await fresh.readJson(config, name, MachineModelSchema)).toEqual({ data: model, etag });
+    await expect(fresh.ensureTable()).rejects.toThrow('ECONNREFUSED');
+    await expect(syncDeviations(sampleInspection())).rejects.toThrow('ECONNREFUSED');
+
+    // Not cached: once the table is back, the next request creates it.
+    createTable.mockRestore();
+    await expect(fresh.ensureTable()).resolves.toBeUndefined();
   });
 
   it('is idempotent across processes (everything already exists)', async () => {

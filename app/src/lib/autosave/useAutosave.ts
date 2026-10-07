@@ -23,6 +23,15 @@ export function useAutosave<T>(
     saver.revive();
     return saver.dispose;
   }, [saver]);
+  // Back online: a save that failed on the way is retried now, not after its backoff (up to 30 s).
+  useEffect(() => {
+    const retryNow = () => {
+      const current = saver.getState();
+      if (current.status === 'error' && current.willRetry) void saver.flush();
+    };
+    window.addEventListener('online', retryNow);
+    return () => window.removeEventListener('online', retryNow);
+  }, [saver]);
   return [saver, state];
 }
 

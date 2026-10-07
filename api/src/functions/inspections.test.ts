@@ -9,6 +9,7 @@ import {
   newId,
   snapshotTemplate,
   TemplateDetailSchema,
+  TemplateListSchema,
   type ApiError,
   type Inspection,
   type InspectionDraftInput,
@@ -28,7 +29,7 @@ import type * as Storage from '../lib/storage';
 import { deviationsTable, readJson, writeJson } from '../lib/storage';
 import { createInspection, getInspection, listInspections, saveInspection } from './inspections';
 import { publishTemplate } from './template-revisions';
-import { getTemplate, saveTemplate } from './templates';
+import { getTemplate, listTemplates, saveTemplate } from './templates';
 
 // Record the registrations instead of letting the package (in "test mode") warn about them.
 const registrations = vi.hoisted((): unknown[][] => []);
@@ -42,6 +43,8 @@ const hooks = vi.hoisted(() => ({
   failSync: false,
   /** Runs once, just before the next blob write, the way a concurrent save could. */
   beforeWrite: undefined as (() => Promise<void>) | undefined,
+  /** Runs once, just before the next deviation sync, the way a slow table could. */
+  beforeSync: undefined as (() => Promise<void>) | undefined,
 }));
 vi.mock('../lib/deviations', async (importOriginal) => {
   const actual = await importOriginal<typeof Deviations>();
@@ -49,6 +52,9 @@ vi.mock('../lib/deviations', async (importOriginal) => {
     ...actual,
     syncDeviations: async (...args: Parameters<typeof actual.syncDeviations>) => {
       if (hooks.failSync) throw new Error('Table storage is down');
+      const hook = hooks.beforeSync;
+      hooks.beforeSync = undefined;
+      await hook?.();
       return actual.syncDeviations(...args);
     },
   };
@@ -80,7 +86,21 @@ beforeEach(async () => {
 afterEach(() => {
   hooks.failSync = false;
   hooks.beforeWrite = undefined;
+  hooks.beforeSync = undefined;
 });
+
+/** Holds the next deviation sync until `release()`; `reached` resolves once it is waiting. */
+function holdNextSync(): { reached: Promise<void>; release: () => void } {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let arrive!: () => void;
+  const reached = new Promise<void>((resolve) => (arrive = resolve));
+  hooks.beforeSync = async () => {
+    arrive();
+    await released;
+  };
+  return { reached, release };
+}
 
 const etagOf = (response: HttpResponseInit) => new Headers(response.headers).get('ETag');
 const errorOf = (response: HttpResponseInit): ApiError => ApiErrorSchema.parse(response.jsonBody);
@@ -267,6 +287,27 @@ describe('POST /api/inspections', () => {
     const template = await publishedTemplate({ coverImageId: undefined });
     const { inspection } = await created(template);
     expect(inspection.front.photoId).toBeUndefined();
+  });
+
+  it('copies the model and name the template list shows for it, not the draft’s', async () => {
+    const template = await publishedTemplate();
+    // An admin moves the draft to another model without publishing.
+    await storeTemplate({ ...template, modelCode: 'RMMT', name: 'Final inspection – RigiMill MT' });
+    const list = TemplateListSchema.parse(
+      (await listTemplates(request({ principal: inspector }), context())).jsonBody,
+    );
+    expect(list).toEqual([
+      expect.objectContaining({
+        id: template.id,
+        modelCode: 'RMMT',
+        publishedRevision: 2,
+        publishedName: template.name,
+        publishedModelCode: 'RMMG',
+      }),
+    ]);
+    const { inspection } = await created(template);
+    expect(inspection.front.modelCode).toBe('RMMG');
+    expect(inspection.templateSnapshot.name).toBe(template.name);
   });
 
   it('uses the latest published revision, not the draft', async () => {
@@ -545,6 +586,30 @@ describe('PUT /api/inspections/{id}', () => {
       etag,
     );
     expect(response.status).toBe(412);
+    expect(await deviationRowKeys()).toEqual([]);
+  });
+
+  it('never leaves a slow sync of an older save in the table', async () => {
+    const { inspection, etag } = await created(await publishedTemplate());
+    const [a] = itemIds(inspection);
+    const held = holdNextSync();
+    const first = put(
+      inspection.id,
+      { ...draftOf(inspection), results: { [a!]: { status: 'NOK' } } },
+      etag,
+    );
+    await held.reached; // its blob is written, its table sync is slow
+    const newer = (await stored(inspection.id))!.etag;
+    const second = await put(
+      inspection.id,
+      { ...draftOf(inspection), results: { [a!]: { status: 'OK' } } },
+      newer,
+    );
+    expect(second.status).toBe(200);
+    expect(await deviationRowKeys()).toEqual([]);
+
+    held.release(); // the first save's sync lands last, with its NOK row
+    expect((await first).status).toBe(200);
     expect(await deviationRowKeys()).toEqual([]);
   });
 

@@ -1,6 +1,6 @@
 import type { MachineModel } from '@modig/shared';
 import { ClipboardCheck, Plus, SearchX } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { Button, ButtonLink } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
@@ -13,6 +13,7 @@ import {
   filterInspections,
   filterToParams,
   isFiltered,
+  rememberListSearch,
   type InspectionFilter,
 } from '../features/inspections/listFilter';
 import { useInspections } from '../features/inspections/queries';
@@ -31,6 +32,9 @@ export function InspectionsPage() {
   // then picking a model) builds on it, and the search box never shows an outdated value.
   const setFilter = (next: InspectionFilter) =>
     setParams(filterToParams(next), { replace: true, flushSync: true });
+  // The inspection pages' "← Inspections" links come back to the same search and filters.
+  const search = filterToParams(filter).toString();
+  useEffect(() => rememberListSearch(search), [search]);
 
   const all = inspections.data;
   const shown = all ? filterInspections(all, filter) : [];

@@ -52,10 +52,11 @@ export const ISSUE_OUTLINE = 'bg-nok-bg outline-1 -outline-offset-1 outline-nok-
 
 /**
  * A focused row: the cyan ring drawn inside the row, so it isn't hidden by its neighbours. It
- * overrides the red issue outline while focused.
+ * overrides the red issue outline while focused. On `:focus`, not `:focus-visible`: the focused
+ * row is where the next status key goes, also after a click (a status segment, Continue, a jump
+ * link), when Chrome would not count the focus as visible.
  */
-export const ROW_FOCUS =
-  'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600';
+export const ROW_FOCUS = 'focus:outline-2 focus:-outline-offset-2 focus:outline-brand-600';
 
 /** NOK rows get a red bar down the left edge (brief §5.3). */
 export const NOK_BAR = 'before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-nok-fg';

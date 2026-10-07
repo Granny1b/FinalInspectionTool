@@ -23,7 +23,11 @@ export type RowCommand =
   | { kind: 'clear' }
   | { kind: 'move'; to: Move }
   | { kind: 'comment' }
-  | { kind: 'guide' };
+  | { kind: 'guide' }
+  /** Every row of the row's section without a status becomes OK ("Set remaining to OK"). */
+  | { kind: 'remaining' }
+  /** Swallowed: Space would scroll the page a screen and leave the focused row out of view. */
+  | { kind: 'none' };
 
 /** Keys that type a character; matched case-insensitively, so Caps Lock and Shift don't matter. */
 const CHARACTER_KEYS: Record<string, RowCommand> = {
@@ -38,6 +42,7 @@ const CHARACTER_KEYS: Record<string, RowCommand> = {
   k: { kind: 'move', to: 'previous' },
   c: { kind: 'comment' },
   g: { kind: 'guide' },
+  r: { kind: 'remaining' },
 };
 
 /** Keys without a character; with Shift they are left to the browser (e.g. selecting text). */
@@ -58,9 +63,11 @@ const NAMED_KEYS: Record<string, RowCommand> = {
  * - Shift still counts for character keys: on some layouts the digits need it.
  * - A held key repeats moves only. Setting or clearing a status takes one press per row, so a key
  *   held a little too long never marks a run of rows.
+ * - Space does nothing (with or without Shift): it would scroll the focused row out of view.
  */
 export function rowCommand(press: KeyPress): RowCommand | null {
   if (press.ctrlKey || press.metaKey || press.altKey) return null;
+  if (press.key === ' ') return { kind: 'none' };
   const command =
     press.key.length === 1
       ? CHARACTER_KEYS[press.key.toLowerCase()]

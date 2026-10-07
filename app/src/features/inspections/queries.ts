@@ -3,6 +3,7 @@
  * live here so invalidation after create/save/finalise is in one place.
  */
 import {
+  FinaliseIssueSchema,
   InspectionListSchema,
   InspectionSchema,
   RespSuggestionsSchema,
@@ -128,19 +129,7 @@ export function useRespHistory() {
   });
 }
 
-const FinaliseIssuesSchema = z.array(
-  z.object({
-    target: z.discriminatedUnion('kind', [
-      z.object({
-        kind: z.literal('front'),
-        field: z.enum(['machineName', 'serialNumber']),
-      }),
-      z.object({ kind: z.literal('row'), sectionId: z.string(), itemId: z.string() }),
-      z.object({ kind: z.literal('extra'), extraId: z.string() }),
-    ]),
-    message: z.string(),
-  }),
-);
+const FinaliseIssuesSchema = z.array(FinaliseIssueSchema);
 
 /** The problems a 400 from …/finalise carries in `details`, if that's what it is. */
 export function finaliseIssuesOf(error: unknown): FinaliseIssue[] | null {
