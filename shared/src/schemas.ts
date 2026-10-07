@@ -214,8 +214,16 @@ export const InspectionSchema = z.object({
   number: z.string().regex(INSPECTION_NUMBER_PATTERN),
   templateId: IdSchema,
   templateRevision: z.number().int().min(1),
-  /** FROZEN copy at creation – template edits never change existing inspections. */
-  templateSnapshot: z.object({ sections: z.array(SectionSchema) }),
+  /**
+   * FROZEN copy at creation – template edits never change existing inspections. Besides the
+   * sections it keeps the template's name and print settings, so printing an inspection never
+   * depends on the live template.
+   */
+  templateSnapshot: z.object({
+    name: z.string().max(200),
+    sections: z.array(SectionSchema),
+    printSettings: PrintSettingsSchema,
+  }),
   front: InspectionFrontSchema,
   /** Keyed by Item.id */
   results: z.record(IdSchema, RowResultSchema),
@@ -223,6 +231,11 @@ export const InspectionSchema = z.object({
   state: InspectionStateSchema,
   finalisedAt: IsoDateTime.optional(),
   finalisedBy: z.string().optional(),
+  /** Server-owned audit fields (emails), shown in the list and used for the deviation rows. */
+  createdAt: IsoDateTime,
+  createdBy: z.string(),
+  updatedAt: IsoDateTime,
+  updatedBy: z.string(),
 });
 export type Inspection = z.infer<typeof InspectionSchema>;
 

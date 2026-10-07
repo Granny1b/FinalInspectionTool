@@ -99,9 +99,11 @@ describe('InspectionSchema', () => {
       templateId: newId(),
       templateRevision: 2,
       templateSnapshot: {
+        name: 'Final inspection – RigiMill MG',
         sections: [
           { id: newId(), title: 'Gantry', items: [{ id: itemId, text: 'Motors - Safety decals' }] },
         ],
+        printSettings: { spareRowsPerSection: 3 },
       },
       front: {
         machineName: 'RigiMill MG #7',
@@ -114,6 +116,10 @@ describe('InspectionSchema', () => {
       results: { [itemId]: { status: 'NA' } },
       extraDeviations: [],
       state: 'in_progress',
+      createdAt: '2026-10-06T09:00:00.000Z',
+      createdBy: 'sam@modig.se',
+      updatedAt: '2026-10-06T09:05:00.000Z',
+      updatedBy: 'sam@modig.se',
     };
     expect(InspectionSchema.safeParse(inspection).success).toBe(true);
     expect(InspectionSchema.safeParse({ ...inspection, number: 'X-1' }).success).toBe(false);
