@@ -107,14 +107,25 @@ export const AnnotatedImageSchema = z.object({
 });
 export type AnnotatedImage = z.infer<typeof AnnotatedImageSchema>;
 
+/** Verdict badge on a guide image (brief §5.4: Good ✓ / Bad ✗ / Info). */
+export const GUIDE_VERDICTS = ['good', 'bad', 'info'] as const;
+export type GuideVerdict = (typeof GUIDE_VERDICTS)[number];
+export const GUIDE_VERDICT_LABELS: Record<GuideVerdict, string> = {
+  good: 'Good',
+  bad: 'Bad',
+  info: 'Info',
+};
+/** Enough for good/bad pairs from a few angles; small enough for the print appendix. */
+export const MAX_GUIDE_IMAGES = 6;
+
 export const GuideImageSchema = AnnotatedImageSchema.extend({
-  verdict: z.enum(['good', 'bad', 'info']),
+  verdict: z.enum(GUIDE_VERDICTS),
 });
 export type GuideImage = z.infer<typeof GuideImageSchema>;
 
 export const GuideSchema = z.object({
   description: z.string().max(5000).optional(),
-  images: z.array(GuideImageSchema),
+  images: z.array(GuideImageSchema).max(MAX_GUIDE_IMAGES),
 });
 export type Guide = z.infer<typeof GuideSchema>;
 

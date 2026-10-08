@@ -3,7 +3,10 @@ import { ID_LENGTH, ID_PATTERN, newId } from './ids';
 import {
   AnnotatedImageSchema,
   AnnotationSchema,
+  GUIDE_VERDICT_LABELS,
   GuideImageSchema,
+  GuideSchema,
+  MAX_GUIDE_IMAGES,
   InspectionSchema,
   ModelCodeSchema,
   TemplateSchema,
@@ -153,5 +156,22 @@ describe('AnnotatedImageSchema / GuideImageSchema', () => {
     expect(AnnotatedImageSchema.parse(image)).toEqual(image);
     expect(GuideImageSchema.safeParse(image).success).toBe(false);
     expect(GuideImageSchema.parse({ ...image, verdict: 'good' }).verdict).toBe('good');
+  });
+});
+
+describe('GuideSchema', () => {
+  const image = { imageId: 'img1', annotations: [], verdict: 'bad' as const };
+
+  it('caps the images per guide', () => {
+    expect(GuideSchema.safeParse({ images: Array(MAX_GUIDE_IMAGES).fill(image) }).success).toBe(
+      true,
+    );
+    expect(GuideSchema.safeParse({ images: Array(MAX_GUIDE_IMAGES + 1).fill(image) }).success).toBe(
+      false,
+    );
+  });
+
+  it('labels every verdict', () => {
+    expect(Object.keys(GUIDE_VERDICT_LABELS).sort()).toEqual(['bad', 'good', 'info']);
   });
 });

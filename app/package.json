@@ -17,6 +17,7 @@
     "@modig/shared": "*",
     "@tanstack/react-query": "^5.104.1",
     "clsx": "^2.1.1",
+    "docx": "^9.9.0",
     "konva": "^10.7.1",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",
