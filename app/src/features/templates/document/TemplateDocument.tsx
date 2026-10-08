@@ -13,10 +13,16 @@ export type TemplateDocumentProps = {
   spareRowsPerSection: number;
   /** Publish problems to highlight (red outline + message) on the matching section/row. */
   issues?: PublishIssue[];
+  /**
+   * Editable only: the open guide editor holds changes that aren't in `sections` yet, so the page's
+   * leave guard can ask before they are lost.
+   */
+  onEditorDirtyChange?: (dirty: boolean) => void;
 };
 
 /**
  * The checklist as one sheet that looks like the printed document (brief §5.2), edited in place.
+ * A row's guide opens from its guide icon: in the guide editor when editable, else in the viewer.
  *
  * DOM hooks for the page: each section root has `id="section-{sectionId}"` and (when editable)
  * its title input `data-section-title={sectionId}`; each row root has `id="row-{itemId}"` and its
@@ -27,6 +33,7 @@ export function TemplateDocument({
   onChange,
   spareRowsPerSection,
   issues,
+  onEditorDirtyChange,
 }: TemplateDocumentProps): JSX.Element {
   const issueIndex = useMemo(() => indexIssues(issues ?? []), [issues]);
   return (
@@ -39,6 +46,7 @@ export function TemplateDocument({
             onChange={onChange}
             spareRowsPerSection={spareRowsPerSection}
             issues={issueIndex}
+            onEditorDirtyChange={onEditorDirtyChange}
           />
         ) : (
           <ReadOnlyDocument

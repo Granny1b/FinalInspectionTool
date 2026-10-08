@@ -7,7 +7,7 @@
  * fresh ids. An unknown id, or a move to where the row already is, returns the input array itself,
  * so callers can skip a pointless save with `next === sections`.
  */
-import { newId, type Item, type Section } from '@modig/shared';
+import { newId, type Guide, type Item, type Section } from '@modig/shared';
 
 /** Where a row ends up: the target section and its index there, counted without the moved row. */
 export type RowPosition = { sectionId: string; index: number };
@@ -121,6 +121,19 @@ export function addRowAfter(sections: Section[], itemId: string): Created | null
 
 export function setRowText(sections: Section[], itemId: string, text: string): Section[] {
   return updateItem(sections, itemId, (item) => (item.text === text ? item : { ...item, text }));
+}
+
+/** Gives a row the guide from the guide editor, or (undefined) takes its guide away. */
+export function setRowGuide(
+  sections: Section[],
+  itemId: string,
+  guide: Guide | undefined,
+): Section[] {
+  return updateItem(sections, itemId, (item) => {
+    if (item.guide === guide) return item;
+    const { guide: _previous, ...rest } = item;
+    return guide ? { ...rest, guide } : rest;
+  });
 }
 
 /** Deep copy (guide included) right after the original, with a fresh id. */

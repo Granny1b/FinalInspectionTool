@@ -1,10 +1,7 @@
 import { SEVERITY_LABELS, STATUS_LABELS, STATUSES, type Status } from '@modig/shared';
-import { Check, Minus, X, type LucideIcon } from 'lucide-react';
 import { useId } from 'react';
+import { STATUS_ICONS } from '../inspections/checklist/status';
 import type { PrintRow, PrintSection } from './model';
-
-/** ✓ ✗ – over the status's name: readable in black and white (brief §6). */
-const MARKS: Record<Status, LucideIcon> = { OK: Check, NOK: X, NA: Minus };
 
 type Props = {
   section: PrintSection;
@@ -91,11 +88,14 @@ function Row({ row }: { row: PrintRow }) {
   );
 }
 
-/** An empty box to tick while nothing is recorded; the mark in the recorded status's column. */
+/**
+ * An empty box to tick while nothing is recorded; in the recorded status's column its mark (✓ ✗ –,
+ * as on the screen) over its name: readable in black and white (brief §6).
+ */
 function StatusCell({ row, status }: { row: PrintRow; status: Status }) {
   if (row.status === null) return <span className="paper-box" aria-hidden="true" />;
   if (row.status !== status) return null;
-  const Mark = MARKS[status];
+  const Mark = STATUS_ICONS[status];
   return (
     <span className="paper-mark">
       <Mark strokeWidth={3} aria-hidden="true" />

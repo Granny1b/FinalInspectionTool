@@ -15,8 +15,6 @@ import type { DragKind } from './useDocumentDnd';
 const REVEAL =
   'opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 pointer-coarse:opacity-100';
 
-const GUIDE_SOON = 'Guide: coming in phase 5';
-
 type Props = {
   item: Item;
   sectionId: string;
@@ -55,6 +53,7 @@ export const EditableRow = memo(function EditableRow({
     disabled: { droppable: dragKind === 'section' },
   });
   const ref = rowRef(sectionIndex, rowIndex);
+  const guideAction = item.guide ? 'Edit' : 'Add';
   const issueId = useId();
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -126,7 +125,14 @@ export const EditableRow = memo(function EditableRow({
               className="col-start-1 row-start-1 resize-none overflow-hidden rounded-sm bg-transparent px-2 py-2 text-ink-900 placeholder:text-ink-500 focus:bg-surface focus-visible:outline-1 focus-visible:-outline-offset-1"
             />
           </div>
-          {item.guide && <GuideMark guide={item.guide} />}
+          {item.guide && (
+            <GuideMark
+              guide={item.guide}
+              rowRef={ref}
+              onOpen={() => actions.openGuide(item.id)}
+              inTabOrder={false}
+            />
+          )}
         </div>
         <PaperCells />
         {/* Inherits the row background so it covers the cell borders it floats over. */}
@@ -135,7 +141,11 @@ export const EditableRow = memo(function EditableRow({
         >
           {/* Mouse and keyboard: the three actions as icons. */}
           <div className="flex gap-0.5 pointer-coarse:hidden">
-            <GuideComingSoon rowRef={ref} />
+            <IconButton
+              icon={Images}
+              label={`${guideAction} guide, row ${ref}`}
+              onClick={() => actions.openGuide(item.id)}
+            />
             <IconButton
               icon={Copy}
               label={`Duplicate row ${ref}`}
@@ -153,7 +163,11 @@ export const EditableRow = memo(function EditableRow({
             <ActionMenu
               label={`Row ${ref} actions`}
               items={[
-                { label: GUIDE_SOON, icon: Images, disabled: true, onSelect: () => undefined },
+                {
+                  label: `${guideAction} guide`,
+                  icon: Images,
+                  onSelect: () => actions.openGuide(item.id),
+                },
                 { label: 'Duplicate', icon: Copy, onSelect: () => actions.duplicateRow(item.id) },
                 {
                   label: 'Delete',
@@ -170,28 +184,6 @@ export const EditableRow = memo(function EditableRow({
     </div>
   );
 });
-
-/** The guide editor arrives in phase 5: the button is there, disabled, and says so on hover. */
-function GuideComingSoon({ rowRef }: { rowRef: string }) {
-  return (
-    <span className="group/guide relative flex">
-      <button
-        type="button"
-        disabled
-        aria-label={`Guide for row ${rowRef} (coming in phase 5)`}
-        className="flex size-7 items-center justify-center rounded-md text-ink-400"
-      >
-        <Images size={15} aria-hidden="true" />
-      </button>
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute right-0 bottom-full z-10 mb-1 hidden rounded-md bg-ink-900 px-2 py-1 text-xs font-medium whitespace-nowrap text-white shadow-md group-hover/guide:block"
-      >
-        {GUIDE_SOON}
-      </span>
-    </span>
-  );
-}
 
 /**
  * A held Backspace deletes one row only. Its auto-repeats would go on to eat the field that gets

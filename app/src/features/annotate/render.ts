@@ -7,7 +7,7 @@ import type { Annotation } from '@modig/shared';
 import type { Shape } from 'konva/lib/Shape';
 import type { Size } from './geometry';
 import { Arrow, Ellipse, Image, Konva, Line, Rect, Text } from './konva';
-import { LABEL_FONT_FAMILY, LABEL_FONT_STYLE, shapeSpec, type ShapeSpec } from './style';
+import { LABEL_FONT_FAMILY, LABEL_FONT_STYLE, shapeSpecs, type ShapeSpec } from './style';
 
 /** Higher than the photos' 0.8: JPEG blurs thin lines and small text first. */
 const RENDER_JPEG_QUALITY = 0.9;
@@ -28,7 +28,9 @@ export async function renderAnnotatedJpeg(
     const layer = new Konva.Layer();
     stage.add(layer);
     layer.add(new Image({ image, ...size }));
-    for (const annotation of annotations) layer.add(createShape(shapeSpec(annotation, size)));
+    for (const annotation of annotations) {
+      for (const spec of shapeSpecs(annotation, size)) layer.add(createShape(spec));
+    }
     return await toJpeg(stage.toCanvas({ pixelRatio: 1 }));
   } finally {
     stage.destroy();

@@ -1,4 +1,4 @@
-import { rowRef, sectionNumber, type Item, type Section } from '@modig/shared';
+import { rowRef, sectionNumber, type Guide, type Item, type Section } from '@modig/shared';
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import {
   addRow,
@@ -18,6 +18,7 @@ import {
   renameSection,
   restoreRow,
   restoreSection,
+  setRowGuide,
   setRowText,
   singleLine,
   type Field,
@@ -52,6 +53,10 @@ export type DocumentActions = {
   focusSectionMenu: (sectionId: string) => void;
   /** Puts the last deleted row or section back where it was, with the same ids. */
   undoDelete: (deleted: Deleted) => void;
+  /** Opens the row's guide in the guide editor. */
+  openGuide: (itemId: string) => void;
+  /** What the guide editor saved: the row's new guide, or undefined to remove it. */
+  setGuide: (itemId: string, guide: Guide | undefined) => void;
 };
 
 /**
@@ -73,6 +78,7 @@ type Options = {
   confirmDelete: (sectionId: string) => void;
   /** A delete that can be undone, or null once the structure changes otherwise. */
   onDeleted: (deleted: Deleted | null) => void;
+  onOpenGuide: (itemId: string) => void;
 };
 
 /**
@@ -86,12 +92,13 @@ export function useDocumentActions({
   rootRef,
   confirmDelete,
   onDeleted,
+  onOpenGuide,
 }: Options): DocumentActions {
-  const latest = useRef({ sections, onChange, confirmDelete, onDeleted });
+  const latest = useRef({ sections, onChange, confirmDelete, onDeleted, onOpenGuide });
   const pendingFocus = useRef<FocusRequest | null>(null);
 
   useLayoutEffect(() => {
-    latest.current = { sections, onChange, confirmDelete, onDeleted };
+    latest.current = { sections, onChange, confirmDelete, onDeleted, onOpenGuide };
     const request = pendingFocus.current;
     if (request && focusElement(rootRef.current, request)) pendingFocus.current = null;
   });
@@ -232,6 +239,9 @@ export function useDocumentActions({
               kind: 'title',
               sectionId: deleted.section.id,
             }),
+      openGuide: (itemId) => latest.current.onOpenGuide(itemId),
+      // Not a change of structure: the undo of the last delete stays on offer.
+      setGuide: (itemId, guide) => commit(setRowGuide(current(), itemId, guide)),
     };
   }, [rootRef]);
 }

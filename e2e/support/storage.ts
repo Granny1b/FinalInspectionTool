@@ -129,20 +129,27 @@ export async function createTemplate(
   return draft;
 }
 
-/** Deletes a template's draft, revisions and cover photos. */
+/**
+ * Deletes a template's draft, revisions, cover photos and guide images (originals and marked-up
+ * copies), which its inspections' snapshots share: they go with the template.
+ */
 export async function deleteTemplate(id: string): Promise<void> {
   const names: string[] = [];
   for await (const blob of templates.listBlobsFlat({ prefix: `${id}/` })) names.push(blob.name);
-  const covers = new Set<string>();
+  const imageIds = new Set<string>();
   for (const name of names) {
-    const { coverImageId } = await readTemplate(name);
-    if (coverImageId) covers.add(coverImageId);
+    const { coverImageId, sections } = await readTemplate(name);
+    if (coverImageId) imageIds.add(coverImageId);
+    for (const image of sections.flatMap((section) =>
+      section.items.flatMap((item) => item.guide?.images ?? []),
+    )) {
+      imageIds.add(image.imageId);
+      if (image.renderedImageId) imageIds.add(image.renderedImageId);
+    }
   }
   await Promise.all([
     ...names.map((name) => templates.deleteBlob(name)),
-    ...[...covers].map((imageId) =>
-      images.getBlobClient(blobNames.image(imageId)).deleteIfExists(),
-    ),
+    deleteImages([...imageIds]),
   ]);
 }
 

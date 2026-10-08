@@ -1,6 +1,7 @@
 import { STATUS_LABELS, STATUSES, type Guide, type Status } from '@modig/shared';
 import clsx from 'clsx';
 import { Camera, ImagePlus, Info } from 'lucide-react';
+import { imageCountText } from '../../guides/guide';
 import { photoCountText } from '../deviations';
 import { CONTROL_HEIGHT } from './layout';
 import { STATUS_ICONS, STATUS_TONES } from './status';
@@ -72,49 +73,35 @@ export function StatusMark({ status }: { status: Status | undefined }) {
   );
 }
 
-export const GUIDE_SOON = 'Guide viewer arrives in phase 5.';
-
 type GuideButtonProps = {
   guide: Guide;
   rowRef: string;
-  /** "Guide viewer arrives in phase 5." is showing next to the button. */
-  noteOpen: boolean;
   onClick: () => void;
+  /** Read-only rows: the button is the only way to the guide, so it is a Tab stop there. */
+  inTabOrder?: boolean;
 };
 
 /**
- * Marks a row that has a guide: a camera when it has photos, otherwise an info icon. It is not a
- * tab stop (Tab goes row → comment → resp); `G` on the row does the same as a click.
+ * Marks a row that has a guide (a camera when it has images, otherwise an info icon) and opens it
+ * in the guide viewer. In an editable row it is not a tab stop (Tab goes row → comment → resp);
+ * `G` on the row does the same as a click.
  */
-export function GuideButton({ guide, rowRef, noteOpen, onClick }: GuideButtonProps) {
-  const photos = guide.images.length;
-  const Icon = photos > 0 ? Camera : Info;
-  const label = `Guide for row ${rowRef}${
-    photos > 0 ? ` (${photos} ${photos === 1 ? 'photo' : 'photos'})` : ''
-  }`;
+export function GuideButton({ guide, rowRef, onClick, inTabOrder = false }: GuideButtonProps) {
+  const images = guide.images.length;
+  const Icon = images > 0 ? Camera : Info;
+  const label = `Guide for row ${rowRef}${images > 0 ? ` (${imageCountText(images)})` : ''}`;
   return (
-    <span className="relative flex shrink-0">
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={label}
-        aria-keyshortcuts="G"
-        title={`${label} · G`}
-        onClick={onClick}
-        className="flex size-11 items-center justify-center rounded-md text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-800 @min-[56rem]:pointer-fine:size-8"
-      >
-        <Icon size={16} aria-hidden="true" />
-      </button>
-      {/* Read out by the sheet's live region; this is the visual half. */}
-      {noteOpen && (
-        <span
-          aria-hidden="true"
-          className="absolute top-full right-0 z-10 mt-1 rounded-md bg-ink-900 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-white shadow-md"
-        >
-          {GUIDE_SOON}
-        </span>
-      )}
-    </span>
+    <button
+      type="button"
+      tabIndex={inTabOrder ? undefined : -1}
+      aria-label={label}
+      aria-keyshortcuts={inTabOrder ? undefined : 'G'}
+      title={inTabOrder ? label : `${label} · G`}
+      onClick={onClick}
+      className="flex size-11 shrink-0 items-center justify-center rounded-md text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-800 @min-[56rem]:pointer-fine:size-8"
+    >
+      <Icon size={16} aria-hidden="true" />
+    </button>
   );
 }
 

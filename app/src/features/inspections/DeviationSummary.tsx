@@ -20,6 +20,8 @@ type Props = {
   onUpdate: (id: string, patch: ExtraDeviationPatch) => void;
   onRemove: (id: string) => void;
   onPhotosChange: (deviation: InspectionDeviation, photos: AnnotatedImage[]) => void;
+  /** The open photo editor holds marks not saved yet (for the page's leave guard). */
+  onEditorDirtyChange: (dirty: boolean) => void;
 };
 
 /**
@@ -37,6 +39,7 @@ export const DeviationSummary = memo(function DeviationSummary({
   onUpdate,
   onRemove,
   onPhotosChange,
+  onEditorDirtyChange,
 }: Props) {
   const titleId = useId();
   const respListId = useId();
@@ -87,6 +90,7 @@ export const DeviationSummary = memo(function DeviationSummary({
                   asksBeforeRemoving(target) ? setConfirming(target) : remove(target)
                 }
                 onPhotosChange={onPhotosChange}
+                onEditorDirtyChange={onEditorDirtyChange}
               />
             </li>
           ))}

@@ -22,3 +22,8 @@ export function parseMode(value: string | null): PrintMode | null {
 export function parseDeviationsPerPage(value: string | null): DeviationsPerPage | null {
   return DEVIATIONS_PER_PAGE.find((perPage) => String(perPage) === value) ?? null;
 }
+
+/** The `appendix` query parameter: "1" includes the reference images. */
+export function parseAppendix(value: string | null): boolean {
+  return value === '1';
+}

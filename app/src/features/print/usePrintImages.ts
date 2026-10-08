@@ -7,11 +7,18 @@ const DEFAULT_LOGO_URL = '/modig-logo.png';
 
 /**
  * Addresses of every image the document shows: the machine photo (or a template's cover), the
- * deviation photos and the logo from the settings. `loading` until all are known, so the document
- * renders once, complete, and its readiness can wait for every image in it.
+ * deviation photos, the logo from the settings and, with `appendix`, the reference images.
+ * `loading` until all but the reference images are known, so the document renders once,
+ * complete; `appendixLoading` while the reference images' addresses are still coming, so turning
+ * the appendix on adds it a moment later instead of reloading the whole preview.
  */
-export function usePrintImages(model: PrintModel | null, logoImageId: string | undefined) {
-  const ids = model ? printedImageIds(model) : [];
+export function usePrintImages(
+  model: PrintModel | null,
+  logoImageId: string | undefined,
+  { appendix }: { appendix: boolean },
+) {
+  const ids = model ? printedImageIds(model, { appendix }) : [];
+  const base = new Set(model ? printedImageIds(model, { appendix: false }) : []);
   const photos = useQueries({ queries: ids.map((id) => imageUrlQuery(id)) });
   const logo = useImageUrl(logoImageId);
 
@@ -22,8 +29,11 @@ export function usePrintImages(model: PrintModel | null, logoImageId: string | u
       return url ? [[id, url] as const] : [];
     }),
   );
+  const pending = (wanted: (id: string) => boolean) =>
+    ids.some((id, index) => wanted(id) && fetching(photos[index]!));
   return {
-    loading: photos.some(fetching) || fetching(logo),
+    loading: pending((id) => base.has(id)) || fetching(logo),
+    appendixLoading: pending((id) => !base.has(id)),
     urls,
     logoUrl: logo.data ?? DEFAULT_LOGO_URL,
   };

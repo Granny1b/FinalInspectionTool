@@ -18,6 +18,7 @@ import {
   renameSection,
   restoreRow,
   restoreSection,
+  setRowGuide,
   setRowText,
   singleLine,
 } from './ops';
@@ -180,6 +181,30 @@ describe('rows', () => {
     expect(before[0]?.items[1]?.text).toBe('Light curtains - Correct height');
     expect(setRowText(before, 'a2', 'Light curtains - Correct height')).toBe(before);
     expect(setRowText(before, 'nope', 'x')).toBe(before);
+  });
+
+  it('setRowGuide gives a row a guide, replaces it, or takes it away; nothing else changes', () => {
+    const before = fixture();
+    const guide = { description: 'Blue paint line', images: [] };
+    const added = setRowGuide(before, 'a1', guide);
+    expect(added[0]?.items[0]).toEqual({
+      id: 'a1',
+      text: 'Lifting columns - Marked screws',
+      guide,
+    });
+    // Keys in the schema's order (id, text, guide): the draft's change check compares JSON.
+    expect(Object.keys(added[0]?.items[0] ?? {})).toEqual(['id', 'text', 'guide']);
+    expect(added[0]?.items[1]).toBe(before[0]?.items[1]);
+    expect(added[1]).toBe(before[1]);
+
+    const removed = setRowGuide(before, 'a2', undefined);
+    expect(removed[0]?.items[1]).toEqual({ id: 'a2', text: 'Light curtains - Correct height' });
+    expect(removed[0]?.items[1]).not.toHaveProperty('guide');
+    expect(before[0]?.items[1]?.guide).toBeDefined();
+
+    expect(setRowGuide(before, 'a2', before[0]?.items[1]?.guide)).toBe(before);
+    expect(setRowGuide(before, 'a1', undefined)).toBe(before);
+    expect(setRowGuide(before, 'nope', guide)).toBe(before);
   });
 
   it('duplicateRow deep-copies right after the original with a fresh id', () => {

@@ -28,6 +28,8 @@ export type ChecklistActions = {
   announce: (message: string) => void;
   /** A NOK row's photo count: shows its deviation's photos (the page's Deviations tab). */
   showPhotos: (itemId: string) => void;
+  /** The row's guide icon or `G`: opens its guide in the viewer. */
+  showGuide: (itemId: string) => void;
 };
 
 type Options = {
@@ -37,6 +39,7 @@ type Options = {
   rootRef: RefObject<HTMLElement | null>;
   announce: (message: string) => void;
   onShowPhotos: (itemId: string) => void;
+  onShowGuide: (itemId: string) => void;
 };
 
 /**
@@ -126,6 +129,7 @@ export function useChecklistActions(options: Options): ChecklistActions {
       },
       announce: (message) => latest.current.announce(message),
       showPhotos: (itemId) => latest.current.onShowPhotos(itemId),
+      showGuide: (itemId) => latest.current.onShowGuide(itemId),
     };
   }, [rootRef]);
 }

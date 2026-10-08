@@ -3,10 +3,12 @@ import { ID_LENGTH, ID_PATTERN, newId } from './ids';
 import {
   AnnotatedImageSchema,
   AnnotationSchema,
+  ExtraDeviationSchema,
   GUIDE_VERDICT_LABELS,
   GuideImageSchema,
   GuideSchema,
   MAX_GUIDE_IMAGES,
+  MAX_PHOTOS_PER_DEVIATION,
   InspectionSchema,
   ModelCodeSchema,
   TemplateSchema,
@@ -173,5 +175,23 @@ describe('GuideSchema', () => {
 
   it('labels every verdict', () => {
     expect(Object.keys(GUIDE_VERDICT_LABELS).sort()).toEqual(['bad', 'good', 'info']);
+  });
+});
+
+describe('ExtraDeviationSchema', () => {
+  const photo = { imageId: 'img1', annotations: [] };
+  const extra = { id: 'x1', description: 'Paint damage', severity: 'minor' as const };
+
+  it('takes up to MAX_PHOTOS_PER_DEVIATION photos, like a row', () => {
+    const photos = (count: number) => Array<typeof photo>(count).fill(photo);
+    expect(ExtraDeviationSchema.safeParse(extra).success).toBe(true);
+    expect(
+      ExtraDeviationSchema.safeParse({ ...extra, photos: photos(MAX_PHOTOS_PER_DEVIATION) })
+        .success,
+    ).toBe(true);
+    expect(
+      ExtraDeviationSchema.safeParse({ ...extra, photos: photos(MAX_PHOTOS_PER_DEVIATION + 1) })
+        .success,
+    ).toBe(false);
   });
 });

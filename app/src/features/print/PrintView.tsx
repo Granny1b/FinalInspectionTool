@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { WordExportButton } from '../export/WordExportButton';
 import {
   DEFAULT_DEVIATIONS_PER_PAGE,
   printedImageIds,
@@ -28,6 +29,8 @@ type Props = {
   mode?: Choice<PrintMode>;
   /** A report's deviation cards per page, and how to change it. */
   deviationsPerPage?: Choice<DeviationsPerPage>;
+  /** "Include reference images" (`?appendix=1`), and how to change it. */
+  appendix: Choice<boolean>;
   /** `?autoprint=1`: open the print dialog once, as soon as everything is loaded. */
   autoprint?: boolean;
   /** Called as autoprint fires, to drop the flag (a reload must not print again). */
@@ -45,6 +48,7 @@ export function PrintView({
   back,
   mode,
   deviationsPerPage,
+  appendix,
   autoprint = false,
   onAutoprinted,
 }: Props) {
@@ -54,16 +58,22 @@ export function PrintView({
     model.deviations.kind === 'cards' ? model.deviations.cards : NO_CARDS,
     perPage,
   );
+  // Asked for and there is something to show: the appendix (in print and Word alike).
+  const withAppendix = appendix.value && model.appendix.length > 0;
+  // Its images' addresses arrive a moment after it is turned on.
+  const appendixShown = withAppendix && !images.appendixLoading;
   // What is laid out and every image address in it: when any changes, readiness waits again.
   const shown = [
     model.mode,
     perPage,
+    appendixShown,
     cards.pages?.map((page) => page.map((card) => card.number).join()).join('|'),
     images.logoUrl,
-    ...printedImageIds(model).map((id) => images.urls.get(id) ?? ''),
+    ...printedImageIds(model, { appendix: appendixShown }).map((id) => images.urls.get(id) ?? ''),
   ].join(' ');
-  // Not while the cards are being measured onto pages.
-  const ready = useAssetsReady(rootRef, shown) && cards.pages !== null;
+  // Not while the cards are being measured onto pages, nor before the appendix is in.
+  const ready =
+    useAssetsReady(rootRef, shown) && cards.pages !== null && appendixShown === withAppendix;
   usePageFooter(model.footer);
 
   const printed = useRef(false);
@@ -86,14 +96,18 @@ export function PrintView({
         mode={mode}
         // Only a report has deviation cards; the blank summary is a table.
         deviationsPerPage={model.deviations.kind === 'cards' ? deviationsPerPage : undefined}
+        appendix={{ ...appendix, available: model.appendix.length > 0 }}
         ready={ready}
-      />
+      >
+        <WordExportButton model={model} appendix={withAppendix} logoUrl={images.logoUrl} />
+      </PrintToolbar>
       <main className="paper-desk flex-1">
         <PrintDocument
           model={model}
           images={images}
           deviationsPerPage={perPage}
           cardPages={cards}
+          appendix={appendixShown}
           ready={ready}
           rootRef={rootRef}
         />

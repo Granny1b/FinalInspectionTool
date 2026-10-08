@@ -7,6 +7,8 @@ import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../../../components/Button';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { guideRow } from '../../guides/guide';
+import { GuideEditor } from '../../guides/GuideEditor';
 import { sectionDndId } from './dnd';
 import { EditableSection } from './EditableSection';
 import type { IssueIndex } from './issues';
@@ -19,18 +21,28 @@ type Props = {
   onChange: (sections: Section[]) => void;
   spareRowsPerSection: number;
   issues: IssueIndex;
+  onEditorDirtyChange?: (dirty: boolean) => void;
 };
 
-export function EditableDocument({ sections, onChange, spareRowsPerSection, issues }: Props) {
+export function EditableDocument({
+  sections,
+  onChange,
+  spareRowsPerSection,
+  issues,
+  onEditorDirtyChange,
+}: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<Deleted | null>(null);
+  // The row whose guide is open in the guide editor.
+  const [guideItemId, setGuideItemId] = useState<string | null>(null);
   const actions = useDocumentActions({
     sections,
     onChange,
     rootRef,
     confirmDelete: setConfirmingDelete,
     onDeleted: setDeleted,
+    onOpenGuide: setGuideItemId,
   });
   const { drag, shown, contextProps } = useDocumentDnd(sections, actions);
 
@@ -39,6 +51,7 @@ export function EditableDocument({ sections, onChange, spareRowsPerSection, issu
 
   const deleting = confirmingDelete === null ? -1 : findSection(sections, confirmingDelete);
   const deletingSection = sections[deleting];
+  const guiding = guideItemId === null ? null : guideRow(sections, guideItemId);
 
   return (
     <div ref={rootRef}>
@@ -112,6 +125,20 @@ export function EditableDocument({ sections, onChange, spareRowsPerSection, issu
             setConfirmingDelete(null);
             actions.focusSectionMenu(deletingSection.id);
           }}
+        />
+      )}
+
+      {guideItemId !== null && guiding && (
+        <GuideEditor
+          rowRef={guiding.ref}
+          rowText={guiding.text}
+          guide={guiding.guide}
+          onSave={(guide) => {
+            setGuideItemId(null);
+            actions.setGuide(guideItemId, guide);
+          }}
+          onCancel={() => setGuideItemId(null)}
+          onDirtyChange={onEditorDirtyChange}
         />
       )}
 

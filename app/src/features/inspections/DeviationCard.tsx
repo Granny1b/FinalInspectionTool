@@ -24,6 +24,7 @@ type Props = {
   onUpdate: (id: string, patch: ExtraDeviationPatch) => void;
   onRemove: (deviation: InspectionDeviation) => void;
   onPhotosChange: (deviation: InspectionDeviation, photos: AnnotatedImage[]) => void;
+  onEditorDirtyChange: (dirty: boolean) => void;
 };
 
 /**
@@ -41,6 +42,7 @@ export function DeviationCard({
   onUpdate,
   onRemove,
   onPhotosChange,
+  onEditorDirtyChange,
 }: Props) {
   const titleId = useId();
   const { number, itemId } = deviation;
@@ -97,7 +99,12 @@ export function DeviationCard({
             <Details deviation={deviation} />
           )}
         </div>
-        <Photos deviation={deviation} readOnly={readOnly} onChange={onPhotosChange} />
+        <Photos
+          deviation={deviation}
+          readOnly={readOnly}
+          onChange={onPhotosChange}
+          onEditorDirtyChange={onEditorDirtyChange}
+        />
       </div>
     </article>
   );
@@ -161,13 +168,14 @@ type PhotosProps = {
   deviation: InspectionDeviation;
   readOnly: boolean;
   onChange: (deviation: InspectionDeviation, photos: AnnotatedImage[]) => void;
+  onEditorDirtyChange: (dirty: boolean) => void;
 };
 
 /**
  * The deviation's photos. The block is the target of a NOK row's photo count (focusable from
  * script only); the page moves the focus on to its first button.
  */
-function Photos({ deviation, readOnly, onChange }: PhotosProps) {
+function Photos({ deviation, readOnly, onChange, onEditorDirtyChange }: PhotosProps) {
   const { photos, number } = deviation;
   return (
     <div id={deviationPhotosId(deviation.key)} tabIndex={-1} className="min-w-0 outline-none">
@@ -187,6 +195,7 @@ function Photos({ deviation, readOnly, onChange }: PhotosProps) {
           onChange={readOnly ? undefined : (next) => onChange(deviation, next)}
           max={MAX_PHOTOS_PER_DEVIATION}
           label={`Photos of ${number}`}
+          onDirtyChange={onEditorDirtyChange}
         />
       )}
     </div>

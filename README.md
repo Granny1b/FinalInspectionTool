@@ -7,7 +7,7 @@ walk-round, transcribe the results, and finalise a printable report. Every devia
 central table for KPIs. It runs on Azure Static Web Apps (Free) with managed Functions, Blob
 Storage and Table Storage: no database, about 1 SEK a month.
 
-## Status: phase 4 of 6 (print and deviation photos)
+## Status: phase 5 of 6 (guides, reference images and Word export)
 
 Working now:
 
@@ -36,6 +36,14 @@ Working now:
   deviation and its photos (2 or 4 cards to a page), and a preview of any template, on A4 from
   Chrome or Edge's print dialog ("Save as PDF"). Tests print real PDFs and measure them. See
   [Printing](#printing).
+- **Guides (phase 5).** A checklist row can have a guide: what the checkpoint should and
+  shouldn't look like, as a short description and up to six reference images marked Good, Bad
+  or Info, drawn on in the same editor as deviation photos. Admins write them in the template
+  editor; inspectors open them from the row, as they were when the inspection was created. See
+  [Guides](#guides).
+- **Reference images and Word (phase 5).** Printouts can add an appendix with every guide's
+  images, two to a row, and every printout can be exported as an editable Word file. See
+  [Reference images](#reference-images-appendix) and [Word export](#word-export).
 - **API.** `/api/me`, the template and inspection endpoints, settings, "Resp" suggestions and
   photo upload/download URLs (see [API](#api)), with role checks, JSON errors and ETag
   concurrency on every save.
@@ -44,10 +52,9 @@ Working now:
 - **Local dev, infrastructure and CI/CD.** One `npm run dev`, a Bicep file, and a GitHub Actions
   workflow that checks every pull request and deploys `main`.
 
-Not yet: guides on a row (phase 5: rows that have one show its icon; the photo editor they will
-use exists now), insights (phase 6) and editing the settings.
+Not yet: insights (phase 6) and editing the settings.
 
-Next phases: 5 guides · 6 insights.
+Next phase: 6 insights.
 
 ## Prerequisites
 
@@ -222,6 +229,7 @@ a severity (minor unless you pick another). Click a row, or use _Continue at_, t
 | `R`                          | The rest of the row's section OK (as **Set remaining to OK**)     |
 | `↓` / `J`, `↑` / `K`         | Next / previous row, across sections (`Home`, `End`: first, last) |
 | `C`                          | Into the comment                                                  |
+| `G`                          | The row's guide, if it has one (`Esc` closes it)                  |
 | `Tab`                        | Row → comment → resp → severity (NOK rows) → next row             |
 | `Enter` in comment or resp   | On to the next row                                                |
 | `Esc` in a field             | Back to the row                                                   |
@@ -230,7 +238,8 @@ Keys typed in a field are text, never shortcuts; `Tab` carries on from a section
 the next section. **Set remaining to OK** on a section header (or `R` on one of its rows) marks
 every row of that section that has no status yet as OK: mark the exceptions, then fill the rest.
 Resp suggests the names of earlier deviations and the ones already entered in this inspection. A
-row with a guide shows its icon; the guide viewer comes in phase 5.
+row with a guide shows its icon (a camera when it has images); the icon or `G` opens the guide
+(see [Guides](#guides)).
 
 ### Deviations, saving, finalising
 
@@ -287,6 +296,10 @@ whoever fixes it sees exactly where. They print on the report's deviation pages.
   (after asking). With two photos the Add button goes away.
 - **Saving.** **Save** uploads the photo and, when it has marks, a flattened copy of the photo
   with them; then the card shows the copy and the inspection saves itself as usual.
+- **Leaving.** Marks and a caption are kept only by **Save**: going elsewhere in the app (Back, a
+  link) while the editor has unsaved changes asks first, and closing the tab warns.
+- **If the editor can't load** (offline, or a new version was deployed meanwhile), a small
+  message says so and offers **Reload page**; the rest of the page and its changes stay.
 
 The editor: tools on top, the photo filling the window, a caption and **Save** / **Cancel** at the
 bottom. Mouse, finger and pen all work.
@@ -303,8 +316,9 @@ bottom. Mouse, finger and pen all work.
 | Cancel                        | `Esc` or **Cancel** (asks first if anything changed)                |
 
 Lines and labels are sized to the photo (a label is 4 % of its long edge), so they look the same
-on screen, on a thumbnail and on paper. On a black-and-white printer red stays clear; yellow and
-white marks fade on light surfaces (labels keep a dark outline).
+on screen, on a thumbnail and on paper. They stay visible on a black-and-white printer: yellow
+and white lines have a thin dark outline (in the editor and in the flattened copy), labels have
+one in every colour, and red and cyan print dark enough on their own.
 
 **How they are stored.** A photo is `{ imageId, caption, annotations, renderedImageId }` in the
 inspection: in the NOK row's result (`results[itemId].photos`) or in the extra deviation. The marks
@@ -315,6 +329,40 @@ has none, and print uses the photo itself; changing only the caption keeps the c
 with a row whose status changes from NOK, but count and print only while it is NOK. Replaced
 copies, removed photos and photos added and then cancelled stay in storage, like replaced cover
 photos.
+
+## Guides
+
+A guide shows what a checkpoint should and shouldn't look like (brief §5.4): a short description
+and up to six reference images, each marked **✓ Good**, **✗ Bad** or **ⓘ Info**, with a caption,
+and drawn on with arrows, boxes and labels in the same editor as deviation photos (see
+[Deviation photos](#deviation-photos)).
+
+- **Writing one (admins).** In the template editor, a row's **Add guide** (**Edit guide** once it
+  has one) opens the guide editor: one of the icons that appear on hover or focus, on a tablet in
+  the row's **⋯**. A row with a guide also shows its icon (a camera when it has images), which
+  opens it too. Type the description, then add images with **Add image** (file picker; a tablet
+  offers its camera), `Ctrl+V` of an image on the clipboard, or by dropping an image file anywhere
+  on the dialog, also while typing. A new image opens in the photo editor straight away; a click
+  on an image opens it again, its **×** removes it (after asking). Under each image: Good / Bad /
+  Info (a new one starts as Info, saying nothing until it is marked) and its caption.
+- **Saving.** **Save** puts the guide into the draft, which saves itself like any other change.
+  **Cancel** or `Esc` asks before discarding changes, and so does leaving the page while the
+  guide editor has changes. **Remove guide** (after asking) takes the guide off the row. A guide
+  without a description or images is no guide.
+- **What inspectors see.** A guide is part of the checklist: it reaches new inspections with the
+  next published revision. An inspection keeps the guides of the revision it was created from,
+  like the rest of its checklist, so editing a guide later never changes an existing inspection.
+- **Reading one.** On an inspection the row's icon, or `G` on the row, opens the guide read-only:
+  the description, then the images with their verdicts and captions. `←` / `→` move between the
+  images; `Enter` or a click shows one large, where `←` / `→` step through them; `Esc` closes
+  (the large view first, then the guide). The read-only template view and a revision page open
+  the same viewer from the row's icon.
+
+**How they are stored.** `item.guide = { description?, images }` on a checklist row, each image
+`{ imageId, caption?, annotations, renderedImageId?, verdict }` (`good`, `bad` or `info`): a
+deviation photo with a verdict, uploaded and flattened the same way. Guides are saved with the
+template's draft, frozen in its published revisions and copied into each inspection's checklist
+(`templateSnapshot`). Images that are replaced, removed or cancelled stay in storage.
 
 ## Printing
 
@@ -335,11 +383,12 @@ part at the foot of each table and no page numbers.
 - **From an inspection**: **Print / Save PDF** → _Blank checklist_ or _Report_. It saves pending
   changes, opens the preview in a new tab and the print dialog once everything (photos, fonts) has
   loaded. The preview's toolbar switches between the two.
-- **From a template** (the editor or a revision): **Print preview**. Admins see the draft, marked
-  "Draft – Rev 3"; inspectors the latest published revision. It prints as a new inspection's
-  blank checklist would, with an empty front page.
-- Addresses: `/inspections/{id}/print?mode=blank|report[&deviationsPerPage=2|4]` (without a mode:
-  the report once finalised, else the blank checklist), `/templates/{id}/print[?revision=n]`.
+- **From a template**: **Print preview**. From the editor: admins see the draft, marked "Draft –
+  Rev N"; inspectors the latest published revision. From a revision page: that revision. It
+  prints as a new inspection's blank checklist would, with an empty front page.
+- Addresses: `/inspections/{id}/print?mode=blank|report[&deviationsPerPage=2|4][&appendix=1]`
+  (without a mode: the report once finalised, else the blank checklist),
+  `/templates/{id}/print[?revision=n]`; `appendix=1` adds the reference images to any of them.
 
 **The document** (brief §6):
 
@@ -367,10 +416,39 @@ part at the foot of each table and no page numbers.
 about 10 × 8 cm. With 4, each card is a row, the text on the left and the photos on the right: one
 photo prints at about 7 × 5 cm. Cards share their page equally, and a card whose text needs more
 room takes it from the others. If the cards don't all fit, the page holds fewer and the next card
-starts the next page; a card is never split. 2 per page is the default.
+starts the next page; a card is never split. A card too tall to share a page of four gets a page
+of its own, laid out full width as with 2. Only a card whose text alone is longer than a page
+(thousands of characters) runs on to the next page, with its photos whole. 2 per page is the
+default.
 
 Everything is laid out for black and white: statuses and severities in words, light grey fills
 only, thin rules. Inter is bundled with the app, so a printout looks the same offline.
+
+### Reference images (appendix)
+
+**Include reference images** in the print toolbar (kept in the address as `appendix=1`) adds the
+guides' images (see [Guides](#guides)) after the deviations, starting on a new page headed
+"Appendix · Reference images": every row whose guide has images, in checklist order, with its ref
+and checkpoint, the guide's description and the images two to a row, each about 9 × 7 cm as
+marked up, captioned "3.c · ✓ Good" (or ✗ Bad, ⓘ Info) and with its own caption below. An image
+never parts from its caption, and a row's heading always has its first images under it. Rows
+whose guide has no images are left out; a checklist without any shows the box greyed out, with "No
+reference images in this checklist". It works for the blank checklist, the report and the template
+preview, and an inspection prints the guides it was created with.
+
+### Word export
+
+**Export to Word (.docx)** in the print toolbar saves what the preview shows as an editable Word
+file, made in the browser: the front page, one table per section with the same columns (blank:
+☐ boxes; report: ✓ / ✗ / – and the word, a NOK row's severity in its comment), the deviations
+(blank: the D-01 to D-15 table; report: a framed block per deviation with its photos and a line
+to sign it off), the reference images when they are included, and the footer with
+"Page X of Y". It is A4 portrait with the print margins; header rows repeat on every page and rows
+and deviation blocks never split, but Word lays out its own pages, so they break differently from
+the PDF. The text is Arial, which every Word installation has. The file is named like the PDF:
+`FI-2026-0042 RigiMill MG – Volvo Skövde – Inspection report.docx` (`– Blank checklist`,
+`– Draft report`, a template's `… – Checklist preview`). The Word library is loaded only on the
+first export.
 
 ## API
 
@@ -461,21 +539,37 @@ because it usually means the command that produced it failed.
   inspectors in conflict. For deviation photos: a photo added to a deviation, an arrow and a
   label drawn on it with the mouse in the real editor, saved, and after a reload the marks stored
   as fractions, the flattened copy a JPEG of the photo's size that is red along the arrow, shown
-  as the thumbnail and on the printed card. The smoke test of brief §9: an inspection created from
-  the seeded RigiMill MG in the UI, marked from the keyboard, finalised, and its report printed
-  from the Print menu.
+  as the thumbnail and on the printed card; at most two photos (then Add goes away, and a paste or
+  a drop says why); a photo on an extra deviation, saved with the inspection; and a finalised
+  inspection's photos in a viewer that never loads the editor's code (Konva). For guides: an admin
+  writes one in the template editor, with an image pasted while typing the description and one
+  dropped on the dialog, one marked up, verdicts and captions, autosaved and the same after a
+  reload; an inspection opens it read-only from the row's icon and with `G` (arrow keys, the
+  large view, `Esc` back to the row) and keeps it unchanged after the template publishes a new
+  version of it, which a new inspection gets. The smoke test of brief §9: an inspection created
+  from the seeded RigiMill MG in the UI, marked from the keyboard, finalised, and its report
+  printed from the Print menu.
 - **Print tests** (`e2e/print.spec.ts`) print real PDFs with Chromium's `page.pdf` (A4, the
   page's own `@page` rule, background graphics on) and measure them with `pdfjs-dist`: a blank
   checklist of the 90-row RigiMill MG, a finalised report in both deviation layouts (long
   comments, N/A rows, extra deviations, photos with and without a marked-up copy), a report whose
-  long texts leave fewer cards on a page, and a template preview with spare lines lettered past z.
+  long texts leave fewer cards on a page, one whose deviation is too tall to share a page of four
+  (it gets a page of its own, full width, and no empty page follows), a template preview with
+  spare lines lettered past z, and a report with its reference images.
   They check that every page is A4, the page count is in a range derived from the layout, page 1
   is the front page, every page has the footer and "Page X of Y" with the right total and nothing
   else in the bottom margin, every row is whole on the one page that has its ref, no section
   title is left without a row after it, no text crosses the right margin, blank rows are at least
   9 mm apart, spare lines carry on the lettering, the blank Deviation Summary is the last page
   with D-01 to D-15, and the report's cards are 2 or 4 to a page, each whole on one page with its
-  photos painted there. Each PDF is kept in `test-results/` to look at.
+  photos painted there. The reference images: turned on in the toolbar, the page is not ready to
+  print until their images are in; the appendix follows the deviations, the images two to a row
+  (side by side on one line), captioned with the ref and verdict, every page painting as many
+  images as it has captions, and no row heading without its images on its page. The Word export
+  is downloaded from the toolbar: its file name, and inside the .docx a table per section with two
+  repeating header rows, every checkpoint, the deviation, the reference images with their
+  captions, the logo and images embedded, and "Page X of Y" as Word fields in the footer; the
+  blank checklist's file has D-01 to D-15. Each PDF and .docx is kept in `test-results/`.
 
 The end-to-end tests sign in by setting the SWA CLI's `StaticWebAppsAuthCookie` directly. Each
 test writes its own throwaway templates into the local Azurite (the print tests a copy of the
@@ -528,11 +622,12 @@ IDs are 16-character alphanumeric nanoids. Names are defined in `shared/src/stor
 Photos never pass through the API. The browser asks `/api/images/upload-url` for a new image id
 and a URL that can only write that one blob, valid for 10 minutes, and uploads the scaled-down
 JPEG straight to the `images` container. To show it, it asks for a read-only URL valid for 15
-minutes. Documents store only image ids: a template's `coverImageId`, an inspection's
-`front.photoId` and its deviation photos (see [Deviation photos](#deviation-photos)). Replacing or
-removing a photo leaves the old file in storage. Locally the API sets Azurite's blob CORS
-rule for the dev origins (ports 4280 and 5173) on its first storage call; in Azure the rule comes
-from the Bicep file.
+minutes. Documents store only image ids: a template's `coverImageId` and its rows' guide images
+(see [Guides](#guides)), which inspections share through their copy of the checklist, and an
+inspection's `front.photoId` and its deviation photos (see [Deviation photos](#deviation-photos)).
+Replacing or removing a photo leaves the old file in storage. Locally the API sets Azurite's blob
+CORS rule for the dev origins (ports 4280 and 5173) on its first storage call; in Azure the rule
+comes from the Bicep file.
 
 ## Auth model and roles
 

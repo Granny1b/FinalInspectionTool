@@ -44,6 +44,8 @@ type Props = {
   subject: EditorSubject;
   onSave: (photo: AnnotatedImage) => void;
   onCancel: () => void;
+  /** Whether it holds marks or a caption not saved yet (for the page's leave guard). */
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 /**
@@ -52,7 +54,14 @@ type Props = {
  * when there are marks, a flattened JPEG of the photo with them at its full resolution for
  * thumbnails and print. Escape cancels, asking first when something would be lost.
  */
-export function AnnotationEditor({ title, label, subject, onSave, onCancel }: Props) {
+export function AnnotationEditor({
+  title,
+  label,
+  subject,
+  onSave,
+  onCancel,
+  onDirtyChange,
+}: Props) {
   const initial = subject.kind === 'stored' ? subject.photo : null;
   const [state, dispatch] = useReducer(
     editorReducer,
@@ -114,6 +123,14 @@ export function AnnotationEditor({ title, label, subject, onSave, onCancel }: Pr
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
+
+  // A link or the browser's Back would lose them too: the page's leave guard asks while this is
+  // true. Saved, cancelled or closed, it is false again.
+  useEffect(() => {
+    if (!dirty || !onDirtyChange) return;
+    onDirtyChange(true);
+    return () => onDirtyChange(false);
+  }, [dirty, onDirtyChange]);
 
   function close(saved: AnnotatedImage | null) {
     outcome.current = saved;

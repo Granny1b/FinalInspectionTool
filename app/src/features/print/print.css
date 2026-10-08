@@ -20,6 +20,9 @@
   --paper-rule: #8c8c8c;
   --paper-fill: #e4e4e4;
   --paper-fill-light: #f3f3f3;
+  /* A page's content box is 267 mm (297 − 14 − 16); 2 mm less never spills onto the next page.
+     The front page and each page of cards are this tall, and useCardPages measures it. */
+  --paper-content-height: 265mm;
   /* Blank rows give room to write by hand (brief §6: at least 9 mm). */
   --paper-write-row: 9.5mm;
   --paper-report-row: 7mm;
@@ -96,8 +99,7 @@
 .paper-front {
   display: flex;
   flex-direction: column;
-  /* The page's content box is 267 mm (297 − 14 − 16); a little less never spills onto page 2. */
-  height: 265mm;
+  height: var(--paper-content-height);
 }
 
 .paper-front-head {
@@ -408,12 +410,6 @@
   font-weight: 600;
 }
 
-.paper-secondary {
-  display: block;
-  margin-top: 0.6mm;
-  color: var(--paper-muted);
-}
-
 .paper-empty {
   color: var(--paper-muted);
   font-style: italic;
@@ -429,15 +425,15 @@
 /* ------------------------------------------------------------------------------------------ */
 /* Deviation cards (report): 2 or 4 to a page, each page a sheet of its own, every card the    */
 /* same size and its photos as large as the text leaves room for. Text is never cut: a card    */
-/* whose text needs more than its share takes it from the others, and a page holds fewer cards */
-/* when they don't all fit (useCardPages measures them first). A card is never split.          */
+/* whose text needs more than its share takes it from the others, a page holds fewer cards     */
+/* when they don't all fit (useCardPages measures them first), and a card too tall to share a  */
+/* page gets one of its own, full width. A card is never split (but see data-wide below).      */
 /* ------------------------------------------------------------------------------------------ */
 
-/* A page's content box is 267 mm tall; a little less never spills onto the next. */
 .paper-card-page {
   display: flex;
   flex-direction: column;
-  min-height: 265mm;
+  min-height: var(--paper-content-height);
 }
 
 .paper-cards {
@@ -456,14 +452,15 @@
   gap: 3mm;
 }
 
-/* While the cards are measured (a moment, on screen): hidden, each at its natural height. */
+/* While the cards are measured (a moment, on screen): hidden, each at its natural height on a
+   page exactly as tall as a printed one. */
 .paper-measure {
   position: absolute;
   visibility: hidden;
 }
 
 .paper-measure .paper-card-page {
-  min-height: 0;
+  height: var(--paper-content-height);
 }
 
 .paper-measure .paper-cards > * {
@@ -633,8 +630,22 @@
   border-bottom: 0.25mm solid var(--paper-ink);
 }
 
-/* Four to a page: one row each, the text on the left, the photos on the right. */
-[data-deviations-per-page='4'] .paper-card {
+/* A card too tall to share a page has one of its own, full width (data-wide), starting at the
+   top. Only text longer than a whole page (thousands of characters, far beyond what a deviation
+   holds in practice) makes it run on to the next page: its text continues there, and its photos
+   and sign-off line stay whole, instead of the page's heading being left alone. */
+.paper-card[data-wide] {
+  break-inside: auto;
+}
+
+.paper-card[data-wide] .paper-card-photos,
+.paper-card[data-wide] .paper-card-closed {
+  break-inside: avoid;
+}
+
+/* Four to a page: one row each, the text on the left, the photos on the right; not a card that
+   has its page to itself (data-wide). */
+[data-deviations-per-page='4'] .paper-card:not([data-wide]) {
   display: grid;
   grid-template-areas:
     'body photos'
@@ -645,14 +656,101 @@
   padding: 2.5mm 3mm;
 }
 
-[data-deviations-per-page='4'] .paper-card-body {
+[data-deviations-per-page='4'] .paper-card:not([data-wide]) .paper-card-body {
   grid-area: body;
 }
 
-[data-deviations-per-page='4'] .paper-card-photos {
+[data-deviations-per-page='4'] .paper-card:not([data-wide]) .paper-card-photos {
   grid-area: photos;
 }
 
-[data-deviations-per-page='4'] .paper-card-closed {
+[data-deviations-per-page='4'] .paper-card:not([data-wide]) .paper-card-closed {
   grid-area: closed;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Reference images (the optional appendix): each row's guide images two to a row, every      */
+/* image the same size, its caption under it. Neither an image with its caption nor a row of   */
+/* two is ever split, and a row's heading keeps its description and first images with it.     */
+/* ------------------------------------------------------------------------------------------ */
+
+.paper-guide + .paper-guide {
+  margin-top: 5mm;
+  padding-top: 3mm;
+  border-top: 0.25mm solid var(--paper-rule);
+}
+
+.paper-guide-start,
+.paper-guide-row,
+.paper-guide-image {
+  break-inside: avoid;
+}
+
+.paper-guide-heading {
+  display: flex;
+  gap: 2.5mm;
+  font-size: 10pt;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.paper-guide-description {
+  margin-top: 1mm;
+  overflow-wrap: anywhere;
+}
+
+.paper-guide-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 6mm;
+  margin-top: 3mm;
+}
+
+.paper-guide-image {
+  min-width: 0;
+  margin: 0;
+}
+
+/* A 4:3 box: landscape photos fill it, others keep their proportions inside it (never cropped),
+   standing on their caption. */
+.paper-guide-photo {
+  position: relative;
+  aspect-ratio: 4 / 3;
+}
+
+.paper-guide-photo > * {
+  position: absolute;
+  inset: 0;
+}
+
+.paper-guide-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.paper-guide-image figcaption {
+  padding-top: 1.2mm;
+  font-size: 8pt;
+  overflow-wrap: anywhere;
+}
+
+.paper-guide-label {
+  font-weight: 700;
+}
+
+/* The Info circle fills its icon box, the check and cross don't: this keeps it off its word. */
+.paper-guide-icon {
+  display: inline-block;
+  width: 3mm;
+  height: 3mm;
+  margin-right: 0.8mm;
+  vertical-align: -0.4mm;
+}
+
+.paper-guide-caption {
+  display: block;
+  margin-top: 0.4mm;
+  color: var(--paper-muted);
 }

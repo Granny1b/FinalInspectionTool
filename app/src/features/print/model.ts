@@ -22,6 +22,7 @@ import {
 } from '@modig/shared';
 import { formatDateTime } from '../../lib/format';
 import { formatCalendarDate } from '../inspections/dates';
+import { appendixEntries, appendixImageIds, type AppendixEntry } from './appendix';
 
 /** `blank`: the checklist to fill in by hand. `report`: what was recorded. */
 export const PRINT_MODES = ['blank', 'report'] as const;
@@ -121,6 +122,11 @@ export type PrintModel = {
   checklistTitle: string;
   sections: PrintSection[];
   deviations: PrintDeviations;
+  /**
+   * The rows with reference images, for the optional appendix (brief §6). Always worked out, so
+   * the toolbar knows whether there is anything to include; printed only when asked for.
+   */
+  appendix: AppendixEntry[];
   /** Bottom left of every page. */
   footer: string;
   /** The document title, which Chrome offers as the PDF's file name. */
@@ -175,6 +181,8 @@ export function inspectionPrint(
     deviations: report
       ? { kind: 'cards', cards: deviations.map(deviationCard) }
       : blankDeviationLines(),
+    // The frozen guides, as the inspection's checklist had them when it was created.
+    appendix: appendixEntries(templateSnapshot.sections),
     footer: [
       companyName,
       number,
@@ -221,6 +229,7 @@ export function templatePrint(
     checklistTitle: `${name}${SEPARATOR}${revision}`,
     sections: printSections(template.sections, { spareRows: spareRows(template) }),
     deviations: blankDeviationLines(),
+    appendix: appendixEntries(template.sections),
     footer: [companyName, name, `Rev ${template.revision}${draft ? ' (draft)' : ''}`].join(
       SEPARATOR,
     ),
@@ -360,10 +369,30 @@ export function packCards<T>(
   return pages;
 }
 
-/** Every uploaded image the document shows (the logo aside), each once: their URLs load first. */
-export function printedImageIds(model: PrintModel): string[] {
+/**
+ * A page whose one card is taller than `room` (packCards gave it a page of its own). It prints
+ * without the empty slots of a page with fewer cards, whose gaps would push it past the page,
+ * and full width, so that with 4 to a page its text is not squeezed into a narrow column.
+ */
+export function isOversizedPage(
+  page: readonly DeviationCard[],
+  heights: ReadonlyMap<string, number>,
+  room: number,
+): boolean {
+  return page.length === 1 && (heights.get(page[0]!.number) ?? 0) > room;
+}
+
+/**
+ * Every uploaded image the document shows (the logo aside), each once: their URLs load first.
+ * The appendix's images only when it is printed.
+ */
+export function printedImageIds(model: PrintModel, { appendix }: { appendix: boolean }): string[] {
   const photos =
     model.deviations.kind === 'cards' ? model.deviations.cards.flatMap((card) => card.photos) : [];
-  const ids = [model.front.photoId, ...photos.map((photo) => photo.imageId)];
+  const ids = [
+    model.front.photoId,
+    ...photos.map((photo) => photo.imageId),
+    ...(appendix ? appendixImageIds(model.appendix) : []),
+  ];
   return [...new Set(ids.filter((id) => id !== undefined))];
 }

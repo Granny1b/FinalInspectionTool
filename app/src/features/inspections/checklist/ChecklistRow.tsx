@@ -11,7 +11,7 @@ import {
   type Severity,
 } from '@modig/shared';
 import clsx from 'clsx';
-import { memo, useId, useState, type FocusEvent, type KeyboardEvent } from 'react';
+import { memo, useId, type KeyboardEvent } from 'react';
 import { singleLine } from '../../templates/document/ops';
 import { IssueNote } from '../../templates/document/parts';
 import { photoCountText } from '../deviations';
@@ -26,7 +26,7 @@ import {
   ROW_FOCUS,
   ROW_LINE,
 } from './layout';
-import { GUIDE_SOON, GuideButton, PhotoCount, StatusControl } from './parts';
+import { GuideButton, PhotoCount, StatusControl } from './parts';
 import type { ChecklistActions } from './useChecklistActions';
 
 type Props = {
@@ -55,7 +55,6 @@ export const ChecklistRow = memo(function ChecklistRow({
   respListId,
   actions,
 }: Props) {
-  const [guideNote, setGuideNote] = useState(false);
   const ref = rowRef(sectionIndex, rowIndex);
   const status = result?.status;
   // Photos belong to the row's deviation, so they count only while it is NOK.
@@ -71,10 +70,10 @@ export const ChecklistRow = memo(function ChecklistRow({
     event.preventDefault();
     if (command.kind === 'none') return;
     if (command.kind === 'guide') {
-      if (item.guide) showGuideNote();
+      // The viewer gives the focus back to this row when it closes.
+      if (item.guide) actions.showGuide(item.id);
       return;
     }
-    if (guideNote) setGuideNote(false);
     actions.run(item.id, command);
   }
 
@@ -89,15 +88,6 @@ export const ChecklistRow = memo(function ChecklistRow({
     };
   }
 
-  function showGuideNote() {
-    setGuideNote(true);
-    actions.announce(GUIDE_SOON);
-  }
-
-  function onBlur(event: FocusEvent<HTMLDivElement>) {
-    if (guideNote && !event.currentTarget.contains(event.relatedTarget)) setGuideNote(false);
-  }
-
   return (
     <div
       id={`row-${item.id}`}
@@ -106,7 +96,6 @@ export const ChecklistRow = memo(function ChecklistRow({
       aria-label={`Row ${refWithText(ref, item.text)}`}
       aria-describedby={issue ? `${statusId} ${issueId}` : statusId}
       onKeyDown={onRowKeyDown}
-      onBlur={onBlur}
       className={clsx(
         // Look-ahead: moving down keeps about one more row in view below the focused one.
         'relative scroll-mt-2 scroll-mb-20',
@@ -135,10 +124,10 @@ export const ChecklistRow = memo(function ChecklistRow({
             <GuideButton
               guide={item.guide}
               rowRef={ref}
-              noteOpen={guideNote}
               onClick={() => {
-                showGuideNote();
+                // The row first: the viewer gives the focus back to it, ready for the next key.
                 actions.focusRow(item.id);
+                actions.showGuide(item.id);
               }}
             />
           )}

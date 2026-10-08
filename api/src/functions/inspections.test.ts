@@ -6,6 +6,7 @@ import {
   CONTAINERS,
   InspectionListSchema,
   InspectionSchema,
+  MAX_PHOTOS_PER_DEVIATION,
   newId,
   snapshotTemplate,
   TemplateDetailSchema,
@@ -711,6 +712,33 @@ describe('PUT /api/inspections/{id}', () => {
     expect(errorOf(response).details).toEqual([
       expect.objectContaining({ path: ['results', a, 'status'] }),
     ]);
+  });
+
+  it('400 for a deviation with more photos than allowed, on a row or an extra one', async () => {
+    const { inspection, etag } = await created(await publishedTemplate());
+    const [a] = itemIds(inspection);
+    const photos = Array.from({ length: MAX_PHOTOS_PER_DEVIATION + 1 }, () => ({
+      imageId: newId(),
+      annotations: [],
+    }));
+    const extra = { id: newId(), description: 'Scratch', severity: 'minor' as const };
+    for (const [body, path] of [
+      [{ results: { [a!]: { status: 'NOK', photos } } }, ['results', a, 'photos']],
+      [{ extraDeviations: [{ ...extra, photos }] }, ['extraDeviations', 0, 'photos']],
+    ] as const) {
+      const response = await put(inspection.id, { ...draftOf(inspection), ...body }, etag);
+      expect(response.status).toBe(400);
+      expect(errorOf(response).details).toEqual([expect.objectContaining({ path })]);
+    }
+    expect((await stored(inspection.id))?.etag).toBe(etag);
+    // Two are fine.
+    const two = await put(
+      inspection.id,
+      { ...draftOf(inspection), extraDeviations: [{ ...extra, photos: photos.slice(1) }] },
+      etag,
+    );
+    expect(two.status).toBe(200);
+    expect(inspectionOf(two).extraDeviations[0]!.photos).toEqual(photos.slice(1));
   });
 
   it('404 for an unknown inspection', async () => {

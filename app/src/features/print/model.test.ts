@@ -4,6 +4,7 @@ import { formatDateTime } from '../../lib/format';
 import {
   BLANK_DEVIATION_LINES,
   inspectionPrint,
+  isOversizedPage,
   NOT_FINALISED_MARKER,
   packCards,
   printedImageIds,
@@ -317,7 +318,7 @@ describe('a report', () => {
       [{ imageId: 'Orig000000000003', caption: 'Door' }],
     ]);
     expect(cardsOf(withPhotos)[1]).toMatchObject({ ref: null, text: 'Paint damage' });
-    expect(printedImageIds(withPhotos)).toEqual([
+    expect(printedImageIds(withPhotos, { appendix: false })).toEqual([
       'Phot000000000001',
       'Rend000000000001',
       'Orig000000000002',
@@ -380,7 +381,7 @@ describe('a template preview', () => {
     expect(model.front.revision).toBe('Draft – Rev 3');
     expect(refs(model.sections[0]!.rows)).toEqual(['1.a', '1.b', '1.c', '1.d']);
     expect(model.deviations).toEqual({ kind: 'lines', numbers: blankNumbers });
-    expect(printedImageIds(model)).toEqual(['Covr000000000001']);
+    expect(printedImageIds(model, { appendix: false })).toEqual(['Covr000000000001']);
     expect(model.footer).toBe(
       'Modig Machine Tool · Final inspection – RigiMill MG · Rev 3 (draft)',
     );
@@ -461,6 +462,19 @@ describe('deviation pages', () => {
     expect(packCards([], [], { perPage: 2, room: 240 })).toEqual([]);
   });
 
+  it('knows a page whose one card is too tall to share it (printed full width, no empty slots)', () => {
+    const card = (number: string) => ({ number }) as DeviationCard;
+    const heights = new Map([
+      ['D-01', 300],
+      ['D-02', 200],
+      ['D-03', 30],
+    ]);
+    expect(isOversizedPage([card('D-01')], heights, 240)).toBe(true);
+    // Alone because the next card didn't fit, not because it is too tall.
+    expect(isOversizedPage([card('D-02')], heights, 240)).toBe(false);
+    expect(isOversizedPage([card('D-01'), card('D-03')], heights, 240)).toBe(false);
+  });
+
   it('loads a photo used twice once, and no front photo when there is none', () => {
     const model = inspectionPrint(
       inspection({
@@ -479,9 +493,9 @@ describe('deviation pages', () => {
       'report',
       CONTEXT,
     );
-    expect(printedImageIds(model)).toEqual(['Same000000000001']);
-    expect(printedImageIds(inspectionPrint(inspection(), 'blank', CONTEXT))).toEqual([
-      'Phot000000000001',
-    ]);
+    expect(printedImageIds(model, { appendix: false })).toEqual(['Same000000000001']);
+    expect(
+      printedImageIds(inspectionPrint(inspection(), 'blank', CONTEXT), { appendix: false }),
+    ).toEqual(['Phot000000000001']);
   });
 });

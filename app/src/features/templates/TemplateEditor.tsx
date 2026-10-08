@@ -105,7 +105,9 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   // A cover photo that is still uploading counts as unsaved.
   const { uploading, trackUpload, saveAll } = useUploadTracking(saver);
   const dirty = saveState.status !== 'saved' || uploading;
-  const leaveGuard = useLeaveGuard(dirty, saveAll);
+  // An open guide editor with changes: leaving asks first, saving can't keep them.
+  const [editorDirty, setEditorDirty] = useState(false);
+  const leaveGuard = useLeaveGuard(dirty, saveAll, editorDirty);
   const reload = useReload(dirty, onReload);
 
   const update = useCallback(
@@ -318,6 +320,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           onChange={updateSections}
           spareRowsPerSection={draft.printSettings.spareRowsPerSection}
           issues={issues}
+          onEditorDirtyChange={setEditorDirty}
         />
       </section>
 

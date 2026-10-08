@@ -1,5 +1,8 @@
-import { rowLetter, sectionNumber, type Section } from '@modig/shared';
+import { rowLetter, rowRef, sectionNumber, type Section } from '@modig/shared';
 import clsx from 'clsx';
+import { useState } from 'react';
+import { guideRow } from '../../guides/guide';
+import { GuideViewer } from '../../guides/GuideViewer';
 import type { IssueIndex } from './issues';
 import {
   GRID,
@@ -18,13 +21,45 @@ type Props = {
   issues: IssueIndex;
 };
 
-/** The same sheet without inputs, handles or menus: for inspectors and published revisions. */
+/**
+ * The same sheet without inputs, handles or menus: for inspectors and published revisions. A
+ * row's guide icon opens the guide, read-only.
+ */
 export function ReadOnlyDocument({ sections, spareRowsPerSection, issues }: Props) {
+  // The row whose guide is open in the viewer.
+  const [guideItemId, setGuideItemId] = useState<string | null>(null);
+  const viewing = guideItemId === null ? null : guideRow(sections, guideItemId);
   if (sections.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-ink-500">This checklist has no sections.</p>
     );
   }
+  return (
+    <>
+      <Sections
+        sections={sections}
+        spareRowsPerSection={spareRowsPerSection}
+        issues={issues}
+        onOpenGuide={setGuideItemId}
+      />
+      {viewing?.guide && (
+        <GuideViewer
+          rowRef={viewing.ref}
+          rowText={viewing.text}
+          guide={viewing.guide}
+          onClose={() => setGuideItemId(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function Sections({
+  sections,
+  spareRowsPerSection,
+  issues,
+  onOpenGuide,
+}: Props & { onOpenGuide: (itemId: string) => void }) {
   return sections.map((section, index) => {
     const sectionIssues = issues.sections.get(section.id);
     return (
@@ -56,7 +91,13 @@ export function ReadOnlyDocument({ sections, spareRowsPerSection, issues }: Prop
                     <p className="min-w-0 flex-1 px-2 py-2 text-sm leading-6 wrap-break-word text-ink-900">
                       {item.text || <span className="text-ink-500">Empty row</span>}
                     </p>
-                    {item.guide && <GuideMark guide={item.guide} />}
+                    {item.guide && (
+                      <GuideMark
+                        guide={item.guide}
+                        rowRef={rowRef(index, rowIndex)}
+                        onOpen={() => onOpenGuide(item.id)}
+                      />
+                    )}
                   </div>
                   <PaperCells />
                 </div>

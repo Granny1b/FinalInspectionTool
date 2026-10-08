@@ -1,18 +1,18 @@
 import { SEVERITY_LABELS } from '@modig/shared';
-import { useId, type Ref } from 'react';
-import type {
-  DeviationCard as DeviationCardModel,
-  DeviationPhoto,
-  DeviationsPerPage,
+import { useId } from 'react';
+import {
+  isOversizedPage,
+  type DeviationCard as DeviationCardModel,
+  type DeviationPhoto,
+  type DeviationsPerPage,
 } from './model';
 import { PaperPhoto } from './PaperPhoto';
+import type { CardPages } from './useCardPages';
 
 type Props = {
   cards: DeviationCardModel[];
-  /** The cards on pages (useCardPages); null while they are measured. */
-  pages: DeviationCardModel[][] | null;
-  /** The hidden page the cards are measured on. */
-  measureRef: Ref<HTMLDivElement>;
+  /** The cards on pages, once measured, and the hidden page they are measured on. */
+  cardPages: CardPages;
   perPage: DeviationsPerPage;
   /** Right of each page's heading: the inspection number. */
   subject: string;
@@ -24,12 +24,14 @@ type Props = {
  * A report's deviations: one card each, up to `perPage` cards to a page, each page a sheet of its
  * own so no card is ever split. Cards share their page equally; one whose text needs more takes
  * it from the others, and the page holds fewer cards when not all of them fit (useCardPages).
- * Every slot has the same size, also on a page with fewer cards.
+ * Every slot has the same size, also on a page with fewer cards; only a card too tall to share a
+ * page has its page to itself, full width.
  */
-export function DeviationCards({ cards, pages, measureRef, perPage, subject, imageUrls }: Props) {
+export function DeviationCards({ cards, cardPages, perPage, subject, imageUrls }: Props) {
   const titleId = useId();
-  const card = (model: DeviationCardModel) => (
-    <DeviationCard key={model.number} card={model} imageUrls={imageUrls} />
+  const { pages, heights, room, measureRef } = cardPages;
+  const card = (model: DeviationCardModel, wide = false) => (
+    <DeviationCard key={model.number} card={model} wide={wide} imageUrls={imageUrls} />
   );
 
   return (
@@ -49,29 +51,33 @@ export function DeviationCards({ cards, pages, measureRef, perPage, subject, ima
           <div ref={measureRef} className="paper-card-page">
             <Heading subject={subject} />
             <div className="paper-cards" data-card-list="">
-              {cards.map(card)}
+              {cards.map((model) => card(model))}
             </div>
           </div>
         </div>
       ) : (
-        pages.map((page, index) => (
-          <div key={page[0]!.number} className="paper-sheet">
-            <div className="paper-card-page">
-              <Heading
-                // Repeated on every page for the reader of the paper; once for a screen reader.
-                titleId={index === 0 ? titleId : undefined}
-                subject={`${subject} · ${range(page)}`}
-              />
-              <div className="paper-cards">
-                {page.map(card)}
-                {/* A page with fewer cards keeps their size. */}
-                {Array.from({ length: perPage - page.length }, (_, slot) => (
-                  <div key={slot} aria-hidden="true" />
-                ))}
+        pages.map((page, index) => {
+          const oversized = isOversizedPage(page, heights, room);
+          return (
+            <div key={page[0]!.number} className="paper-sheet">
+              <div className="paper-card-page">
+                <Heading
+                  // Repeated on every page for the reader of the paper; once for a screen reader.
+                  titleId={index === 0 ? titleId : undefined}
+                  subject={`${subject} · ${range(page)}`}
+                />
+                <div className="paper-cards">
+                  {page.map((model) => card(model, oversized))}
+                  {/* A page with fewer cards keeps their size. */}
+                  {!oversized &&
+                    Array.from({ length: perPage - page.length }, (_, slot) => (
+                      <div key={slot} aria-hidden="true" />
+                    ))}
+                </div>
               </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </section>
   );
@@ -95,14 +101,22 @@ function range(page: DeviationCardModel[]): string {
 
 function DeviationCard({
   card,
+  wide,
   imageUrls,
 }: {
   card: DeviationCardModel;
+  /** Alone on its page: full width in either layout (print.css). */
+  wide: boolean;
   imageUrls: ReadonlyMap<string, string>;
 }) {
   const titleId = useId();
   return (
-    <article className="paper-card" data-deviation-card={card.number} aria-labelledby={titleId}>
+    <article
+      className="paper-card"
+      data-deviation-card={card.number}
+      data-wide={wide || undefined}
+      aria-labelledby={titleId}
+    >
       <div className="paper-card-body">
         {/* "D-03 · 4.c · Major": the severity in words, never by colour alone. */}
         <h3 id={titleId} className="paper-card-head">

@@ -1,16 +1,28 @@
 import {
   DEFAULT_COMPANY_NAME,
   deviationNumber,
+  GUIDE_VERDICT_LABELS,
   InspectionSchema,
+  newId,
   rowLetter,
   type AnnotatedImage,
   type ExtraDeviation,
+  type GuideImage,
   type Inspection,
   type RowResult,
   type Section,
   type Template,
 } from '@modig/shared';
-import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
+import {
+  expect,
+  test as base,
+  type APIRequestContext,
+  type Browser,
+  type Page,
+  type Route,
+} from '@playwright/test';
+import JSZip from 'jszip';
+import { readFile } from 'node:fs/promises';
 import { signIn } from './support/auth';
 import { compact, footerTexts, MM, pageText, readPdf, type PdfPage } from './support/pdf';
 import { testPhoto, uploadPhoto } from './support/photos';
@@ -44,6 +56,8 @@ const test = base.extend<{
   /** A published copy of the seeded checklist; `spareRows` per section (3 if omitted). */
   copyOfSeeded: (name: string, spareRows?: number) => Promise<Template>;
   cleanup: Cleanup;
+  /** The inspector's page in a browser of its own that keeps download names (see below). */
+  downloadingPage: Page;
 }>({
   // eslint-disable-next-line no-empty-pattern -- Playwright fixtures take an object pattern first
   copyOfSeeded: async ({}, use) => {
@@ -72,6 +86,20 @@ const test = base.extend<{
     });
     await Promise.all([...inspections.map(deleteInspection), ...templates.map(deleteTemplate)]);
     await deleteImages(images);
+  },
+  // Chromium on Linux names a download "download" when its name has characters (–, ö) that the
+  // system locale can't write, as in a bare POSIX locale: this browser runs with a UTF-8 one.
+  downloadingPage: async ({ playwright, baseURL }, use) => {
+    const env = Object.entries(process.env).filter(
+      (entry): entry is [string, string] => !!entry[1],
+    );
+    const browser = await playwright.chromium.launch({
+      env: { ...Object.fromEntries(env), LC_ALL: 'C.UTF-8' },
+    });
+    const context = await browser.newContext({ baseURL });
+    await signIn(context, INSPECTOR, ['inspector']);
+    await use(await context.newPage());
+    await browser.close();
   },
 });
 
@@ -454,6 +482,216 @@ async function createReport(
 }
 
 // -------------------------------------------------------------------------------------------
+// Reference images (the appendix) and the Word export
+// -------------------------------------------------------------------------------------------
+
+const APPENDIX_TITLE = 'Appendix · Reference images';
+
+/** The appendix starts on a page of its own with this heading (13 pt). */
+const isAppendixPage = (page: PdfPage) =>
+  page.texts.some((text) => text.text === APPENDIX_TITLE && text.size > 12);
+
+/** The comment of the guided report's one NOK row, 1.b. */
+const NOK_COMMENT = 'Pallet changer stops halfway.';
+
+/** ✓ Good, ✗ Bad, ⓘ Info: the Word file writes the symbols as text. */
+const VERDICT_SYMBOLS = { good: '✓', bad: '✗', info: 'ⓘ' } as const;
+
+/** A guide with images, as the appendix prints it: one entry per row, in checklist order. */
+type GuidedRow = { ref: string; text: string; description: string; images: GuideImage[] };
+
+/** "1.a · Good": the bold start of an image's caption. */
+const captionOf = (ref: string, image: GuideImage) =>
+  `${ref} · ${GUIDE_VERDICT_LABELS[image.verdict]}`;
+
+/**
+ * A finalised report of a six-row checklist whose guides hold eight images on three rows: 1.a
+ * three (the first marked up, so its flattened copy prints), 1.c one (portrait), 2.b four. 2.a has
+ * a guide with a description only, which the appendix skips. One NOK row, without photos.
+ */
+async function createGuidedReport(
+  request: APIRequestContext,
+  browser: Browser,
+  cleanup: Cleanup,
+): Promise<{ inspection: Inspection; rows: GuidedRow[]; imageIds: string[] }> {
+  const upload = async (label: string, width = 1200, height = 900) =>
+    uploadPhoto(request, await testPhoto(browser, { width, height, label }));
+  const [marked, ...ids] = await Promise.all([
+    upload('1.a marked'),
+    upload('1.a good'),
+    upload('1.a bad'),
+    upload('1.a info'),
+    upload('1.c portrait', 900, 1200),
+    ...[1, 2, 3, 4].map((index) => upload(`2.b ${index}`)),
+  ]);
+  const image = (imageId: string, verdict: GuideImage['verdict'], caption?: string) => ({
+    imageId,
+    verdict,
+    caption,
+    annotations: [],
+  });
+  const guides = {
+    '1.a': {
+      description: 'Every screw has an unbroken paint mark from head to plate.',
+      images: [
+        {
+          ...image(ids[0]!, 'good', 'All four screws marked'),
+          annotations: [
+            { kind: 'rect' as const, x: 0.5, y: 0.25, w: 0.3, h: 0.3, color: '#E02424' },
+          ],
+          renderedImageId: marked,
+        },
+        image(ids[1]!, 'bad', 'Top screw unmarked'),
+        image(ids[2]!, 'info'),
+      ],
+    },
+    '1.c': { images: [image(ids[3]!, 'bad', 'Fence open at the bottom')] },
+    '2.a': { description: 'Pockets free of chips and coolant.', images: [] },
+    '2.b': {
+      description: 'The gripper closes centred on the tool holder.',
+      images: [
+        image(ids[4]!, 'good', 'Centred'),
+        image(ids[5]!, 'bad', 'Offset to the left'),
+        image(ids[6]!, 'bad', 'Offset to the right'),
+        image(ids[7]!, 'info', 'Gauge used for the check'),
+      ],
+    },
+  };
+  const texts = [
+    ['Lifting columns - Marked screws, blue/red/yellow', 'Pallet changer - Smooth movement'],
+    ['Tool magazine - All pockets clean', 'Tool changer - Gripper aligned'],
+  ];
+  const sections: Section[] = texts.map((rows, section) => ({
+    id: newId(),
+    title: section === 0 ? 'Loading area' : 'Tool arena',
+    items: [...rows, 'Safety fence - Undamaged and closed'].map((text, row) => {
+      const guide = guides[`${section + 1}.${rowLetter(row)}` as keyof typeof guides];
+      return { id: newId(), text, ...(guide && { guide }) };
+    }),
+  }));
+  const template = await createTemplate('E2E print – reference images', true, { sections });
+  cleanup.template(template.id);
+
+  const created = await createInspection(request, template, 'RigiMill MG – Volvo Cars Skövde');
+  cleanup.inspection(created.inspection.id);
+  const items = sections.flatMap((section) => section.items);
+  const results: Record<string, RowResult> = Object.fromEntries(
+    items.map(({ id }) => [id, { status: 'OK' }]),
+  );
+  results[items[1]!.id] = { status: 'NOK', comment: NOK_COMMENT };
+  const etag = await save(request, created, results, []);
+  const finalised = await request.post(`/api/inspections/${created.inspection.id}/finalise`, {
+    headers: { 'If-Match': etag },
+  });
+  expect(finalised.status()).toBe(200);
+
+  const rows = sections.flatMap((section, sectionIndex) =>
+    section.items.flatMap((item, rowIndex) =>
+      item.guide?.images.length
+        ? [
+            {
+              ref: `${sectionIndex + 1}.${rowLetter(rowIndex)}`,
+              text: item.text,
+              description: item.guide.description ?? '',
+              images: item.guide.images,
+            },
+          ]
+        : [],
+    ),
+  );
+  return {
+    inspection: InspectionSchema.parse(await finalised.json()),
+    rows,
+    imageIds: [marked!, ...ids],
+  };
+}
+
+/** Pairs: [1, 2, 3] → [[1, 2], [3]]. */
+const inTwos = <T>(items: T[]) =>
+  Array.from({ length: Math.ceil(items.length / 2) }, (_, index) =>
+    items.slice(index * 2, index * 2 + 2),
+  );
+
+/**
+ * The appendix pages: every guide image of `rows` in checklist order, two to a row (side by side
+ * on one baseline), each captioned "1.a · Good". An image never parts from its caption (each page
+ * paints as many images as it has captions), and a row's heading always has its first images
+ * below it on the same page.
+ */
+function expectAppendix(pages: PdfPage[], rows: GuidedRow[]): void {
+  expect(pages[0]!.texts.find((text) => text.text === APPENDIX_TITLE)?.size).toBeGreaterThan(12);
+  const printedRows: { page: number; captions: string[]; x: number[] }[] = [];
+  for (const page of pages) {
+    const where = `appendix page ${page.number}`;
+    const captions: { text: string; x: number; y: number }[] = [];
+    page.texts.forEach((text, index) => {
+      // "1.a ·", then the verdict's word (the symbol between them is drawn, not text).
+      const ref = /^(\d+\.[a-z]+) ·(?: (\w+))?$/.exec(text.text);
+      if (!ref) return;
+      const verdict = ref[2] ?? page.texts[index + 1]?.text;
+      captions.push({ text: `${ref[1]} · ${verdict}`, x: text.x, y: text.y });
+    });
+    expect(page.images, `images on ${where}`).toBe(captions.length);
+    for (const { text, y } of captions) {
+      const line = captions.filter((other) => Math.abs(other.y - y) < 1);
+      if (line[0]!.text !== text) continue;
+      printedRows.push({
+        page: page.number,
+        captions: line.map((caption) => caption.text),
+        x: line.map((caption) => caption.x),
+      });
+    }
+    // Each heading on the page ("1.a" left in the margin column) has a caption of its row below.
+    for (const heading of page.texts.filter(
+      (text) => rows.some((row) => row.ref === text.text) && text.x < 18 * MM,
+    )) {
+      expect(
+        captions.some(({ text, y }) => text.startsWith(`${heading.text} ·`) && y > heading.y),
+        `heading ${heading.text} on ${where} has its images`,
+      ).toBe(true);
+    }
+  }
+  expect(printedRows.map((row) => row.captions)).toEqual(
+    rows.flatMap((row) => inTwos(row.images.map((image) => captionOf(row.ref, image)))),
+  );
+  // Side by side: the left one first, in the left half of the page.
+  for (const { x } of printedRows) {
+    expect(x[0]!).toBeLessThan(105 * MM);
+    if (x[1] !== undefined) expect(x[1]).toBeGreaterThan(105 * MM);
+  }
+}
+
+/** What a downloaded .docx says: its whole text, and its XML parts. */
+async function readDocx(
+  path: string,
+): Promise<{ document: string; text: string; footers: string[] }> {
+  const zip = await JSZip.loadAsync(await readFile(path));
+  const document = await zip.file('word/document.xml')!.async('string');
+  const footers = await Promise.all(
+    zip.file(/^word\/footer\d*\.xml$/).map((file) => file.async('string')),
+  );
+  const decode = (xml: string) =>
+    xml.replace(/&(lt|gt|quot|apos|amp);/g, (_, name: string) => ENTITIES[name]!);
+  const text = [...document.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)]
+    .map((match) => decode(match[1]!))
+    .join('');
+  return { document, text, footers };
+}
+
+const ENTITIES: Record<string, string> = { lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' };
+
+/** Clicks the toolbar's Word export and saves the download in the test's output folder. */
+async function exportWord(page: Page, name: string) {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Export to Word (.docx)' }).click(),
+  ]);
+  const path = test.info().outputPath(`${name}.docx`);
+  await download.saveAs(path);
+  return { fileName: download.suggestedFilename(), ...(await readDocx(path)) };
+}
+
+// -------------------------------------------------------------------------------------------
 // Tests
 // -------------------------------------------------------------------------------------------
 
@@ -476,6 +714,10 @@ test('a blank checklist of the 90-row RigiMill MG prints on A4 with room to writ
   const pages = await printPdf(page, 'blank-checklist');
   await expect(page.locator('[data-print-root]')).toHaveAttribute('data-print-mode', 'blank');
   await expect(page.locator('tr[data-spare]')).toHaveCount(6 * 3);
+  // The seeded checklist has no guides: no reference images to include.
+  const appendix = page.getByRole('checkbox', { name: 'Include reference images' });
+  await expect(appendix).toBeDisabled();
+  await expect(appendix).toHaveAccessibleDescription('No reference images in this checklist');
 
   // 90 checkpoints and 3 spare lines per section, each at least 9 mm: 108 × 9 mm = 972 mm, at
   // least 4 of the 267 mm content pages; measured 5 (most checkpoints take two lines). With the
@@ -616,6 +858,90 @@ test('a page holds fewer cards when their text needs the room; no card is ever s
   );
 });
 
+test('a deviation too tall to share a page of four has one of its own, full width and whole', async ({
+  page,
+  context,
+  browser,
+  cleanup,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const template = await createTemplate('E2E print – oversized deviation', true);
+  cleanup.template(template.id);
+  const created = await createInspection(page.request, template, 'RigiMill MG – Sandvik Gimo');
+  cleanup.inspection(created.inspection.id);
+  const photos = await Promise.all(
+    [1, 2].map(async (index) =>
+      uploadPhoto(
+        page.request,
+        await testPhoto(browser, { width: 1200, height: 900, label: `Photo ${index}` }),
+      ),
+    ),
+  );
+  cleanup.images(photos);
+
+  // Two short NOK rows, then an extra deviation with every field at its longest (the schema's
+  // limits) and two photos, then a short one.
+  const longest = (length: number) =>
+    LONG_COMMENTS.join(' ')
+      .repeat(Math.ceil(length / 400))
+      .slice(0, length)
+      .trim();
+  const items = created.inspection.templateSnapshot.sections.flatMap((section) => section.items);
+  const noks = items.slice(0, 2).map(({ id, text }) => ({
+    id,
+    text,
+    result: {
+      status: 'NOK' as const,
+      comment: 'Needs adjustment before delivery.',
+      resp: 'Montage',
+    },
+  }));
+  const extras: ExtraDeviation[] = [
+    {
+      id: 'E2eLongest000001',
+      description: longest(1000),
+      comment: longest(2000),
+      resp: longest(200),
+      severity: 'critical',
+      photos: photos.map((imageId) => ({ imageId, caption: longest(500), annotations: [] })),
+    },
+    {
+      id: 'E2eExtra00000003',
+      description: 'Operator manual missing from the electrical cabinet',
+      resp: 'Dokumentation',
+      severity: 'major',
+    },
+  ];
+  await save(
+    page.request,
+    created,
+    Object.fromEntries(noks.map(({ id, result }) => [id, result])),
+    extras,
+  );
+  const { inspection } = created;
+
+  await page.goto(`/inspections/${inspection.id}/print?mode=report&deviationsPerPage=4`);
+  const pdf = await printPdf(page, 'report-oversized-deviation');
+
+  // D-03 is laid out full width (text above its photos) without the empty slots of a page of
+  // four, whose gaps used to push it past the page: an empty extra page, or the card split.
+  await expect(page.locator('[data-deviation-card][data-wide]')).toHaveCount(1);
+  await expect(page.locator('[data-deviation-card="D-03"]')).toHaveAttribute('data-wide', 'true');
+  // Front page, checklist, three pages of cards: no blank page.
+  expect(pdf).toHaveLength(5);
+  expectPages(
+    pdf,
+    `${inspectionFooter(await companyName(page.request), inspection)} · Not finalised`,
+  );
+  expectChecklist(pdf, inspection.templateSnapshot.sections, 0);
+  expectCards(
+    pdf,
+    expectedCards(noks, extras),
+    [['D-01', 'D-02'], ['D-03'], ['D-04']],
+    inspection.number,
+  );
+});
+
 test('a template preview prints the draft as a blank checklist; spare rows run on past z', async ({
   page,
   context,
@@ -640,4 +966,144 @@ test('a template preview prints the draft as a blank checklist; spare rows run o
   expect(checklistPages.flatMap(refsOn).map((ref) => ref.text)).toContain('5.aa');
   expect(smallestRowPitch(checklistPages) / MM).toBeGreaterThanOrEqual(9);
   expectBlankDeviationTable(pages);
+});
+
+test('reference images print in an appendix, two to a row, captioned with ref and verdict', async ({
+  page,
+  context,
+  browser,
+  cleanup,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const { inspection, rows, imageIds } = await createGuidedReport(page.request, browser, cleanup);
+  cleanup.images(imageIds);
+  const root = page.locator('[data-print-root]');
+
+  await page.goto(`/inspections/${inspection.id}/print?mode=report`);
+  await expectReady(page);
+  await expect(root.locator('[data-appendix]')).toHaveCount(0);
+
+  // Turned on in the toolbar: the appendix's images are fetched only now, and the page is not
+  // ready (nor printable) until they are in. They are held back here to see that.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const requested = new Set<string>();
+  await page.route(
+    (url) => imageIds.some((id) => url.pathname.endsWith(`/images/${id}.jpg`)),
+    async (route: Route) => {
+      requested.add(new URL(route.request().url()).pathname);
+      await held;
+      await route.continue();
+    },
+  );
+  const toggle = page.getByRole('checkbox', { name: 'Include reference images' });
+  // Ticked by the address it changes, a moment after the click.
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  await expect(page).toHaveURL(/[?&]appendix=1/);
+  // Eight images, the marked-up one as its flattened copy (not its original, imageIds[1]).
+  await expect.poll(() => requested.size).toBe(imageIds.length - 1);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  await expect(root).toHaveAttribute('data-print-ready', 'false');
+  await expect(page.getByRole('button', { name: 'Preparing…' })).toBeDisabled();
+  release();
+
+  const all = await printPdf(page, 'report-with-appendix');
+  expect([...requested].filter((path) => path.endsWith(`/images/${imageIds[1]}.jpg`))).toEqual([]);
+  const appendix = root.locator('section[data-appendix]');
+  await expect(appendix.locator('section[data-guide-ref]')).toHaveCount(rows.length);
+  expect(
+    await appendix
+      .locator('section[data-guide-ref]')
+      .evaluateAll((sections) => sections.map((section) => section.getAttribute('data-guide-ref'))),
+  ).toEqual(rows.map((row) => row.ref));
+  await expect(appendix.locator('figure[data-guide-image]')).toHaveCount(8);
+  await expect(appendix.locator('[data-guide-ref="1.a"] figure').first()).toHaveAttribute(
+    'data-verdict',
+    'good',
+  );
+  await expect(appendix.locator('[data-guide-ref="1.a"] figure img').first()).toHaveAttribute(
+    'src',
+    new RegExp(`/images/${imageIds[0]}\\.jpg\\?`),
+  );
+
+  // Front page, checklist and the card, then the appendix: 8 images in 5 rows of about 75 mm,
+  // with headings and descriptions at least 2 pages of 265 mm; measured 3, and none more is
+  // allowed (it would be a page with a heading alone, or an empty one).
+  expectPages(all, inspectionFooter(await companyName(page.request), inspection));
+  const first = all.findIndex(isAppendixPage);
+  const pages = all.slice(0, first);
+  const appendixPages = all.slice(first);
+  expect(appendixPages.length).toBeGreaterThanOrEqual(2);
+  expect(appendixPages.length).toBeLessThanOrEqual(3);
+  expectChecklist(pages, inspection.templateSnapshot.sections, 0);
+  const nok = {
+    text: inspection.templateSnapshot.sections[0]!.items[1]!.text,
+    comment: NOK_COMMENT,
+  };
+  expectCards(pages, [{ number: 'D-01', ...nok, photos: 0 }], [['D-01']], inspection.number);
+  expectAppendix(appendixPages, rows);
+});
+
+test('a report exports to Word: tables per section, the deviations, reference images, page numbers', async ({
+  downloadingPage: page,
+  cleanup,
+}) => {
+  const browser = page.context().browser()!;
+  const { inspection, rows, imageIds } = await createGuidedReport(page.request, browser, cleanup);
+  cleanup.images(imageIds);
+  const { sections } = inspection.templateSnapshot;
+  const footer = inspectionFooter(await companyName(page.request), inspection);
+
+  await page.goto(`/inspections/${inspection.id}/print?mode=report&appendix=1`);
+  await expectReady(page);
+  const report = await exportWord(page, 'report');
+  expect(report.fileName).toBe(
+    `${inspection.number} ${inspection.front.machineName} – Inspection report.docx`,
+  );
+  // One table per section, each with its title and column labels as two repeating header rows.
+  expect(report.document.match(/<w:tblHeader\/>/g)).toHaveLength(2 * sections.length);
+  for (const section of sections) {
+    expect(report.text).toContain(section.title);
+    for (const item of section.items) expect(report.text).toContain(item.text);
+  }
+  expect(report.text).toContain('No.CheckpointCommentOKNOKN/AResp');
+  // The one deviation as a card, then the reference images with their captions.
+  expect(report.text).toContain(`D-01 · 1.b · Minor`);
+  expect(report.text).toContain(NOK_COMMENT);
+  expect(report.text).toContain(APPENDIX_TITLE);
+  for (const row of rows) {
+    for (const image of row.images) {
+      const label = `${VERDICT_SYMBOLS[image.verdict]} ${GUIDE_VERDICT_LABELS[image.verdict]}`;
+      expect(report.text).toContain(`${row.ref} · ${label}${image.caption ?? ''}`);
+    }
+  }
+  // The logo and the eight reference images (the inspection has no machine or deviation photo).
+  expect(report.document.match(/<pic:pic\b/g)).toHaveLength(1 + 8);
+  // The footer: the document bottom left, "Page X of Y" as Word fields.
+  const pageFooter = report.footers.find((xml) => xml.includes('NUMPAGES'));
+  expect(pageFooter).toBeDefined();
+  expect(pageFooter).toMatch(/<w:instrText[^>]*>\s*PAGE\s*<\/w:instrText>/);
+  expect(pageFooter).toContain(footer.replaceAll('&', '&amp;'));
+
+  // The blank checklist exports its Deviation Summary to fill in, D-01 to D-15, and without the
+  // appendix once it is turned off.
+  await page
+    .getByRole('group', { name: 'What to print' })
+    .getByRole('button', { name: 'Blank checklist' })
+    .click();
+  await page.getByRole('checkbox', { name: 'Include reference images' }).click();
+  await expect(page).not.toHaveURL(/[?&]appendix=1/);
+  await expectReady(page);
+  const blank = await exportWord(page, 'blank');
+  expect(blank.fileName).toBe(
+    `${inspection.number} ${inspection.front.machineName} – Blank checklist.docx`,
+  );
+  for (let line = 0; line < 15; line += 1) expect(blank.text).toContain(deviationNumber(line));
+  expect(blank.text).not.toContain(NOK_COMMENT);
+  expect(blank.text).not.toContain(APPENDIX_TITLE);
+  expect(blank.document.match(/<pic:pic\b/g)).toHaveLength(1);
 });

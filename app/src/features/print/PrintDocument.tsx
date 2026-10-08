@@ -4,7 +4,8 @@ import { DeviationCards } from './DeviationCards';
 import { DeviationTable } from './DeviationTable';
 import { FrontPage } from './FrontPage';
 import type { DeviationsPerPage, PrintModel } from './model';
-import type { useCardPages } from './useCardPages';
+import { ReferenceAppendix } from './ReferenceAppendix';
+import type { CardPages } from './useCardPages';
 import { PRINTS_MARGIN_BOXES } from './usePageFooter';
 import type { PrintImages } from './usePrintImages';
 
@@ -13,21 +14,25 @@ type Props = {
   images: PrintImages;
   deviationsPerPage: DeviationsPerPage;
   /** The report's deviation cards on pages, once measured. */
-  cardPages: ReturnType<typeof useCardPages>;
+  cardPages: CardPages;
+  /** Print the "Include reference images" appendix (it has entries and its image URLs are in). */
+  appendix: boolean;
   /** Data, images and fonts are all in: printing now gives the finished document. */
   ready: boolean;
   rootRef: Ref<HTMLDivElement>;
 };
 
 /**
- * The document (brief §6): front page, checklist, deviations, each starting on a new page. The
- * attributes on the root are what tests and autoprint wait for.
+ * The document (brief §6): front page, checklist, deviations and, when asked for, the reference
+ * images, each starting on a new page. The attributes on the root are what tests and autoprint
+ * wait for.
  */
 export function PrintDocument({
   model,
   images,
   deviationsPerPage,
   cardPages,
+  appendix,
   ready,
   rootRef,
 }: Props) {
@@ -78,17 +83,16 @@ export function PrintDocument({
       ) : (
         <DeviationCards
           cards={deviations.cards}
-          pages={cardPages.pages}
-          measureRef={cardPages.measureRef}
+          cardPages={cardPages}
           perPage={deviationsPerPage}
           subject={subject}
           imageUrls={images.urls}
         />
       )}
 
-      {/* Extension point, phase 5: the "Include reference images" appendix (brief §6: each
-          guide's annotated images, two per row, captioned with ref and Good/Bad) goes here, as
-          one more sheet after the deviations. */}
+      {appendix && (
+        <ReferenceAppendix entries={model.appendix} subject={subject} imageUrls={images.urls} />
+      )}
     </div>
   );
 }

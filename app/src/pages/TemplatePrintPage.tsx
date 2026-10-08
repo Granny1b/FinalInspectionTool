@@ -3,6 +3,7 @@ import { FileClock } from 'lucide-react';
 import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { EmptyState } from '../components/EmptyState';
+import { parseAppendix } from '../features/print/links';
 import { templatePrint } from '../features/print/model';
 import { PrintLoadError, PrintLoading, PrintMessage } from '../features/print/PrintStates';
 import { PrintView } from '../features/print/PrintView';
@@ -21,9 +22,10 @@ import { modelName, useSettings } from '../lib/useSettings';
 type Back = { to: string; label: string };
 
 /**
- * /templates/:id/print[?revision=n] — a template's checklist as it prints for a new inspection,
- * blank, with an empty front page. Admins see the draft (marked as such), inspectors the latest
- * published revision; `?revision=n` shows that revision to both.
+ * /templates/:id/print[?revision=n][&appendix=1] — a template's checklist as it prints for a new
+ * inspection, blank, with an empty front page. Admins see the draft (marked as such), inspectors
+ * the latest published revision; `?revision=n` shows that revision to both. `appendix=1` adds
+ * its reference images.
  */
 export function TemplatePrintPage() {
   const { id = '' } = useParams();
@@ -106,6 +108,8 @@ function TemplatePrint({
   back: Back;
 }) {
   const settings = useSettings();
+  const [params, setParams] = useSearchParams();
+  const appendix = parseAppendix(params.get('appendix'));
   const model = useMemo(
     () =>
       settings.data
@@ -117,11 +121,30 @@ function TemplatePrint({
         : null,
     [template, draft, settings.data],
   );
-  const images = usePrintImages(model, settings.data?.logoImageId);
+  const images = usePrintImages(model, settings.data?.logoImageId, { appendix });
   if (settings.isError) return <PrintLoadError query={settings} />;
   if (!model || images.loading) return <PrintLoading />;
 
-  return <PrintView model={model} images={images} subject={model.checklistTitle} back={back} />;
+  /** Changes the address in place, keeping `revision`. */
+  const setAppendix = (value: boolean) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set('appendix', '1');
+        else next.delete('appendix');
+        return next;
+      },
+      { replace: true },
+    );
+  return (
+    <PrintView
+      model={model}
+      images={images}
+      subject={model.checklistTitle}
+      back={back}
+      appendix={{ value: appendix, onChange: setAppendix }}
+    />
+  );
 }
 
 function NotFound({ what }: { what?: 'revision' }) {

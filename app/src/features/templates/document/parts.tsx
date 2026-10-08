@@ -2,6 +2,7 @@ import { rowLetter, type Guide } from '@modig/shared';
 import clsx from 'clsx';
 import { Camera, CircleAlert, GripVertical, Info, type LucideIcon } from 'lucide-react';
 import type { ButtonHTMLAttributes, Ref } from 'react';
+import { imageCountText } from '../../guides/guide';
 import { GRID, REF_CELL, ROW_LINE } from './layout';
 
 /** The paper-only columns, each pinned to its grid column (see layout.ts). */
@@ -81,21 +82,32 @@ export function IssueNote({ id, messages }: { id: string; messages: string[] }) 
   );
 }
 
-/** Marks a row that has a guide: a camera when it has photos, otherwise an info icon. */
-export function GuideMark({ guide }: { guide: Guide }) {
-  const photos = guide.images.length;
-  const Icon = photos > 0 ? Camera : Info;
-  const label =
-    photos > 0 ? `Has a guide with ${photos} ${photos === 1 ? 'photo' : 'photos'}` : 'Has a guide';
+type GuideMarkProps = {
+  guide: Guide;
+  /** "3.c" */
+  rowRef: string;
+  /** Opens the guide: the viewer, or the guide editor in the template editor. */
+  onOpen: () => void;
+  /** False in the editor, where the row's Guide action is the keyboard's way in. */
+  inTabOrder?: boolean;
+};
+
+/** Marks a row that has a guide (a camera when it has images, otherwise an info icon) and opens it. */
+export function GuideMark({ guide, rowRef, onOpen, inTabOrder = true }: GuideMarkProps) {
+  const images = guide.images.length;
+  const Icon = images > 0 ? Camera : Info;
+  const label = `Guide for row ${rowRef}${images > 0 ? ` (${imageCountText(images)})` : ''}`;
   return (
-    <span
-      role="img"
+    <button
+      type="button"
       aria-label={label}
       title={label}
-      className="mt-2.5 mr-1 ml-1.5 shrink-0 text-brand-600"
+      tabIndex={inTabOrder ? undefined : -1}
+      onClick={onOpen}
+      className="mt-1.5 mr-0.5 ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-800 pointer-coarse:mt-0 pointer-coarse:size-10"
     >
       <Icon size={15} aria-hidden="true" />
-    </span>
+    </button>
   );
 }
 

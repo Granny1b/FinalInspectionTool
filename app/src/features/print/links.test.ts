@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inspectionPrintHref, parseDeviationsPerPage, parseMode } from './links';
+import { inspectionPrintHref, parseAppendix, parseDeviationsPerPage, parseMode } from './links';
 
 describe('print links', () => {
   it('opens an inspection print, printing at once if asked', () => {
@@ -18,6 +18,13 @@ describe('print links', () => {
     expect(parseDeviationsPerPage('4')).toBe(4);
     for (const value of ['3', '04', '4.0', '', null]) {
       expect(parseDeviationsPerPage(value)).toBeNull();
+    }
+  });
+
+  it('includes the reference images only for appendix=1', () => {
+    expect(parseAppendix('1')).toBe(true);
+    for (const value of ['0', 'true', 'yes', '', null]) {
+      expect(parseAppendix(value)).toBe(false);
     }
   });
 });

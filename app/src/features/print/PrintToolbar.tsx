@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { Printer } from 'lucide-react';
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { BackLink } from '../../components/BackLink';
 import { Button } from '../../components/Button';
 import { DEVIATIONS_PER_PAGE, PRINT_MODES, type DeviationsPerPage, type PrintMode } from './model';
@@ -17,12 +17,24 @@ type Props = {
   mode?: Choice<PrintMode>;
   /** A report's deviation cards: 2 or 4 to a page. */
   deviationsPerPage?: Choice<DeviationsPerPage>;
+  /** "Include reference images"; `available` is false when no row has any. */
+  appendix: Choice<boolean> & { available: boolean };
   /** Until the document is complete, Print would miss a photo or the font. */
   ready: boolean;
+  /** More ways out, before Print: the Word export. */
+  children?: ReactNode;
 };
 
 /** Above the preview, never printed: the way back, the layout, and Print with the settings to use. */
-export function PrintToolbar({ subject, back, mode, deviationsPerPage, ready }: Props) {
+export function PrintToolbar({
+  subject,
+  back,
+  mode,
+  deviationsPerPage,
+  appendix,
+  ready,
+  children,
+}: Props) {
   const hintId = useId();
   return (
     <header className="sticky top-0 z-10 border-b border-ink-200 bg-surface print:hidden">
@@ -47,10 +59,15 @@ export function PrintToolbar({ subject, back, mode, deviationsPerPage, ready }: 
             {...deviationsPerPage}
           />
         )}
-        <Button onClick={() => window.print()} disabled={!ready} aria-describedby={hintId}>
-          <Printer size={16} aria-hidden="true" />
-          {ready ? 'Print / Save PDF' : 'Preparing…'}
-        </Button>
+        <AppendixToggle {...appendix} />
+        {/* Right-aligned, also when they wrap onto a line of their own. */}
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {children}
+          <Button onClick={() => window.print()} disabled={!ready} aria-describedby={hintId}>
+            <Printer size={16} aria-hidden="true" />
+            {ready ? 'Print / Save PDF' : 'Preparing…'}
+          </Button>
+        </div>
       </div>
       <p
         id={hintId}
@@ -108,6 +125,36 @@ function Segmented<T extends string | number>({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** "Include reference images": disabled, and saying why, when no row has any. */
+function AppendixToggle({ value, onChange, available }: Choice<boolean> & { available: boolean }) {
+  const noteId = useId();
+  return (
+    <div className="flex items-center gap-2">
+      <label
+        className={clsx(
+          'flex items-center gap-2 text-sm whitespace-nowrap',
+          available ? 'text-ink-800' : 'text-ink-500',
+        )}
+      >
+        <input
+          type="checkbox"
+          className="size-4 accent-brand-600"
+          checked={available && value}
+          disabled={!available}
+          onChange={(event) => onChange(event.target.checked)}
+          aria-describedby={available ? undefined : noteId}
+        />
+        Include reference images
+      </label>
+      {!available && (
+        <span id={noteId} className="text-xs text-ink-500">
+          No reference images in this checklist
+        </span>
+      )}
     </div>
   );
 }

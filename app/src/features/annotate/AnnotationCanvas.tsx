@@ -28,7 +28,7 @@ import {
   type Point,
   type Size,
 } from './geometry';
-import { shapeSpec, type ShapeSpec } from './style';
+import { shapeSpecs, type ShapeSpec } from './style';
 import { TextLabelInput } from './TextLabelInput';
 import type { Tool } from './tools';
 
@@ -233,8 +233,8 @@ export function AnnotationCanvas({
                 onPointerEnter={() => setHovering(true)}
                 onPointerLeave={() => setHovering(false)}
               >
-                <AnnotationShape
-                  spec={shapeSpec(item.annotation, size)}
+                <AnnotationShapes
+                  specs={shapeSpecs(item.annotation, size)}
                   minHitWidth={HIT_PX / scale.x}
                 />
               </Group>
@@ -242,7 +242,7 @@ export function AnnotationCanvas({
           )}
           {draft && (
             <Group listening={false}>
-              <AnnotationShape spec={shapeSpec(draft, size)} minHitWidth={0} />
+              <AnnotationShapes specs={shapeSpecs(draft, size)} minHitWidth={0} />
             </Group>
           )}
           <Transformer
@@ -272,6 +272,13 @@ export function AnnotationCanvas({
       )}
     </div>
   );
+}
+
+/** An annotation's shapes (a light line's outline, then the mark), bottom first. */
+function AnnotationShapes({ specs, minHitWidth }: { specs: ShapeSpec[]; minHitWidth: number }) {
+  return specs.map((spec, index) => (
+    <AnnotationShape key={index} spec={spec} minHitWidth={minHitWidth} />
+  ));
 }
 
 function AnnotationShape({ spec, minHitWidth }: { spec: ShapeSpec; minHitWidth: number }) {

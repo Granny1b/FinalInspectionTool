@@ -149,7 +149,9 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   }, [saveUploaded]);
 
   const dirty = saveState.status !== 'saved' || uploading || participantPending;
-  const leaveGuard = useLeaveGuard(dirty, saveAll);
+  // A deviation photo open in the editor with marks: leaving asks first, saving can't keep them.
+  const [editorDirty, setEditorDirty] = useState(false);
+  const leaveGuard = useLeaveGuard(dirty, saveAll, editorDirty);
   const reload = useReload(dirty, onReload);
 
   const update = useCallback(
@@ -617,6 +619,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             onUpdate={updateExtraDeviation}
             onRemove={removeExtraDeviation}
             onPhotosChange={updateDeviationPhotos}
+            onEditorDirtyChange={setEditorDirty}
           />
         )}
       </div>

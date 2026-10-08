@@ -905,14 +905,15 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   polite live region announces "3.c NOK" and "Section 2: 13 rows set to OK"; section titles are
   headings with a hidden "Section N:".
 - **The guide icon** (camera with photos, info without) and `G` show "Guide viewer arrives in
-  phase 5."
+  phase 5." (Superseded in phase 5: they open the guide viewer, see Guides.)
 - **Read-only (finalised) is separate, simpler markup** with the same grid; rows stay focusable
   from script for jump links.
 - **Performance:** rows and sections are memoised and the actions object is stable, so a change
   re-renders one row and its section. Measured in a production build on 180 rows: 1.9 ms of
   script per status key (p95 2.6 ms).
 - **`SEVERITY_LABELS` (Minor, Major, Critical) lives in `checklist/status.ts`;** the Deviation
-  Summary reuses it. A candidate for shared.
+  Summary reuses it. A candidate for shared. (Superseded in phase 4: it moved to
+  `@modig/shared`, where print and the Word export use it too.)
 
 ### Inspection pages
 
@@ -931,6 +932,7 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   was on the page and the first status keys did nothing. No page-level shortcut keys (Alt+1…):
   Ctrl/Alt/Meta combinations stay the browser's (AltGr on Swedish layouts, tab switching).
 - **Print is shown disabled** but focusable, with "Print / Save PDF: coming in phase 4".
+  (Superseded in phase 4: it opens the Blank checklist / Report menu, see Print.)
 - **The save status is hidden on a finalised inspection** unless something is still unsaved.
 - **List filters live in the address** (`?q=&model=&state=`, replacing the history entry) and are
   applied at once (`flushSync`): as a router transition, fast typing kept only the first letter
@@ -964,6 +966,8 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   their ref jumps to the row. Extra deviations are edited in place (Enter never adds a line
   break); removing one asks only if something was typed, then focus goes to **Add extra
   deviation**. A new extra deviation gets the focus in its description. Ids are `newId()`.
+  (Superseded in phase 4: a card per deviation instead of a table, see Deviation cards on the
+  inspection page; the rest still holds.)
 - **Resp suggestions** are the history merged with this inspection's own values, trimmed,
   de-duplicated ignoring case and sorted (Swedish). **This inspection's values are taken when a
   Resp field is left**, not as they are typed: otherwise the half-typed text was offered to its
@@ -1061,7 +1065,8 @@ The calls with product, data or paper impact. Each is explained in its section b
   prints at 103 × 77 mm with 2 per page, 68 × 51 mm with 4; labels at about 12 pt and 8 pt (Print).
 - **4 per page is four stacked rows** (text left, photos right), not a 2 × 2 grid (Print).
 - **A page holds fewer cards when their text doesn't fit.** The cards are measured in the browser
-  before they are put on pages; a card is never split, and no text is cut (Print).
+  before they are put on pages; a card is never split, and no text is cut (Print). (Phase 5: a
+  card whose text alone is longer than a page runs on, its photos whole; see Print carry-overs.)
 - **The blank checklist keeps the handwritten Deviation Summary table** (D-01 to D-15), as the
   brief has it; only the report has cards (Print).
 - **Flattened copies are JPEG images with their own id** (`renderedImageId`), not
@@ -1072,7 +1077,8 @@ The calls with product, data or paper impact. Each is explained in its section b
 - A row's photos stay when it stops being NOK, but count and print only while it is NOK (Deviation
   cards).
 - Browser Back while the photo editor has unsaved marks discards them without asking; only closing
-  or reloading the tab warns (open, see Deviation cards).
+  or reloading the tab warns (open, see Deviation cards). (Resolved in phase 5: leaving asks
+  first.)
 - Page numbers ("Page X of Y") need Chrome or Edge; Firefox and Safari print the footer text at the
   foot of each table only (Print).
 
@@ -1111,7 +1117,8 @@ The calls with product, data or paper impact. Each is explained in its section b
   top-left corner).
 - **Sizes follow the photo's long edge:** lines 0.65 %, arrow heads 4.5 × 4 lines, labels 4 % in
   bold Inter. A soft dark shadow behind lines and a 70 % black outline round labels keep every
-  colour readable on busy photos and in black and white.
+  colour readable on busy photos and in black and white. (Phase 5: yellow and white lines still
+  faded on light machine paint in black and white, and now have a dark outline too.)
 - **The flattened copy** is drawn on an off-screen Konva stage from the same shape settings as the
   screen, at the stored photo's size (at most 1600 px), and saved as JPEG at quality 0.9 (photos
   use 0.8: JPEG blurs thin lines first) with `canvas.toBlob` (not `fetch(dataURL)`, which the CSP's
@@ -1170,7 +1177,7 @@ The calls with product, data or paper impact. Each is explained in its section b
 - **Removing an extra deviation asks first** if it has text or photos, and says how many photos go.
 - **Open:** browser Back while the editor has unsaved marks discards them; only closing or
   reloading the tab warns. Fixing it needs an "editing" callback from `AnnotatedPhotos` into the
-  page's leave guard.
+  page's leave guard. (Resolved in phase 5 that way: leaving asks first.)
 
 ### Print
 
@@ -1227,14 +1234,16 @@ The calls with product, data or paper impact. Each is explained in its section b
   page pushed its fourth card onto an extra page of its own, without a heading, and the page's
   "D-01–D-04" was wrong. A flowing table with a repeating heading was tried and rejected: every
   card kept at least a quarter page, so any comment over about 200 characters pushed the next card
-  on. A page with fewer cards keeps empty slots, so its cards keep their size.
+  on. A page with fewer cards keeps empty slots, so its cards keep their size. (Phase 5: the
+  265 mm is one CSS custom property that the measuring reads, and a card taller than a page's
+  room gets a page of its own without empty slots.)
 - **Ready means everything is in:** the page first fetches every image's address, renders the
   document once, and sets `data-print-ready` after the images, the fonts and the card measuring;
   switching the mode or layout waits again. The Print button says "Preparing…" until then.
 - **The deviation heading repeats on every page of cards** with its range ("FI-2026-0042 ·
   D-01–D-04"); screen readers hear it once.
 - **The "Include reference images" appendix** (brief §6) is left to phase 5, with a marked place
-  in `PrintDocument`.
+  in `PrintDocument`. (Built in phase 5, see there.)
 - **Chrome embeds the variable Inter font as Type 3 fonts** in its PDFs: sharp and searchable;
   `pdfinfo` warns about their bounding boxes. Left as it is.
 
@@ -1268,3 +1277,223 @@ printBackground: true })` after `data-print-ready` and reads them with `pdfjs-di
   printed instead of the copy, cards grouped without measuring: each failed a test.
 - **The sample PDFs and the 2-vs-4 comparison** were made outside the repository, from a
   finalised RigiMill MG inspection whose photos were marked up through the editor.
+
+## Phase 5 – Guides, appendix and Word export
+
+### Worth reviewing first
+
+The calls with product, data or paper impact. Each is explained in its section below.
+
+- **A new guide image starts as Info:** it claims nothing until an admin marks it Good or Bad
+  (Guides).
+- **A guide is edited in a dialog;** **Save** puts it into the draft, which then autosaves like
+  any other change, and Cancel or Escape asks before discarding. A guide with neither a
+  description nor images is no guide (Guides).
+- **Guides reach inspectors with the next published revision,** and an inspection keeps the
+  guides it was created with, like the rest of its checklist (Guides).
+- **Leaving a page while an editor dialog has unsaved changes now asks first** (photo marks, a
+  guide); in phase 4 Back discarded them silently (Annotation editor).
+- **Yellow and white lines get a thin dark outline** on screen and in the flattened copy, so they
+  print on black-and-white printers; red and cyan are unchanged (Annotation editor).
+- **The appendix prints every image in the same 4:3 box,** two to a row at about 9 × 7 cm, three
+  rows to a page; the verdict is an icon and its word (Print appendix).
+- **Word lays out its own pages:** the export has the printout's structure and rules (header rows
+  repeat, rows and deviation blocks never split) but the deviation blocks flow instead of 2 or 4
+  to a page, and the text is Arial, not Inter (Word export).
+- **The Word file is named like the PDF,** "… – Inspection report.docx" (or "– Blank checklist"),
+  not as the contract's example without the suffix (Word export).
+- **A deviation card whose text alone is longer than a page runs on** to the next page, its photos
+  whole; every other card still prints whole (Print carry-overs).
+- Guide images that are replaced, removed or cancelled stay in storage, like every other photo
+  (Guides).
+
+### Guides
+
+- **No API or shared change.** The groundwork commit added `GUIDE_VERDICTS`,
+  `GUIDE_VERDICT_LABELS` (Good, Bad, Info) and `MAX_GUIDE_IMAGES` (6) to shared; guides travel in
+  the template's PUT, publishing freezes them, and an inspection's snapshot already copies them.
+- **A guide's pictures are "images"** ("Reference images", "Add image", "Image 2 of 3"); a
+  deviation's evidence stays "photos". `AnnotatedPhotos` takes the word (`noun`). Some texts
+  inside the shared annotation editor still say "photo" ("Discard this photo?").
+- **One editor, extended, not forked.** `AnnotatedPhotos` gained only optional props: `noun`,
+  `layout: 'grid'`, `renderDetails` (what goes under a tile: a guide image's verdict and caption),
+  `acceptAnywhere` and `onDirtyChange`; deviation cards look and behave as before. It stays
+  non-generic: the guide editor puts each verdict back by `imageId` after every change
+  (`withVerdicts`), since an edited image keeps its id and the annotation editor knows nothing of
+  verdicts.
+- **A new image is Info until marked Good or Bad.** The verdict picker is a native radio group
+  (one Tab stop, arrow keys pick), styled like the status control; every verdict is a lucide
+  icon, its word and a colour (ok, nok, n/a tones), never colour alone. Badges in the viewer use
+  the same icons, words and colours.
+- **Captions are edited inline under each tile;** it is the same field as the annotation editor's
+  caption.
+- **Paste and drop work anywhere in the guide editor** (`acceptAnywhere`), because it opens with
+  the focus in the description. While an inner dialog is open, a dropped file is swallowed so the
+  browser never opens it in place of the app. A refused paste or drop (six images, not an image)
+  scrolls its message into view.
+- **The saved guide is trimmed:** description and captions lose surrounding whitespace, empty ones
+  are left out, and no description with no images removes `item.guide`. Keys come in the schema's
+  order, because the draft's unpublished-changes check compares JSON: a different order after a
+  publish made the next autosave a false 412 conflict.
+- **Save without changes only closes** (no pointless draft save). **Remove guide** shows only on a
+  row that has one, asks first and says that published revisions and inspections keep theirs.
+- **Guide changes are not structural:** saving one doesn't end the Undo of a deleted row or
+  section, and a deleted row with a guide comes back with it.
+- **Ways in:** in the template editor the row's hover/focus action "Add guide, row 3.c" or "Edit
+  guide, row 3.c" (on touch, the row's ⋯ menu); the row's guide icon opens the editor too, but is
+  not a Tab stop there. No preview inside the editor and no reordering of images (both optional).
+- **The viewer** opens from an inspection row's icon or `G` (in an editable row the icon is not a
+  Tab stop: Tab stays row → comment → resp), from a finalised row (a Tab stop, as nothing else in
+  the row is) and from the template's read-only and revision views (a Tab stop, 28 px with a mouse,
+  40 px on touch). It is rendered once per sheet or document; rows ask through the existing
+  stable actions objects, so they stay memoised.
+- **Viewer keys:** ←/→/Home/End move between the images, Enter or a click shows one large. The
+  photo viewer gained a `badge` slot and `browse` (←/→ and Previous/Next, `aria-disabled` at the
+  ends so the focus is never dropped, "1 / 3"). Escape closes the large view, back on the image
+  last shown, then the guide, back on the row, ready for the next key; keys never reach the
+  checklist behind.
+- **Nested dialogs act only on their own events.** React passes `close` and `cancel` up from inner
+  `<dialog>`s, so the guide dialogs check `event.target === currentTarget`, and the guide editor
+  takes Escape only from its own content.
+- **Sizes:** the editor is at most 60rem wide, as tall as its content up to the window (the body
+  scrolls); the viewer 64rem. Image grids fill the width with tiles of at least 11.5rem (editor)
+  and 14rem (viewer).
+
+### Annotation editor (phase 4 carry-overs)
+
+- **Leaving asks while an editor dialog has unsaved changes.** The leave guard takes a third
+  flag, `editorDirty`: such changes are not in the document yet, so nothing can save them; Back or a
+  link asks "Leave without saving?" ("The open editor has changes that aren't saved yet."), and
+  Leave then saves the rest of the page as any link does. Closing the tab warns too. An untouched
+  new photo doesn't count, as with the editor's Cancel. The flag comes up through `onDirtyChange`:
+  annotation editor → `AnnotatedPhotos` → deviation card and summary → inspection page, and guide
+  editor (its own changes or its open photo editor) → template document → template editor. The
+  guard arms in an effect after the change: a script that goes back within milliseconds of typing
+  can slip through; a person can't.
+- **The lazily loaded editor has an error boundary** (`EditorLoadBoundary`, around its Suspense, so
+  it covers the guide editor too): "Couldn't open the editor" with Close and **Reload page**
+  instead of the route's error screen, keeping the page and its unsaved work. There is no retry
+  in the page, because a module import that failed stays failed until a reload. A crash inside the
+  editor gets the same message.
+- **Yellow and white lines have a dark outline:** a wider copy in black at 80 % under the line,
+  0.35 × the line's width each side, arrow heads included, without shadow and not clickable, from
+  the same shape settings in the editor and the flattened JPEG. Measured on a light panel, 7 px
+  from the line's centre: 40–44 luma beside the line, against 248 for the surface. Red (36 %
+  luma) and cyan (54 %) print dark enough and keep only their soft shadow; yellow (77 %) and white
+  (100 %) vanished on light machine paint (80–90 %). Labels already had an outline.
+
+### Print appendix
+
+- **A pure model (`print/appendix.ts`)** lists the rows whose guides have images, in checklist
+  order, with their images in rows of two and each caption's text; the print view
+  (`ReferenceAppendix`) and the Word export both lay it out. Rows whose guide has only a
+  description are skipped.
+- **Every image sits in the same 4:3 box at half the width** (about 90 × 67 mm): never cropped, a
+  portrait image letterboxed, standing on its caption. Rows stay even, about three to a page. The
+  caption is the bold "3.c · ✓ Good" with the image's own caption on a muted line below.
+- **Page breaks:** a row's heading, description and first images are one block that never splits;
+  so is every row of two and every image with its caption. Entries are divided by a thin rule.
+  The appendix heading doesn't repeat on later pages, since every caption names its ref.
+- **On paper the verdict symbol is drawn** (the same lucide icons as on screen), because the
+  bundled Inter has no ✓ ✗ ⓘ and they would come from a system font. The PDF's text therefore
+  reads "3.c · Good"; image alt texts and the Word export write the symbols as text.
+- **The appendix's images load only while it is on.** Turning it on adds it to the preview
+  without going back to the loading screen; Print says "Preparing…" and `data-print-ready` waits
+  until its images are in.
+- **The toggle is a checkbox after the layout switches,** kept in the address as `appendix=1`
+  (replacing the history entry and dropping `autoprint`; a template preview keeps its
+  `revision`). Without any reference images it is disabled with "No reference images in this
+  checklist", and `appendix=1` prints nothing extra.
+- **One set of verdict icons** (`guides/verdicts.ts`) for screen and paper (integrator: print had a
+  copy of its own).
+
+### Word export
+
+- **One module, `features/export/`:** the toolbar's "Export to Word (.docx)" button sits in the
+  main chunk and imports `exportWord.ts` only when clicked, which brings `docx` (a 445 kB chunk,
+  129 kB gzip); the main chunk has none of it. `wordDocument(model, { appendix, images })` is a
+  pure builder from the print model, tested in node: `Packer.toBuffer`, then the XML read with
+  JSZip (docx's own dependency, not listed by the app).
+- **The file is named like the printout:** its PDF name plus `.docx`, e.g. "FI-2026-0042 RigiMill
+  MG – Volvo Skövde – Inspection report.docx" ("– Blank checklist", "– Draft report", "… –
+  Checklist preview"), so a blank and a report export of one inspection don't collide. The
+  characters Windows and macOS refuse (`\ / : * ? " < > |`) and control characters become `-`,
+  spaces are collapsed, trailing dots and spaces go, 150 characters at most.
+- **It includes the appendix exactly when the preview shows it.** Its images are fetched through
+  fresh read URLs (expired ones are renewed) with `cache: 'no-store'`: Chrome reused the preview's
+  cached responses, loaded without CORS, and blocked the export's CORS fetch. An image that can't
+  be loaded prints "The photo couldn't be loaded." in its place, as on paper. Format and size come
+  from the JPEG or PNG header, not from decoding in the browser.
+- **Arial 9 pt** (on every Word installation; LibreOffice uses the metric-compatible Liberation
+  Sans), not Inter; ✓ ✗ ☐ ⓘ in Segoe UI Symbol, which Word itself uses for them. Print's greys
+  and rule widths.
+- **Word's own pagination with print's rules:** each section is a table whose two header rows
+  repeat and keep with the next; the first row keeps with the second, the second-to-last with the
+  last; rows never split. Each deviation is a framed one-row table that never splits, and the
+  blocks flow instead of 2 or 4 to a page. Photos: one up to 120 × 80 mm, two up to 85 × 64 mm;
+  none gives a dashed 40 mm "Sketch / photo" frame; the Closed line uses underscore tab leaders.
+  Appendix headings and descriptions keep with their first images.
+- **The front page fits one page:** the machine photo at most 186 × 85 mm, the signature space
+  15 mm (95 and 23 overflowed). Its field rules are set per cell, because LibreOffice drops a
+  table's own borders when some sides are "none"; without a photo a 60 mm frame.
+- **The footer's size and colour are a paragraph style** ("Page footer"): LibreOffice renders
+  field results (PAGE, NUMPAGES) in the paragraph style, not the run's formatting.
+- **No Vite `optimizeDeps` entry for docx** (integrator). A dev server whose dependency cache was
+  built before the export existed discovers `docx` at the first click and reloads the page once,
+  losing that export; a fresh cache finds it by itself, and a lockfile change rebuilds the cache.
+  Konva got the same treatment in phase 4.
+
+### Print (phase 4 carry-overs)
+
+- **A card taller than a page's room gets the page to itself** (R1): `useCardPages` now returns
+  every card's height and the room per page; such a page has no empty slots, and the card is
+  laid out full width (`data-wide`, the 2-per-page layout) even at 4 per page. Before, the slots'
+  gaps pushed it on, printing an empty page or splitting it.
+- **Only a card whose text alone is longer than a page runs on.** A `data-wide` card may break
+  inside, but its photos and Closed line never do, and it starts at the top of its own page.
+  Measured: every field at the schema's limits in ordinary text is 209 mm of 253 mm, so it fits;
+  in capitals ("WMWM…") 338 mm, which now continues cleanly instead of leaving a page with the
+  heading alone and splitting the photos. At 2 per page a lone card that fits keeps its empty
+  slot below (phase 4 behaviour, left as it is).
+- **One source for the content height** (R4): `--paper-content-height: 265mm` on the sheet is used
+  by the front page, the card pages and the measuring page, and `useCardPages` measures the page
+  box instead of a constant. `.paper-secondary` is gone; `ChecklistTable` uses `STATUS_ICONS`.
+- **The toolbar keeps Export and Print together on the right,** also when it wraps.
+
+### Tests and tooling
+
+- **`e2e/guides.spec.ts`:** an admin writes a guide in the real editor (an image pasted while
+  typing the description, one dropped on the dialog's heading, one marked with an arrow and a box,
+  verdicts, captions trimmed), autosaved and the same after a reload; an inspection opens it
+  read-only from the row's icon and `G` (arrow keys, the large view, Escape back to the row, keys
+  kept from the row), keeps it after the template publishes a reworded guide (through the API),
+  and a new inspection gets the new one.
+- **Paste and drop in tests are real events:** an image put on the clipboard as PNG (the only image
+  type the async clipboard API takes, with permissions granted) and Ctrl+V; drops dispatch
+  dragenter, dragover and drop with a `DataTransfer` holding a `File`.
+- **The appendix test holds the appendix's images back** (`page.route`) after turning it on, and
+  checks that the page is not ready and Print says "Preparing…" once the fonts are in and two
+  frames have passed, then lets them through. In the PDF every appendix page paints as many images
+  as it has captions (no image parted from its caption), the captions come in checklist order,
+  two to a line in the left and right halves, and every row heading has a caption of its row
+  below it on its page. The marked-up image's original is never fetched.
+- **The Word test downloads through the toolbar** in a Chromium of its own launched with
+  `LC_ALL=C.UTF-8` (a fixture): on Linux, Chromium names a download "download" when the system
+  locale can't write its name, as in this container's POSIX locale. It unzips the file with JSZip
+  (as the unit tests do) and checks the file name, two repeating header rows per section, every
+  checkpoint, the deviation, the reference images' captions with their symbols, the embedded
+  images (logo and eight), and PAGE and NUMPAGES fields in the footer; then the blank checklist's
+  file: D-01 to D-15, no appendix.
+- **Phase 4 test gaps** (`e2e/annotate.spec.ts`): two photos remove Add, and a drop or paste then
+  says why (a non-image drop in between proves each message is new); a photo added to an extra
+  deviation in the UI is saved with its flattened copy; a finalised inspection's photo opens in the
+  viewer without any request for the editor's code or Konva. The editable test shows the same
+  pattern matching the editor's background prefetch, and a mutation (always prefetching) fails the
+  finalised test. Shared: `ExtraDeviationSchema` takes two photos and refuses three; API: a PUT
+  with three photos on a row or an extra deviation is a 400 with the zod path, and nothing is
+  stored.
+- **`deleteTemplate` also deletes guide images** (originals and copies); inspections share them
+  through their snapshots, so they go with the template.
+- **Not in the suite:** the leave question for an open editor and the editor's load failure were
+  checked by script during the build (Back after drawing; the editor's module request aborted).
+  A test of the first would need a fixed wait before Back, as the guard arms in an effect.

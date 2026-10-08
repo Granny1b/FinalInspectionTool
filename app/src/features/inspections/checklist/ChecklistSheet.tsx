@@ -1,5 +1,7 @@
 import type { FinaliseIssue, RowResult, Section } from '@modig/shared';
 import { useId, useMemo, useRef, useState, type JSX } from 'react';
+import { guideRow } from '../../guides/guide';
+import { GuideViewer } from '../../guides/GuideViewer';
 import { ChecklistSection } from './ChecklistSection';
 import { SHEET } from './layout';
 import { ReadOnlyChecklist } from './ReadOnlyChecklist';
@@ -22,7 +24,8 @@ export type ChecklistSheetProps = {
 
 /**
  * The inspection's checklist, filled in from the keyboard (brief §5.3): the same sheet as the
- * print, with a status, comment and resp per row.
+ * print, with a status, comment and resp per row. A row's guide icon (or `G`) opens its guide,
+ * read-only, as frozen in the inspection.
  *
  * DOM hooks for the page: each section root has `id="section-{sectionId}"`; each row root has
  * `id="row-{itemId}"` and is focusable (in the Tab order when editable); its comment field has
@@ -49,6 +52,9 @@ export function ChecklistSheet({
     return byRow;
   }, [issues]);
   const [announcement, setAnnouncement] = useState('');
+  // The row whose guide is open in the viewer: the frozen guide of the inspection's snapshot.
+  const [guideItemId, setGuideItemId] = useState<string | null>(null);
+  const guiding = guideItemId === null ? null : guideRow(sections, guideItemId);
 
   return (
     // The sheet adapts to its own width (container queries), not the viewport's.
@@ -65,17 +71,26 @@ export function ChecklistSheet({
             rowIssues={rowIssues}
             announce={setAnnouncement}
             onShowPhotos={onShowPhotos}
+            onShowGuide={setGuideItemId}
           />
         ) : (
           <ReadOnlyChecklist
             sections={sections}
             results={results}
             rowIssues={rowIssues}
-            announce={setAnnouncement}
             onShowPhotos={onShowPhotos}
+            onShowGuide={setGuideItemId}
           />
         )}
       </div>
+      {guiding?.guide && (
+        <GuideViewer
+          rowRef={guiding.ref}
+          rowText={guiding.text}
+          guide={guiding.guide}
+          onClose={() => setGuideItemId(null)}
+        />
+      )}
       {/* Status changes are read out ("3.c NOK"): the focus has usually moved on already. */}
       <p aria-live="polite" className="sr-only">
         {announcement}
@@ -92,6 +107,7 @@ type EditableProps = {
   rowIssues: ReadonlyMap<string, string>;
   announce: (message: string) => void;
   onShowPhotos: (itemId: string) => void;
+  onShowGuide: (itemId: string) => void;
 };
 
 function EditableChecklist({
@@ -102,6 +118,7 @@ function EditableChecklist({
   rowIssues,
   announce,
   onShowPhotos,
+  onShowGuide,
 }: EditableProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const respListId = useId();
@@ -112,6 +129,7 @@ function EditableChecklist({
     rootRef,
     announce,
     onShowPhotos,
+    onShowGuide,
   });
   const suggestions = useMemo(() => [...new Set(respSuggestions)], [respSuggestions]);
 
