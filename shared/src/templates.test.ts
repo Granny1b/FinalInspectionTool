@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Template } from './schemas';
+import type { Guide, Template } from './schemas';
 import {
   CreateTemplateRequestSchema,
   TemplateDraftInputSchema,
@@ -114,6 +114,34 @@ describe('hasUnpublishedChanges', () => {
       hasUnpublishedChanges({ ...base, printSettings: { spareRowsPerSection: 5 } }, published),
     ).toBe(true);
     expect(hasUnpublishedChanges({ ...base, coverImageId: 'img1' }, published)).toBe(true);
+  });
+
+  it('detects a guide added, changed or removed, but not the same guide again', () => {
+    const s = base.sections[0]!;
+    const guide: Guide = {
+      description: 'Screws marked',
+      images: [{ imageId: 'img2', verdict: 'good', annotations: [] }],
+    };
+    const withGuide = (g: Guide | undefined): Template => ({
+      ...base,
+      sections: [{ ...s, items: [{ ...s.items[0]!, ...(g && { guide: g }) }, s.items[1]!] }],
+    });
+    const guided: Template = { ...withGuide(guide), status: 'published' };
+    expect(hasUnpublishedChanges(withGuide(guide), published)).toBe(true);
+    expect(hasUnpublishedChanges(withGuide({ ...guide, description: 'Marked' }), guided)).toBe(
+      true,
+    );
+    expect(
+      hasUnpublishedChanges(
+        withGuide({ ...guide, images: [{ ...guide.images[0]!, verdict: 'bad' }] }),
+        guided,
+      ),
+    ).toBe(true);
+    expect(hasUnpublishedChanges(withGuide(undefined), guided)).toBe(true);
+    // A copy, as a reload or the next autosave brings it.
+    expect(
+      hasUnpublishedChanges(withGuide(JSON.parse(JSON.stringify(guide)) as Guide), guided),
+    ).toBe(false);
   });
 });
 

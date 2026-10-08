@@ -6,7 +6,7 @@ import { Button } from '../../components/Button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { INPUT } from '../../components/Field';
 import { ApiRequestError, errorMessage } from '../../lib/api';
-import { fitWithin, ImageError, useImageUrl } from '../../lib/images';
+import { fitWithin, ImageError, isTimeout, uploadJpeg, useImageUrl } from '../../lib/images';
 import { AnnotationCanvas } from './AnnotationCanvas';
 import { editorCommand } from './commands';
 import {
@@ -23,7 +23,7 @@ import { needsRender, savedPhoto } from './photos';
 import { renderAnnotatedJpeg } from './render';
 import { defaultTextSize } from './style';
 import { TOOL_HINTS } from './tools';
-import { uploadJpeg, type PendingUpload } from './upload';
+import type { PendingUpload } from './upload';
 import { useElementSize, useLoadedImage } from './useLoadedImage';
 
 /** The photo being annotated: one already stored, or a new one that uploads meanwhile. */
@@ -76,6 +76,8 @@ export function AnnotationEditor({
   const dialogRef = useRef<HTMLDialogElement>(null);
   /** What closing the dialog reports: the saved photo, or null for Cancel. */
   const outcome = useRef<AnnotatedImage | null>(null);
+  /** Stops the save in progress (Cancel or Escape while saving). */
+  const stopSave = useRef<AbortController | null>(null);
   const titleId = useId();
   const captionId = useId();
 
@@ -91,9 +93,10 @@ export function AnnotationEditor({
   const annotations = annotationsOf(state);
   // The picker shows the selected mark's colour; picking another recolours it.
   const selectedColor = items.find((item) => item.id === state.selectedId)?.annotation.color;
+  // A guide image's caption may still have the spaces it was typed with: they don't count.
   const dirty =
     !sameAnnotations(annotations, initial?.annotations ?? []) ||
-    caption.trim() !== (initial?.caption ?? '');
+    caption.trim() !== (initial?.caption ?? '').trim();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -139,21 +142,29 @@ export function AnnotationEditor({
   }
 
   function requestCancel() {
-    if (saving) return;
-    if (dirty) setConfirming(true);
+    // While saving (an upload may hang on poor Wi-Fi), Cancel and Escape stop the save; the
+    // editor stays open with its marks, to save again or cancel.
+    if (saving) stopSave.current?.abort();
+    else if (dirty) setConfirming(true);
     else close(null);
   }
 
   async function save() {
     if (!image || !size || saving) return;
+    const stop = new AbortController();
+    stopSave.current = stop;
     setSaving(true);
     setError(null);
     try {
       const imageId =
-        subject.kind === 'stored' ? subject.photo.imageId : await subject.upload.retry();
+        subject.kind === 'stored'
+          ? subject.photo.imageId
+          : // The new photo's own upload goes on (and times out by itself); Save stops waiting.
+            await untilAborted(subject.upload.retry(), stop.signal);
       const renderedImageId = needsRender(initial, annotations)
-        ? await uploadJpeg(await renderAnnotatedJpeg(image, size, annotations))
+        ? await uploadJpeg(await renderAnnotatedJpeg(image, size, annotations), stop.signal)
         : initial?.renderedImageId;
+      stop.signal.throwIfAborted();
       close(savedPhoto({ imageId, caption, annotations, renderedImageId }));
     } catch (failure) {
       setError(failureMessage(failure));
@@ -276,7 +287,8 @@ export function AnnotationEditor({
               </p>
             )}
             <div className="ml-auto flex gap-2">
-              <Button variant="secondary" onClick={requestCancel} disabled={saving}>
+              {/* While saving, it stops the save. */}
+              <Button variant="secondary" onClick={requestCancel}>
                 Cancel
               </Button>
               {/* aria-disabled while saving: a disabled button would drop the keyboard focus. */}
@@ -313,7 +325,19 @@ export function AnnotationEditor({
   );
 }
 
+/** `promise`, or the signal's reason as soon as it is aborted (the work itself goes on). */
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise((resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason as Error), { once: true });
+    promise.then(resolve, reject);
+  });
+}
+
 function failureMessage(failure: unknown): string {
+  if (failure instanceof DOMException && failure.name === 'AbortError') {
+    return 'Saving was stopped. Your marks are still here: Save to try again.';
+  }
+  if (isTimeout(failure)) return 'The upload took too long. Check your connection and try again.';
   if (failure instanceof ImageError || failure instanceof ApiRequestError) return failure.message;
   // fetch() rejects with a TypeError when the network is down.
   if (failure instanceof TypeError) return errorMessage(failure);

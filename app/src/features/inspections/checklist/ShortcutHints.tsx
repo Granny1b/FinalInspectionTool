@@ -11,6 +11,7 @@ const HINTS: { keys: string[]; label: string }[] = [
   { keys: ['↓', 'J'], label: 'Down' },
   { keys: ['↑', 'K'], label: 'Up' },
   { keys: ['C'], label: 'Comment' },
+  { keys: ['G'], label: 'Guide' },
   { keys: ['Tab'], label: 'Next field' },
   { keys: ['Enter'], label: 'Next row' },
   { keys: ['Esc'], label: 'Back to row' },

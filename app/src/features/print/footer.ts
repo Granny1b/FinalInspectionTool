@@ -10,7 +10,8 @@ const BOX_STYLE = `font-family: 'Inter Variable', ui-sans-serif, system-ui, sans
 export function pageFooterRule(left: string): string {
   return (
     `@page { ` +
-    `@bottom-left { content: ${cssString(left)}; ${BOX_STYLE} } ` +
+    // The padding keeps a footer long enough to wrap off the page number.
+    `@bottom-left { content: ${cssString(left)}; ${BOX_STYLE} padding-right: 4mm; } ` +
     // The inset keeps the page number inside the margin: Chrome's PDFs place the right content
     // edge about 0.3 mm further out (see --paper-edge-inset in print.css).
     `@bottom-right { content: "Page " counter(page) " of " counter(pages); ${BOX_STYLE} text-align: right; padding-right: 0.5mm; white-space: nowrap; } ` +

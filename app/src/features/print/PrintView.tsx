@@ -99,7 +99,7 @@ export function PrintView({
         appendix={{ ...appendix, available: model.appendix.length > 0 }}
         ready={ready}
       >
-        <WordExportButton model={model} appendix={withAppendix} logoUrl={images.logoUrl} />
+        <WordExportButton model={model} appendix={withAppendix} logoImageId={images.logoImageId} />
       </PrintToolbar>
       <main className="paper-desk flex-1">
         <PrintDocument

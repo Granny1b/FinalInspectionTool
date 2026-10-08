@@ -93,13 +93,16 @@
 }
 
 /* ------------------------------------------------------------------------------------------ */
-/* Front page: one page tall; the photo takes whatever height the text leaves.                */
+/* Front page: one page tall; the photo takes whatever height the text leaves. Values so long  */
+/* that even a small photo leaves no room (hundreds of characters, twenty participants) make   */
+/* it run on: the signatures and revision then start the next page together, instead of being  */
+/* printed over the checklist.                                                                */
 /* ------------------------------------------------------------------------------------------ */
 
 .paper-front {
   display: flex;
   flex-direction: column;
-  height: var(--paper-content-height);
+  min-height: var(--paper-content-height);
 }
 
 .paper-front-head {
@@ -166,7 +169,7 @@
 .paper-photo {
   position: relative;
   flex: 1 1 0;
-  min-height: 40mm;
+  min-height: 20mm;
   margin: 8mm 0;
 }
 
@@ -216,6 +219,10 @@
   margin: 0;
   font-size: 11pt;
   overflow-wrap: anywhere;
+}
+
+.paper-front-sign {
+  break-inside: avoid;
 }
 
 .paper-signatures {
@@ -325,7 +332,7 @@
 /* The number sits over the refs, the title over the checkpoints. */
 .paper-section-number {
   display: inline-block;
-  width: 10mm;
+  width: 12mm;
 }
 
 .paper-table .paper-columns th {
@@ -336,8 +343,9 @@
   white-space: nowrap;
 }
 
+/* Wide enough for a ref past z in a section past 9 ("10.am"). */
 .paper-col-ref {
-  width: 10.5mm;
+  width: 12.5mm;
 }
 .paper-col-comment {
   width: 47mm;
@@ -559,6 +567,13 @@
   column-gap: 3mm;
 }
 
+/* Two to a page is the layout for large photos: never smaller than in four to a page. A card
+   whose text leaves less goes to a page of its own (useCardPages measures this height too). The
+   empty "Sketch / photo" frame keeps the 24 mm, so cards without photos still pair up. */
+[data-deviations-per-page='2'] .paper-card-photos:has(.paper-card-photo) {
+  grid-template-rows: minmax(50mm, 1fr) auto;
+}
+
 .paper-card-photo {
   display: grid;
   grid-row: span 2;
@@ -680,6 +695,32 @@
   border-top: 0.25mm solid var(--paper-rule);
 }
 
+/* Browsers without margin boxes: the entries as table rows, under a repeating footer. Separate
+   borders, so the row groups draw none of the rule between entries (their first row does). */
+.paper-appendix-flow {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.paper-appendix-flow tr {
+  break-inside: avoid;
+}
+
+.paper-appendix-flow td {
+  padding: 0;
+  vertical-align: top;
+}
+
+.paper-appendix-flow tbody + tbody > tr:first-child > td {
+  padding-top: 5mm;
+}
+
+.paper-appendix-flow tbody + tbody > tr:first-child .paper-guide-start {
+  padding-top: 3mm;
+  border-top: 0.25mm solid var(--paper-rule);
+}
+
 .paper-guide-start,
 .paper-guide-row,
 .paper-guide-image {
@@ -697,6 +738,8 @@
 .paper-guide-description {
   margin-top: 1mm;
   overflow-wrap: anywhere;
+  /* The description's own line breaks, as the guide shows them. */
+  white-space: pre-line;
 }
 
 .paper-guide-row {

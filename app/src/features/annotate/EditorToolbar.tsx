@@ -79,6 +79,8 @@ export function EditorToolbar({
             aria-pressed={color === value}
             disabled={disabled}
             onClick={() => onColor(value)}
+            // Keeps the focus in a label being typed, so the label takes the colour.
+            onMouseDown={(event) => event.preventDefault()}
             className="group"
           >
             <span
@@ -91,16 +93,29 @@ export function EditorToolbar({
       </div>
       <Divider />
       <div className="flex items-center gap-0.5">
-        <BarButton label="Undo" shortcut="Ctrl+Z" disabled={disabled || !canUndo} onClick={onUndo}>
+        <BarButton
+          label="Undo"
+          shortcut="Ctrl+Z"
+          disabled={disabled}
+          inactive={!canUndo}
+          onClick={onUndo}
+        >
           <Undo2 size={18} aria-hidden="true" />
         </BarButton>
-        <BarButton label="Redo" shortcut="Ctrl+Y" disabled={disabled || !canRedo} onClick={onRedo}>
+        <BarButton
+          label="Redo"
+          shortcut="Ctrl+Y"
+          disabled={disabled}
+          inactive={!canRedo}
+          onClick={onRedo}
+        >
           <Redo2 size={18} aria-hidden="true" />
         </BarButton>
         <BarButton
           label="Delete mark"
           shortcut="Delete"
-          disabled={disabled || !canDelete}
+          disabled={disabled}
+          inactive={!canDelete}
           onClick={onDelete}
         >
           <Trash2 size={18} aria-hidden="true" />
@@ -114,23 +129,33 @@ function Divider() {
   return <div aria-hidden="true" className="mx-0.5 h-6 w-px bg-ink-200" />;
 }
 
-/** An icon button, 44 px for fingers and 36 px with a mouse; its name is also its tooltip. */
+/**
+ * An icon button, 44 px for fingers and 36 px with a mouse; its name is also its tooltip.
+ * `inactive` (aria-disabled, not disabled) is for Undo, Redo and Delete mark, which turn
+ * themselves off: a disabled button would drop the focus out of the dialog, and its shortcuts
+ * and Escape with it.
+ */
 function BarButton({
   label,
   shortcut,
+  inactive = false,
+  onClick,
   className,
   ...props
-}: ComponentProps<'button'> & { label: string; shortcut?: string }) {
+}: ComponentProps<'button'> & { label: string; shortcut?: string; inactive?: boolean }) {
   const tip = shortcut ? `${label} (${shortcut})` : label;
   return (
     <button
       type="button"
       aria-label={label}
       aria-keyshortcuts={shortcut?.replace('Ctrl', 'Control')}
+      aria-disabled={inactive || undefined}
       title={tip}
+      onClick={inactive ? undefined : onClick}
       className={clsx(
         'flex size-11 items-center justify-center rounded-md text-ink-600 transition-colors pointer-fine:size-9',
         'hover:bg-ink-100 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-40',
+        'aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ink-600',
         className,
       )}
       {...props}

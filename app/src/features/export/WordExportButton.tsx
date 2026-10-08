@@ -9,15 +9,15 @@ type Props = {
   model: PrintModel;
   /** Include the reference images, as the preview does. */
   appendix: boolean;
-  /** The logo the preview prints. */
-  logoUrl: string;
+  /** The settings' own logo, if any. */
+  logoImageId: string | undefined;
 };
 
 /**
  * "Export to Word (.docx)" (brief §6, phase 5): the printout as an editable Word file, made in the
  * browser. The `docx` library is loaded on the first click.
  */
-export function WordExportButton({ model, appendix, logoUrl }: Props) {
+export function WordExportButton({ model, appendix, logoImageId }: Props) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -29,7 +29,7 @@ export function WordExportButton({ model, appendix, logoUrl }: Props) {
       const { exportWord } = await import('./exportWord');
       await exportWord(model, {
         appendix,
-        logoUrl,
+        logoImageId,
         // Read URLs expire: a cached one is used only while it is fresh.
         imageUrl: (id) => queryClient.fetchQuery(imageUrlQuery(id)),
       });

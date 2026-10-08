@@ -1,6 +1,6 @@
 import { IMAGE_MAX_EDGE_PX } from '@modig/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fitWithin, ImageError, putToStorage } from './images';
+import { fitWithin, ImageError, putToStorage, uploadJpeg } from './images';
 
 describe('fitWithin', () => {
   it('scales a landscape photo to the maximum long edge', () => {
@@ -40,6 +40,7 @@ describe('putToStorage', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.resetAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('PUTs the JPEG as a block blob, without cookies', async () => {
@@ -50,6 +51,7 @@ describe('putToStorage', () => {
       headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': 'image/jpeg' },
       body: jpeg,
       credentials: 'omit',
+      signal: expect.any(AbortSignal) as AbortSignal,
     });
   });
 
@@ -64,4 +66,42 @@ describe('putToStorage', () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
     await expect(putToStorage(sasUrl, jpeg)).rejects.toBeInstanceOf(ImageError);
   });
+
+  it('gives up on an upload that hangs, so it can be tried again', async () => {
+    hang();
+    // The timeout, already expired.
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(() =>
+      AbortSignal.abort(new DOMException('Timed out', 'TimeoutError')),
+    );
+    await expect(putToStorage(sasUrl, jpeg)).rejects.toThrow(
+      new ImageError('The upload took too long. Check your connection and try again.'),
+    );
+  });
+
+  it('stops when the caller stops it (Cancel while saving)', async () => {
+    const urlResponse = {
+      imageId: 'img0000000000001',
+      sasUrl,
+      expiresAt: '2026-10-08T12:00:00.000Z',
+    };
+    hang((url) => (url.startsWith('/api/') ? Response.json(urlResponse) : null));
+    const stop = new AbortController();
+    const upload = uploadJpeg(jpeg, stop.signal);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    stop.abort();
+    await expect(upload).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  /** A fetch that never answers (or answers `answer`'s response), until its signal aborts. */
+  function hang(answer: (url: string) => Response | null = () => null) {
+    fetchMock.mockImplementation((input, init) => {
+      const response = answer(String(input));
+      if (response) return Promise.resolve(response);
+      return new Promise((_, reject) => {
+        const signal = init?.signal;
+        if (signal?.aborted) reject(signal.reason as Error);
+        signal?.addEventListener('abort', () => reject(signal.reason as Error));
+      });
+    });
+  }
 });

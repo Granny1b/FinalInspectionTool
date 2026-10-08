@@ -1,6 +1,6 @@
 import type { AnnotatedImage, Annotation } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
-import { firstImageFile, needsRender, savedPhoto, shownImageId } from './photos';
+import { firstImageFile, needsRender, pastesText, savedPhoto, shownImageId } from './photos';
 
 const ARROW: Annotation = { kind: 'arrow', points: [0.1, 0.1, 0.5, 0.5], color: '#E02424' };
 const BOX: Annotation = { kind: 'rect', x: 0.2, y: 0.2, w: 0.3, h: 0.3, color: '#E02424' };
@@ -27,6 +27,34 @@ describe('firstImageFile', () => {
   it('gives null when there is no image', () => {
     expect(firstImageFile([])).toBeNull();
     expect(firstImageFile([new File(['x'], 'a.pdf', { type: 'application/pdf' })])).toBeNull();
+  });
+});
+
+describe('pastesText', () => {
+  const clipboard = (types: Record<string, string>) => ({
+    getData: (type: string) => types[type] ?? '',
+  });
+  const field = { tagName: 'TEXTAREA' } as unknown as EventTarget;
+  const button = { tagName: 'BUTTON', isContentEditable: false } as unknown as EventTarget;
+
+  it('keeps text pasted into a field as text, even with a picture of it (Excel, Word)', () => {
+    expect(pastesText({ target: field, clipboardData: clipboard({ 'text/plain': 'Rails' }) })).toBe(
+      true,
+    );
+    const editable = { tagName: 'DIV', isContentEditable: true } as unknown as EventTarget;
+    expect(pastesText({ target: editable, clipboardData: clipboard({ 'text/plain': 'x' }) })).toBe(
+      true,
+    );
+  });
+
+  it('lets an image through: no plain text (a browser’s Copy image), or not into a field', () => {
+    expect(
+      pastesText({ target: field, clipboardData: clipboard({ 'text/html': '<img src="x">' }) }),
+    ).toBe(false);
+    expect(
+      pastesText({ target: button, clipboardData: clipboard({ 'text/plain': 'Rails' }) }),
+    ).toBe(false);
+    expect(pastesText({ target: null, clipboardData: null })).toBe(false);
   });
 });
 

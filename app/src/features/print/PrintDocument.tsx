@@ -91,7 +91,12 @@ export function PrintDocument({
       )}
 
       {appendix && (
-        <ReferenceAppendix entries={model.appendix} subject={subject} imageUrls={images.urls} />
+        <ReferenceAppendix
+          entries={model.appendix}
+          subject={subject}
+          imageUrls={images.urls}
+          fallbackFooter={fallbackFooter}
+        />
       )}
     </div>
   );

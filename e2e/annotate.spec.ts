@@ -15,6 +15,7 @@ import {
   type APIRequestContext,
   type Locator,
   type Page,
+  type Route,
 } from '@playwright/test';
 import { signIn } from './support/auth';
 import { jpegSize, testPhoto, uploadPhoto } from './support/photos';
@@ -25,8 +26,10 @@ import { createTemplate, deleteInspection, deleteTemplate } from './support/stor
  * and marked up in the real annotation editor with the mouse, saved, and still there after a
  * reload: the marks stored as fractions of the photo, plus a flattened copy with them, which the
  * thumbnail and the printed deviation card show. Also: at most two photos a deviation, photos on
- * extra deviations, and the read-only viewer of a finalised inspection, which never loads the
- * editor. Throwaway template and inspections, deleted afterwards with their photos.
+ * extra deviations, the read-only viewer of a finalised inspection, which never loads the
+ * editor, leaving the page with unsaved marks, an editor that can't load, and the editor's
+ * keyboard, label colour and stopped saves. Throwaway template and inspections, deleted
+ * afterwards with their photos.
  */
 
 const INSPECTOR = 'erik.lund@modig.se';
@@ -178,6 +181,34 @@ async function dropFile(page: Page, on: Locator, file: { name: string; type: str
 
 /** Requests for the editor's code and Konva, which it alone brings along (dev and build names). */
 const EDITOR_CODE = /AnnotationEditor|konva/i;
+
+/** Uploads to (and reads from) blob storage, the browser's own requests. */
+const STORAGE_IMAGES = /\/devstoreaccount1\/images\//;
+
+/**
+ * Two animation frames. The page's leave guard arms in an effect after a change, so a script
+ * that goes Back in the same moment can slip past it (a person can't); this lets it arm.
+ */
+async function nextFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+}
+
+/** An 800 × 600 PNG, transparent but for a blue square in the middle (a cut-out, a diagram). */
+async function transparentPng(page: Page): Promise<Buffer> {
+  const base64 = await page.evaluate(async () => {
+    const canvas = new OffscreenCanvas(800, 600);
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#2050bf';
+    context.fillRect(300, 200, 200, 200);
+    const bytes = new Uint8Array(
+      await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer(),
+    );
+    return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''));
+  });
+  return Buffer.from(base64, 'base64');
+}
 
 async function readUrl(page: Page, imageId: string): Promise<string> {
   const response = await page.request.get(`/api/images/${imageId}/url`);
@@ -459,4 +490,192 @@ test('a finalised inspection shows its photos in a viewer, without loading the e
   await viewer.getByRole('button', { name: 'Close' }).click();
   await expect(viewer).toBeHidden();
   expect(requested.filter((url) => EDITOR_CODE.test(url))).toEqual([]);
+});
+
+test('leaving with unsaved marks asks first; a transparent PNG is flattened on white', async ({
+  page,
+  context,
+  published,
+  tracked,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const created = await createInspection(page.request, published, tracked);
+  const { id, number } = created.inspection;
+  const itemId = published.sections[0]!.items[1]!.id;
+  await save(page.request, created, { [itemId]: { status: 'NOK' } });
+
+  // Opened from the list, so Back stays in the app.
+  await page.goto('/inspections');
+  await page.getByRole('searchbox', { name: 'Search inspections' }).fill(number);
+  await page.getByRole('link', { name: number }).click();
+  await page.getByRole('tab', { name: /^Deviations/ }).click();
+  const card = page.locator('article[data-deviation="D-01"]');
+  await card.locator('[data-photo-input]').setInputFiles({
+    name: 'cut-out.png',
+    mimeType: 'image/png',
+    buffer: await transparentPng(page),
+  });
+  await expect(canvas(page)).toBeVisible({ timeout: 20_000 });
+  await drag(page, [0.2, 0.2], [0.45, 0.45]);
+  await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 1 mark');
+
+  // Back: the marks are in no document yet, so nothing could save them. Cancel keeps them.
+  await nextFrames(page);
+  await page.goBack();
+  const leave = page.getByRole('dialog', { name: 'Leave without saving?' });
+  await expect(leave).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/inspections/${id}$`));
+  await leave.getByRole('button', { name: 'Cancel' }).click();
+  await expect(leave).toBeHidden();
+  await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 1 mark');
+
+  // Saved: where the PNG is transparent, the flattened copy is white, like the stored photo.
+  await editor(page).getByRole('button', { name: 'Save' }).click();
+  await expect(editor(page)).toBeHidden({ timeout: 30_000 });
+  await expect
+    .poll(
+      async () =>
+        (await stored(page.request, id)).results[itemId]?.photos?.[0]?.renderedImageId ?? null,
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+  const [photo] = (await stored(page.request, id)).results[itemId]!.photos!;
+  for (const imageId of [photo!.imageId, photo!.renderedImageId!]) {
+    const corner = await pixel(page, await readUrl(page, imageId), [0.05, 0.9]);
+    for (const value of corner) expect(value).toBeGreaterThan(240);
+  }
+
+  // A second mark, then Back and Leave: back on the list, the mark not saved.
+  await card.getByRole('button', { name: 'Edit photo 1' }).click();
+  await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 1 mark', {
+    timeout: 20_000,
+  });
+  await drag(page, [0.6, 0.6], [0.85, 0.85]);
+  await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 2 marks');
+  await nextFrames(page);
+  await page.goBack();
+  await leave.getByRole('button', { name: 'Leave' }).click();
+  await expect(page).toHaveURL(/\/inspections\?q=/);
+  expect((await stored(page.request, id)).results[itemId]!.photos![0]!.annotations).toHaveLength(1);
+});
+
+test('if the editor can’t load, a message says so and the page keeps its unsaved work', async ({
+  page,
+  context,
+  browser,
+  published,
+  tracked,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const { inspection } = await createInspection(page.request, published, tracked);
+  // Offline, or a new version deployed meanwhile: the editor's code never comes.
+  await page.route(EDITOR_CODE, (route) => route.abort());
+
+  await page.goto(`/inspections/${inspection.id}`);
+  await page.getByRole('tab', { name: /^Deviations/ }).click();
+  await page.getByRole('button', { name: 'Add extra deviation' }).click();
+  const description = page.getByRole('textbox', { name: 'Description, D-01' });
+  await description.fill('Paint damage on the right-hand door');
+  const add = page.locator('article[data-deviation="D-01"]').getByRole('button', {
+    name: /^Add photo/,
+  });
+  const chooser = page.waitForEvent('filechooser');
+  await add.click();
+  await (
+    await chooser
+  ).setFiles({
+    name: 'door.jpg',
+    mimeType: 'image/jpeg',
+    buffer: await testPhoto(browser, { width: 1200, height: 900, label: 'Door' }),
+  });
+
+  const failed = page.getByRole('dialog', { name: 'Couldn’t open the editor' });
+  await expect(failed).toBeVisible();
+  await expect(failed.getByRole('button', { name: 'Reload page' })).toBeVisible();
+  await failed.getByRole('button', { name: 'Close' }).click();
+  await expect(failed).toBeHidden();
+  // Back on the button that opened it; the page and what was typed are as they were.
+  await expect(add).toBeFocused();
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(description).toHaveValue('Paint damage on the right-hand door');
+});
+
+test('the photo editor keeps the keyboard, gives a label the colour picked, and a hanging save can be stopped', async ({
+  page,
+  context,
+  published,
+  tracked,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const created = await createInspection(page.request, published, tracked);
+  const { id } = created.inspection;
+  const itemId = published.sections[0]!.items[1]!.id;
+  const [imageId] = await uploadPhotos(page, ['Cabinet']);
+  await save(page.request, created, {
+    [itemId]: { status: 'NOK', photos: [{ imageId: imageId!, annotations: [] }] },
+  });
+
+  await page.goto(`/inspections/${id}`);
+  await page.getByRole('tab', { name: /^Deviations/ }).click();
+  const thumbnail = page
+    .locator('article[data-deviation="D-01"]')
+    .getByRole('button', { name: 'Edit photo 1' });
+
+  // The first opening on the page (its code still loading) gives the focus back on closing too.
+  await thumbnail.click();
+  await expect(canvas(page)).toBeVisible({ timeout: 20_000 });
+  await page.keyboard.press('Escape');
+  await expect(editor(page)).toBeHidden();
+  await expect(thumbnail).toBeFocused();
+
+  // The bin turns itself off but keeps the focus in the editor: Ctrl+Z brings the mark back.
+  await thumbnail.click();
+  await expect(canvas(page)).toBeVisible({ timeout: 20_000 });
+  await drag(page, [0.3, 0.3], [0.55, 0.55]);
+  await pick(page, 'Tool', 'Select and move');
+  await page.mouse.click(...(await onPhoto(page, [0.425, 0.425])));
+  const bin = editor(page).getByRole('button', { name: 'Delete mark' });
+  await expect(bin).not.toHaveAttribute('aria-disabled');
+  await bin.click();
+  await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 0 marks');
+  await expect(bin).toBeFocused();
+  await expect(bin).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Control+Z');
+  await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 1 mark');
+
+  // A colour picked while a label is typed is the label's.
+  await pick(page, 'Tool', 'Text');
+  await page.mouse.click(...(await onPhoto(page, [0.6, 0.2])));
+  await page.keyboard.type('Loose');
+  await pick(page, 'Colour', 'Yellow');
+  await expect(editor(page).getByRole('textbox', { name: 'Label text' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 2 marks');
+
+  // The upload hangs (poor Wi-Fi): Cancel stops the save, the marks stay, and Save tries again.
+  const held: Route[] = [];
+  const hold = (route: Route) =>
+    route.request().method() === 'PUT' ? void held.push(route) : route.continue();
+  await page.route(STORAGE_IMAGES, hold);
+  await editor(page).getByRole('button', { name: 'Save' }).click();
+  await expect(editor(page).getByRole('button', { name: 'Saving…' })).toBeVisible();
+  await expect.poll(() => held.length).toBe(1);
+  await editor(page).getByRole('button', { name: 'Cancel' }).click();
+  await expect(editor(page).getByRole('alert')).toHaveText(/^Saving was stopped/);
+  await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 2 marks');
+  await page.unroute(STORAGE_IMAGES, hold);
+  await Promise.all(held.map((route) => route.abort().catch(() => undefined)));
+  await editor(page).getByRole('button', { name: 'Save' }).click();
+  await expect(editor(page)).toBeHidden({ timeout: 30_000 });
+
+  await expect
+    .poll(
+      async () =>
+        (await stored(page.request, id)).results[itemId]?.photos?.[0]?.renderedImageId ?? null,
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+  const [arrow, label] = (await stored(page.request, id)).results[itemId]!.photos![0]!.annotations;
+  expect(arrow).toMatchObject({ kind: 'arrow', color: ANNOTATION_COLORS.red });
+  expect(label).toMatchObject({ kind: 'text', text: 'Loose', color: ANNOTATION_COLORS.yellow });
 });

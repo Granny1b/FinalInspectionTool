@@ -63,14 +63,17 @@ export function FrontPage({ front, logoUrl, photoUrl }: Props) {
           ))}
         </dl>
 
-        <div className="paper-signatures">
-          {SIGNATURES.map((label) => (
-            <div key={label} className="paper-signature">
-              <span>{label}</span>
-            </div>
-          ))}
+        {/* Together on the next page if the values leave them no room on this one. */}
+        <div className="paper-front-sign">
+          <div className="paper-signatures">
+            {SIGNATURES.map((label) => (
+              <div key={label} className="paper-signature">
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="paper-revision">{front.revision}</p>
         </div>
-        <p className="paper-revision">{front.revision}</p>
       </div>
     </section>
   );

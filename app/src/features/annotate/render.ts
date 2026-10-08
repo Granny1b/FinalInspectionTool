@@ -27,6 +27,9 @@ export async function renderAnnotatedJpeg(
   try {
     const layer = new Konva.Layer();
     stage.add(layer);
+    // JPEG has no transparency: transparent parts of a PNG would otherwise turn black, as in
+    // lib/images.ts.
+    layer.add(new Rect({ x: 0, y: 0, ...size, fill: '#ffffff', listening: false }));
     layer.add(new Image({ image, ...size }));
     for (const annotation of annotations) {
       for (const spec of shapeSpecs(annotation, size)) layer.add(createShape(spec));

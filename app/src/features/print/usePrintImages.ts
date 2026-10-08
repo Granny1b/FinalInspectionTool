@@ -3,7 +3,7 @@ import { imageUrlQuery, useImageUrl } from '../../lib/images';
 import { printedImageIds, type PrintModel } from './model';
 
 /** Printed when the settings name no logo of their own, or it can't be fetched. */
-const DEFAULT_LOGO_URL = '/modig-logo.png';
+export const DEFAULT_LOGO_URL = '/modig-logo.png';
 
 /**
  * Addresses of every image the document shows: the machine photo (or a template's cover), the
@@ -36,6 +36,7 @@ export function usePrintImages(
     appendixLoading: pending((id) => !base.has(id)),
     urls,
     logoUrl: logo.data ?? DEFAULT_LOGO_URL,
+    logoImageId,
   };
 }
 

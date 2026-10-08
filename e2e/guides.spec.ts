@@ -95,6 +95,29 @@ async function pasteImage(page: Page, file: { base64: string }, into: Locator): 
   await page.keyboard.press('Control+V');
 }
 
+/** Puts text with a picture of it on the clipboard, as Excel and Word copy, and presses Ctrl+V. */
+async function pasteTextWithPicture(page: Page, text: string, into: Locator): Promise<void> {
+  await page.evaluate(async (text) => {
+    const canvas = new OffscreenCanvas(200, 60);
+    canvas.getContext('2d')!.fillRect(0, 0, 200, 60);
+    const png = await canvas.convertToBlob({ type: 'image/png' });
+    const plain = new Blob([text], { type: 'text/plain' });
+    await navigator.clipboard.write([new ClipboardItem({ 'text/plain': plain, 'image/png': png })]);
+  }, text);
+  await into.focus();
+  await page.keyboard.press('Control+V');
+}
+
+/**
+ * Two animation frames. The page's leave guard arms in an effect after a change, so a script
+ * that goes Back in the same moment can slip past it (a person can't); this lets it arm.
+ */
+async function nextFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+}
+
 /** Drags an image file over an element and drops it there, as from the file manager. */
 async function dropImage(
   page: Page,
@@ -160,6 +183,14 @@ test('an admin writes a guide with pasted and dropped images, marks one up and s
   await expect(dialog.getByRole('heading', { name: `Guide · 1.b ${row.text}` })).toBeVisible();
   const description = dialog.getByLabel('Description');
   await expect(description).toBeFocused();
+  await description.fill('Every screw has an unbroken paint mark from head to plate.');
+
+  // Text copied from Excel or Word comes with a picture of itself: it is pasted as text.
+  await pasteTextWithPicture(page, ' Checked after transport.', description);
+  await expect(description).toHaveValue(
+    'Every screw has an unbroken paint mark from head to plate. Checked after transport.',
+  );
+  await expect(annotationEditor(page)).toHaveCount(0);
   await description.fill('Every screw has an unbroken paint mark from head to plate.');
 
   // Pasted while typing the description: the image opens in the annotation editor at once. An
@@ -400,4 +431,43 @@ test('an inspection shows the guide as it was when it was created, from the row�
     .click();
   await expect(viewer).toContainText('Changed after the inspection was created.');
   await expect(viewer.locator('li[data-guide-image] [data-verdict]')).toHaveText(['Info']);
+});
+
+test('leaving the template editor while the guide editor has changes asks first', async ({
+  page,
+  context,
+  templates,
+}) => {
+  await signIn(context, ADMIN, ['admin']);
+  const template = templates(
+    await createTemplate('E2E guides – leave', false, { sections: checklist() }),
+  );
+  const row = template.sections[0]!.items[1]!;
+
+  // Opened from the list, so Back stays in the app.
+  await page.goto('/templates');
+  await page.getByRole('link', { name: template.name, exact: true }).click();
+  await page.locator(`#row-${row.id}`).hover();
+  await page.getByRole('button', { name: 'Add guide, row 1.b' }).click();
+  const description = guideEditor(page).getByLabel('Description');
+  await description.fill('Rails clean, no chips.');
+
+  // The guide is in no draft yet: Back asks, and Cancel keeps it.
+  await nextFrames(page);
+  await page.goBack();
+  const leave = page.getByRole('dialog', { name: 'Leave without saving?' });
+  await expect(leave).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/templates/${template.id}$`));
+  await leave.getByRole('button', { name: 'Cancel' }).click();
+  await expect(leave).toBeHidden();
+  await expect(description).toHaveValue('Rails clean, no chips.');
+
+  // Leave: back on the list, without the guide.
+  await nextFrames(page);
+  await page.goBack();
+  await leave.getByRole('button', { name: 'Leave' }).click();
+  await expect(page).toHaveURL(/\/templates$/);
+  expect(
+    (await savedDraft(page.request, template.id)).sections[0]!.items[1]!.guide,
+  ).toBeUndefined();
 });

@@ -4,14 +4,15 @@
  */
 import { Packer } from 'docx';
 import { printedImageIds, type PrintModel } from '../print/model';
+import { DEFAULT_LOGO_URL } from '../print/usePrintImages';
 import { readImage, type WordImage } from './images';
 import { wordDocument } from './wordDocument';
 
 type Sources = {
   /** With the reference images. */
   appendix: boolean;
-  /** The logo as printed: the settings' own, or the bundled Modig logo. */
-  logoUrl: string;
+  /** The settings' own logo; without one, the bundled Modig logo. */
+  logoImageId: string | undefined;
   /** A fresh read URL for an uploaded image. */
   imageUrl: (imageId: string) => Promise<string>;
 };
@@ -19,8 +20,12 @@ type Sources = {
 /** Builds the printout as a .docx in the browser and saves it under the printout's name. */
 export async function exportWord(model: PrintModel, sources: Sources): Promise<void> {
   const ids = printedImageIds(model, { appendix: sources.appendix });
+  // A fresh URL, as for the photos: the preview's may have expired by now.
+  const logoUrl = sources.logoImageId
+    ? sources.imageUrl(sources.logoImageId).catch(() => DEFAULT_LOGO_URL)
+    : Promise.resolve(DEFAULT_LOGO_URL);
   const [logo, ...loaded] = await Promise.all([
-    loadImage(sources.logoUrl),
+    logoUrl.then(loadImage),
     ...ids.map((id) => sources.imageUrl(id).then(loadImage, () => null)),
   ]);
   const photos = new Map(
@@ -36,18 +41,27 @@ export async function exportWord(model: PrintModel, sources: Sources): Promise<v
   save(await Packer.toBlob(file), wordFileName(model.fileName));
 }
 
+/** The longest file name, without ".docx". */
+const FILE_NAME_LENGTH = 150;
+
 /**
  * "FI-2026-0042 RigiMill MG – Volvo Skövde – Inspection report.docx": the PDF's name, with the
- * characters Windows and macOS refuse in file names replaced, and not too long.
+ * characters Windows and macOS refuse in file names replaced, and not too long. A long name is
+ * shortened before its last part ("– Blank checklist"), so a blank and a report export never get
+ * the same name.
  */
 export function wordFileName(name: string): string {
-  const safe = name
+  let safe = name
     .replace(/\s+/g, ' ')
     // eslint-disable-next-line no-control-regex -- control characters are exactly what is replaced
     .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, '-')
-    .slice(0, 150)
-    .replace(/[\s.]+$/, '')
     .trim();
+  if (safe.length > FILE_NAME_LENGTH) {
+    const last = safe.lastIndexOf(' – ');
+    const kind = last > 0 && safe.length - last <= 40 ? safe.slice(last) : '';
+    safe = `${safe.slice(0, FILE_NAME_LENGTH - kind.length - 1).trimEnd()}…${kind}`;
+  }
+  safe = safe.replace(/[\s.]+$/, '');
   return `${safe || 'Final inspection'}.docx`;
 }
 

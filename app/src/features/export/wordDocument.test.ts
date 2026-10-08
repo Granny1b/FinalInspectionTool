@@ -109,7 +109,13 @@ const ALL_IMAGES: WordImages = {
   ),
 };
 
-type Unzipped = { document: string; footer: string; media: string[] };
+type Unzipped = {
+  document: string;
+  footer: string;
+  media: string[];
+  /** Every XML part of the file by name. */
+  parts: Record<string, string>;
+};
 
 async function build(
   model: PrintModel,
@@ -120,12 +126,17 @@ async function build(
   );
   const read = (name: string) => zip.file(name)!.async('string');
   const footers = Object.keys(zip.files).filter((name) => /^word\/footer\d*\.xml$/.test(name));
+  const xml = Object.keys(zip.files).filter((name) => /\.(xml|rels)$/.test(name));
   return {
     document: await read('word/document.xml'),
     footer: (await Promise.all(footers.map(read))).join(''),
     media: Object.keys(zip.files).filter((name) => name.startsWith('word/media/')),
+    parts: Object.fromEntries(await Promise.all(xml.map(async (name) => [name, await read(name)]))),
   };
 }
+
+/** The checklist's rows (tables without nested ones), as XML. */
+const tableRows = (xml: string) => xml.match(/<w:tr[ >](?:(?!<w:tbl>)[\s\S])*?<\/w:tr>/g) ?? [];
 
 const count = (xml: string, pattern: RegExp) => xml.match(pattern)?.length ?? 0;
 /** The text of the document in order, without the XML. */
@@ -209,11 +220,16 @@ describe('the Word export of a report', () => {
   });
 
   it('says where a photo couldn’t be loaded', async () => {
-    const { document } = await build(model, { images: { logo: null, photos: new Map() } });
+    const { document } = await build(model, {
+      appendix: true,
+      images: { logo: null, photos: new Map() },
+    });
     expect(count(document, /<a:blip /g)).toBe(0);
     const all = text(document);
     expect(all).toContain('The machine photo couldn’t be loaded.');
     expect(count(all, /The photo couldn’t be loaded\./g)).toBe(2);
+    // A reference image keeps its frame, as on paper.
+    expect(count(all, /The image couldn’t be loaded\./g)).toBe(3);
   });
 
   it('has the footer of the printout and "Page X of Y" as Word fields', async () => {
@@ -237,6 +253,173 @@ describe('the Word export of a report', () => {
     expect(all).toContain('1.b · ⓘ Info');
     // Logo, machine photo, two deviation photos and three reference images.
     expect(count(document, /<a:blip /g)).toBe(7);
+  });
+});
+
+describe('the Word export of awkward text', () => {
+  it('leaves out the control characters XML refuses, so the file always opens', async () => {
+    // U+000B is the line break Word's own paste leaves in a text; U+0001 any stray control.
+    const inspection: Inspection = {
+      ...INSPECTION,
+      templateSnapshot: {
+        ...INSPECTION.templateSnapshot,
+        sections: [
+          {
+            ...SECTIONS[0]!,
+            title: 'Loading\u0001area',
+            items: SECTIONS[0]!.items.map((item) =>
+              item.guide
+                ? { ...item, guide: { ...item.guide, description: 'Rails\u000Bclean' } }
+                : item,
+            ),
+          },
+          SECTIONS[1]!,
+        ],
+      },
+      front: { ...INSPECTION.front, machineName: 'RigiMill\u000BMG' },
+      results: {
+        ...INSPECTION.results,
+        [id('Item', 1)]: {
+          ...INSPECTION.results[id('Item', 1)]!,
+          comment: 'Bolt loose\u000Bsee photo',
+          photos: [{ imageId: id('Orig', 2), caption: 'Left\u000Bcolumn', annotations: [] }],
+        },
+      },
+    };
+    const model = inspectionPrint(inspection, 'report', {
+      ...CONTEXT,
+      companyName: 'Modig\u0001Machine Tool',
+    });
+    const { document, parts } = await build(model, { appendix: true });
+    for (const [name, xml] of Object.entries(parts)) {
+      // eslint-disable-next-line no-control-regex -- the characters XML 1.0 refuses
+      expect(xml, name).not.toMatch(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/);
+    }
+    const all = text(document);
+    expect(all).toContain('Bolt loose see photo');
+    expect(all).toContain('RigiMill MG');
+    expect(all).toContain('Loadingarea');
+    expect(all).toContain('Left column');
+    expect(all).toContain('Rails clean');
+  });
+
+  it('keeps the line breaks of a guide’s description', async () => {
+    const sections: Section[] = [
+      {
+        ...SECTIONS[0]!,
+        items: SECTIONS[0]!.items.map((item) =>
+          item.guide
+            ? { ...item, guide: { ...item.guide, description: 'Check:\n1. Rails\r\n2. Chips' } }
+            : item,
+        ),
+      },
+    ];
+    const inspection = {
+      ...INSPECTION,
+      templateSnapshot: { ...INSPECTION.templateSnapshot, sections },
+    };
+    const { document } = await build(inspectionPrint(inspection, 'report', CONTEXT), {
+      appendix: true,
+    });
+    expect(document).toMatch(
+      /Check:<\/w:t><\/w:r><w:r><w:br\/><w:t[^>]*>1\. Rails<\/w:t><\/w:r><w:r><w:br\/><w:t[^>]*>2\. Chips</,
+    );
+    expect(document).not.toMatch(/<w:t[^>]*>[^<]*[\r\n][^<]*<\/w:t>/);
+  });
+
+  it('lets a row or card taller than a page split, instead of Word cutting it off', async () => {
+    const long = 'Long comment about the deviation, with details. '.repeat(41).slice(0, 2000);
+    const inspection: Inspection = {
+      ...INSPECTION,
+      results: {
+        ...INSPECTION.results,
+        [id('Item', 1)]: { ...INSPECTION.results[id('Item', 1)]!, comment: long },
+      },
+      extraDeviations: [
+        {
+          id: id('Extr', 1),
+          description: 'D'.repeat(2000),
+          comment: long,
+          severity: 'critical',
+        },
+      ],
+    };
+    const { document } = await build(inspectionPrint(inspection, 'report', CONTEXT));
+    const rows = tableRows(document);
+    const tall = rows.filter((row) => row.includes('Long comment about'));
+    // The checklist row (the cards hold nested tables and are not among these).
+    expect(tall).toHaveLength(1);
+    expect(tall[0]).not.toContain('<w:cantSplit/>');
+    expect(tall[0]).not.toContain('<w:keepNext/>');
+    // The section's next row is short: it still never splits and keeps with the last.
+    const next = rows.find((row) => row.includes('>1.b<'));
+    expect(next).toContain('<w:cantSplit/>');
+    // The extra deviation's card (one outer row) may split; the first card may not.
+    const cardStart = (number: string) => {
+      const at = document.indexOf(`>${number} · `);
+      return document.slice(document.lastIndexOf('<w:tbl>', at), at);
+    };
+    expect(cardStart('D-01')).toContain('<w:cantSplit/>');
+    expect(cardStart('D-02')).not.toContain('<w:cantSplit/>');
+    expect(text(document)).toContain('D-02 · Critical');
+  });
+
+  it('gives the photo less room when the front page’s values run over several lines', async () => {
+    const photoHeight = (xml: string) =>
+      Number(
+        /<wp:extent cx="\d+" cy="(\d+)"\/>(?:(?!<wp:extent)[\s\S])*?descr="Machine photo"/.exec(
+          xml,
+        )![1],
+      );
+    const normal = photoHeight(
+      (await build(inspectionPrint(INSPECTION, 'report', CONTEXT))).document,
+    );
+    const crowded: Inspection = {
+      ...INSPECTION,
+      front: {
+        ...INSPECTION.front,
+        machineName: 'M'.repeat(200),
+        location: 'L'.repeat(200),
+        participants: Array.from({ length: 12 }, (_, n) => `Participant Person${n} Lastname`),
+      },
+    };
+    const smaller = photoHeight(
+      (await build(inspectionPrint(crowded, 'report', CONTEXT))).document,
+    );
+    expect(smaller).toBeLessThan(normal * 0.75);
+  });
+
+  it('holds a ref like 10.am on one line: the No. column is 12.5 mm', async () => {
+    const sections: Section[] = Array.from({ length: 10 }, (_, s) => ({
+      id: id('Sect', s + 1),
+      title: `Section ${s + 1}`,
+      items: Array.from({ length: s === 9 ? 40 : 1 }, (_, n) => ({
+        id: id(`I${s}x`, n + 1),
+        text: `Row ${n + 1}`,
+      })),
+    }));
+    const { document } = await build(
+      templatePrint(
+        {
+          id: id('Tmpl', 1),
+          name: 'Many sections',
+          modelCode: 'RMMG',
+          revision: 1,
+          status: 'draft',
+          printSettings: { spareRowsPerSection: 0 },
+          sections,
+          updatedAt: '2026-10-07T08:00:00.000Z',
+          updatedBy: 'anna@modig.se',
+        },
+        { ...CONTEXT, draft: false },
+      ),
+    );
+    expect(text(document)).toContain('10.am');
+    // 12.5 mm in twips, the first column of every section's table.
+    const grids = document.match(/<w:tblGrid>(?:(?!<\/w:tblGrid>)[\s\S])*<\/w:tblGrid>/g) ?? [];
+    const sectionGrids = grids.filter((grid) => grid.match(/<w:gridCol /g)?.length === 7);
+    expect(sectionGrids).toHaveLength(10);
+    for (const grid of sectionGrids) expect(grid).toMatch(/^<w:tblGrid><w:gridCol w:w="709"\/>/);
   });
 });
 
@@ -298,7 +481,14 @@ describe('the file name', () => {
     expect(wordFileName('  Name with\ttabs and trailing dots... ')).toBe(
       'Name with tabs and trailing dots.docx',
     );
-    expect(wordFileName('x'.repeat(300))).toBe(`${'x'.repeat(150)}.docx`);
+    expect(wordFileName('x'.repeat(300))).toBe(`${'x'.repeat(149)}….docx`);
+    // A long machine name is shortened, never the kind of printout.
+    const long = `FI-2026-0042 ${'M'.repeat(200)}`;
+    const blank = wordFileName(`${long} – Blank checklist`);
+    const report = wordFileName(`${long} – Inspection report`);
+    expect(blank).toMatch(/^FI-2026-0042 M+… – Blank checklist\.docx$/);
+    expect(report).toMatch(/^FI-2026-0042 M+… – Inspection report\.docx$/);
+    expect(blank.length).toBeLessThanOrEqual(150 + '.docx'.length);
     expect(wordFileName(' ?')).toBe('-.docx');
     expect(wordFileName('   ')).toBe('Final inspection.docx');
   });

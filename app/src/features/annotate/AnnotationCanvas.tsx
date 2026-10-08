@@ -186,8 +186,9 @@ export function AnnotationCanvas({
       onLostPointerCapture={onPointerCancel}
       style={{ width: shown.width, height: shown.height }}
       className={clsx(
-        // No scrolling or zooming the page while drawing with a finger or pen.
-        'relative touch-none shadow-lg outline-none select-none',
+        // No scrolling or zooming the page while drawing with a finger or pen. White behind a
+        // transparent PNG, as in the stored photo and the flattened copy.
+        'relative touch-none bg-white shadow-lg outline-none select-none',
         selecting
           ? hovering && 'cursor-move'
           : !disabled && (tool === 'text' ? 'cursor-text' : 'cursor-crosshair'),

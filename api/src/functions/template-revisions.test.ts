@@ -96,15 +96,30 @@ async function revisionNumbers(id: string) {
   return (await listBlobNames(templates, `${id}/`)).filter((name) => name.includes('/rev-'));
 }
 
-/** Published as revision 2 (like the seed), then edited: the draft has one more section. */
+/**
+ * Published as revision 2 (like the seed), then edited: the draft has one more section, whose row
+ * has a guide (publishing freezes it with the rest).
+ */
 async function editedTemplate() {
   const original = draftTemplate({ revision: 3 });
   await storeTemplate(original, [1, 2]);
+  const guide = {
+    description: 'No dents',
+    images: [
+      {
+        imageId: newId(),
+        caption: 'Dent',
+        annotations: [{ kind: 'arrow' as const, points: [0.1, 0.1, 0.5, 0.5], color: '#E02424' }],
+        renderedImageId: newId(),
+        verdict: 'bad' as const,
+      },
+    ],
+  };
   const draft: Template = {
     ...original,
     sections: [
       ...original.sections,
-      { id: newId(), title: 'Gantry', items: [{ id: newId(), text: 'Covers - Intact' }] },
+      { id: newId(), title: 'Gantry', items: [{ id: newId(), text: 'Covers - Intact', guide }] },
     ],
   };
   const etag = await storeTemplate(draft);

@@ -1128,7 +1128,15 @@ The calls with product, data or paper impact. Each is explained in its section b
   removing every mark drops it, and print uses the photo itself.
 - **A new photo opens in the editor at once** from a local copy while the scaled original uploads.
   A failed upload is reported at once and Save tries again; Save waits for an upload still running;
-  Cancel drops a new photo (its blob stays).
+  Cancel drops a new photo (its blob stays). (Review: a file the browser can't draw, such as HEIC
+  in Chrome or an SVG, is refused before the editor opens, since it could never be saved; a
+  transparent PNG is drawn on white in the editor and in the flattened copy, as in the stored
+  photo, where it had turned black.)
+- **An upload that hangs gives up** (review): the upload URL after 30 s, like saves, the photo's
+  PUT after 60 s, so a stalled request on workshop Wi-Fi becomes a failure that Save retries,
+  never an endless "Saving…". While saving, **Cancel and Escape stop the save** and keep the editor
+  open with its marks and "Saving was stopped"; a new photo's own upload goes on meanwhile. Each
+  attempt gets a new image id, so stopping or retrying never overwrites anything.
 - **Every image the feature loads asks for CORS** (`crossOrigin="anonymous"`, thumbnails and
   viewer too), so the browser cache never holds a response that would taint the canvas.
 - **Thumbnails are 160 × 120 and show the whole photo** (contain, on white), so marks near an edge
@@ -1136,14 +1144,33 @@ The calls with product, data or paper impact. Each is explained in its section b
   asks first. Focus goes to the new thumbnail after adding, to Add photo after removing.
 - **`accept="image/*"` without `capture`:** a tablet offers its camera and its photo library. Paste
   works while the component's buttons have the focus, drop on its area; only the first image is
-  used, pasted text is ignored, and a non-image or a drop when full says why.
+  used, pasted text is ignored, and a non-image or a drop when full says why. Removing a photo
+  clears a "full" message (review).
 - **Read-only** (no `onChange`): a thumbnail opens a simple viewer of the flattened copy, without
   Konva; with no photos the component renders nothing (the card says "No photos"). The hidden file
   input is rendered only while editable (integrator).
+- **Undo, Redo and Delete mark are `aria-disabled`, not disabled** (review): they turn themselves
+  off when clicked (the bin always does), and a disabled button that had the focus dropped it to
+  the page, out of the dialog, and Ctrl+Z, Delete and Escape stopped working. The same rule as the
+  app's other buttons that switch themselves off.
+- **A colour picked while typing a label is the label's** (review): the colour buttons don't take
+  the focus on press (`mousedown` default prevented), so the label stays open and the reducer
+  recolours it; before, the press ended the label in its old colour while the toolbar showed the
+  new one. The tool buttons still end a label. Keyboard users who Tab from the label to a colour
+  still end it first.
+- **Marks are drawn and edited with a pointer only** (review: recorded): the canvas is no Tab
+  stop, and there is no keyboard way to select, move or edit a mark; the keyboard has the tools,
+  colours, Undo/Redo, Delete for a selected mark, the caption, Save and Cancel. Not asked for by
+  the brief; photos come from a camera and are marked by hand.
+- **The first opening returns the focus too** (review): the "Opening the photo editor" dialog
+  shown while the editor's code loads is closed before React removes it (a layout effect's
+  cleanup), so the focus goes back to the button that opened the editor instead of the page.
 - **Escape is handled by the editor** (`closedby="none"`): Chrome lets a page refuse only one
   Escape per click. It asks before discarding changed marks or caption; in a label it ends the
   label only. Keys never reach the page behind (a checklist row would take "1" as OK). The dialog
-  focuses itself, not its first tool, whose focus ring looked like a second selected tool.
+  focuses itself, not its first tool, whose focus ring looked like a second selected tool. A
+  caption's surrounding spaces don't count as a change (a guide image's caption is trimmed only
+  when the guide is saved).
 - **Closing or reloading the tab with unsaved marks warns** (`beforeunload`).
 - **Labels are one line of at most 200 characters;** Enter or leaving the field keeps it, an empty
   one is removed, a double-click (Select tool) edits it.
@@ -1193,20 +1220,33 @@ The calls with product, data or paper impact. Each is explained in its section b
   CSSOM edits. The text is escaped as a CSS string (control characters become spaces).
 - **Chromium is recognised by `navigator.userAgentData`** (only Chromium browsers have it). Others
   get the footer's left text as a repeating table footer, without page numbers; the card pages
-  have none, their heading already names the inspection.
+  have none, their heading already names the inspection. (Review: the reference images appendix
+  repeats it too, its entries as the rows of a table, each row a block that never splits; its
+  heading doesn't repeat, so its later pages named nothing.)
 - **A report of an inspection in progress** says "NOT FINALISED – DRAFT REPORT" on its front page
   and "Not finalised" in every footer, so no single page passes for the final report.
 - **The PDF's file name** comes from the document title: "FI-2026-0042 RigiMill MG – Volvo Cars
   Skövde – Inspection report".
 - **The front page is exactly one page** (a 265 mm column; the photo takes what the text leaves).
   Without a photo its frame stays, so every front page has the same layout. The finaliser is
-  printed as stored, by email.
+  printed as stored, by email. (Review: values far beyond the usual, such as names and locations
+  near their 200 characters or twenty participants, used to push the signatures and Rev over the
+  checklist's first page. The column is now at least a page, the photo gives way down to 20 mm,
+  and beyond that the signatures and Rev start the next page together. Values are never cut.)
+- **The No. column is 12.5 mm** (review; 10.5 before): a ref past z in a section past 9, such as
+  "10.am", ran over its rule. The Checkpoint column gives the 2 mm, in print and in Word.
+- **The footer names the machine by at most 60 characters** (review), "…" after that: a 200
+  character name made the footer three lines, running into "Page X of Y" and toward the paper's
+  edge. The front page has the whole name. The left box keeps 4 mm from the page number.
 - **Checklist rows:** blank rows 9.5 mm (at least 9 mm to write in), report rows at least 7 mm. A
   status is an icon and its word in its column. **A NOK row's severity is a "Severity: Major" line
   at the top of its comment cell.** Spare lines print in blank mode only: in a report, findings
   that belong to no row are extra deviations.
 - **Orphans:** the section title and column labels are the repeating table head, a section's first
-  row keeps with the next and its last with the previous one, and no row is split.
+  row keeps with the next and its last with the previous one, and no row is split. (Review,
+  left as it is: a row whose comment alone is longer than a page, near the 2 000-character limit,
+  moves to a new page and then runs on, so the page before may hold only the heading. No text is
+  lost; Word has its own rule for this, see Word export.)
 - **Right-aligned text stays 0.5 mm inside the margin:** Chrome's PDFs put the right content edge
   about 0.3 mm further out.
 - **Black and white:** light grey fills (`print-color-adjust: exact`, so they print without
@@ -1218,13 +1258,20 @@ The calls with product, data or paper impact. Each is explained in its section b
   photo that can't be loaded says so in its place. No deviations: "No deviations recorded."
 - **`deviationsPerPage` lives in the address only** (default 2); the toolbar's switch replaces the
   history entry. The inspection's Report menu opens 2 per page.
+- **2 per page never prints a photo under 50 mm** (review). With the 24 mm floor alone, a card
+  with about 1 000 characters of text (or a neighbour with them) printed its photos at 24 mm,
+  smaller than 4 per page prints them (the 4-per-page row puts text beside the photos). Measured
+  in the card layout: the floor makes such a card take a page of its own, two cards without much
+  text still share one, and a card with every field at the schema's limits grows to about 245 of
+  the 253 mm a page has for cards. The empty "Sketch / photo" frame keeps 24 mm.
 - **4 per page is four stacked rows,** text in a 74 mm column on the left, photos on the right.
   Measured against a 2 × 2 grid: a pair of photos prints at 50 × 37 mm each instead of 33 × 25 mm,
   where the labels became unreadable; rows also read top to bottom like everything else. The grid
   code is removed.
 - **Each page of cards is a sheet of its own**, and its cards share it equally (flex); a card
   whose text needs more takes it from the others. Photos are positioned inside their slot, so
-  their pixel size never makes a card taller; a photo is never smaller than 24 mm, and captions
+  their pixel size never makes a card taller; a photo is never smaller than 24 mm (50 mm with 2
+  per page, see below), and captions
   are a row of their own under the photos (a long caption makes the card taller, never hides the
   photo). One photo takes the full width, two share it on a common caption line.
 - **Cards are measured before they are put on pages (`useCardPages`, `packCards`).** They are laid
@@ -1306,6 +1353,11 @@ The calls with product, data or paper impact. Each is explained in its section b
   whole; every other card still prints whole (Print carry-overs).
 - Guide images that are replaced, removed or cancelled stay in storage, like every other photo
   (Guides).
+- After the phase 4–5 review: **2 per page never prints a photo under 50 mm** (a card with long
+  text takes a page of its own); **extreme front-page values run on to a second page** instead of
+  over the checklist (print), while Word shrinks the photo; **in Word a row or deviation block
+  taller than a page may split** instead of being cut off; the No. column is 12.5 mm; Word drops
+  control characters that would make the file unreadable (Print, Word export).
 
 ### Guides
 
@@ -1328,7 +1380,10 @@ The calls with product, data or paper impact. Each is explained in its section b
 - **Captions are edited inline under each tile;** it is the same field as the annotation editor's
   caption.
 - **Paste and drop work anywhere in the guide editor** (`acceptAnywhere`), because it opens with
-  the focus in the description. While an inner dialog is open, a dropped file is swallowed so the
+  the focus in the description. **Text pasted into a text field stays text** (review), even when
+  the clipboard also holds a picture of it, as Excel and Word put there: the description pasted
+  from the old workbook used to vanish and open the photo editor on a picture of the cells. Only
+  plain text counts, since Chrome's "Copy image" puts HTML beside the image, which is still added. While an inner dialog is open, a dropped file is swallowed so the
   browser never opens it in place of the app. A refused paste or drop (six images, not an image)
   scrolls its message into view.
 - **The saved guide is trimmed:** description and captions lose surrounding whitespace, empty ones
@@ -1391,6 +1446,8 @@ The calls with product, data or paper impact. Each is explained in its section b
 - **Every image sits in the same 4:3 box at half the width** (about 90 × 67 mm): never cropped, a
   portrait image letterboxed, standing on its caption. Rows stay even, about three to a page. The
   caption is the bold "3.c · ✓ Good" with the image's own caption on a muted line below.
+- **A description keeps its line breaks** (review), on paper and in Word, as the guide viewer
+  shows them: a numbered list was printed as one run-on line.
 - **Page breaks:** a row's heading, description and first images are one block that never splits;
   so is every row of two and every image with its caption. Entries are divided by a thin rule.
   The appendix heading doesn't repeat on later pages, since every caption names its ref.
@@ -1419,6 +1476,17 @@ The calls with product, data or paper impact. Each is explained in its section b
   Checklist preview"), so a blank and a report export of one inspection don't collide. The
   characters Windows and macOS refuse (`\ / : * ? " < > |`) and control characters become `-`,
   spaces are collapsed, trailing dots and spaces go, 150 characters at most.
+- **Text is made safe for XML first** (review): docx escapes markup but writes control characters
+  as they are, and one of them (a line break pasted from Word, U+000B, is the usual one) made Word
+  and LibreOffice refuse the whole file. Every string of the print model, so also the footer and
+  the file's properties, loses the characters XML 1.0 forbids (vertical tab and form feed become
+  spaces) at the start of the builder, which covers data already stored. The inputs are left as
+  they are.
+- **A long name is shortened before its kind** (review): over 150 characters, the machine part is
+  cut with "…" and "– Blank checklist" or "– Inspection report" stays, so the two exports of an
+  inspection with a 200-character machine name no longer get one name.
+- **The logo gets a fresh read URL at export**, like the photos (review): the preview's could have
+  expired, and Word then showed the company name instead.
 - **It includes the appendix exactly when the preview shows it.** Its images are fetched through
   fresh read URLs (expired ones are renewed) with `cache: 'no-store'`: Chrome reused the preview's
   cached responses, loaded without CORS, and blocked the export's CORS fetch. An image that can't
@@ -1429,12 +1497,21 @@ The calls with product, data or paper impact. Each is explained in its section b
   and rule widths.
 - **Word's own pagination with print's rules:** each section is a table whose two header rows
   repeat and keep with the next; the first row keeps with the second, the second-to-last with the
-  last; rows never split. Each deviation is a framed one-row table that never splits, and the
+  last; rows never split. **Except a row or deviation block taller than a page** (review): Word
+  hides what a non-splitting row can't fit on a page, and LibreOffice drew it over the footer, so
+  the end of a long comment was lost. A row or block estimated at 200 mm or more (characters per
+  line of Arial 9 pt in its column, 3.9 mm a line; a block adds its photos) may split, and its
+  row keeps with nothing, so its section's heading isn't left alone on a page. A block's photos
+  stay whole. Only text near the schema's limits gets there. Each deviation is a framed one-row table that never splits, and the
   blocks flow instead of 2 or 4 to a page. Photos: one up to 120 × 80 mm, two up to 85 × 64 mm;
   none gives a dashed 40 mm "Sketch / photo" frame; the Closed line uses underscore tab leaders.
+  A critical deviation's severity is filled black with white text, as on paper; a reference image
+  that can't be loaded keeps its 4:3 frame with "The image couldn't be loaded." (review).
   Appendix headings and descriptions keep with their first images.
 - **The front page fits one page:** the machine photo at most 186 × 85 mm, the signature space
-  15 mm (95 and 23 overflowed). Its field rules are set per cell, because LibreOffice drops a
+  15 mm (95 and 23 overflowed). (Review: the photo, or the 60 mm frame without one, gives up about
+  4.5 mm for every line a front-page value takes beyond its first, down to 30 mm, so long values
+  keep the signatures and Rev on page 1.) Its field rules are set per cell, because LibreOffice drops a
   table's own borders when some sides are "none"; without a photo a 60 mm frame.
 - **The footer's size and colour are a paragraph style** ("Page footer"): LibreOffice renders
   field results (PAGE, NUMPAGES) in the paragraph style, not the run's formatting.
@@ -1494,6 +1571,21 @@ The calls with product, data or paper impact. Each is explained in its section b
   stored.
 - **`deleteTemplate` also deletes guide images** (originals and copies); inspections share them
   through their snapshots, so they go with the template.
-- **Not in the suite:** the leave question for an open editor and the editor's load failure were
-  checked by script during the build (Back after drawing; the editor's module request aborted).
-  A test of the first would need a fixed wait before Back, as the guard arms in an effect.
+- **Leaving with an open editor and the editor's load failure are tested** (review;
+  `annotate.spec.ts`, `guides.spec.ts`). The leave tests open the page from a list, so Back stays
+  in the app, and wait two animation frames before Back, because the guard arms in an effect
+  after the change (see Annotation editor carry-overs): no fixed wait. The load-failure test
+  aborts the editor's code (`page.route`), adds a photo, and checks the message, Reload page,
+  and that Close returns to Add photo with the typed description intact. Removing
+  `onDirtyChange` fails the photo leave test. Keeping `useBlocker` on a ref updated during render,
+  as the review first suggested, breaks the hooks lint rule and still let a Back sent in the same
+  frame through, so the guard is unchanged.
+- **Review fixes have tests that fail without them** (mutation-checked): the editor test with a
+  stored photo (first opening returns the focus, the bin keeps it, a colour picked while typing a
+  label, a hanging PUT held with `page.route` and stopped with Cancel), the transparent PNG's
+  white corner in the flattened copy, the mixed text + picture paste, print with long front-page
+  values and refs to 10.an, the 50 mm floor at 2 per page, the appendix footer without
+  `navigator.userAgentData`; in node the Word builder (control characters, description line
+  breaks, tall rows and blocks, the shrinking photo, the 12.5 mm column), upload timeouts and
+  stopping, `pastesText`, guides in the unpublished-changes check, and the API's guide image cap
+  and a guide frozen by publishing.

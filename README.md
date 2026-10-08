@@ -291,11 +291,15 @@ whoever fixes it sees exactly where. They print on the report's deviation pages.
 - **Adding.** **Add photo** on the deviation's card opens the file picker (a tablet offers its
   camera too). An image on the clipboard is pasted with `Ctrl+V` while the card's photo buttons
   have the focus, and an image file can be dropped on them. The photo is scaled in the browser to
-  1600 px on the long edge and uploads while the editor opens straight away.
+  1600 px on the long edge and uploads while the editor opens straight away. A file the browser
+  can't open as a picture (HEIC in Chrome, SVG) is refused with a message; transparent parts of a
+  PNG become white.
 - **Editing.** A click on a thumbnail opens the photo in the editor again; its **×** removes it
   (after asking). With two photos the Add button goes away.
 - **Saving.** **Save** uploads the photo and, when it has marks, a flattened copy of the photo
-  with them; then the card shows the copy and the inspection saves itself as usual.
+  with them; then the card shows the copy and the inspection saves itself as usual. An upload
+  that hangs gives up after a minute (Save tries again), and **Cancel** or `Esc` while saving
+  stops the save and keeps the marks.
 - **Leaving.** Marks and a caption are kept only by **Save**: going elsewhere in the app (Back, a
   link) while the editor has unsaved changes asks first, and closing the tab warns.
 - **If the editor can't load** (offline, or a new version was deployed meanwhile), a small
@@ -304,16 +308,16 @@ whoever fixes it sees exactly where. They print on the report's deviation pages.
 The editor: tools on top, the photo filling the window, a caption and **Save** / **Cancel** at the
 bottom. Mouse, finger and pen all work.
 
-| To                            | Do                                                                  |
-| ----------------------------- | ------------------------------------------------------------------- |
-| Draw an arrow, box or ellipse | Pick **Arrow**, **Rectangle** or **Ellipse**, drag across the photo |
-| Write a label                 | **Text**, click where it goes, type, `Enter`                        |
-| Draw by hand                  | **Freehand**, then draw                                             |
-| Pick a colour                 | Red, Cyan, Yellow or White (also recolours the selected mark)       |
-| Move or delete a mark         | **Select and move**: drag it; `Delete` or the bin removes it        |
-| Change a label                | Double-click it with **Select and move**                            |
-| Undo, redo                    | `Ctrl+Z`; `Ctrl+Shift+Z` or `Ctrl+Y` (also the buttons)             |
-| Cancel                        | `Esc` or **Cancel** (asks first if anything changed)                |
+| To                            | Do                                                                                      |
+| ----------------------------- | --------------------------------------------------------------------------------------- |
+| Draw an arrow, box or ellipse | Pick **Arrow**, **Rectangle** or **Ellipse**, drag across the photo                     |
+| Write a label                 | **Text**, click where it goes, type, `Enter`                                            |
+| Draw by hand                  | **Freehand**, then draw                                                                 |
+| Pick a colour                 | Red, Cyan, Yellow or White (also recolours the selected mark, or the label being typed) |
+| Move or delete a mark         | **Select and move**: drag it; `Delete` or the bin removes it                            |
+| Change a label                | Double-click it with **Select and move**                                                |
+| Undo, redo                    | `Ctrl+Z`; `Ctrl+Shift+Z` or `Ctrl+Y` (also the buttons)                                 |
+| Cancel                        | `Esc` or **Cancel** (asks first if anything changed)                                    |
 
 Lines and labels are sized to the photo (a label is 4 % of its long edge), so they look the same
 on screen, on a thumbnail and on paper. They stay visible on a black-and-white printer: yellow
@@ -342,7 +346,8 @@ and drawn on with arrows, boxes and labels in the same editor as deviation photo
   the row's **⋯**. A row with a guide also shows its icon (a camera when it has images), which
   opens it too. Type the description, then add images with **Add image** (file picker; a tablet
   offers its camera), `Ctrl+V` of an image on the clipboard, or by dropping an image file anywhere
-  on the dialog, also while typing. A new image opens in the photo editor straight away; a click
+  on the dialog, also while typing. Text pasted into the description or a caption stays text, also
+  when it comes from Excel or Word with a picture of itself. A new image opens in the photo editor straight away; a click
   on an image opens it again, its **×** removes it (after asking). Under each image: Good / Bad /
   Info (a new one starts as Info, saying nothing until it is marked) and its caption.
 - **Saving.** **Save** puts the guide into the draft, which saves itself like any other change.
@@ -376,7 +381,8 @@ Save PDF** opens the print dialog. In it, in **Chrome or Edge**:
 
 Chrome and Edge print the footer on every page: the inspection, machine, serial number and
 revision bottom left, "Page X of Y" bottom right. Firefox and Safari can't; they print the left
-part at the foot of each table and no page numbers.
+part at the foot of each table (and of each page of reference images) and no page numbers. A
+machine name longer than 60 characters is shortened in the footer.
 
 **What to print.**
 
@@ -397,7 +403,8 @@ part at the foot of each table and no page numbers.
   and the checklist's revision bottom right ("Rev: 2"). A report also has its number, who
   finalised it and when, and "90 / 90 rows filled · 6 NOK · 8 deviations"; a report of an
   inspection in progress says "NOT FINALISED – DRAFT REPORT" instead, and "Not finalised" in every
-  footer.
+  footer. The photo gives way to long values; values far beyond the usual (dozens of participants,
+  names near their 200 characters) move the signatures and revision to a second page.
 - **Checklist.** One table per section: No. | Checkpoint | Comment | OK | NOK | N/A | Resp. Its
   title and column labels repeat on every page the section runs onto; a row is never split, and a
   section title never stands alone at the foot of a page. _Blank_: tick boxes, rows at least
@@ -415,7 +422,8 @@ part at the foot of each table and no page numbers.
 (kept in the address). With 2, a card has the full width and half a page: one photo prints at
 about 10 × 8 cm. With 4, each card is a row, the text on the left and the photos on the right: one
 photo prints at about 7 × 5 cm. Cards share their page equally, and a card whose text needs more
-room takes it from the others. If the cards don't all fit, the page holds fewer and the next card
+room takes it from the others, but with 2 a photo never prints under 5 cm: a card with much text
+then has a page of its own. If the cards don't all fit, the page holds fewer and the next card
 starts the next page; a card is never split. A card too tall to share a page of four gets a page
 of its own, laid out full width as with 2. Only a card whose text alone is longer than a page
 (thousands of characters) runs on to the next page, with its photos whole. 2 per page is the
@@ -444,11 +452,11 @@ file, made in the browser: the front page, one table per section with the same c
 (blank: the D-01 to D-15 table; report: a framed block per deviation with its photos and a line
 to sign it off), the reference images when they are included, and the footer with
 "Page X of Y". It is A4 portrait with the print margins; header rows repeat on every page and rows
-and deviation blocks never split, but Word lays out its own pages, so they break differently from
-the PDF. The text is Arial, which every Word installation has. The file is named like the PDF:
+and deviation blocks never split (only one taller than a page may, so that Word doesn't cut it
+off), but Word lays out its own pages, so they break differently from the PDF. The text is Arial, which every Word installation has. The file is named like the PDF:
 `FI-2026-0042 RigiMill MG – Volvo Skövde – Inspection report.docx` (`– Blank checklist`,
-`– Draft report`, a template's `… – Checklist preview`). The Word library is loaded only on the
-first export.
+`– Draft report`, a template's `… – Checklist preview`); a very long name is shortened before
+that last part. The Word library is loaded only on the first export.
 
 ## API
 
@@ -540,11 +548,16 @@ because it usually means the command that produced it failed.
   label drawn on it with the mouse in the real editor, saved, and after a reload the marks stored
   as fractions, the flattened copy a JPEG of the photo's size that is red along the arrow, shown
   as the thumbnail and on the printed card; at most two photos (then Add goes away, and a paste or
-  a drop says why); a photo on an extra deviation, saved with the inspection; and a finalised
-  inspection's photos in a viewer that never loads the editor's code (Konva). For guides: an admin
+  a drop says why); a photo on an extra deviation, saved with the inspection; a finalised
+  inspection's photos in a viewer that never loads the editor's code (Konva); Back with unsaved
+  marks asks first (Cancel keeps them, Leave goes), and a transparent PNG flattened on white; an
+  editor whose code can't load says so and keeps the page; and in the editor the focus coming
+  back after the first opening and staying after the bin, a colour picked while typing a label,
+  and a save whose upload hangs stopped with Cancel and then saved. For guides: an admin
   writes one in the template editor, with an image pasted while typing the description and one
   dropped on the dialog, one marked up, verdicts and captions, autosaved and the same after a
-  reload; an inspection opens it read-only from the row's icon and with `G` (arrow keys, the
+  reload, and text pasted from Excel kept as text; leaving with the guide editor open asks first;
+  an inspection opens it read-only from the row's icon and with `G` (arrow keys, the
   large view, `Esc` back to the row) and keeps it unchanged after the template publishes a new
   version of it, which a new inspection gets. The smoke test of brief §9: an inspection created
   from the seeded RigiMill MG in the UI, marked from the keyboard, finalised, and its report
@@ -555,7 +568,10 @@ because it usually means the command that produced it failed.
   comments, N/A rows, extra deviations, photos with and without a marked-up copy), a report whose
   long texts leave fewer cards on a page, one whose deviation is too tall to share a page of four
   (it gets a page of its own, full width, and no empty page follows), a template preview with
-  spare lines lettered past z, and a report with its reference images.
+  spare lines lettered past z, a report with its reference images (also as Firefox and Safari
+  print it, with the footer on every appendix page), a front page with very long values (the
+  signatures and revision move on together) and refs up to 10.an inside their column, and 2 per
+  page with long texts (no photo under 50 mm).
   They check that every page is A4, the page count is in a range derived from the layout, page 1
   is the front page, every page has the footer and "Page X of Y" with the right total and nothing
   else in the bottom margin, every row is whole on the one page that has its ref, no section

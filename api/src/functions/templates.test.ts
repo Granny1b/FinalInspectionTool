@@ -4,6 +4,7 @@ import {
   ApiErrorSchema,
   blobNames,
   CONTAINERS,
+  MAX_GUIDE_IMAGES,
   newId,
   SaveTemplateResponseSchema,
   TemplateDetailSchema,
@@ -404,6 +405,35 @@ describe('PUT /api/templates/{id}', () => {
     expect(errorOf(response).details).toEqual([
       expect.objectContaining({ path: ['printSettings', 'spareRowsPerSection'] }),
     ]);
+  });
+
+  it('400 for a guide with more images than allowed; as many as allowed are saved', async () => {
+    const { template, etag } = await seeded();
+    const [section] = template.sections;
+    const images = Array.from({ length: MAX_GUIDE_IMAGES + 1 }, () => ({
+      imageId: newId(),
+      verdict: 'good' as const,
+      annotations: [],
+    }));
+    const withGuide = (guide: { images: typeof images }) => [
+      { ...section!, items: [{ ...section!.items[0]!, guide }, ...section!.items.slice(1)] },
+      ...template.sections.slice(1),
+    ];
+    const tooMany = await put(
+      template.id,
+      { ...editable(template), sections: withGuide({ images }) },
+      etag,
+    );
+    expect(tooMany.status).toBe(400);
+    expect(errorOf(tooMany).details).toEqual([
+      expect.objectContaining({ path: ['sections', 0, 'items', 0, 'guide', 'images'] }),
+    ]);
+    expect(await storedDraft(template.id)).toMatchObject({ etag });
+
+    const allowed = withGuide({ images: images.slice(1) });
+    const saved = await put(template.id, { ...editable(template), sections: allowed }, etag);
+    expect(saved.status).toBe(200);
+    expect(SaveTemplateResponseSchema.parse(saved.jsonBody).draft.sections).toEqual(allowed);
   });
 
   it('400 for a malformed row id', async () => {

@@ -175,6 +175,19 @@ describe('a blank checklist', () => {
     expect(bare.fileName).toBe('FI-2026-0042 – Blank checklist');
     expect(bare.front.companyName).toBe('Modig Machine Tool');
   });
+
+  it('cuts a long machine name in the footer, never on the front page', () => {
+    const name = `RigiMill MG ${'x'.repeat(100)}`;
+    const long = inspectionPrint(
+      inspection({ front: { ...inspection().front, machineName: name } }),
+      'blank',
+      CONTEXT,
+    );
+    expect(long.footer).toBe(
+      `Modig Machine Tool · FI-2026-0042 · RigiMill MG ${'x'.repeat(47)}… · S/N RM-2026-031 · Rev 2`,
+    );
+    expect(long.front.fields[0]).toEqual({ label: 'Machine name', value: name });
+  });
 });
 
 describe('lettering', () => {

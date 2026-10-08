@@ -9,7 +9,7 @@ import {
   deriveDeviations,
   deviationNumber,
   inspectionProgress,
-  rowLetter,
+  rowRef,
   sectionNumber,
   type AnnotatedImage,
   type Inspection,
@@ -143,6 +143,16 @@ export type PrintContext = {
 
 const SEPARATOR = ' · ';
 
+/**
+ * The machine as the footer names it: a long name is cut (the front page has it whole), so the
+ * footer stays clear of "Page X of Y" and the paper's edge.
+ */
+const FOOTER_MACHINE_LENGTH = 60;
+
+function clip(text: string, length: number): string {
+  return text.length > length ? `${text.slice(0, length - 1).trimEnd()}…` : text;
+}
+
 /** A blank checklist or the report of one inspection, from its frozen checklist. */
 export function inspectionPrint(
   inspection: Inspection,
@@ -186,7 +196,7 @@ export function inspectionPrint(
     footer: [
       companyName,
       number,
-      machine || '—',
+      clip(machine, FOOTER_MACHINE_LENGTH) || '—',
       `S/N ${front.serialNumber.trim() || '—'}`,
       `Rev ${templateRevision}`,
       // A page of a draft report must not pass for the final one, even on its own.
@@ -288,8 +298,7 @@ function printSections(
   fill: { results: Record<string, RowResult> } | { spareRows: number },
 ): PrintSection[] {
   return sections.map((section, sectionIndex) => {
-    const number = sectionNumber(sectionIndex);
-    const ref = (rowIndex: number) => `${number}.${rowLetter(rowIndex)}`;
+    const ref = (rowIndex: number) => rowRef(sectionIndex, rowIndex);
     const rows: PrintRow[] = section.items.map((item, rowIndex) => {
       const result = 'results' in fill ? fill.results[item.id] : undefined;
       const status = result?.status ?? null;
@@ -315,7 +324,7 @@ function printSections(
         resp: '',
       });
     }
-    return { number, title: section.title.trim(), rows };
+    return { number: sectionNumber(sectionIndex), title: section.title.trim(), rows };
   });
 }
 

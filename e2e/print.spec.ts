@@ -968,6 +968,132 @@ test('a template preview prints the draft as a blank checklist; spare rows run o
   expectBlankDeviationTable(pages);
 });
 
+test('long front-page values and a section past z still print cleanly', async ({
+  page,
+  context,
+  cleanup,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  // Ten sections, the tenth lettered past z up to 10.an (which, like 10.am, is a wide ref).
+  const sections: Section[] = Array.from({ length: 10 }, (_, index) => ({
+    id: newId(),
+    title: `Section ${index + 1}`,
+    items: Array.from({ length: index === 9 ? 40 : 2 }, (_, row) => ({
+      id: newId(),
+      text: `Checkpoint ${index + 1}-${row + 1} - In order`,
+    })),
+  }));
+  const template = await createTemplate('E2E print – long values', true, {
+    sections,
+    spareRowsPerSection: 0,
+  });
+  cleanup.template(template.id);
+  // Every front-page value long, thirty participants: more than a front page holds.
+  const response = await page.request.post('/api/inspections', {
+    data: {
+      templateId: template.id,
+      front: {
+        ...FRONT,
+        machineName: `RigiMill MG – ${'Volvo Cars Skövde, hall 4 '.repeat(8)}`.slice(0, 200),
+        location: 'Kalmar, Sweden, assembly hall 2, bay 7, '.repeat(5).slice(0, 200),
+        participants: Array.from({ length: 30 }, (_, n) => `Participant ${n + 1} Lastname`),
+      },
+    },
+  });
+  expect(response.status()).toBe(201);
+  const inspection = InspectionSchema.parse(await response.json());
+  cleanup.inspection(inspection.id);
+
+  // The draft report: its state and summary lines take room too.
+  await page.goto(`/inspections/${inspection.id}/print?mode=report`);
+  const pages = await printPdf(page, 'report-long-values');
+
+  // The front page runs on: its signatures and revision start the next page together, which the
+  // checklist doesn't share (it used to print over its first rows).
+  const has = (pdfPage: PdfPage, text: string) => pdfPage.texts.some((t) => t.text === text);
+  const checklist = pages.findIndex((pdfPage) => has(pdfPage, 'Checklist'));
+  const signed = pages.findIndex((pdfPage) => has(pdfPage, 'Inspected by'));
+  expect(has(pages[0]!, 'Final Inspection')).toBe(true);
+  expect(signed).toBeGreaterThanOrEqual(0);
+  expect(signed).toBeLessThan(checklist);
+  expect(has(pages[signed]!, 'Rev: 1')).toBe(true);
+  expect(pages.slice(checklist).some((pdfPage) => has(pdfPage, 'Rev: 1'))).toBe(false);
+
+  // Refs past z in section 10 end before the rule between No. and Checkpoint (the checkpoint's
+  // text starts 1.5 mm after it), on the same line.
+  const refs = pages.flatMap((pdfPage) =>
+    refsOn(pdfPage)
+      .filter((ref) => ref.text.startsWith('10.'))
+      .map((ref) => ({ ref, pdfPage })),
+  );
+  expect(refs.map(({ ref }) => ref.text)).toEqual(
+    Array.from({ length: 40 }, (_, row) => `10.${rowLetter(row)}`),
+  );
+  for (const { ref, pdfPage } of refs) {
+    const checkpoint = pdfPage.texts.find(
+      (text) => text.text.startsWith('Checkpoint 10-') && Math.abs(text.y - ref.y) < 1,
+    );
+    expect(checkpoint, `checkpoint of ${ref.text}`).toBeDefined();
+    expect(ref.right, `${ref.text} inside its column`).toBeLessThanOrEqual(
+      checkpoint!.x - 1.5 * MM,
+    );
+  }
+});
+
+test('two to a page, a photo is never smaller than 50 mm, however long the text', async ({
+  page,
+  context,
+  browser,
+  cleanup,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const template = await createTemplate('E2E print – large photos', true);
+  cleanup.template(template.id);
+  const created = await createInspection(page.request, template, 'RigiMill MG – Sandvik Gimo');
+  cleanup.inspection(created.inspection.id);
+  const photos = await Promise.all(
+    [1, 2].map(async (index) =>
+      uploadPhoto(
+        page.request,
+        await testPhoto(browser, { width: 1200, height: 900, label: `Photo ${index}` }),
+      ),
+    ),
+  );
+  cleanup.images(photos);
+
+  // Two NOK rows with the longest comment and a photo each.
+  const comment = LONG_COMMENTS.join(' ').repeat(3).slice(0, 2000).trim();
+  const items = created.inspection.templateSnapshot.sections.flatMap((section) => section.items);
+  const noks = items.slice(0, 2).map(({ id, text }, index) => ({
+    id,
+    text,
+    result: {
+      status: 'NOK' as const,
+      comment,
+      resp: 'Montage',
+      photos: [{ imageId: photos[index]!, annotations: [] }],
+    },
+  }));
+  await save(
+    page.request,
+    created,
+    Object.fromEntries(noks.map(({ id, result }) => [id, result])),
+    [],
+  );
+  const { inspection } = created;
+
+  await page.goto(`/inspections/${inspection.id}/print?mode=report`);
+  const pdf = await printPdf(page, 'report-large-photos');
+  // Each card has a page of its own, its photo at least 50 mm tall (it used to be squeezed to
+  // 24 mm, smaller than four to a page prints it).
+  expectCards(pdf, expectedCards(noks, []), [['D-01'], ['D-02']], inspection.number);
+  const heights = await page
+    .locator('[data-deviation-card] .paper-card-image')
+    .evaluateAll((boxes) => boxes.map((box) => box.getBoundingClientRect().height));
+  expect(heights).toHaveLength(2);
+  for (const height of heights) expect(height / (96 / 25.4)).toBeGreaterThanOrEqual(49.5);
+});
+
 test('reference images print in an appendix, two to a row, captioned with ref and verdict', async ({
   page,
   context,
@@ -1045,6 +1171,33 @@ test('reference images print in an appendix, two to a row, captioned with ref an
     comment: NOK_COMMENT,
   };
   expectCards(pages, [{ number: 'D-01', ...nok, photos: 0 }], [['D-01']], inspection.number);
+  expectAppendix(appendixPages, rows);
+});
+
+test('without page margin boxes (Firefox, Safari), every appendix page still names the inspection', async ({
+  page,
+  context,
+  browser,
+  cleanup,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const { inspection, rows, imageIds } = await createGuidedReport(page.request, browser, cleanup);
+  cleanup.images(imageIds);
+  // Chromium is recognised by navigator.userAgentData; without it the app takes the browser for
+  // one that prints no margin boxes, and repeats the footer at the foot of each table instead.
+  await page.addInitScript(() => {
+    delete (Navigator.prototype as { userAgentData?: unknown }).userAgentData;
+  });
+
+  await page.goto(`/inspections/${inspection.id}/print?mode=report&appendix=1`);
+  const all = await printPdf(page, 'report-appendix-fallback-footer');
+  const footer = compact(inspectionFooter(await companyName(page.request), inspection));
+  const appendixPages = all.slice(all.findIndex(isAppendixPage));
+  expect(appendixPages.length).toBeGreaterThanOrEqual(2);
+  for (const pdfPage of appendixPages) {
+    expect(pageText(pdfPage), `appendix page ${pdfPage.number}`).toContain(footer);
+    expect(pageText(pdfPage)).not.toMatch(/Page\d+of\d+/);
+  }
   expectAppendix(appendixPages, rows);
 });
 

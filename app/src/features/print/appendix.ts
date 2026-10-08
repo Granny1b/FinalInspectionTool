@@ -4,13 +4,7 @@
  * with the row's ref and the image's verdict. Pure, so the rules are unit-tested; print and the
  * Word export lay it out.
  */
-import {
-  GUIDE_VERDICT_LABELS,
-  rowLetter,
-  sectionNumber,
-  type GuideVerdict,
-  type Section,
-} from '@modig/shared';
+import { GUIDE_VERDICT_LABELS, rowRef, type GuideVerdict, type Section } from '@modig/shared';
 
 export const APPENDIX_TITLE = 'Appendix · Reference images';
 
@@ -47,7 +41,7 @@ export function appendixEntries(sections: readonly Section[]): AppendixEntry[] {
     section.items.flatMap((item, rowIndex) => {
       const images = item.guide?.images ?? [];
       if (images.length === 0) return [];
-      const ref = `${sectionNumber(sectionIndex)}.${rowLetter(rowIndex)}`;
+      const ref = rowRef(sectionIndex, rowIndex);
       return [
         {
           ref,

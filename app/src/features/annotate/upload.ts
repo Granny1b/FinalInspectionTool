@@ -1,19 +1,4 @@
-import { ImageUploadUrlResponseSchema } from '@modig/shared';
-import { apiFetch } from '../../lib/api';
-import { putToStorage, uploadImage } from '../../lib/images';
-
-/**
- * Uploads an already encoded JPEG (a flattened copy) as a new image, as `uploadImage` does for
- * photos but without scaling and re-encoding it, which would blur its lines a second time.
- */
-export async function uploadJpeg(jpeg: Blob): Promise<string> {
-  const { data } = await apiFetch('/api/images/upload-url', {
-    method: 'POST',
-    schema: ImageUploadUrlResponseSchema,
-  });
-  await putToStorage(data.sasUrl, jpeg);
-  return data.imageId;
-}
+import { uploadImage } from '../../lib/images';
 
 /** A new photo uploading while it is annotated. */
 export type PendingUpload = {
@@ -23,7 +8,10 @@ export type PendingUpload = {
   retry: () => Promise<string>;
 };
 
-/** Starts scaling and uploading a new photo at once, so it is usually done before Save. */
+/**
+ * Starts scaling and uploading a new photo at once, so it is usually done before Save. An attempt
+ * that hangs times out (lib/images), so `retry` can start a new one.
+ */
 export function startUpload(file: Blob): PendingUpload {
   let failed = false;
   const begin = () => {

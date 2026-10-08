@@ -6,6 +6,7 @@ import {
   Suspense,
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
   type ClipboardEvent,
@@ -17,7 +18,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useImageUrl } from '../../lib/images';
 import type { EditorSubject } from './AnnotationEditor';
 import { EditorLoadBoundary } from './EditorLoadBoundary';
-import { firstImageFile, shownImageId } from './photos';
+import { canDecode, firstImageFile, pastesText, shownImageId } from './photos';
 import { PhotoViewer } from './PhotoViewer';
 import { startUpload } from './upload';
 
@@ -113,10 +114,13 @@ export function AnnotatedPhotos({
   // handled (default prevented) when the event gets here.
   const onWindowPaste = useEffectEvent((event: globalThis.ClipboardEvent) => {
     const file =
-      accepting && !event.defaultPrevented && firstImageFile(event.clipboardData?.files ?? []);
+      accepting &&
+      !event.defaultPrevented &&
+      !pastesText(event) &&
+      firstImageFile(event.clipboardData?.files ?? []);
     if (!file) return;
     event.preventDefault();
-    add(file);
+    void add(file);
   });
   const onWindowDrag = useEffectEvent((event: globalThis.DragEvent) => {
     const transfer = event.dataTransfer;
@@ -128,7 +132,7 @@ export function AnnotatedPhotos({
       setDragging(accepting);
     } else {
       setDragging(false);
-      if (accepting) addDropped(transfer.files);
+      if (accepting) void addDropped(transfer.files);
     }
   });
   useEffect(() => {
@@ -153,9 +157,14 @@ export function AnnotatedPhotos({
 
   if (!editable && photos.length === 0) return null;
 
-  function add(file: File) {
+  async function add(file: File) {
     if (full) {
       setError(`Up to ${max} ${words.name}s. Remove one to add another.`);
+      return;
+    }
+    // One the browser can't draw (HEIC in Chrome, SVG) could never be saved: say so at once.
+    if (!(await canDecode(file))) {
+      setError(words.notOne);
       return;
     }
     setError(null);
@@ -167,7 +176,7 @@ export function AnnotatedPhotos({
 
   function addDropped(files: FileList) {
     const file = firstImageFile(files);
-    if (file) add(file);
+    if (file) void add(file);
     else setError(words.notOne);
   }
 
@@ -185,6 +194,8 @@ export function AnnotatedPhotos({
   function remove(index: number) {
     flushSync(() => {
       setRemoving(null);
+      // "Up to 6 images" no longer applies.
+      setError(null);
       onChange?.(photos.toSpliced(index, 1));
     });
     addRef.current?.focus();
@@ -205,11 +216,12 @@ export function AnnotatedPhotos({
   }
 
   function onPaste(event: ClipboardEvent<HTMLDivElement>) {
-    // Pasted text is left alone; only an image adds a photo.
-    const file = accepting ? firstImageFile(event.clipboardData.files) : null;
+    // Pasted text is left alone, also text pasted into a field that comes with a picture of
+    // itself; only an image adds a photo.
+    const file = accepting && !pastesText(event) ? firstImageFile(event.clipboardData.files) : null;
     if (!file) return;
     event.preventDefault();
-    add(file);
+    void add(file);
   }
 
   const tile = layout === 'row' ? 'w-40' : 'min-w-0';
@@ -286,7 +298,7 @@ export function AnnotatedPhotos({
             const file = event.target.files?.[0];
             // Cleared so that picking the same file again still counts.
             event.target.value = '';
-            if (file) add(file);
+            if (file) void add(file);
           }}
         />
       )}
@@ -408,9 +420,13 @@ function Thumbnail({
 /** Shown the first time the editor opens, while its code (with Konva) loads. */
 function EditorLoading() {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (dialog && !dialog.open) dialog.showModal();
+    // Closed before React removes it, so the focus goes back to the opener (which the editor
+    // then records as its own return target) instead of falling to <body>. A layout effect's
+    // cleanup runs while the dialog is still in the page; a passive one would be too late.
+    return () => dialog?.close();
   }, []);
   return (
     <dialog

@@ -13,6 +13,36 @@ export function firstImageFile(files: Iterable<File> | ArrayLike<File>): File | 
 }
 
 /**
+ * Text pasted into a text field stays text, even when the clipboard also holds a picture of it
+ * (Excel and Word put both there). An image copied in a browser comes with HTML but no plain
+ * text, so it is still added.
+ */
+export function pastesText(event: {
+  target: EventTarget | null;
+  clipboardData: Pick<DataTransfer, 'getData'> | null;
+}): boolean {
+  const target = event.target as Partial<HTMLElement> | null;
+  const field =
+    target?.tagName === 'INPUT' ||
+    target?.tagName === 'TEXTAREA' ||
+    target?.isContentEditable === true;
+  return field && (event.clipboardData?.getData('text/plain') ?? '') !== '';
+}
+
+/**
+ * Whether the browser can draw the file, so it can be marked up and saved: Chrome can't decode
+ * HEIC, and no browser makes a bitmap of an SVG.
+ */
+export async function canDecode(file: Blob): Promise<boolean> {
+  try {
+    (await createImageBitmap(file)).close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Whether saving must flatten the photo again: it has marks, and they changed or were never
  * flattened. Without marks there is nothing to flatten; print uses the photo itself.
  */

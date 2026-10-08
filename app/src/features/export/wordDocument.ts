@@ -98,10 +98,14 @@ const FOOTER_STYLE = 'PageFooter';
 /** ✓ ✗ – as on paper: a status never depends on colour. */
 const STATUS_SYMBOLS: Record<Status, string> = { OK: '✓', NOK: '✗', NA: '–' };
 
-/** No. | Checkpoint | Comment | OK | NOK | N/A | Resp, in mm as print.css has them. */
-const CHECKLIST_COLUMNS = [10.5, 70, 47, 9.5, 9.5, 9.5, 30];
+/**
+ * No. | Checkpoint | Comment | OK | NOK | N/A | Resp, in mm as print.css has them. The ref column
+ * holds "10.am" on one line.
+ */
+const CHECKLIST_COLUMNS = [12.5, 68, 47, 9.5, 9.5, 9.5, 30];
+const REF_WIDTH = CHECKLIST_COLUMNS[0]!;
 /** No. | Ref | Description | Severity | Resp | Closed (sign/date) */
-const SUMMARY_COLUMNS = [13, 10.5, 87.5, 17, 30, 28];
+const SUMMARY_COLUMNS = [13, REF_WIDTH, 85.5, 17, 30, 28];
 /** Inside a deviation card's padding. */
 const CARD_PADDING = 3;
 const CARD_WIDTH = CONTENT_WIDTH - 2 * CARD_PADDING;
@@ -109,13 +113,30 @@ const CARD_WIDTH = CONTENT_WIDTH - 2 * CARD_PADDING;
 /** Blank rows leave room to write by hand (brief §6: at least 9 mm); report rows are lower. */
 const ROW_HEIGHT: Record<PrintMode, number> = { blank: 9.5, report: 7 };
 
+/**
+ * Rows and cards never split, but Word hides whatever part of a non-splitting row doesn't fit
+ * on a page. A row or card whose text makes it about this tall (of the 267 mm a page has, less
+ * the repeating header rows) may therefore split, like print's card that runs on.
+ */
+const TALL = 200;
+/** Rough Arial 9 pt metrics for that estimate, in mm: an average character and a line. */
+const CHAR_WIDTH = 1.5;
+const LINE_HEIGHT = 3.9;
+
+/** About how many lines `text` takes in `width` mm of Arial 9 pt. */
+function lines(text: string, width: number): number {
+  return text ? Math.ceil(text.length / Math.max(1, Math.floor(width / CHAR_WIDTH))) : 0;
+}
+
 // --- The document ------------------------------------------------------------------------------
 
 /** The Word document for a printout, with or without the reference images. */
 export function wordDocument(
-  model: PrintModel,
+  printModel: PrintModel,
   { appendix, images }: { appendix: boolean; images: WordImages },
 ): Document {
+  // Every text, the footer and the file's properties included, as XML can hold it.
+  const model = mapStrings(printModel, xmlText);
   // Right of every heading, as on paper: the inspection number, or the checklist's name.
   const subject = model.front.number ?? model.checklistTitle;
   const children: (Paragraph | Table)[] = [
@@ -194,6 +215,33 @@ function pageFooter(text: string): Footer {
       }),
     ],
   });
+}
+
+/**
+ * Text as XML 1.0 allows it. docx escapes markup but writes control characters as they are, and
+ * one of them anywhere (a line break pasted from Word, U+000B, is the usual one) makes Word and
+ * LibreOffice refuse the whole file. Vertical tab and form feed become spaces; the rest goes.
+ */
+function xmlText(text: string): string {
+  return (
+    text
+      // eslint-disable-next-line no-control-regex -- control characters are exactly what is replaced
+      .replace(/[\u000B\u000C]/g, ' ')
+      // eslint-disable-next-line no-control-regex -- control characters are exactly what is removed
+      .replace(/[\u0000-\u0008\u000E-\u001F\uFFFE\uFFFF]/g, '')
+  );
+}
+
+/** Every string in plain data (objects, arrays) through `map`; the rest as it is. */
+function mapStrings<T>(value: T, map: (text: string) => string): T {
+  if (typeof value === 'string') return map(value) as T;
+  if (Array.isArray(value)) return value.map((item: unknown) => mapStrings(item, map)) as T;
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, mapStrings(item, map)]),
+    ) as T;
+  }
+  return value;
 }
 
 // --- Building blocks ---------------------------------------------------------------------------
@@ -356,12 +404,26 @@ function frontPage(front: FrontPage, images: WordImages): (Paragraph | Table)[] 
   ];
 }
 
+/**
+ * The machine photo (or its frame) gives up the room long front-page values need, so the
+ * signatures and Rev stay on the first page: about 4.5 mm for every line a value takes beyond
+ * its first (some 70 characters of 11 pt in the value column), down to 30 mm.
+ */
+function machinePhotoHeight(front: FrontPage, height: number): number {
+  const extra = front.fields.reduce(
+    (sum, { value }) => sum + Math.max(0, Math.ceil(value.length / 70) - 1),
+    0,
+  );
+  return Math.max(30, height - 4.5 * extra);
+}
+
 function machinePhoto(front: FrontPage, images: WordImages): (Paragraph | Table)[] {
   const space = () => paragraph([], { spacing: { after: twips(4) } });
   const image = front.photoId ? images.photos.get(front.photoId) : undefined;
   if (image) {
+    const box = { width: CONTENT_WIDTH, height: machinePhotoHeight(front, 85) };
     return [
-      paragraph([imageRun(image, { width: CONTENT_WIDTH, height: 85 }, 'Machine photo')], {
+      paragraph([imageRun(image, box, 'Machine photo')], {
         alignment: AlignmentType.CENTER,
         spacing: { before: twips(8), after: twips(8) },
       }),
@@ -369,7 +431,11 @@ function machinePhoto(front: FrontPage, images: WordImages): (Paragraph | Table)
   }
   // Without a photo its frame stays, like on paper.
   const label = front.photoId ? 'The machine photo couldn’t be loaded.' : 'No machine photo';
-  return [space(), frame(label, { width: CONTENT_WIDTH, height: 60, centred: true }), space()];
+  return [
+    space(),
+    frame(label, { width: CONTENT_WIDTH, height: machinePhotoHeight(front, 60), centred: true }),
+    space(),
+  ];
 }
 
 /** A dashed frame, e.g. to sketch in; its label in the corner or in the middle. */
@@ -472,7 +538,7 @@ function sectionTable(section: PrintSection, mode: PrintMode): Table {
                 new TextRun({ children: [new Tab(), section.title], bold: true, size: pt(10) }),
               ],
               // The title sits over the checkpoints, the number over the refs.
-              { ...keep, tabStops: [{ type: TabStopType.LEFT, position: twips(10.5) }] },
+              { ...keep, tabStops: [{ type: TabStopType.LEFT, position: twips(REF_WIDTH) }] },
             ),
           ],
           {
@@ -534,14 +600,18 @@ function sectionTable(section: PrintSection, mode: PrintMode): Table {
   return table([...header, ...rows], CHECKLIST_COLUMNS);
 }
 
-function checklistRow(row: PrintRow, mode: PrintMode, keepNext: boolean): TableRow {
+function checklistRow(row: PrintRow, mode: PrintMode, keepWithNext: boolean): TableRow {
+  // A row taller than a page may split, and then keeps with nothing (a section's heading would
+  // otherwise be left alone on a page before it).
+  const tall = rowHeight(row) >= TALL;
+  const keepNext = keepWithNext && !tall;
   const text = (value: string, style: RunStyle = {}) =>
     paragraph([run(value, style)], { keepNext });
   // Blank rows are written in by hand: their text sits in the middle, like on paper.
   const verticalAlign = mode === 'blank' ? VerticalAlignTable.CENTER : VerticalAlignTable.TOP;
   const marks = { verticalAlign: VerticalAlignTable.CENTER };
   return new TableRow({
-    cantSplit: true,
+    cantSplit: !tall,
     height: { value: twips(ROW_HEIGHT[mode]), rule: HeightRule.ATLEAST },
     children: [
       cell([text(row.ref, { bold: true })], { verticalAlign }),
@@ -559,6 +629,21 @@ function checklistRow(row: PrintRow, mode: PrintMode, keepNext: boolean): TableR
       cell([text(row.resp)], { verticalAlign }),
     ],
   });
+}
+
+/** About how tall a row's text makes it, in mm: its tallest cell (inside the cells' padding). */
+function rowHeight(row: PrintRow): number {
+  const [, checkpoint = 0, comment = 0, , , , resp = 0] = CHECKLIST_COLUMNS.map(
+    (width) => width - 3,
+  );
+  return (
+    LINE_HEIGHT *
+    Math.max(
+      lines(row.text, checkpoint),
+      (row.severity ? 1 : 0) + lines(row.comment, comment),
+      lines(row.resp, resp),
+    )
+  );
 }
 
 /** An empty box to tick while nothing is recorded; in the recorded status's column ✓ ✗ – over its name. */
@@ -619,13 +704,24 @@ function summaryTable(numbers: string[]): Table {
 /**
  * A report's deviation as a framed card: "D-03 · 4.c · Major", the section, checkpoint or
  * description, comment, Resp, up to two photos as marked up, and a line to sign it off. One table
- * row that can't split, so a card is never split across pages.
+ * row that can't split, so a card is never split across pages; only a card whose text makes it
+ * taller than a page may (its photos still don't).
  */
 function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImage>): Table {
-  const head = [card.number, ...(card.ref ? [card.ref] : []), SEVERITY_LABELS[card.severity]];
+  const head = { bold: true, size: pt(11) };
   const label = (text: string) => run(`${text}  `, { bold: true, size: pt(7.5), color: MUTED });
   const content = [
-    paragraph([run(head.join(' · '), { bold: true, size: pt(11) })]),
+    paragraph([
+      run([card.number, ...(card.ref ? [card.ref] : []), ''].join(' · '), head),
+      // A critical one stands out in black and white, filled black as on paper.
+      run(SEVERITY_LABELS[card.severity], {
+        ...head,
+        ...(card.severity === 'critical' && {
+          color: 'FFFFFF',
+          shading: { type: ShadingType.CLEAR, fill: INK, color: 'auto' },
+        }),
+      }),
+    ]),
     paragraph(
       [run(card.ref ? card.sectionTitle : 'Not on the checklist', { size: pt(7.5), color: MUTED })],
       {
@@ -659,10 +755,19 @@ function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImag
       },
     ),
   ];
-  return table([new TableRow({ cantSplit: true, children: [cell(content)] })], [CONTENT_WIDTH], {
-    borders: { top: rule(7), bottom: rule(7), left: rule(7), right: rule(7) },
-    margins: CARD_PADDING,
-  });
+  const height =
+    LINE_HEIGHT * (lines(card.text, CARD_WIDTH) + lines(card.comment, CARD_WIDTH)) +
+    (card.photos.length === 0 ? 40 : card.photos.length === 1 ? 80 : 64) +
+    // The head, section, Resp and Closed lines, captions and spacing.
+    30;
+  return table(
+    [new TableRow({ cantSplit: height < TALL, children: [cell(content)] })],
+    [CONTENT_WIDTH],
+    {
+      borders: { top: rule(7), bottom: rule(7), left: rule(7), right: rule(7) },
+      margins: CARD_PADDING,
+    },
+  );
 }
 
 /** One photo large, two side by side, each with its caption; none: a frame to sketch in. */
@@ -715,14 +820,22 @@ function appendixEntry(
       ],
       {
         keepNext: true,
-        tabStops: [{ type: TabStopType.LEFT, position: twips(10.5) }],
-        indent: { left: twips(10.5), hanging: twips(10.5) },
+        tabStops: [{ type: TabStopType.LEFT, position: twips(REF_WIDTH) }],
+        indent: { left: twips(REF_WIDTH), hanging: twips(REF_WIDTH) },
         spacing: { before: twips(index === 0 ? 0 : 6), after: twips(1) },
         ...(index === 0 ? {} : { border: { top: { ...rule(), space: 6 } } }),
       },
     ),
+    // The description's own line breaks, as the guide shows them.
     ...(entry.description
-      ? [paragraph([run(entry.description)], { keepNext: true, spacing: { after: twips(1) } })]
+      ? [
+          paragraph(
+            entry.description
+              .split(/\r?\n/)
+              .map((line, index) => run(line, index === 0 ? {} : { break: 1 })),
+            { keepNext: true, spacing: { after: twips(1) } },
+          ),
+        ]
       : []),
     table(
       entry.rows.map(
@@ -741,14 +854,18 @@ function appendixEntry(
   ];
 }
 
-function guideImage(image: AppendixImage, photos: ReadonlyMap<string, WordImage>): Paragraph[] {
+function guideImage(
+  image: AppendixImage,
+  photos: ReadonlyMap<string, WordImage>,
+): (Paragraph | Table)[] {
   const bold = { bold: true, size: pt(8) };
+  const box = { width: CONTENT_WIDTH / 2 - 3, height: 66 };
+  const loaded = photos.get(image.imageId);
   return [
-    picture(
-      photos.get(image.imageId),
-      { width: CONTENT_WIDTH / 2 - 3, height: 66 },
-      captionLabel(image),
-    ),
+    // Missing, it keeps its 4:3 box, as on paper.
+    loaded
+      ? picture(loaded, box, captionLabel(image))
+      : frame('The image couldn’t be loaded.', { ...box, centred: true }),
     paragraph(
       [
         run(`${image.ref} · `, bold),
