@@ -1,0 +1,10 @@
+node_modules
+dist
+api/deploy
+coverage
+playwright-report
+test-results
+.azurite
+package-lock.json
+*.xlsm
+final-inspection-claude-code-prompt.md

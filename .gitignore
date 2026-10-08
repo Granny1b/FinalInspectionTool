@@ -1,0 +1,20 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.azurite/
+__azurite_db_*
+__blobstorage__/
+__queuestorage__/
+api/local.settings.json
+api/deploy/
+# Local copy of the SWA config for checking the built app (scripts/local-swa-config.mjs)
+.swa-local/
+.env
+.env.*
+!.env.example
+coverage/
+test-results/
+playwright-report/
+.DS_Store
+# Compiled ARM output of `bicep build`; main.bicep is the source
+infra/*.json

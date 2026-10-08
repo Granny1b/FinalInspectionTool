@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in · Modig Final Inspection</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="stylesheet" href="/login-assets/auth.css" />
+    <script type="module" src="/login-assets/auth.js"></script>
+  </head>
+  <body data-page="login">
+    <main class="auth">
+      <div class="card">
+        <img class="logo" src="/modig-logo.png" alt="Modig Machine Tool" width="291" height="90" />
+        <h1>Final Inspection</h1>
+        <p class="lead">Checklists, deviations and reports for every machine before delivery.</p>
+
+        <!-- The script upgrades this link to an absolute return URL; this href works without JS. -->
+        <a id="sign-in" class="button" href="/.auth/login/aad?post_login_redirect_uri=/">
+          <svg class="ms-logo" viewBox="0 0 21 21" aria-hidden="true">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+          </svg>
+          Sign in with Microsoft
+        </a>
+
+        <p class="note">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="11" width="16" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+          Access is by invitation — ask a Quality admin.
+        </p>
+      </div>
+      <p class="footer">Modig Machine Tool · Quality</p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://aka.ms/azure/static-web-apps-cli/schema",
+  "configurations": {
+    "modig": {
+      "appLocation": "app",
+      "appDevserverUrl": "http://127.0.0.1:5173",
+      "apiDevserverUrl": "http://127.0.0.1:7071",
+      "swaConfigLocation": "app/public",
+      "port": 4280,
+      "devserverTimeout": 180
+    }
+  }
+}
