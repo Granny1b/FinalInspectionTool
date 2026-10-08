@@ -86,12 +86,29 @@ export const AnnotationSchema = z.discriminatedUnion('kind', [
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
-export const GuideImageSchema = z.object({
+/** The four annotation colours (brief §5.4): red, Modig cyan, yellow, white. */
+export const ANNOTATION_COLORS = {
+  red: '#E02424',
+  cyan: '#29ABE2',
+  yellow: '#FACC15',
+  white: '#FFFFFF',
+} as const;
+
+/**
+ * A photo with vector annotations drawn on it (arrows, boxes, text…). The vectors stay editable;
+ * `renderedImageId` is a flattened copy (photo + annotations) used for thumbnails and print.
+ * Used for deviation photos and, from phase 5, guide images.
+ */
+export const AnnotatedImageSchema = z.object({
   imageId: IdSchema,
-  verdict: z.enum(['good', 'bad', 'info']),
   caption: z.string().max(500).optional(),
   annotations: z.array(AnnotationSchema),
   renderedImageId: IdSchema.optional(),
+});
+export type AnnotatedImage = z.infer<typeof AnnotatedImageSchema>;
+
+export const GuideImageSchema = AnnotatedImageSchema.extend({
+  verdict: z.enum(['good', 'bad', 'info']),
 });
 export type GuideImage = z.infer<typeof GuideImageSchema>;
 
@@ -164,6 +181,17 @@ export const SEVERITIES = ['minor', 'major', 'critical'] as const;
 export const SeveritySchema = z.enum(SEVERITIES);
 export type Severity = z.infer<typeof SeveritySchema>;
 export const DEFAULT_SEVERITY: Severity = 'minor';
+/**
+ * Photos per deviation. Two keep every photo on the printed deviation card in both the
+ * 2-per-page and 4-per-page layouts (typically an overview and a close-up).
+ */
+export const MAX_PHOTOS_PER_DEVIATION = 2;
+/** How a severity is shown to people (inspection page, deviation summary, print). */
+export const SEVERITY_LABELS: Record<Severity, string> = {
+  minor: 'Minor',
+  major: 'Major',
+  critical: 'Critical',
+};
 
 export const RowResultSchema = z.object({
   status: StatusSchema.optional(),
@@ -172,7 +200,8 @@ export const RowResultSchema = z.object({
   resp: z.string().max(200).optional(),
   /** Only meaningful when status is NOK; defaults to "minor". */
   severity: SeveritySchema.optional(),
-  photoIds: z.array(IdSchema).optional(),
+  /** Annotated evidence photos of a deviation (printed on the deviation pages). */
+  photos: z.array(AnnotatedImageSchema).max(MAX_PHOTOS_PER_DEVIATION).optional(),
 });
 export type RowResult = z.infer<typeof RowResultSchema>;
 
@@ -187,6 +216,7 @@ export const ExtraDeviationSchema = z.object({
   comment: z.string().max(2000).optional(),
   resp: z.string().max(200).optional(),
   severity: SeveritySchema,
+  photos: z.array(AnnotatedImageSchema).max(MAX_PHOTOS_PER_DEVIATION).optional(),
 });
 export type ExtraDeviation = z.infer<typeof ExtraDeviationSchema>;
 

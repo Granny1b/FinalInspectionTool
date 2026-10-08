@@ -17,9 +17,11 @@
     "@modig/shared": "*",
     "@tanstack/react-query": "^5.104.1",
     "clsx": "^2.1.1",
+    "konva": "^10.7.1",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "react-konva": "^19.3.0",
     "react-router": "^8.4.0",
     "zod": "^4.6.5"
   },

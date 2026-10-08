@@ -218,3 +218,45 @@ describe('request schemas', () => {
     expect('modelCode' in parsed.front).toBe(false);
   });
 });
+
+describe('deviation photos', () => {
+  const photo = {
+    imageId: 'img1',
+    annotations: [{ kind: 'arrow' as const, points: [0.1, 0.1, 0.5, 0.5], color: '#E02424' }],
+    renderedImageId: 'img1r',
+  };
+
+  it('carries the photos of NOK rows and extra deviations', () => {
+    const devs = deriveDeviations(
+      inspection({
+        results: { i2: { status: 'NOK', photos: [photo] } },
+        extraDeviations: [
+          {
+            id: 'x1',
+            description: 'Dent',
+            severity: 'minor',
+            photos: [photo, { imageId: 'img2', annotations: [] }],
+          },
+        ],
+      }),
+    );
+    expect(devs.map((d) => d.photos.length)).toEqual([1, 2]);
+    expect(devs[0]!.photos[0]).toEqual(photo);
+  });
+
+  it('gives deviations without photos an empty list', () => {
+    expect(deriveDeviations(inspection({ results: { i1: { status: 'NOK' } } }))[0]!.photos).toEqual(
+      [],
+    );
+  });
+
+  it('caps photos per deviation', () => {
+    const three = [photo, photo, photo];
+    expect(
+      InspectionDraftInputSchema.safeParse({
+        ...InspectionDraftInputSchema.parse(inspection()),
+        results: { i1: { status: 'NOK', photos: three } },
+      }).success,
+    ).toBe(false);
+  });
+});

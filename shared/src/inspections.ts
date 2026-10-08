@@ -13,6 +13,7 @@ import {
   InspectionStateSchema,
   ModelCodeSchema,
   RowResultSchema,
+  type AnnotatedImage,
   type Inspection,
   type Severity,
   type Template,
@@ -109,6 +110,8 @@ export type InspectionDeviation = {
   comment: string;
   severity: Severity;
   resp: string;
+  /** Annotated evidence photos (rendered copies are what print shows). */
+  photos: AnnotatedImage[];
 };
 
 type DeviationSource = Pick<Inspection, 'templateSnapshot' | 'results' | 'extraDeviations'>;
@@ -129,6 +132,7 @@ export function deriveDeviations(inspection: DeviationSource): InspectionDeviati
         comment: result.comment ?? '',
         severity: result.severity ?? DEFAULT_SEVERITY,
         resp: result.resp ?? '',
+        photos: result.photos ?? [],
       },
     ];
   });
@@ -142,6 +146,7 @@ export function deriveDeviations(inspection: DeviationSource): InspectionDeviati
     comment: extra.comment ?? '',
     severity: extra.severity,
     resp: extra.resp ?? '',
+    photos: extra.photos ?? [],
   }));
   return [...rows, ...extras].map((deviation, index) => ({
     number: deviationNumber(index),

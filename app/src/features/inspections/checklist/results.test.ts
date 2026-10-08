@@ -30,8 +30,8 @@ describe('withStatus', () => {
     expect(withStatus(results, 'a1', 'NA')).toEqual({
       a1: { status: 'NA', comment: 'Re-checked', resp: 'Elektro' },
     });
-    expect(withStatus({ a1: { photoIds: ['p1'] } }, 'a1', 'OK')).toEqual({
-      a1: { status: 'OK', photoIds: ['p1'] },
+    expect(withStatus({ a1: { comment: 'kept' } }, 'a1', 'OK')).toEqual({
+      a1: { status: 'OK', comment: 'kept' },
     });
   });
 

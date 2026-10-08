@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ID_LENGTH, ID_PATTERN, newId } from './ids';
-import { AnnotationSchema, InspectionSchema, ModelCodeSchema, TemplateSchema } from './schemas';
+import {
+  AnnotatedImageSchema,
+  AnnotationSchema,
+  GuideImageSchema,
+  InspectionSchema,
+  ModelCodeSchema,
+  TemplateSchema,
+} from './schemas';
 import { blobNames, deviationKeys } from './storage';
 
 const now = '2026-10-06T09:00:00.000Z';
@@ -137,5 +144,14 @@ describe('storage conventions', () => {
       partitionKey: 'RMMG',
       rowKey: 'insp_item',
     });
+  });
+});
+
+describe('AnnotatedImageSchema / GuideImageSchema', () => {
+  it('a guide image is an annotated image with a verdict', () => {
+    const image = { imageId: 'img1', annotations: [], caption: 'Good weld' };
+    expect(AnnotatedImageSchema.parse(image)).toEqual(image);
+    expect(GuideImageSchema.safeParse(image).success).toBe(false);
+    expect(GuideImageSchema.parse({ ...image, verdict: 'good' }).verdict).toBe('good');
   });
 });
