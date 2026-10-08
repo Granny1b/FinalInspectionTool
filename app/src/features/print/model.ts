@@ -30,10 +30,10 @@ export type PrintMode = (typeof PRINT_MODES)[number];
 /** Numbered lines on a blank Deviation Summary (brief §6: "~15 numbered lines"). */
 export const BLANK_DEVIATION_LINES = 15;
 
-/** A report's deviation cards per page: two with large photos, or four (both on trial). */
+/** A report's deviation cards per page: two with large photos, or four for long, short-text lists. */
 export const DEVIATIONS_PER_PAGE = [2, 4] as const;
 export type DeviationsPerPage = (typeof DEVIATIONS_PER_PAGE)[number];
-/** Until the Quality department has picked the layout it prefers. */
+/** Chosen by the Quality department after comparing both sample reports; 4 stays in the toolbar. */
 export const DEFAULT_DEVIATIONS_PER_PAGE: DeviationsPerPage = 2;
 
 /** On the front page of a report that is not finalised, so it is never taken for the final one. */

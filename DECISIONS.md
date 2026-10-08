@@ -1056,7 +1056,8 @@ The calls with product, data or paper impact. Each is explained in its section b
   deviation photos now; phase 5 reuses it for guide images (Contract).
 - At most **2 photos per deviation** (Contract).
 - The report's deviations print as **cards with their photos**, 2 or 4 to a page, chosen in the
-  print toolbar (and the address); **2 is the default**. The sample PDFs compare both: one photo
+  print toolbar (and the address); **2 is the default, chosen by the user** after comparing the
+  two sample reports. The sample PDFs compare both: one photo
   prints at 103 × 77 mm with 2 per page, 68 × 51 mm with 4; labels at about 12 pt and 8 pt (Print).
 - **4 per page is four stacked rows** (text left, photos right), not a 2 × 2 grid (Print).
 - **A page holds fewer cards when their text doesn't fit.** The cards are measured in the browser
