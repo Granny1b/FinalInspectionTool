@@ -1,11 +1,7 @@
 import clsx from 'clsx';
-import { RefreshCw } from 'lucide-react';
 import { Outlet, ScrollRestoration } from 'react-router';
-import { ApiRequestError } from '../lib/api';
-import { signOutUrl } from '../lib/auth';
 import { useMe } from '../lib/useMe';
-import { Button } from './Button';
-import { ErrorScreen } from './ErrorScreen';
+import { AccountError } from './AccountError';
 import { CONTENT_FRAME, CONTENT_OFFSET, SIDEBAR_FRAME } from './layout';
 import { LoadingShell } from './LoadingShell';
 import { MobileNav } from './MobileNav';
@@ -17,27 +13,8 @@ export function AppShell() {
 
   if (me.isPending) return <LoadingShell />;
   if (me.isError) {
-    const retrying = me.isFetching;
     return (
-      <ErrorScreen
-        title="We couldn't load your account"
-        message={
-          me.error instanceof ApiRequestError
-            ? me.error.message
-            : 'Check your network connection and try again.'
-        }
-        actions={
-          <>
-            <Button className="w-full" onClick={() => void me.refetch()}>
-              <RefreshCw size={16} className={clsx(retrying && 'animate-spin')} />
-              {retrying ? 'Trying again…' : 'Try again'}
-            </Button>
-            <a href={signOutUrl()} className="text-sm text-ink-500 hover:text-ink-900">
-              Sign out
-            </a>
-          </>
-        }
-      />
+      <AccountError error={me.error} retrying={me.isFetching} onRetry={() => void me.refetch()} />
     );
   }
 

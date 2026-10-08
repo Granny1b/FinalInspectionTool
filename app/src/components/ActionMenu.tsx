@@ -7,8 +7,10 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type ReactNode,
   type ToggleEvent,
 } from 'react';
+import { buttonClasses } from './buttonClasses';
 
 type MenuItem = {
   label: string;
@@ -25,6 +27,8 @@ type Props = {
   items: MenuItem[];
   /** Data attributes for the button, so the editor can move focus back to it. */
   triggerData?: Record<`data-${string}`, string>;
+  /** A secondary button with this content (icon and text) instead of the ⋯ icon. */
+  trigger?: ReactNode;
 };
 
 /**
@@ -32,7 +36,7 @@ type Props = {
  * Menu keyboard support on top: focus starts on the first enabled item, arrows/Home/End move,
  * Tab closes.
  */
-export function ActionMenu({ label, items, triggerData }: Props) {
+export function ActionMenu({ label, items, triggerData, trigger }: Props) {
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -100,12 +104,17 @@ export function ActionMenu({ label, items, triggerData }: Props) {
         type="button"
         popoverTarget={menuId}
         aria-haspopup="menu"
-        aria-label={label}
-        title={label}
-        className="flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-200/70 hover:text-ink-900"
+        // A labelled trigger is named by its text; the icon needs the label.
+        aria-label={trigger ? undefined : label}
+        title={trigger ? undefined : label}
+        className={
+          trigger
+            ? buttonClasses('secondary')
+            : 'flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-200/70 hover:text-ink-900'
+        }
         {...triggerData}
       >
-        <Ellipsis size={16} aria-hidden="true" />
+        {trigger ?? <Ellipsis size={16} aria-hidden="true" />}
       </button>
       <div
         ref={menuRef}

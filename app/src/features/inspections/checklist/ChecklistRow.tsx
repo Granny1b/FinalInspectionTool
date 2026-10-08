@@ -4,6 +4,7 @@ import {
   rowLetter,
   rowRef,
   SEVERITIES,
+  SEVERITY_LABELS,
   STATUS_LABELS,
   type Item,
   type RowResult,
@@ -25,7 +26,6 @@ import {
   ROW_LINE,
 } from './layout';
 import { GUIDE_SOON, GuideButton, StatusControl } from './parts';
-import { SEVERITY_LABELS } from './status';
 import type { ChecklistActions } from './useChecklistActions';
 
 type Props = {

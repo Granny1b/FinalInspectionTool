@@ -9,10 +9,10 @@ import {
   type TemplateDraftInput,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Upload } from 'lucide-react';
+import { Printer, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackLink } from '../../components/BackLink';
-import { Button } from '../../components/Button';
+import { Button, ButtonLink } from '../../components/Button';
 import { Callout } from '../../components/Callout';
 import { ApiRequestError } from '../../lib/api';
 import { AutosaveAlerts } from '../../lib/autosave/AutosaveAlerts';
@@ -23,6 +23,7 @@ import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
 import { useReload } from '../../lib/autosave/useReload';
 import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { useSettings } from '../../lib/useSettings';
+import { templatePrintHref } from '../print/links';
 import { Badge } from './Badge';
 import { ChecklistHeading } from './ChecklistHeading';
 import { TemplateDocument } from './document/TemplateDocument';
@@ -241,6 +242,11 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             onRetry={() => void saver.flush()}
             onReload={reload.askReload}
           />
+          {/* The draft as it prints; leaving the editor saves first, like any link. */}
+          <ButtonLink variant="secondary" to={templatePrintHref(id)}>
+            <Printer size={16} aria-hidden="true" />
+            Print preview
+          </ButtonLink>
           {/* Nothing to publish when the draft equals the latest revision (the badges say so). */}
           <Button onClick={openPublish} disabled={!unpublished || conflict}>
             <Upload size={16} aria-hidden="true" />

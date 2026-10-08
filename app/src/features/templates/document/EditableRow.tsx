@@ -4,7 +4,7 @@ import { rowLetter, rowRef, type Item } from '@modig/shared';
 import clsx from 'clsx';
 import { Copy, Images, Trash2 } from 'lucide-react';
 import { memo, useId, type KeyboardEvent } from 'react';
-import { ActionMenu } from './ActionMenu';
+import { ActionMenu } from '../../../components/ActionMenu';
 import { rowDndId, type DragData } from './dnd';
 import { GRID, ISSUE_OUTLINE, REF_CELL, ROW_CONTROLS, ROW_LINE, TEXT_CELL } from './layout';
 import { DragHandle, GuideMark, IconButton, IssueNote, PaperCells } from './parts';

@@ -13,9 +13,10 @@ import {
   type RowResult,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Lock, LockOpen, Printer } from 'lucide-react';
+import { ChevronDown, ClipboardCheck, ClipboardList, Lock, LockOpen, Printer } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { ActionMenu } from '../../components/ActionMenu';
 import { BackLink } from '../../components/BackLink';
 import { Button } from '../../components/Button';
 import { Callout } from '../../components/Callout';
@@ -31,6 +32,8 @@ import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { formatDateTime } from '../../lib/format';
 import { useCurrentUser } from '../../lib/useMe';
 import { modelName, useSettings } from '../../lib/useSettings';
+import { inspectionPrintHref } from '../print/links';
+import type { PrintMode } from '../print/model';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
 import { DeviationSummary } from './DeviationSummary';
 import { draftOf, sameDraft } from './draft';
@@ -277,7 +280,6 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const [notice, setNotice] = useState<StateChange | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [stateConflict, setStateConflict] = useState(false);
-  const printHintId = useId();
   const continueId = `${idPrefix}-continue`;
 
   // Finalise and Reopen swap places under the keyboard focus: the notice takes it instead.
@@ -293,6 +295,16 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   }, [continueId]);
 
   const conflict = saveState.status === 'conflict' || stateConflict;
+
+  /**
+   * The print route loads the inspection from the server, so pending changes are saved first; if
+   * that fails, the save status and its alert say why and nothing opens. It opens in a new tab,
+   * which prints as soon as it has loaded.
+   */
+  async function openPrint(mode: PrintMode) {
+    if (!(await saveAll())) return;
+    window.open(inspectionPrintHref(id, mode, true), '_blank', 'noopener');
+  }
 
   function openFinalise() {
     const found = validateForFinalise(withSnapshot(inspection, draftRef.current));
@@ -419,20 +431,24 @@ export function InspectionEditor({ loaded, onReload }: Props) {
                 />
               </div>
             )}
-            {/* Planned (brief §6): focusable and with a tooltip, so it can say when it comes. */}
-            <Button
-              variant="secondary"
-              aria-disabled
-              aria-describedby={printHintId}
-              title="Print / Save PDF: coming in phase 4"
-              className="cursor-default opacity-50"
-            >
-              <Printer size={16} aria-hidden="true" />
-              Print
-            </Button>
-            <span id={printHintId} className="sr-only">
-              Coming in phase 4
-            </span>
+            <ActionMenu
+              label="Print / Save PDF"
+              trigger={
+                <>
+                  <Printer size={16} aria-hidden="true" />
+                  Print / Save PDF
+                  <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
+                </>
+              }
+              items={[
+                {
+                  label: 'Blank checklist',
+                  icon: ClipboardList,
+                  onSelect: () => void openPrint('blank'),
+                },
+                { label: 'Report', icon: ClipboardCheck, onSelect: () => void openPrint('report') },
+              ]}
+            />
             {!finalised ? (
               <Button onClick={openFinalise} disabled={conflict}>
                 <Lock size={16} aria-hidden="true" />

@@ -1,0 +1,420 @@
+/*
+ * The printed document (brief §6): A4 portrait, clean in black and white. Everything about the
+ * paper lives here, for the screen preview (white sheets on a grey desk) and for print alike; the
+ * toolbar around it is ordinary app UI (Tailwind classes, hidden in print).
+ *
+ * Plain CSS, outside Tailwind's layers, so it wins over the base styles without !important.
+ * The page footer is not here: its text depends on the document, so usePageFooter adds the
+ * margin-box rule at runtime (see footer.ts).
+ */
+
+@page {
+  size: A4 portrait;
+  margin: 14mm 12mm 16mm 12mm;
+}
+
+.paper {
+  /* Greys that print as clean greys on a black-and-white laser printer. */
+  --paper-ink: #000;
+  --paper-muted: #4d4d4d;
+  --paper-rule: #8c8c8c;
+  --paper-fill: #e4e4e4;
+  --paper-fill-light: #f3f3f3;
+  /* Blank rows give room to write by hand (brief §6: at least 9 mm). */
+  --paper-write-row: 9.5mm;
+  --paper-report-row: 7mm;
+  /* Chrome's PDFs place the right content edge about 0.3 mm past the 12 mm margin; right-aligned
+     text keeps this far in, so it never crosses the margin (footer.ts does the same). */
+  --paper-edge-inset: 0.5mm;
+
+  color: var(--paper-ink);
+  font-size: 9pt;
+  line-height: 1.3;
+  /* Light grey fills print even with the dialog's "Background graphics" off. */
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Screen: A4 sheets on a grey desk. On paper the @page margins take the sheets' padding.      */
+/* ------------------------------------------------------------------------------------------ */
+
+@media screen {
+  .paper-desk {
+    padding: 24px 16px 64px;
+    overflow-x: auto;
+    background: var(--color-ink-200);
+  }
+
+  .paper-sheet {
+    box-sizing: border-box;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto 24px;
+    padding: 14mm 12mm 16mm;
+    background: #fff;
+    box-shadow:
+      0 1px 3px rgb(0 0 0 / 0.12),
+      0 10px 30px rgb(0 0 0 / 0.08);
+  }
+
+  /* The fallback footer is for paper only. */
+  .paper-fallback-footer {
+    display: none;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+  }
+
+  .paper-sheet + .paper-sheet {
+    break-before: page;
+  }
+
+  /* Browsers without margin boxes repeat this at the foot of every page a table spans. */
+  .paper-fallback-footer {
+    display: table-footer-group;
+  }
+}
+
+.paper h2 {
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Front page: one page tall; the photo takes whatever height the text leaves.                */
+/* ------------------------------------------------------------------------------------------ */
+
+.paper-front {
+  display: flex;
+  flex-direction: column;
+  /* The page's content box is 267 mm (297 − 14 − 16); a little less never spills onto page 2. */
+  height: 265mm;
+}
+
+.paper-front-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8mm;
+  padding-bottom: 4mm;
+  border-bottom: 0.4mm solid var(--paper-ink);
+}
+
+.paper-logo {
+  display: block;
+  width: auto;
+  max-width: 80mm;
+  height: 14mm;
+  object-fit: contain;
+  object-position: left bottom;
+}
+
+.paper-front-number {
+  padding-right: var(--paper-edge-inset);
+  font-size: 12pt;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.paper-title {
+  margin-top: 10mm;
+  font-size: 28pt;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.paper-company {
+  margin-top: 1.5mm;
+  font-size: 12pt;
+  color: var(--paper-muted);
+}
+
+.paper-state {
+  margin-top: 6mm;
+  font-size: 10pt;
+}
+
+.paper-state-text {
+  font-weight: 600;
+}
+
+.paper-state-draft {
+  display: inline-block;
+  padding: 1.5mm 3mm;
+  border: 0.6mm solid var(--paper-ink);
+  font-size: 11pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.paper-state-summary {
+  margin-top: 1.5mm;
+  color: var(--paper-muted);
+}
+
+.paper-photo {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 40mm;
+  margin: 8mm 0;
+}
+
+.paper-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.paper-photo-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.3mm dashed var(--paper-rule);
+  color: var(--paper-muted);
+}
+
+/* Label and value on one baseline, low in the row: on the line, as on a paper form. Flex, not a
+   table: Chromium loses table cells' baseline alignment when it lays out pages. */
+.paper-fields {
+  margin: 0;
+  border-top: 0.25mm solid var(--paper-rule);
+}
+
+.paper-fields > div {
+  display: flex;
+  align-items: baseline;
+  gap: 4mm;
+  padding: 4.5mm 0 1.5mm;
+  border-bottom: 0.25mm solid var(--paper-rule);
+}
+
+.paper-fields dt {
+  flex: none;
+  width: 36mm;
+  font-size: 8pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+.paper-fields dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 11pt;
+  overflow-wrap: anywhere;
+}
+
+.paper-signatures {
+  display: grid;
+  grid-template-columns: 5fr 3fr 5fr;
+  gap: 8mm;
+  margin-top: 10mm;
+}
+
+/* Room above the line to sign by hand. */
+.paper-signature {
+  padding-top: 13mm;
+}
+
+.paper-signature span {
+  display: block;
+  padding-top: 1.2mm;
+  border-top: 0.3mm solid var(--paper-ink);
+  font-size: 8pt;
+  color: var(--paper-muted);
+}
+
+.paper-revision {
+  margin-top: 7mm;
+  padding-right: var(--paper-edge-inset);
+  font-size: 9pt;
+  text-align: right;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Checklist and Deviation Summary tables.                                                    */
+/* ------------------------------------------------------------------------------------------ */
+
+.paper-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6mm;
+  margin-bottom: 4mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 0.4mm solid var(--paper-ink);
+}
+
+.paper-heading h2 {
+  font-size: 13pt;
+}
+
+.paper-heading p {
+  margin: 0;
+  padding-right: var(--paper-edge-inset);
+  color: var(--paper-muted);
+  text-align: right;
+}
+
+.paper-note {
+  margin: -1.5mm 0 3mm;
+  color: var(--paper-muted);
+}
+
+.paper-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.paper-table + .paper-table {
+  margin-top: 5mm;
+}
+
+/* The section title and column labels repeat on every page a section runs onto. */
+.paper-table thead {
+  display: table-header-group;
+}
+
+/* Never split a row; never leave a section title with one row at the foot of a page, or one row
+   alone on the next. */
+.paper-table tr {
+  break-inside: avoid;
+}
+
+.paper-table tbody tr:first-child {
+  break-after: avoid;
+}
+
+.paper-table tbody tr:last-child {
+  break-before: avoid;
+}
+
+.paper-table th,
+.paper-table td {
+  padding: 1.2mm 1.5mm;
+  border: 0.25mm solid var(--paper-rule);
+  text-align: left;
+  vertical-align: top;
+  /* A long part number or URL wraps instead of running past the page edge. */
+  overflow-wrap: anywhere;
+}
+
+.paper-table .paper-section-title th {
+  padding: 1.6mm 2mm;
+  border-color: var(--paper-ink);
+  background: var(--paper-fill);
+  font-size: 10pt;
+  font-weight: 600;
+}
+
+/* The number sits over the refs, the title over the checkpoints. */
+.paper-section-number {
+  display: inline-block;
+  width: 10mm;
+}
+
+.paper-table .paper-columns th {
+  background: var(--paper-fill-light);
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.paper-col-ref {
+  width: 10.5mm;
+}
+.paper-col-comment {
+  width: 47mm;
+}
+.paper-col-mark {
+  width: 9.5mm;
+}
+/* Wide enough for a department on one line ("El-avdelningen"). */
+.paper-col-resp {
+  width: 30mm;
+}
+.paper-col-number {
+  width: 13mm;
+}
+.paper-col-severity {
+  width: 17mm;
+}
+.paper-col-closed {
+  width: 28mm;
+}
+
+[data-print-mode='blank'] .paper-table tbody td {
+  height: var(--paper-write-row);
+  vertical-align: middle;
+}
+
+[data-print-mode='report'] .paper-table tbody td {
+  height: var(--paper-report-row);
+}
+
+.paper-ref {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.paper-table .paper-mark-cell {
+  padding-inline: 0;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* An empty box to tick by hand. */
+.paper-box {
+  display: inline-block;
+  width: 3.8mm;
+  height: 3.8mm;
+  border: 0.3mm solid var(--paper-ink);
+  border-radius: 0.4mm;
+  vertical-align: middle;
+}
+
+/* A recorded status: its symbol over its name, so it never depends on colour. */
+.paper-mark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 6.5pt;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.paper-mark svg {
+  width: 4mm;
+  height: 4mm;
+}
+
+.paper-severity {
+  display: block;
+  font-weight: 600;
+}
+
+.paper-secondary {
+  display: block;
+  margin-top: 0.6mm;
+  color: var(--paper-muted);
+}
+
+.paper-empty {
+  color: var(--paper-muted);
+  font-style: italic;
+}
+
+.paper-fallback-footer td {
+  padding: 2mm 0 0;
+  border: 0;
+  font-size: 7pt;
+  color: var(--paper-muted);
+}

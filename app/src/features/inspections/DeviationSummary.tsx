@@ -1,6 +1,7 @@
 import {
   EXTRA_DEVIATION_REF,
   SEVERITIES,
+  SEVERITY_LABELS,
   type InspectionDeviation,
   type Severity,
 } from '@modig/shared';
@@ -10,7 +11,6 @@ import { memo, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '../../components/Button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { FIELD } from './checklist/layout';
-import { SEVERITY_LABELS } from './checklist/status';
 import { singleLine } from '../templates/document/ops';
 import type { ExtraDeviationPatch } from './extras';
 import { extraDescriptionId } from './issues';

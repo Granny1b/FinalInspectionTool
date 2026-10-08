@@ -1,21 +1,19 @@
 import { hasRole } from '@modig/shared';
 import { useParams } from 'react-router';
 import { LoadError, PageLoading } from '../components/PageStates';
+import { templatePrintHref } from '../features/print/links';
 import { Badge } from '../features/templates/Badge';
 import { PublishedTemplateView } from '../features/templates/PublishedTemplateView';
-import { useTemplateRevision, useTemplates } from '../features/templates/queries';
+import { parseRevision, useTemplateRevision, useTemplates } from '../features/templates/queries';
 import { TemplateNotFound } from '../features/templates/TemplateNotFound';
 import { errorMessage, isMissing } from '../lib/api';
 import { useCurrentUser } from '../lib/useMe';
-
-/** Same rule as the API: a positive integer without leading zeros. */
-const REVISION_PATTERN = /^[1-9]\d{0,8}$/;
 
 /** /templates/:id/revisions/:revision — one published revision, read-only (from the history). */
 export function TemplateRevisionPage() {
   const { id = '', revision: param = '' } = useParams();
   const isAdmin = hasRole(useCurrentUser().roles, 'admin');
-  const number = REVISION_PATTERN.test(param) ? Number(param) : null;
+  const number = parseRevision(param);
   const revision = useTemplateRevision(id, number);
   // Only to say whether this is the latest revision; the page works without it.
   const latest = useTemplates().data?.find((template) => template.id === id)?.publishedRevision;
@@ -52,6 +50,7 @@ export function TemplateRevisionPage() {
           )}
         </>
       }
+      printHref={templatePrintHref(id, number)}
     />
   );
 }

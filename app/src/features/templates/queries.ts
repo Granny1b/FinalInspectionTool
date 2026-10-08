@@ -25,6 +25,11 @@ export const templateKeys = {
 
 const templatePath = (id: string) => `/api/templates/${encodeURIComponent(id)}`;
 
+/** A revision number from an address: as the API wants it, a positive integer without leading zeros. */
+export function parseRevision(param: string | null | undefined): number | null {
+  return param && /^[1-9]\d{0,8}$/.test(param) ? Number(param) : null;
+}
+
 /**
  * Saves and publishes give up after this long, so a request that hangs becomes a failure that is
  * retried or shown (SWA's gateway itself gives up at 45 s).

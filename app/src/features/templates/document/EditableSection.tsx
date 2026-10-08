@@ -5,7 +5,7 @@ import { sectionNumber, type Section } from '@modig/shared';
 import clsx from 'clsx';
 import { ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from 'lucide-react';
 import { memo, useId, useMemo, type KeyboardEvent } from 'react';
-import { ActionMenu } from './ActionMenu';
+import { ActionMenu } from '../../../components/ActionMenu';
 import { bodyDndId, rowDndId, sectionDndId, type DragData } from './dnd';
 import { EditableRow } from './EditableRow';
 import {

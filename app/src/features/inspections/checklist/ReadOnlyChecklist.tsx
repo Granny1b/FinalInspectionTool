@@ -4,6 +4,7 @@ import {
   rowLetter,
   rowRef,
   sectionNumber,
+  SEVERITY_LABELS,
   type Section,
 } from '@modig/shared';
 import clsx from 'clsx';
@@ -13,7 +14,6 @@ import { CELL, GRID, ISSUE_OUTLINE, NOK_BAR, ROW_FOCUS, ROW_LINE } from './layou
 import { GUIDE_SOON, GuideButton, StatusMark } from './parts';
 import type { Results } from './results';
 import { SectionHeader } from './SectionHeader';
-import { SEVERITY_LABELS } from './status';
 
 type Props = {
   sections: Section[];
