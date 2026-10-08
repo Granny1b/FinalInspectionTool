@@ -6,8 +6,9 @@
  * - wide (≥ 56rem, a desktop): one line per row, in the print's column order;
  * - narrow (≥ 34rem, a tablet): the checkpoint on its own line, Comment | Status | Resp below;
  * - below that everything stacks.
- * A NOK row's severity goes on the next line, under the status it qualifies. Every cell is placed
- * explicitly, so the DOM order (which is the Tab order) can stay comment → resp → severity.
+ * A NOK row's severity goes on the next line, under the status it qualifies, and its photo count
+ * next to it, under Resp. Every cell is placed explicitly, so the DOM order (which is the Tab
+ * order) can stay comment → resp → severity.
  * Resp is 10rem wide, so a department such as "El-avdelningen" fits its input unclipped.
  */
 export const GRID =
@@ -22,6 +23,8 @@ export const CELL = {
   resp: 'col-start-2 @min-[34rem]:col-start-4 @min-[34rem]:row-start-2 @min-[56rem]:col-start-5 @min-[56rem]:row-start-1',
   severity:
     'col-start-2 @min-[34rem]:col-start-3 @min-[34rem]:row-start-3 @min-[56rem]:col-start-4 @min-[56rem]:row-start-2',
+  photos:
+    'col-start-2 @min-[34rem]:col-start-4 @min-[34rem]:row-start-3 @min-[56rem]:col-start-5 @min-[56rem]:row-start-2',
 } as const;
 
 /** Wide sheets only: the column labels of a section header. */

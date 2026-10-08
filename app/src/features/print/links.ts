@@ -1,4 +1,4 @@
-import { PRINT_MODES, type PrintMode } from './model';
+import { DEVIATIONS_PER_PAGE, PRINT_MODES, type DeviationsPerPage, type PrintMode } from './model';
 
 /** `/inspections/:id/print?mode=…`; `autoprint` opens the print dialog once it has loaded. */
 export function inspectionPrintHref(id: string, mode: PrintMode, autoprint = false): string {
@@ -16,4 +16,9 @@ export function templatePrintHref(id: string, revision?: number): string {
 /** The `mode` query parameter, if it names a mode. */
 export function parseMode(value: string | null): PrintMode | null {
   return PRINT_MODES.find((mode) => mode === value) ?? null;
+}
+
+/** The `deviationsPerPage` query parameter, if it is one of the layouts ("2" or "4"). */
+export function parseDeviationsPerPage(value: string | null): DeviationsPerPage | null {
+  return DEVIATIONS_PER_PAGE.find((perPage) => String(perPage) === value) ?? null;
 }

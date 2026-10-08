@@ -5,6 +5,7 @@ import {
   indexItems,
   inspectionProgress,
   validateForFinalise,
+  type AnnotatedImage,
   type FinaliseIssue,
   type Inspection,
   type InspectionDeviation,
@@ -35,12 +36,14 @@ import { modelName, useSettings } from '../../lib/useSettings';
 import { inspectionPrintHref } from '../print/links';
 import type { PrintMode } from '../print/model';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
+import { withPhotos } from './checklist/results';
 import { DeviationSummary } from './DeviationSummary';
 import { draftOf, sameDraft } from './draft';
 import { newExtraDeviation, removeExtra, updateExtra, type ExtraDeviationPatch } from './extras';
 import { FrontPageCard } from './FrontPageCard';
 import { ProgressSummary, TabBar } from './HeaderParts';
 import {
+  deviationPhotosId,
   extraDescriptionId,
   extraIssues,
   frontIssues,
@@ -172,6 +175,15 @@ export function InspectionEditor({ loaded, onReload }: Props) {
       update({ extraDeviations: updateExtra(draftRef.current.extraDeviations, extraId, patch) }),
     [update],
   );
+  // A row deviation's photos live in its result, an extra deviation's in itself. They reach here
+  // once uploaded (the photo and its marked-up copy), so they autosave like any other change.
+  const updateDeviationPhotos = useCallback(
+    ({ kind, key }: InspectionDeviation, photos: AnnotatedImage[]) =>
+      kind === 'row'
+        ? update({ results: withPhotos(draftRef.current.results, key, photos) })
+        : updateExtraDeviation(key, { photos }),
+    [update, updateExtraDeviation],
+  );
 
   // After an attempt to finalise with problems, they stay marked (and update as rows get a
   // status) until the inspection is finalised.
@@ -225,6 +237,9 @@ export function InspectionEditor({ loaded, onReload }: Props) {
 
   // Tabs keep their own scroll position, so going back to the checklist returns to the row.
   const [tab, setTab] = useState<InspectionTab>('checklist');
+  // The Deviations tab is rendered when first shown, then kept: opening an inspection doesn't
+  // download every deviation photo for a tab that may not be looked at.
+  const [deviationsShown, setDeviationsShown] = useState(false);
   const tabRef = useRef(tab);
   const scrollByTab = useRef<Record<InspectionTab, number>>({ checklist: 0, deviations: 0 });
   /** Shows the tab at once (so its elements can take the focus); false if it was showing. */
@@ -232,7 +247,10 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     if (next === tabRef.current) return false;
     scrollByTab.current[tabRef.current] = window.scrollY;
     tabRef.current = next;
-    flushSync(() => setTab(next));
+    flushSync(() => {
+      setTab(next);
+      if (next === 'deviations') setDeviationsShown(true);
+    });
     return true;
   }, []);
   const selectTab = useCallback(
@@ -255,6 +273,17 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const goToRow = useCallback(
     (itemId: string) => goTo({ tab: 'checklist', elementId: rowElementId(itemId) }),
     [goTo],
+  );
+  /** A NOK row's photo count: its card's first photo button (Add photo, or the first photo). */
+  const goToPhotos = useCallback(
+    (itemId: string) => {
+      switchTab('deviations');
+      const photos = document.getElementById(deviationPhotosId(itemId));
+      if (!photos) return;
+      (photos.querySelector<HTMLElement>('button') ?? photos).focus({ preventScroll: true });
+      (photos.closest('article') ?? photos).scrollIntoView({ block: 'center' });
+    },
+    [switchTab],
   );
 
   const addExtraDeviation = useCallback(() => {
@@ -566,6 +595,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             onChange={finalised ? undefined : updateResults}
             respSuggestions={suggestions}
             issues={issues}
+            onShowPhotos={goToPhotos}
           />
         </section>
       </div>
@@ -576,16 +606,19 @@ export function InspectionEditor({ loaded, onReload }: Props) {
         hidden={tab !== 'deviations'}
         className="mt-6"
       >
-        <DeviationSummary
-          deviations={deviations}
-          readOnly={finalised}
-          issues={extraErrors}
-          respSuggestions={suggestions}
-          onGoToRow={goToRow}
-          onAdd={addExtraDeviation}
-          onUpdate={updateExtraDeviation}
-          onRemove={removeExtraDeviation}
-        />
+        {deviationsShown && (
+          <DeviationSummary
+            deviations={deviations}
+            readOnly={finalised}
+            issues={extraErrors}
+            respSuggestions={suggestions}
+            onGoToRow={goToRow}
+            onAdd={addExtraDeviation}
+            onUpdate={updateExtraDeviation}
+            onRemove={removeExtraDeviation}
+            onPhotosChange={updateDeviationPhotos}
+          />
+        )}
       </div>
 
       {dialog?.change === 'finalise' && (

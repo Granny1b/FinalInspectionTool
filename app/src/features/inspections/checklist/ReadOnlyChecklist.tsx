@@ -11,7 +11,7 @@ import clsx from 'clsx';
 import { useState } from 'react';
 import { IssueNote } from '../../templates/document/parts';
 import { CELL, GRID, ISSUE_OUTLINE, NOK_BAR, ROW_FOCUS, ROW_LINE } from './layout';
-import { GUIDE_SOON, GuideButton, StatusMark } from './parts';
+import { GUIDE_SOON, GuideButton, PhotoCount, StatusMark } from './parts';
 import type { Results } from './results';
 import { SectionHeader } from './SectionHeader';
 
@@ -20,6 +20,7 @@ type Props = {
   results: Results;
   rowIssues: ReadonlyMap<string, string>;
   announce: (message: string) => void;
+  onShowPhotos: (itemId: string) => void;
 };
 
 /**
@@ -27,7 +28,7 @@ type Props = {
  * and resp as text. Rows can take the focus from script (`tabIndex={-1}`), so the page's jump
  * links still work.
  */
-export function ReadOnlyChecklist({ sections, results, rowIssues, announce }: Props) {
+export function ReadOnlyChecklist({ sections, results, rowIssues, announce, onShowPhotos }: Props) {
   // The one row whose "Guide viewer arrives in phase 5." note is showing.
   const [guideNote, setGuideNote] = useState<string | null>(null);
   return sections.map((section, sectionIndex) => (
@@ -38,6 +39,7 @@ export function ReadOnlyChecklist({ sections, results, rowIssues, announce }: Pr
           const ref = rowRef(sectionIndex, rowIndex);
           const result = results[item.id];
           const issue = rowIssues.get(item.id);
+          const photos = result?.status === 'NOK' ? (result.photos?.length ?? 0) : 0;
           return (
             <li
               key={item.id}
@@ -80,9 +82,20 @@ export function ReadOnlyChecklist({ sections, results, rowIssues, announce }: Pr
                 <ReadOnlyText className={CELL.comment} label="Comment" value={result?.comment} />
                 <ReadOnlyText className={CELL.resp} label="Resp" value={result?.resp} />
                 {result?.status === 'NOK' && (
-                  <p className={clsx(CELL.severity, 'text-xs leading-6 font-medium text-nok-fg')}>
+                  <p
+                    className={clsx(
+                      CELL.severity,
+                      'self-center text-xs leading-6 font-medium text-nok-fg',
+                    )}
+                  >
                     Severity: {SEVERITY_LABELS[result.severity ?? DEFAULT_SEVERITY]}
                   </p>
+                )}
+                {/* Nothing to add once finalised, so only photos that exist are shown. */}
+                {photos > 0 && (
+                  <div className={clsx(CELL.photos, 'flex items-center')}>
+                    <PhotoCount count={photos} rowRef={ref} onClick={() => onShowPhotos(item.id)} />
+                  </div>
                 )}
               </div>
               {issue && <IssueNote id={`issue-${item.id}`} messages={[issue]} />}

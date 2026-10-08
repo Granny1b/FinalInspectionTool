@@ -1,9 +1,8 @@
 import { useId } from 'react';
-import type { DeviationLine, PrintMode } from './model';
 
 type Props = {
-  mode: PrintMode;
-  lines: DeviationLine[];
+  /** "D-01"… one line each. */
+  numbers: string[];
   /** Right of the heading: the inspection number, or the checklist for a template preview. */
   subject: string;
   /** The page footer as a repeating table footer, for browsers without margin boxes. */
@@ -11,11 +10,10 @@ type Props = {
 };
 
 /**
- * The Deviation Summary, on a page of its own (brief §6): No. | Ref | Description | Severity |
- * Resp | Closed (sign/date). Blank: numbered lines to fill in; report: what was found, with
- * "Closed" left empty for signing off later.
+ * The blank Deviation Summary, on a page of its own (brief §6): numbered lines with No. | Ref |
+ * Description | Severity | Resp | Closed (sign/date), filled in by hand on the walk-round.
  */
-export function DeviationTable({ mode, lines, subject, fallbackFooter }: Props) {
+export function DeviationTable({ numbers, subject, fallbackFooter }: Props) {
   const titleId = useId();
   return (
     <section className="paper-sheet" aria-labelledby={titleId}>
@@ -23,11 +21,9 @@ export function DeviationTable({ mode, lines, subject, fallbackFooter }: Props) 
         <h2 id={titleId}>Deviation Summary</h2>
         <p>{subject}</p>
       </div>
-      {mode === 'blank' && (
-        <p className="paper-note">
-          Every NOK row and every finding that isn’t on the checklist, numbered in order.
-        </p>
-      )}
+      <p className="paper-note">
+        Every NOK row and every finding that isn’t on the checklist, numbered in order.
+      </p>
       <table className="paper-table" data-deviation-summary="" aria-labelledby={titleId}>
         <colgroup>
           <col className="paper-col-number" />
@@ -55,27 +51,16 @@ export function DeviationTable({ mode, lines, subject, fallbackFooter }: Props) 
           </tfoot>
         )}
         <tbody>
-          {lines.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="paper-empty">
-                No deviations recorded.
-              </td>
+          {numbers.map((number) => (
+            <tr key={number} data-deviation={number}>
+              <td className="paper-ref">{number}</td>
+              <td />
+              <td />
+              <td />
+              <td />
+              <td />
             </tr>
-          ) : (
-            lines.map((line) => (
-              <tr key={line.number} data-deviation={line.number}>
-                <td className="paper-ref">{line.number}</td>
-                <td className="paper-ref">{line.ref}</td>
-                <td>
-                  {line.text}
-                  {line.comment && <span className="paper-secondary">{line.comment}</span>}
-                </td>
-                <td>{line.severity}</td>
-                <td>{line.resp}</td>
-                <td />
-              </tr>
-            ))
-          )}
+          ))}
         </tbody>
       </table>
     </section>

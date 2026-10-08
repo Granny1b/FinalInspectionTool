@@ -9,7 +9,7 @@ import {
   ImageReadUrlResponseSchema,
   ImageUploadUrlResponseSchema,
 } from '@modig/shared';
-import { skipToken, useQuery } from '@tanstack/react-query';
+import { queryOptions, skipToken, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './api';
 
 /** A failure with a message meant for the user. */
@@ -99,7 +99,12 @@ const READ_URL_STALE_MS = 10 * 60_000;
 
 /** A short-lived URL to show an uploaded image; idle without an id. */
 export function useImageUrl(imageId: string | undefined) {
-  return useQuery({
+  return useQuery(imageUrlQuery(imageId));
+}
+
+/** The query behind useImageUrl, for pages that need several URLs at once (print). */
+export function imageUrlQuery(imageId: string | undefined) {
+  return queryOptions({
     queryKey: ['images', imageId, 'url'],
     queryFn: imageId
       ? async ({ signal }) =>

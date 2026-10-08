@@ -1,6 +1,6 @@
 /**
  * What gets printed (brief §6), worked out from the data alone: the front page, one table per
- * section with spare rows, the Deviation Summary and the page footer. Pure, so the rules are
+ * section with spare rows, the deviation pages and the page footer. Pure, so the rules are
  * unit-tested; the components only lay it out.
  */
 import {
@@ -11,8 +11,9 @@ import {
   inspectionProgress,
   rowLetter,
   sectionNumber,
-  SEVERITY_LABELS,
+  type AnnotatedImage,
   type Inspection,
+  type InspectionDeviation,
   type RowResult,
   type Section,
   type Severity,
@@ -28,6 +29,12 @@ export type PrintMode = (typeof PRINT_MODES)[number];
 
 /** Numbered lines on a blank Deviation Summary (brief §6: "~15 numbered lines"). */
 export const BLANK_DEVIATION_LINES = 15;
+
+/** A report's deviation cards per page: two with large photos, or four (both on trial). */
+export const DEVIATIONS_PER_PAGE = [2, 4] as const;
+export type DeviationsPerPage = (typeof DEVIATIONS_PER_PAGE)[number];
+/** Until the Quality department has picked the layout it prefers. */
+export const DEFAULT_DEVIATIONS_PER_PAGE: DeviationsPerPage = 2;
 
 /** On the front page of a report that is not finalised, so it is never taken for the final one. */
 export const NOT_FINALISED_MARKER = 'NOT FINALISED – DRAFT REPORT';
@@ -55,18 +62,34 @@ export type PrintSection = {
   rows: PrintRow[];
 };
 
-export type DeviationLine = {
-  /** "D-01" */
+export type DeviationPhoto = {
+  /** The flattened copy with the annotations when there is one, else the photo itself. */
+  imageId: string;
+  caption: string;
+};
+
+/** One deviation of a report, printed as a card with its photos. */
+export type DeviationCard = {
+  /** "D-03" */
   number: string;
-  /** "3.c", "—" for a deviation not tied to a row; empty on a blank line. */
-  ref: string;
-  /** Checkpoint text or the extra deviation's description. */
+  /** "4.c"; null for a deviation that is not tied to a row. */
+  ref: string | null;
+  /** The row's section; empty for a deviation that is not tied to a row. */
+  sectionTitle: string;
+  /** Checkpoint text, or the extra deviation's description. */
   text: string;
   comment: string;
-  /** "Major"; empty on a blank line. */
-  severity: string;
+  severity: Severity;
   resp: string;
+  photos: DeviationPhoto[];
 };
+
+/**
+ * Blank: the Deviation Summary's numbered lines (D-01…) to fill in by hand. Report: one card per
+ * deviation, none when nothing was found.
+ */
+export type PrintDeviations =
+  { kind: 'lines'; numbers: string[] } | { kind: 'cards'; cards: DeviationCard[] };
 
 export type FrontField = { label: string; value: string };
 
@@ -97,7 +120,7 @@ export type PrintModel = {
   /** Above the first section: "Final inspection – RigiMill MG · Rev 2". */
   checklistTitle: string;
   sections: PrintSection[];
-  deviations: DeviationLine[];
+  deviations: PrintDeviations;
   /** Bottom left of every page. */
   footer: string;
   /** The document title, which Chrome offers as the PDF's file name. */
@@ -150,14 +173,7 @@ export function inspectionPrint(
       report ? { results: inspection.results } : { spareRows: spareRows(templateSnapshot) },
     ),
     deviations: report
-      ? deviations.map((deviation) => ({
-          number: deviation.number,
-          ref: deviation.ref,
-          text: deviation.text,
-          comment: deviation.comment,
-          severity: SEVERITY_LABELS[deviation.severity],
-          resp: deviation.resp,
-        }))
+      ? { kind: 'cards', cards: deviations.map(deviationCard) }
       : blankDeviationLines(),
     footer: [
       companyName,
@@ -294,13 +310,60 @@ function printSections(
   });
 }
 
-function blankDeviationLines(): DeviationLine[] {
-  return Array.from({ length: BLANK_DEVIATION_LINES }, (_, index) => ({
-    number: deviationNumber(index),
-    ref: '',
-    text: '',
-    comment: '',
-    severity: '',
-    resp: '',
-  }));
+function blankDeviationLines(): PrintDeviations {
+  return {
+    kind: 'lines',
+    numbers: Array.from({ length: BLANK_DEVIATION_LINES }, (_, index) => deviationNumber(index)),
+  };
+}
+
+function deviationCard(deviation: InspectionDeviation): DeviationCard {
+  return {
+    number: deviation.number,
+    ref: deviation.kind === 'row' ? deviation.ref : null,
+    sectionTitle: deviation.sectionTitle.trim(),
+    text: deviation.text.trim(),
+    comment: deviation.comment.trim(),
+    severity: deviation.severity,
+    resp: deviation.resp.trim(),
+    photos: deviation.photos.map(printedPhoto),
+  };
+}
+
+function printedPhoto(photo: AnnotatedImage): DeviationPhoto {
+  return { imageId: photo.renderedImageId ?? photo.imageId, caption: photo.caption?.trim() ?? '' };
+}
+
+/**
+ * The report's cards on pages: `perPage` to a page while they fit, fewer when the cards' natural
+ * heights (in mm, from the laid-out page) add up to more than `room`, the page height left for
+ * cards. A card taller than that gets a page of its own. Never splits or reorders a card.
+ */
+export function packCards<T>(
+  cards: readonly T[],
+  heights: readonly number[],
+  { perPage, room }: { perPage: DeviationsPerPage; room: number },
+): T[][] {
+  const pages: T[][] = [];
+  let used = 0;
+  cards.forEach((card, index) => {
+    const height = heights[index] ?? 0;
+    const page = pages.at(-1);
+    if (page && page.length < perPage && used + height <= room) {
+      page.push(card);
+      used += height;
+    } else {
+      pages.push([card]);
+      used = height;
+    }
+  });
+  return pages;
+}
+
+/** Every uploaded image the document shows (the logo aside), each once: their URLs load first. */
+export function printedImageIds(model: PrintModel): string[] {
+  const photos =
+    model.deviations.kind === 'cards' ? model.deviations.cards.flatMap((card) => card.photos) : [];
+  const ids = [model.front.photoId, ...photos.map((photo) => photo.imageId)];
+  return [...new Set(ids.filter((id) => id !== undefined))];
 }

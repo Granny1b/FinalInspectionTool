@@ -16,6 +16,8 @@ export type ChecklistSheetProps = {
   respSuggestions?: string[];
   /** Finalise problems to highlight (rows without a status). */
   issues?: FinaliseIssue[];
+  /** A NOK row's photo count was clicked: show that deviation's photos. */
+  onShowPhotos: (itemId: string) => void;
 };
 
 /**
@@ -34,6 +36,7 @@ export function ChecklistSheet({
   onChange,
   respSuggestions,
   issues,
+  onShowPhotos,
 }: ChecklistSheetProps): JSX.Element {
   // A primitive per row, so rows stay memoised when the page recomputes the issues on each change.
   const rowIssues = useMemo(() => {
@@ -61,6 +64,7 @@ export function ChecklistSheet({
             respSuggestions={respSuggestions}
             rowIssues={rowIssues}
             announce={setAnnouncement}
+            onShowPhotos={onShowPhotos}
           />
         ) : (
           <ReadOnlyChecklist
@@ -68,6 +72,7 @@ export function ChecklistSheet({
             results={results}
             rowIssues={rowIssues}
             announce={setAnnouncement}
+            onShowPhotos={onShowPhotos}
           />
         )}
       </div>
@@ -86,6 +91,7 @@ type EditableProps = {
   respSuggestions: string[] | undefined;
   rowIssues: ReadonlyMap<string, string>;
   announce: (message: string) => void;
+  onShowPhotos: (itemId: string) => void;
 };
 
 function EditableChecklist({
@@ -95,10 +101,18 @@ function EditableChecklist({
   respSuggestions,
   rowIssues,
   announce,
+  onShowPhotos,
 }: EditableProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const respListId = useId();
-  const actions = useChecklistActions({ sections, results, onChange, rootRef, announce });
+  const actions = useChecklistActions({
+    sections,
+    results,
+    onChange,
+    rootRef,
+    announce,
+    onShowPhotos,
+  });
   const suggestions = useMemo(() => [...new Set(respSuggestions)], [respSuggestions]);
 
   return (

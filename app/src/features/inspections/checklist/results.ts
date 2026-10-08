@@ -5,7 +5,7 @@
  * that changes nothing returns the input itself, so callers can skip a pointless save with
  * `next === results`. A row left with nothing in it is removed rather than stored as `{}`.
  */
-import type { RowResult, Section, Severity, Status } from '@modig/shared';
+import type { AnnotatedImage, RowResult, Section, Severity, Status } from '@modig/shared';
 
 export type Results = Record<string, RowResult>;
 
@@ -36,6 +36,17 @@ export function withText(
   if ((current[field] ?? '') === value) return results;
   const { [field]: _previous, ...rest } = current;
   return put(results, itemId, value ? { ...rest, [field]: value } : rest);
+}
+
+/**
+ * Sets a row's deviation photos (added on the Deviations tab); none removes them. Like the
+ * comment, they stay when the status changes, so a NOK set to OK by mistake loses nothing.
+ */
+export function withPhotos(results: Results, itemId: string, photos: AnnotatedImage[]): Results {
+  const current = results[itemId] ?? {};
+  if (current.photos === photos || (!current.photos?.length && !photos.length)) return results;
+  const { photos: _previous, ...rest } = current;
+  return put(results, itemId, photos.length > 0 ? { ...rest, photos } : rest);
 }
 
 export function withSeverity(results: Results, itemId: string, severity: Severity): Results {

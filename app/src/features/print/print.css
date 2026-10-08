@@ -70,8 +70,13 @@
     background: #fff;
   }
 
-  .paper-sheet + .paper-sheet {
+  /* Every sheet starts a page: the front page, the checklist, each page of deviations. */
+  .paper-sheet {
     break-before: page;
+  }
+
+  .paper > .paper-sheet:first-child {
+    break-before: auto;
   }
 
   /* Browsers without margin boxes repeat this at the foot of every page a table spans. */
@@ -172,6 +177,8 @@
 }
 
 .paper-photo-missing {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -417,4 +424,235 @@
   border: 0;
   font-size: 7pt;
   color: var(--paper-muted);
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Deviation cards (report): 2 or 4 to a page, each page a sheet of its own, every card the    */
+/* same size and its photos as large as the text leaves room for. Text is never cut: a card    */
+/* whose text needs more than its share takes it from the others, and a page holds fewer cards */
+/* when they don't all fit (useCardPages measures them first). A card is never split.          */
+/* ------------------------------------------------------------------------------------------ */
+
+/* A page's content box is 267 mm tall; a little less never spills onto the next. */
+.paper-card-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 265mm;
+}
+
+.paper-cards {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4mm;
+}
+
+/* Equal shares of the page; a card whose text needs more keeps it and the others give way. */
+.paper-cards > * {
+  flex: 1 1 0;
+}
+
+[data-deviations-per-page='4'] .paper-cards {
+  gap: 3mm;
+}
+
+/* While the cards are measured (a moment, on screen): hidden, each at its natural height. */
+.paper-measure {
+  position: absolute;
+  visibility: hidden;
+}
+
+.paper-measure .paper-card-page {
+  min-height: 0;
+}
+
+.paper-measure .paper-cards > * {
+  flex: none;
+}
+
+.paper-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5mm;
+  min-width: 0;
+  padding: 3mm 3.5mm;
+  border: 0.3mm solid var(--paper-rule);
+  border-radius: 1mm;
+  break-inside: avoid;
+}
+
+.paper-card-body {
+  min-width: 0;
+}
+
+.paper-card-head {
+  display: flex;
+  align-items: center;
+  gap: 2.5mm;
+  font-size: 11pt;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.paper-card-ref {
+  font-weight: 600;
+}
+
+.paper-card-dot {
+  margin-inline: -1mm;
+  color: var(--paper-muted);
+}
+
+/* The severity in words; critical stands out in black and white too. */
+.paper-card-severity {
+  padding: 0.3mm 1.6mm;
+  border: 0.3mm solid var(--paper-ink);
+  border-radius: 0.6mm;
+  font-size: 6.5pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.paper-card-severity[data-severity='critical'] {
+  background: var(--paper-ink);
+  color: #fff;
+}
+
+.paper-card-section {
+  margin-top: 1.2mm;
+  font-size: 7.5pt;
+  color: var(--paper-muted);
+}
+
+.paper-card-text {
+  margin-top: 0.6mm;
+  font-size: 9.5pt;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.paper-card-comment {
+  margin-top: 1mm;
+  overflow-wrap: anywhere;
+}
+
+.paper-card-resp {
+  margin-top: 1.5mm;
+  overflow-wrap: anywhere;
+}
+
+.paper-card-label {
+  margin-right: 2mm;
+  font-size: 7.5pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+/* One photo takes the whole width, two share it. The photos fill what the text leaves; their
+   captions are a row of their own below them, so a long caption makes the card taller like a long
+   comment does, instead of squeezing the photo. */
+.paper-card-photos {
+  display: grid;
+  flex: 1 1 0;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  /* However much text there is, a photo is never smaller than this. */
+  grid-template-rows: minmax(24mm, 1fr) auto;
+  column-gap: 3mm;
+}
+
+.paper-card-photo {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  min-width: 0;
+  margin: 0;
+}
+
+/* The image keeps its proportions (never cropped), standing on its caption. Positioned, so its
+   pixel size never makes the card taller. */
+.paper-card-image {
+  position: relative;
+}
+
+.paper-card-image > * {
+  position: absolute;
+  inset: 0;
+}
+
+.paper-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.paper-card-photo figcaption {
+  padding-top: 1mm;
+  font-size: 7.5pt;
+  color: var(--paper-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.paper-card-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.3mm dashed var(--paper-rule);
+  border-radius: 1mm;
+  font-size: 7.5pt;
+  color: var(--paper-muted);
+}
+
+/* An empty frame to sketch in or stick a photo on, labelled in its corner. */
+.paper-card-sketch {
+  grid-row: 1 / -1;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 1.5mm 2mm;
+}
+
+/* Signed off by hand once the deviation is fixed. */
+.paper-card-closed {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 3fr) auto minmax(0, 2fr);
+  align-items: end;
+  column-gap: 2mm;
+  font-size: 7.5pt;
+  color: var(--paper-muted);
+}
+
+.paper-card-closed .paper-card-label {
+  margin-right: 1mm;
+}
+
+.paper-card-line {
+  height: 6mm;
+  border-bottom: 0.25mm solid var(--paper-ink);
+}
+
+/* Four to a page: one row each, the text on the left, the photos on the right. */
+[data-deviations-per-page='4'] .paper-card {
+  display: grid;
+  grid-template-areas:
+    'body photos'
+    'closed photos';
+  grid-template-columns: 74mm minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  gap: 2mm 4mm;
+  padding: 2.5mm 3mm;
+}
+
+[data-deviations-per-page='4'] .paper-card-body {
+  grid-area: body;
+}
+
+[data-deviations-per-page='4'] .paper-card-photos {
+  grid-area: photos;
+}
+
+[data-deviations-per-page='4'] .paper-card-closed {
+  grid-area: closed;
 }

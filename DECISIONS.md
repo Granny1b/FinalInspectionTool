@@ -487,8 +487,8 @@ The calls with product, security or data impact. Each is explained in its sectio
   covers one new blob name.
 - **A read URL serves an inline JPEG whatever the uploader stored** (`rsct=image/jpeg`,
   `rscd=inline` in the SAS). Otherwise an uploaded web page or `attachment; filename=…` would be
-  served as such from the storage account's domain. Phase 5's annotated PNGs will need
-  `image/png`, chosen by blob name.
+  served as such from the storage account's domain. (Phase 4 made the flattened copies of
+  marked-up photos JPEGs too, so this still covers every image.)
 - **Photos are scaled in the browser** (`createImageBitmap` with the camera orientation, white
   background for transparent PNGs, at most 1600 px, JPEG 0.8) and PUT with `credentials: 'omit'`.
 - **Read URLs are cached for 10 minutes**, under their 15-minute lifetime.
@@ -1044,3 +1044,226 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **The production build was checked by hand** (built app and `api/deploy` behind `swa start`
   with the local config copy): creating with a photo, filling in, finalising and a deep link, with
   no CSP violations and no console errors. As in phase 2, that is not part of the suite.
+
+## Phase 4 – Print and deviation photos
+
+### Worth reviewing first
+
+The calls with product, data or paper impact. Each is explained in its section below.
+
+- **The annotation editor came forward from phase 5**, at the user's request ("pictures with
+  arrows and annotations … possible to print … 4 deviations per page or 2"). It is used for
+  deviation photos now; phase 5 reuses it for guide images (Contract).
+- At most **2 photos per deviation** (Contract).
+- The report's deviations print as **cards with their photos**, 2 or 4 to a page, chosen in the
+  print toolbar (and the address); **2 is the default**. The sample PDFs compare both: one photo
+  prints at 103 × 77 mm with 2 per page, 68 × 51 mm with 4; labels at about 12 pt and 8 pt (Print).
+- **4 per page is four stacked rows** (text left, photos right), not a 2 × 2 grid (Print).
+- **A page holds fewer cards when their text doesn't fit.** The cards are measured in the browser
+  before they are put on pages; a card is never split, and no text is cut (Print).
+- **The blank checklist keeps the handwritten Deviation Summary table** (D-01 to D-15), as the
+  brief has it; only the report has cards (Print).
+- **Flattened copies are JPEG images with their own id** (`renderedImageId`), not
+  `images/{id}.annotated.png`, so they use the existing upload and read URLs: no API change
+  (Contract).
+- Cancelled, removed and replaced photos stay in storage, like replaced cover photos (Annotation
+  editor).
+- A row's photos stay when it stops being NOK, but count and print only while it is NOK (Deviation
+  cards).
+- Browser Back while the photo editor has unsaved marks discards them without asking; only closing
+  or reloading the tab warns (open, see Deviation cards).
+- Page numbers ("Page X of Y") need Chrome or Edge; Firefox and Safari print the footer text at the
+  foot of each table only (Print).
+
+### Contract (shared)
+
+- **`AnnotatedImage = { imageId, caption?, annotations, renderedImageId? }`** on
+  `RowResult.photos` and `ExtraDeviation.photos`, at most `MAX_PHOTOS_PER_DEVIATION` (2); the
+  unused `photoIds` is gone. `deriveDeviations` returns `photos` (always an array). `GuideImage`
+  extends `AnnotatedImage` with `verdict`, so phase 5 guides reuse the type and the editor.
+- **Coordinates are fractions (0–1) of the photo's width and height** (brief §4); a label's `size`
+  is a fraction of the photo's height. `ANNOTATION_COLORS`: red `#E02424`, cyan `#29ABE2` (Modig),
+  yellow `#FACC15`, white `#FFFFFF`.
+- **The flattened copy is an ordinary image** (`images/{id}.jpg`) whose id is `renderedImageId`.
+  It goes through `/api/images/upload-url` and the read URL, which already serve JPEG.
+  `blobNames.annotatedImage` (the brief's `.annotated.png`) is removed as unused.
+- **No API change:** photos travel inside the inspection's PUT and are validated by its schema.
+  The deviations table carries no photos.
+
+### Annotation editor
+
+- **Konva only where photos are edited.** `AnnotatedPhotos` lazy-loads the editor and fetches it
+  in the background when the photos are editable. The editor uses react-konva's core entry plus
+  only its shapes: a 314 kB chunk (98 kB gzip), none of it in the main chunk. A cold Vite cache
+  pre-bundles Konva at startup (its scan follows the dynamic import), so the dev server needs no
+  `optimizeDeps` entry.
+- **The editor's logic is a pure reducer** (marks with undo/redo, tool, colour, selection, the
+  label being typed), unit-tested in node; the canvas only turns gestures into actions.
+- **Selection belongs to the Select tool.** Drawing never selects the new mark; picking a colour
+  sets it for the next mark and recolours a selected one (one undo step). Selecting each new mark
+  made "pick a colour for the next mark" recolour the previous one.
+- **It opens with the Arrow tool in red**, the most common mark.
+- **Undo and redo keep the last 100 steps** of the marks; the caption has its field's own undo.
+- **Marks are stored rounded to 4 decimals and kept on the photo.** Boxes drawn in any direction
+  get a positive size; a press that moves under 6 screen px draws nothing (an arrow needs 12);
+  freehand keeps a point every 2 px or more; a moved mark stays on the photo (a label by its
+  top-left corner).
+- **Sizes follow the photo's long edge:** lines 0.65 %, arrow heads 4.5 × 4 lines, labels 4 % in
+  bold Inter. A soft dark shadow behind lines and a 70 % black outline round labels keep every
+  colour readable on busy photos and in black and white.
+- **The flattened copy** is drawn on an off-screen Konva stage from the same shape settings as the
+  screen, at the stored photo's size (at most 1600 px), and saved as JPEG at quality 0.9 (photos
+  use 0.8: JPEG blurs thin lines first) with `canvas.toBlob` (not `fetch(dataURL)`, which the CSP's
+  `connect-src` refuses). It is uploaded as it is (`uploadJpeg`; `lib/images` only offers an upload
+  that scales and re-encodes).
+- **A copy is made only when the marks changed** (or never had one). A caption-only edit keeps it;
+  removing every mark drops it, and print uses the photo itself.
+- **A new photo opens in the editor at once** from a local copy while the scaled original uploads.
+  A failed upload is reported at once and Save tries again; Save waits for an upload still running;
+  Cancel drops a new photo (its blob stays).
+- **Every image the feature loads asks for CORS** (`crossOrigin="anonymous"`, thumbnails and
+  viewer too), so the browser cache never holds a response that would taint the canvas.
+- **Thumbnails are 160 × 120 and show the whole photo** (contain, on white), so marks near an edge
+  are never cropped; the caption sits underneath. The remove button is always visible (touch) and
+  asks first. Focus goes to the new thumbnail after adding, to Add photo after removing.
+- **`accept="image/*"` without `capture`:** a tablet offers its camera and its photo library. Paste
+  works while the component's buttons have the focus, drop on its area; only the first image is
+  used, pasted text is ignored, and a non-image or a drop when full says why.
+- **Read-only** (no `onChange`): a thumbnail opens a simple viewer of the flattened copy, without
+  Konva; with no photos the component renders nothing (the card says "No photos"). The hidden file
+  input is rendered only while editable (integrator).
+- **Escape is handled by the editor** (`closedby="none"`): Chrome lets a page refuse only one
+  Escape per click. It asks before discarding changed marks or caption; in a label it ends the
+  label only. Keys never reach the page behind (a checklist row would take "1" as OK). The dialog
+  focuses itself, not its first tool, whose focus ring looked like a second selected tool.
+- **Closing or reloading the tab with unsaved marks warns** (`beforeunload`).
+- **Labels are one line of at most 200 characters;** Enter or leaving the field keeps it, an empty
+  one is removed, a double-click (Select tool) edits it.
+- **Touch and pen:** lines are hit-tested at least 24 px wide, the canvas has `touch-action: none`
+  and captures the pointer, a pen's side buttons are ignored. Toolbar buttons are 44 px for
+  fingers, 36 px with a mouse; a one-line hint under the photo says how the tool is used.
+
+### Deviation cards on the inspection page
+
+- **The Deviations tab is a list of cards:** D-nn, the ref as a link back to the row, the section,
+  and the severity (or Remove on an editable extra deviation) on top; the text on the left, the
+  photos on the right once the card is 46rem wide (container query), stacked below that.
+- **A row deviation's comment, Resp and severity are still edited in its row;** the card shows
+  them. An extra deviation is edited on its card with visible labels, in the old Tab order
+  (Description, Comment, Severity, Resp); its accessible names keep the number ("Description,
+  D-04").
+- **Severity is always a word:** Minor grey, Major outlined red, Critical filled red.
+- **Photos are stored** in the row's result (`withPhotos`) or the extra deviation; an empty list is
+  left out. They reach the page only once the photo and its copy have uploaded, so they autosave
+  like everything else with no upload tracking.
+- **A row's photos stay when its status changes**, like its comment, so a NOK set to OK by mistake
+  loses nothing; they count and print only while it is NOK.
+- **The tab is rendered when first shown**, then kept: opening an inspection downloads no deviation
+  photos. Jump links still work (the tab switch renders synchronously).
+- **NOK rows show "Add photo" or "2 photos"** under Resp; a click opens the Deviations tab with the
+  focus on the card's first photo button. It is not a Tab stop (transcribing is unchanged) and
+  there is no key for it: photos come from a camera, not from the paper. Screen readers hear the
+  count with the row's status. Read-only rows show it only when there are photos.
+- **A file dropped beside a photo area is ignored** instead of the browser opening the image in
+  place of the app (window-level `dragover`/`drop` of files, once the tab has been shown).
+- **Removing an extra deviation asks first** if it has text or photos, and says how many photos go.
+- **Open:** browser Back while the editor has unsaved marks discards them; only closing or
+  reloading the tab warns. Fixing it needs an "editing" callback from `AnnotatedPhotos` into the
+  page's leave guard.
+
+### Print
+
+- **Print routes have no sidebar** (`PrintShell`), but wait for `/api/me` like the app shell.
+- **Without `mode`, an inspection prints its report once finalised, else the blank checklist.**
+  **Print / Save PDF** on the inspection saves pending changes first, then opens the route in a new
+  tab with `autoprint=1`, which prints once everything is loaded and is then dropped from the
+  address, so a reload doesn't print again.
+- **Template preview:** admins see the draft ("Draft – Rev 3" on the front page, "(draft)" in the
+  footer), inspectors the latest published revision, `?revision=n` any published one.
+- **The footer is one `@page` rule with both margin boxes**, added at runtime through the CSSOM to
+  the app's own stylesheet: the production CSP (`style-src 'self'`) blocks inline styles but not
+  CSSOM edits. The text is escaped as a CSS string (control characters become spaces).
+- **Chromium is recognised by `navigator.userAgentData`** (only Chromium browsers have it). Others
+  get the footer's left text as a repeating table footer, without page numbers; the card pages
+  have none, their heading already names the inspection.
+- **A report of an inspection in progress** says "NOT FINALISED – DRAFT REPORT" on its front page
+  and "Not finalised" in every footer, so no single page passes for the final report.
+- **The PDF's file name** comes from the document title: "FI-2026-0042 RigiMill MG – Volvo Cars
+  Skövde – Inspection report".
+- **The front page is exactly one page** (a 265 mm column; the photo takes what the text leaves).
+  Without a photo its frame stays, so every front page has the same layout. The finaliser is
+  printed as stored, by email.
+- **Checklist rows:** blank rows 9.5 mm (at least 9 mm to write in), report rows at least 7 mm. A
+  status is an icon and its word in its column. **A NOK row's severity is a "Severity: Major" line
+  at the top of its comment cell.** Spare lines print in blank mode only: in a report, findings
+  that belong to no row are extra deviations.
+- **Orphans:** the section title and column labels are the repeating table head, a section's first
+  row keeps with the next and its last with the previous one, and no row is split.
+- **Right-aligned text stays 0.5 mm inside the margin:** Chrome's PDFs put the right content edge
+  about 0.3 mm further out.
+- **Black and white:** light grey fills (`print-color-adjust: exact`, so they print without
+  "Background graphics"), thin rules, words for statuses and severities; a critical card's badge
+  is the one filled black.
+- **Report cards:** "D-03 · 4.c · MAJOR" (an extra deviation: "Not on the checklist"), the section,
+  checkpoint or description, comment, Resp ("—" when empty), up to two photos as marked up with
+  their captions, and a "Closed · Sign · Date" line. No photo: an empty "Sketch / photo" frame. A
+  photo that can't be loaded says so in its place. No deviations: "No deviations recorded."
+- **`deviationsPerPage` lives in the address only** (default 2); the toolbar's switch replaces the
+  history entry. The inspection's Report menu opens 2 per page.
+- **4 per page is four stacked rows,** text in a 74 mm column on the left, photos on the right.
+  Measured against a 2 × 2 grid: a pair of photos prints at 50 × 37 mm each instead of 33 × 25 mm,
+  where the labels became unreadable; rows also read top to bottom like everything else. The grid
+  code is removed.
+- **Each page of cards is a sheet of its own**, and its cards share it equally (flex); a card
+  whose text needs more takes it from the others. Photos are positioned inside their slot, so
+  their pixel size never makes a card taller; a photo is never smaller than 24 mm, and captions
+  are a row of their own under the photos (a long caption makes the card taller, never hides the
+  photo). One photo takes the full width, two share it on a common caption line.
+- **Cards are measured before they are put on pages (`useCardPages`, `packCards`).** They are laid
+  out once, hidden, at their natural height in the chosen layout, after the fonts have loaded;
+  then each page takes up to 2 or 4 of them while their heights fit (265 mm less the heading and
+  the gaps of a full page). Why (integrator): with fixed groups of four, two long comments on one
+  page pushed its fourth card onto an extra page of its own, without a heading, and the page's
+  "D-01–D-04" was wrong. A flowing table with a repeating heading was tried and rejected: every
+  card kept at least a quarter page, so any comment over about 200 characters pushed the next card
+  on. A page with fewer cards keeps empty slots, so its cards keep their size.
+- **Ready means everything is in:** the page first fetches every image's address, renders the
+  document once, and sets `data-print-ready` after the images, the fonts and the card measuring;
+  switching the mode or layout waits again. The Print button says "Preparing…" until then.
+- **The deviation heading repeats on every page of cards** with its range ("FI-2026-0042 ·
+  D-01–D-04"); screen readers hear it once.
+- **The "Include reference images" appendix** (brief §6) is left to phase 5, with a marked place
+  in `PrintDocument`.
+- **Chrome embeds the variable Inter font as Type 3 fonts** in its PDFs: sharp and searchable;
+  `pdfinfo` warns about their bounding boxes. Left as it is.
+
+### Tests and tooling
+
+- **`e2e/print.spec.ts` prints real PDFs** with `page.pdf({ format: 'A4', preferCSSPageSize: true,
+printBackground: true })` after `data-print-ready` and reads them with `pdfjs-dist`
+  (`e2e/support/pdf.ts`): text with positions, and the images each page paints. Each PDF is kept in
+  `test-results/`.
+- **The print tests print a copy of the seeded checklist** (its published revision, as a
+  throwaway template with model E2E), so a local edit to the seeded template never changes a page
+  count. The smoke test uses the seeded template itself, as brief §9 says.
+- **Page counts are ranges:** the lower bound from geometry (e.g. 108 blank rows × 9 mm need at
+  least 4 pages of 267 mm), the upper bound one page over the measured count (blank 7, report 10
+  and 8, template preview with 5 spare lines 8).
+- **Rows are checked by text:** each ref is on exactly one checklist page, in order, and that page
+  holds the row's whole checkpoint (whitespace removed). Every section title on a page has a row of
+  its section below it; no text ends past page width − 12 mm (measured: 12.2 mm); blank refs are at
+  least 9 mm apart (measured 9.26).
+- **Cards:** the reports' data fits 2 and 4 per page with at least 30 mm to spare, so the layout
+  is exact; a separate test with three 780-character comments expects D-01 and D-02 on one page and
+  D-03 to D-05 on the next (measured 214 mm of 244 for two cards, 319 for three). Each page paints
+  exactly its cards' photos; the DOM shows the marked-up copy where there is one.
+- **Test photos are drawn by the browser** (a generated scene, screenshotted as JPEG): no image
+  files in the repository, and no red in them, so the annotation test can find its red arrow in
+  the flattened copy (decoded in the page). It drives the real editor with the mouse.
+- **`deleteInspection` also deletes the deviation photos** (originals and copies); the machine
+  photo stays, as it may be a template's cover.
+- **The smoke test counts `window.print()`** in the new tab (stubbed) to check autoprint.
+- **Mutation checks:** rows allowed to split, 8 mm blank rows, no footer, the original photo
+  printed instead of the copy, cards grouped without measuring: each failed a test.
+- **The sample PDFs and the 2-vs-4 comparison** were made outside the repository, from a
+  finalised RigiMill MG inspection whose photos were marked up through the editor.

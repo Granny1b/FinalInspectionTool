@@ -40,6 +40,15 @@ describe('updateExtra', () => {
     expect(next).not.toHaveProperty('comment');
     expect(next).not.toHaveProperty('resp');
   });
+
+  it('sets the photos, and removes the field when the last one goes', () => {
+    const photo = { imageId: 'Img0000000000001', annotations: [] };
+    const [withPhoto] = updateExtra([a], a.id, { photos: [photo] });
+    expect(withPhoto).toEqual({ ...a, photos: [photo] });
+    const [without] = updateExtra([withPhoto!], a.id, { photos: [] });
+    expect(without).toEqual(a);
+    expect(without).not.toHaveProperty('photos');
+  });
 });
 
 describe('removeExtra', () => {

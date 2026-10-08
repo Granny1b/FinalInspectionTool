@@ -1,7 +1,8 @@
-import type { Section } from '@modig/shared';
+import type { AnnotatedImage, Section } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
 import {
   rowsWithoutStatus,
+  withPhotos,
   withRemainingOk,
   withSeverity,
   withStatus,
@@ -20,6 +21,14 @@ const section: Section = {
   ],
 };
 
+const photo: AnnotatedImage = { imageId: 'Img0000000000001', annotations: [] };
+const marked: AnnotatedImage = {
+  imageId: 'Img0000000000002',
+  caption: 'Close-up',
+  annotations: [{ kind: 'rect', x: 0.1, y: 0.2, w: 0.3, h: 0.25, color: '#E02424' }],
+  renderedImageId: 'Img0000000000003',
+};
+
 describe('withStatus', () => {
   it('sets a status on a row without a result', () => {
     expect(withStatus({}, 'a1', 'OK')).toEqual({ a1: { status: 'OK' } });
@@ -32,6 +41,9 @@ describe('withStatus', () => {
     });
     expect(withStatus({ a1: { comment: 'kept' } }, 'a1', 'OK')).toEqual({
       a1: { status: 'OK', comment: 'kept' },
+    });
+    expect(withStatus({ a1: { status: 'NOK', photos: [photo] } }, 'a1', 'OK')).toEqual({
+      a1: { status: 'OK', photos: [photo] },
     });
   });
 
@@ -89,6 +101,32 @@ describe('withText', () => {
     const results: Results = { a1: { comment: 'x' } };
     expect(withText(results, 'a1', 'comment', 'x')).toBe(results);
     expect(withText(results, 'a2', 'resp', '')).toBe(results);
+  });
+});
+
+describe('withPhotos', () => {
+  it('sets and replaces a row’s photos, keeping the rest of its result', () => {
+    const results: Results = { a1: { status: 'NOK', comment: 'Bent' }, a2: { status: 'OK' } };
+    const next = withPhotos(results, 'a1', [photo]);
+    expect(next).toEqual({
+      a1: { status: 'NOK', comment: 'Bent', photos: [photo] },
+      a2: results.a2,
+    });
+    expect(next.a2).toBe(results.a2);
+    expect(withPhotos(next, 'a1', [photo, marked]).a1?.photos).toEqual([photo, marked]);
+  });
+
+  it('removes the field when the last photo goes, and a row left empty', () => {
+    expect(withPhotos({ a1: { status: 'NOK', photos: [photo] } }, 'a1', [])).toEqual({
+      a1: { status: 'NOK' },
+    });
+    expect(withPhotos({ a1: { photos: [photo] } }, 'a1', [])).toEqual({});
+  });
+
+  it('returns the same object when nothing changes', () => {
+    const results: Results = { a1: { status: 'NOK', photos: [photo] } };
+    expect(withPhotos(results, 'a1', results.a1!.photos!)).toBe(results);
+    expect(withPhotos(results, 'a2', [])).toBe(results);
   });
 });
 

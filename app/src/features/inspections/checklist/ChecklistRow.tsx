@@ -14,6 +14,7 @@ import clsx from 'clsx';
 import { memo, useId, useState, type FocusEvent, type KeyboardEvent } from 'react';
 import { singleLine } from '../../templates/document/ops';
 import { IssueNote } from '../../templates/document/parts';
+import { photoCountText } from '../deviations';
 import { fieldCommand, rowCommand, type RowField } from './keys';
 import {
   CELL,
@@ -25,7 +26,7 @@ import {
   ROW_FOCUS,
   ROW_LINE,
 } from './layout';
-import { GUIDE_SOON, GuideButton, StatusControl } from './parts';
+import { GUIDE_SOON, GuideButton, PhotoCount, StatusControl } from './parts';
 import type { ChecklistActions } from './useChecklistActions';
 
 type Props = {
@@ -57,6 +58,8 @@ export const ChecklistRow = memo(function ChecklistRow({
   const [guideNote, setGuideNote] = useState(false);
   const ref = rowRef(sectionIndex, rowIndex);
   const status = result?.status;
+  // Photos belong to the row's deviation, so they count only while it is NOK.
+  const photos = status === 'NOK' ? (result?.photos?.length ?? 0) : 0;
   const statusId = useId();
   const issueId = useId();
 
@@ -115,6 +118,7 @@ export const ChecklistRow = memo(function ChecklistRow({
       {/* Read when the row takes the focus; hidden, so browse mode doesn't read the status twice. */}
       <span id={statusId} hidden>
         {status ? `Status ${STATUS_LABELS[status]}` : 'No status'}
+        {photos > 0 && `, ${photoCountText(photos)}`}
       </span>
       <div className={clsx(GRID, ROW_LINE)}>
         <span
@@ -188,6 +192,11 @@ export const ChecklistRow = memo(function ChecklistRow({
               ))}
             </select>
           </label>
+        )}
+        {status === 'NOK' && (
+          <div className={clsx(CELL.photos, 'flex items-center')}>
+            <PhotoCount count={photos} rowRef={ref} onClick={() => actions.showPhotos(item.id)} />
+          </div>
         )}
       </div>
       {issue && <IssueNote id={issueId} messages={[issue]} />}

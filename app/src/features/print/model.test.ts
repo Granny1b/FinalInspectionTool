@@ -5,7 +5,11 @@ import {
   BLANK_DEVIATION_LINES,
   inspectionPrint,
   NOT_FINALISED_MARKER,
+  packCards,
+  printedImageIds,
   templatePrint,
+  type DeviationCard,
+  type PrintModel,
   type PrintRow,
 } from './model';
 
@@ -76,6 +80,14 @@ function template(patch: Partial<Template> = {}): Template {
 }
 
 const refs = (rows: PrintRow[]) => rows.map((row) => row.ref);
+const blankNumbers = Array.from(
+  { length: BLANK_DEVIATION_LINES },
+  (_, index) => `D-${String(index + 1).padStart(2, '0')}`,
+);
+function cardsOf(model: PrintModel): DeviationCard[] {
+  if (model.deviations.kind !== 'cards') throw new Error('expected deviation cards');
+  return model.deviations.cards;
+}
 
 describe('a blank checklist', () => {
   const model = inspectionPrint(inspection(), 'blank', CONTEXT);
@@ -131,12 +143,15 @@ describe('a blank checklist', () => {
     expect(filled.sections[0]!.rows[0]).toMatchObject({ status: null, comment: '', resp: '' });
   });
 
-  it('has fifteen numbered, empty deviation lines', () => {
-    expect(model.deviations).toHaveLength(BLANK_DEVIATION_LINES);
-    expect(model.deviations.map((line) => line.number)).toEqual(
-      Array.from({ length: 15 }, (_, index) => `D-${String(index + 1).padStart(2, '0')}`),
+  it('has fifteen numbered deviation lines to fill in, even when deviations were recorded', () => {
+    expect(BLANK_DEVIATION_LINES).toBe(15);
+    expect(model.deviations).toEqual({ kind: 'lines', numbers: blankNumbers });
+    const recorded = inspectionPrint(
+      inspection({ results: { [row1a!.id]: { status: 'NOK' } } }),
+      'blank',
+      CONTEXT,
     );
-    expect(model.deviations.every((line) => !line.ref && !line.text && !line.severity)).toBe(true);
+    expect(recorded.deviations).toEqual({ kind: 'lines', numbers: blankNumbers });
   });
 
   it('names the inspection in the footer and the file', () => {
@@ -230,32 +245,83 @@ describe('a report', () => {
     expect(refs(model.sections[1]!.rows)).toEqual(['2.a', '2.b', '2.c']);
   });
 
-  it('lists the deviations: NOK rows in checklist order, then extras', () => {
-    expect(model.deviations).toEqual([
+  it('has a card per deviation: NOK rows in checklist order, then extras', () => {
+    expect(cardsOf(model)).toEqual([
       {
         number: 'D-01',
         ref: '1.b',
+        sectionTitle: 'Loading area',
         text: 'Checkpoint 1.1',
         comment: 'Screw loose',
-        severity: 'Major',
+        severity: 'major',
         resp: 'Assembly',
+        photos: [],
       },
       {
         number: 'D-02',
         ref: '2.b',
+        sectionTitle: 'Tool arena',
         text: 'Checkpoint 2.1',
         comment: 'Label missing',
-        severity: 'Minor',
+        severity: 'minor',
         resp: '',
+        photos: [],
       },
       {
         number: 'D-03',
-        ref: '—',
+        ref: null,
+        sectionTitle: '',
         text: 'Paint damage on door',
         comment: 'Left side',
-        severity: 'Critical',
+        severity: 'critical',
         resp: 'Paint shop',
+        photos: [],
       },
+    ]);
+  });
+
+  it('prints the annotated copy of a photo when there is one, else the photo itself', () => {
+    const withPhotos = inspectionPrint(
+      inspection({
+        results: {
+          [row1b!.id]: {
+            status: 'NOK',
+            photos: [
+              {
+                imageId: 'Orig000000000001',
+                renderedImageId: 'Rend000000000001',
+                caption: '  Left column ',
+                annotations: [{ kind: 'rect', x: 0.1, y: 0.1, w: 0.2, h: 0.2, color: '#E02424' }],
+              },
+              { imageId: 'Orig000000000002', annotations: [] },
+            ],
+          },
+        },
+        extraDeviations: [
+          {
+            id: 'Extr000000000001',
+            description: ' Paint damage ',
+            severity: 'minor',
+            photos: [{ imageId: 'Orig000000000003', annotations: [], caption: 'Door' }],
+          },
+        ],
+      }),
+      'report',
+      CONTEXT,
+    );
+    expect(cardsOf(withPhotos).map((card) => card.photos)).toEqual([
+      [
+        { imageId: 'Rend000000000001', caption: 'Left column' },
+        { imageId: 'Orig000000000002', caption: '' },
+      ],
+      [{ imageId: 'Orig000000000003', caption: 'Door' }],
+    ]);
+    expect(cardsOf(withPhotos)[1]).toMatchObject({ ref: null, text: 'Paint damage' });
+    expect(printedImageIds(withPhotos)).toEqual([
+      'Phot000000000001',
+      'Rend000000000001',
+      'Orig000000000002',
+      'Orig000000000003',
     ]);
   });
 
@@ -286,13 +352,13 @@ describe('a report', () => {
     expect(draft.sections[1]!.rows.every((row) => row.status === null)).toBe(true);
   });
 
-  it('has no deviation lines when nothing was found', () => {
+  it('has no deviation cards when nothing was found', () => {
     const clean = inspectionPrint(
       inspection({ results: { [row1a!.id]: { status: 'OK' } }, state: 'finalised' }),
       'report',
       CONTEXT,
     );
-    expect(clean.deviations).toEqual([]);
+    expect(clean.deviations).toEqual({ kind: 'cards', cards: [] });
     expect(clean.front.report?.summary).toBe('1 / 5 rows filled · 0 NOK · 0 deviations');
   });
 });
@@ -313,7 +379,8 @@ describe('a template preview', () => {
     expect(model.front.photoId).toBe('Covr000000000001');
     expect(model.front.revision).toBe('Draft – Rev 3');
     expect(refs(model.sections[0]!.rows)).toEqual(['1.a', '1.b', '1.c', '1.d']);
-    expect(model.deviations).toHaveLength(BLANK_DEVIATION_LINES);
+    expect(model.deviations).toEqual({ kind: 'lines', numbers: blankNumbers });
+    expect(printedImageIds(model)).toEqual(['Covr000000000001']);
     expect(model.footer).toBe(
       'Modig Machine Tool · Final inspection – RigiMill MG · Rev 3 (draft)',
     );
@@ -349,5 +416,72 @@ describe('a template preview', () => {
   it('names an untitled template', () => {
     const model = templatePrint(template({ name: '  ' }), { ...CONTEXT, draft: true });
     expect(model.footer).toBe('Modig Machine Tool · Untitled template · Rev 3 (draft)');
+  });
+});
+
+describe('deviation pages', () => {
+  const five = ['D-01', 'D-02', 'D-03', 'D-04', 'D-05'];
+
+  it('puts 2 or 4 cards on a page while they fit; only the last page holds fewer', () => {
+    const short = [40, 40, 40, 40, 40];
+    expect(packCards(five, short, { perPage: 2, room: 240 })).toEqual([
+      ['D-01', 'D-02'],
+      ['D-03', 'D-04'],
+      ['D-05'],
+    ]);
+    expect(packCards(five, short, { perPage: 4, room: 240 })).toEqual([
+      ['D-01', 'D-02', 'D-03', 'D-04'],
+      ['D-05'],
+    ]);
+  });
+
+  it('moves a card that no longer fits on to the next page, whole and in order', () => {
+    // D-02 has a long comment: D-03 doesn't fit after it, and D-01 to D-03 can't share a page.
+    const heights = [50, 120, 80, 40, 40];
+    expect(packCards(five, heights, { perPage: 4, room: 240 })).toEqual([
+      ['D-01', 'D-02'],
+      ['D-03', 'D-04', 'D-05'],
+    ]);
+    // Exactly full still fits.
+    expect(packCards(five, [120, 120, 1, 1, 1], { perPage: 4, room: 240 })).toEqual([
+      ['D-01', 'D-02'],
+      ['D-03', 'D-04', 'D-05'],
+    ]);
+  });
+
+  it('gives a card taller than a page a page of its own', () => {
+    expect(packCards(five.slice(0, 3), [30, 300, 30], { perPage: 4, room: 240 })).toEqual([
+      ['D-01'],
+      ['D-02'],
+      ['D-03'],
+    ]);
+  });
+
+  it('has no pages without cards', () => {
+    expect(packCards([], [], { perPage: 2, room: 240 })).toEqual([]);
+  });
+
+  it('loads a photo used twice once, and no front photo when there is none', () => {
+    const model = inspectionPrint(
+      inspection({
+        front: { ...inspection().front, photoId: undefined },
+        results: {
+          [row1a!.id]: {
+            status: 'NOK',
+            photos: [{ imageId: 'Same000000000001', annotations: [] }],
+          },
+          [row1b!.id]: {
+            status: 'NOK',
+            photos: [{ imageId: 'Same000000000001', annotations: [] }],
+          },
+        },
+      }),
+      'report',
+      CONTEXT,
+    );
+    expect(printedImageIds(model)).toEqual(['Same000000000001']);
+    expect(printedImageIds(inspectionPrint(inspection(), 'blank', CONTEXT))).toEqual([
+      'Phot000000000001',
+    ]);
   });
 });

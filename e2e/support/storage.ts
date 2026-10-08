@@ -12,8 +12,10 @@ import {
   CONTAINERS,
   DEFAULT_SPARE_ROWS_PER_SECTION,
   DEVIATIONS_TABLE,
+  InspectionSchema,
   newId,
   TemplateSchema,
+  type Section,
   type Template,
 } from '@modig/shared';
 
@@ -86,22 +88,31 @@ const CHECKLIST = [
 ];
 
 /**
- * A two-section, six-row template. `published` adds revision 1 with the same content, so the
- * draft continues as revision 2 without unpublished changes.
+ * A two-section, six-row template, or the given checklist (e.g. a copy of the seeded one).
+ * `published` adds revision 1 with the same content, so the draft continues as revision 2
+ * without unpublished changes.
  */
-export async function createTemplate(name: string, published = false): Promise<Template> {
+export async function createTemplate(
+  name: string,
+  published = false,
+  checklist?: { sections: Section[]; spareRowsPerSection?: number },
+): Promise<Template> {
   const draft: Template = {
     id: newId(),
     name,
     modelCode: TEST_MODEL,
     revision: published ? 2 : 1,
     status: 'draft',
-    printSettings: { spareRowsPerSection: DEFAULT_SPARE_ROWS_PER_SECTION },
-    sections: CHECKLIST.map(({ title, rows }) => ({
-      id: newId(),
-      title,
-      items: rows.map((text) => ({ id: newId(), text })),
-    })),
+    printSettings: {
+      spareRowsPerSection: checklist?.spareRowsPerSection ?? DEFAULT_SPARE_ROWS_PER_SECTION,
+    },
+    sections:
+      checklist?.sections ??
+      CHECKLIST.map(({ title, rows }) => ({
+        id: newId(),
+        title,
+        items: rows.map((text) => ({ id: newId(), text })),
+      })),
     updatedAt: new Date().toISOString(),
     updatedBy: 'e2e@modig.se',
   };
@@ -153,11 +164,36 @@ export async function deviationRows(inspectionId: string): Promise<StoredDeviati
   return rows.sort((a, b) => a.rowKey.localeCompare(b.rowKey));
 }
 
-/** Deletes an inspection's blob and its deviation rows. */
+/**
+ * Deletes an inspection's blob, its deviation rows and its deviation photos (originals and
+ * marked-up copies: nothing else uses them). The machine photo stays: it may be a template's
+ * cover.
+ */
 export async function deleteInspection(id: string): Promise<void> {
+  const blob = inspections.getBlobClient(blobNames.inspection(id));
+  const photoIds = (await blob.exists()) ? deviationPhotoIds(await blob.downloadToBuffer()) : [];
   const rows = await deviationRows(id);
   await Promise.all([
-    inspections.getBlobClient(blobNames.inspection(id)).deleteIfExists(),
+    blob.deleteIfExists(),
+    deleteImages(photoIds),
     ...rows.map((row) => deviations.deleteEntity(row.partitionKey, row.rowKey)),
   ]);
+}
+
+function deviationPhotoIds(content: Buffer): string[] {
+  const inspection = InspectionSchema.parse(JSON.parse(content.toString('utf8')));
+  const photos = [
+    ...Object.values(inspection.results).flatMap((result) => result.photos ?? []),
+    ...inspection.extraDeviations.flatMap((extra) => extra.photos ?? []),
+  ];
+  return photos.flatMap(({ imageId, renderedImageId }) =>
+    renderedImageId ? [imageId, renderedImageId] : [imageId],
+  );
+}
+
+/** Deletes uploaded images (`images/{id}.jpg`); missing ones are skipped. */
+export async function deleteImages(ids: readonly string[]): Promise<void> {
+  await Promise.all(
+    ids.map((imageId) => images.getBlobClient(blobNames.image(imageId)).deleteIfExists()),
+  );
 }

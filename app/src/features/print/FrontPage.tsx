@@ -1,10 +1,11 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import type { FrontPage as FrontPageModel } from './model';
+import { PaperPhoto } from './PaperPhoto';
 
 type Props = {
   front: FrontPageModel;
   logoUrl: string;
-  /** Null when the photo's address couldn't be fetched (`front.photoId` is set but unreachable). */
+  /** Null when there is no photo or its address couldn't be fetched. */
   photoUrl: string | null;
 };
 
@@ -17,8 +18,6 @@ const SIGNATURES = ['Inspected by', 'Date', 'Signature'] as const;
  */
 export function FrontPage({ front, logoUrl, photoUrl }: Props) {
   const titleId = useId();
-  // The address that failed to load: a fresh one (read URLs expire) is tried again.
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const { report } = front;
 
   return (
@@ -42,22 +41,24 @@ export function FrontPage({ front, logoUrl, photoUrl }: Props) {
         )}
 
         {/* Without a photo its frame stays, so every front page has the same layout. */}
-        {front.photoId && photoUrl && photoUrl !== failedUrl ? (
-          <div className="paper-photo">
-            <img src={photoUrl} alt="Machine photo" onError={() => setFailedUrl(photoUrl)} />
-          </div>
-        ) : (
-          <div className="paper-photo paper-photo-missing">
-            {front.photoId ? 'The machine photo couldn’t be loaded.' : 'No machine photo'}
-          </div>
-        )}
+        <div className="paper-photo">
+          <PaperPhoto
+            url={front.photoId ? photoUrl : null}
+            alt="Machine photo"
+            missing={
+              <div className="paper-photo-missing">
+                {front.photoId ? 'The machine photo couldn’t be loaded.' : 'No machine photo'}
+              </div>
+            }
+          />
+        </div>
 
         <dl className="paper-fields">
           {front.fields.map(({ label, value }) => (
             <div key={label}>
               <dt>{label}</dt>
               {/* A space keeps an empty field's line (and its baseline) for writing on. */}
-              <dd>{value || '\u00a0'}</dd>
+              <dd>{value || ' '}</dd>
             </div>
           ))}
         </dl>

@@ -1,5 +1,6 @@
 import { hasRole, type Template } from '@modig/shared';
 import { FileClock } from 'lucide-react';
+import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { EmptyState } from '../components/EmptyState';
 import { templatePrint } from '../features/print/model';
@@ -105,24 +106,22 @@ function TemplatePrint({
   back: Back;
 }) {
   const settings = useSettings();
-  const images = usePrintImages(template.coverImageId, settings.data?.logoImageId);
-  if (settings.isError) return <PrintLoadError query={settings} />;
-  if (!settings.data || images.loading) return <PrintLoading />;
-
-  const model = templatePrint(template, {
-    draft,
-    companyName: settings.data.companyName,
-    modelLabel: modelName(settings.data.machineModels, template.modelCode),
-  });
-  return (
-    <PrintView
-      model={model}
-      logoUrl={images.logoUrl}
-      photoUrl={images.photoUrl}
-      subject={model.checklistTitle}
-      back={back}
-    />
+  const model = useMemo(
+    () =>
+      settings.data
+        ? templatePrint(template, {
+            draft,
+            companyName: settings.data.companyName,
+            modelLabel: modelName(settings.data.machineModels, template.modelCode),
+          })
+        : null,
+    [template, draft, settings.data],
   );
+  const images = usePrintImages(model, settings.data?.logoImageId);
+  if (settings.isError) return <PrintLoadError query={settings} />;
+  if (!model || images.loading) return <PrintLoading />;
+
+  return <PrintView model={model} images={images} subject={model.checklistTitle} back={back} />;
 }
 
 function NotFound({ what }: { what?: 'revision' }) {

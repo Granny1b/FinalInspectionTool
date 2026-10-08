@@ -13,6 +13,7 @@ import {
   test as base,
   type APIRequestContext,
   type BrowserContext,
+  type Locator,
   type Page,
 } from '@playwright/test';
 import { signIn } from './support/auth';
@@ -114,8 +115,22 @@ const saveStatus = (page: Page) => page.locator('main header [role="status"]');
 /** "4 / 6 rows filled · 2 NOK" in the sticky header. */
 const progress = (page: Page) => page.locator('main header').getByText(/rows filled/);
 const deviationsTab = (page: Page) => page.getByRole('tab', { name: /^Deviations/ });
-const summaryRows = (page: Page) =>
-  page.getByRole('region', { name: 'Deviation Summary' }).locator('tbody tr');
+const summaryCards = (page: Page) =>
+  page.getByRole('region', { name: 'Deviation Summary' }).locator('article[data-deviation]');
+
+/** A row deviation's card: number, ref (a link to the row), checkpoint, severity, comment, resp. */
+async function expectRowCard(
+  card: Locator,
+  expected: { number: string; ref: string; text: string; severity: string; details: string[] },
+): Promise<void> {
+  await expect(card.getByRole('heading', { level: 3 })).toHaveText(expected.number);
+  await expect(
+    card.getByRole('button', { name: `Row ${expected.ref}, go to it in the checklist` }),
+  ).toBeVisible();
+  await expect(card).toContainText(expected.text);
+  await expect(card).toContainText(`Severity: ${expected.severity}`);
+  await expect(card.getByRole('definition')).toHaveText(expected.details);
+}
 
 async function openInspection(page: Page, { inspection }: Loaded): Promise<void> {
   await page.goto(`/inspections/${inspection.id}`);
@@ -396,25 +411,21 @@ test.describe('an inspector', () => {
     await expect(deviationsTab(page)).toHaveText(/^Deviations\s*2$/);
 
     await deviationsTab(page).click();
-    await expect(summaryRows(page)).toHaveCount(2);
-    await expect(summaryRows(page).nth(0).getByRole('cell')).toHaveText([
-      'D-01',
-      '1.c',
-      one!.items[2]!.text,
-      'Gap of 12 mm under the fence',
-      'Minor',
-      'El-avdelningen',
-      '',
-    ]);
-    await expect(summaryRows(page).nth(1).getByRole('cell')).toHaveText([
-      'D-02',
-      '2.b',
-      two!.items[1]!.text,
-      'Coolant nozzle bent',
-      'Minor',
-      'Mekanik',
-      '',
-    ]);
+    await expect(summaryCards(page)).toHaveCount(2);
+    await expectRowCard(summaryCards(page).nth(0), {
+      number: 'D-01',
+      ref: '1.c',
+      text: one!.items[2]!.text,
+      severity: 'Minor',
+      details: ['Gap of 12 mm under the fence', 'El-avdelningen'],
+    });
+    await expectRowCard(summaryCards(page).nth(1), {
+      number: 'D-02',
+      ref: '2.b',
+      text: two!.items[1]!.text,
+      severity: 'Minor',
+      details: ['Coolant nozzle bent', 'Mekanik'],
+    });
 
     // An extra deviation, not tied to a row, filled in from the keyboard.
     await page.getByRole('button', { name: 'Add extra deviation' }).click();
@@ -516,8 +527,10 @@ test.describe('an inspector', () => {
     expect(createdAt(await deviationRows(inspection.id))).toBe(createdAt(firstRecorded));
 
     await deviationsTab(page).click();
-    await expect(summaryRows(page).nth(0).getByRole('cell').nth(1)).toHaveText('2.b');
-    await expect(summaryRows(page).nth(0).getByRole('cell').nth(0)).toHaveText('D-01');
+    await expect(summaryCards(page).nth(0).getByRole('heading', { level: 3 })).toHaveText('D-01');
+    await expect(
+      summaryCards(page).nth(0).getByRole('button', { name: 'Row 2.b, go to it in the checklist' }),
+    ).toBeVisible();
   });
 
   test('Resp suggests names typed in this inspection once their field is left', async ({

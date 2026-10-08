@@ -26,6 +26,8 @@ export type ChecklistActions = {
   finishRow: (itemId: string) => void;
   /** Read out by the sheet's live region. */
   announce: (message: string) => void;
+  /** A NOK row's photo count: shows its deviation's photos (the page's Deviations tab). */
+  showPhotos: (itemId: string) => void;
 };
 
 type Options = {
@@ -34,6 +36,7 @@ type Options = {
   onChange: (results: Results) => void;
   rootRef: RefObject<HTMLElement | null>;
   announce: (message: string) => void;
+  onShowPhotos: (itemId: string) => void;
 };
 
 /**
@@ -122,6 +125,7 @@ export function useChecklistActions(options: Options): ChecklistActions {
         if (!move(itemId, 'next')) focusRow(rootRef.current, itemId);
       },
       announce: (message) => latest.current.announce(message),
+      showPhotos: (itemId) => latest.current.onShowPhotos(itemId),
     };
   }, [rootRef]);
 }

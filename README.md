@@ -7,7 +7,7 @@ walk-round, transcribe the results, and finalise a printable report. Every devia
 central table for KPIs. It runs on Azure Static Web Apps (Free) with managed Functions, Blob
 Storage and Table Storage: no database, about 1 SEK a month.
 
-## Status: phase 3 of 6 (inspections)
+## Status: phase 4 of 6 (print and deviation photos)
 
 Working now:
 
@@ -29,6 +29,13 @@ Working now:
   autosave with conflict detection; Finalise, which locks it, and Reopen for admins. Every
   deviation is mirrored into the `deviations` table for the KPIs of phase 6. See
   [Inspections](#inspections).
+- **Deviation photos (phase 4).** Up to two photos per deviation, added from a file, the camera,
+  the clipboard or by drag and drop, and marked up in the app with arrows, boxes, ellipses, text
+  and freehand lines. See [Deviation photos](#deviation-photos).
+- **Printing (phase 4).** The blank checklist for the walk-round, the report with a card per
+  deviation and its photos (2 or 4 cards to a page), and a preview of any template, on A4 from
+  Chrome or Edge's print dialog ("Save as PDF"). Tests print real PDFs and measure them. See
+  [Printing](#printing).
 - **API.** `/api/me`, the template and inspection endpoints, settings, "Resp" suggestions and
   photo upload/download URLs (see [API](#api)), with role checks, JSON errors and ETag
   concurrency on every save.
@@ -37,10 +44,10 @@ Working now:
 - **Local dev, infrastructure and CI/CD.** One `npm run dev`, a Bicep file, and a GitHub Actions
   workflow that checks every pull request and deploys `main`.
 
-Not yet: printing (phase 4: the inspection's **Print** button is shown disabled), guides on a row
-(phase 5: rows that have one show its icon), insights (phase 6) and editing the settings.
+Not yet: guides on a row (phase 5: rows that have one show its icon; the photo editor they will
+use exists now), insights (phase 6) and editing the settings.
 
-Next phases: 4 print · 5 guides and annotations · 6 insights.
+Next phases: 5 guides · 6 insights.
 
 ## Prerequisites
 
@@ -192,8 +199,9 @@ Inspectors and admins create and fill in inspections; only admins reopen a final
   progress) and the number of NOK rows, newest first. Search by number, machine or serial number,
   and filter by model and state; the filters are kept in the address, so they survive opening an
   inspection and coming back (with the browser's Back or the page's _← Inspections_).
-- **The page.** A sticky header with the number, machine, state, revision, save status, **Print**
-  (phase 4), **Finalise** (or **Reopen**), the tabs _Checklist_ and _Deviations (n)_, and the
+- **The page.** A sticky header with the number, machine, state, revision, save status, **Print /
+  Save PDF** (see [Printing](#printing)), **Finalise** (or **Reopen**), the tabs _Checklist_ and
+  _Deviations (n)_, and the
   progress, e.g. `87 / 104 rows filled · 6 NOK`. _Continue at 3.b_ jumps to the first row without
   a status; the page opens with the focus on it, so `Enter` starts transcribing. The front page
   sits at the top of the Checklist tab and can be edited until the inspection is finalised. A
@@ -226,11 +234,15 @@ row with a guide shows its icon; the guide viewer comes in phase 5.
 
 ### Deviations, saving, finalising
 
-- **Deviation Summary.** The _Deviations_ tab lists every NOK row in checklist order, then the
-  extra deviations: `D-01 | ref | checkpoint | comment | severity | resp`, updated as you type. A
-  row's ref jumps to it in the checklist. **Add extra deviation** adds a finding that isn't tied to
-  a row; it is edited in place and removed with its bin icon (which asks first if anything was
-  typed).
+- **Deviation Summary.** The _Deviations_ tab has a card for every NOK row, in checklist order,
+  then for each extra deviation: D-01, the row's ref (a link back to the row), its section, the
+  checkpoint, comment, Resp and severity, and the deviation's photos (see
+  [Deviation photos](#deviation-photos)). A row's comment, Resp and severity are edited in its
+  checklist row. **Add extra deviation** adds a finding that isn't tied to a row; it is edited on
+  its card (Description, Comment, Severity, Resp) and removed with its bin icon, which asks first
+  if anything was typed or a photo added. A NOK row in the checklist shows _Add photo_ or _2
+  photos_ under Resp; a click opens its card's photos (it is not a Tab stop, so transcribing is
+  unchanged). Once finalised, the cards are read-only and a photo opens in a viewer.
 - **Autosave and conflicts.** As in the template editor: saved about a second after you stop,
   _Saved_ in the header, failed saves retried, a warning before leaving with unsaved changes. If
   someone else saved the inspection in between, nothing is overwritten: the page shows "Someone
@@ -261,6 +273,104 @@ back to OK, a removed extra deviation) are deleted, unchanged rows are left alon
 - **Finalise** and **Reopen** update the table first (its `finalised` flag decides what the KPIs
   count), then the inspection. If the table update fails, nothing changes and the request can
   simply be sent again.
+
+## Deviation photos
+
+Every deviation, from a NOK row or an extra one, can have up to two photos, marked up so that
+whoever fixes it sees exactly where. They print on the report's deviation pages.
+
+- **Adding.** **Add photo** on the deviation's card opens the file picker (a tablet offers its
+  camera too). An image on the clipboard is pasted with `Ctrl+V` while the card's photo buttons
+  have the focus, and an image file can be dropped on them. The photo is scaled in the browser to
+  1600 px on the long edge and uploads while the editor opens straight away.
+- **Editing.** A click on a thumbnail opens the photo in the editor again; its **×** removes it
+  (after asking). With two photos the Add button goes away.
+- **Saving.** **Save** uploads the photo and, when it has marks, a flattened copy of the photo
+  with them; then the card shows the copy and the inspection saves itself as usual.
+
+The editor: tools on top, the photo filling the window, a caption and **Save** / **Cancel** at the
+bottom. Mouse, finger and pen all work.
+
+| To                            | Do                                                                  |
+| ----------------------------- | ------------------------------------------------------------------- |
+| Draw an arrow, box or ellipse | Pick **Arrow**, **Rectangle** or **Ellipse**, drag across the photo |
+| Write a label                 | **Text**, click where it goes, type, `Enter`                        |
+| Draw by hand                  | **Freehand**, then draw                                             |
+| Pick a colour                 | Red, Cyan, Yellow or White (also recolours the selected mark)       |
+| Move or delete a mark         | **Select and move**: drag it; `Delete` or the bin removes it        |
+| Change a label                | Double-click it with **Select and move**                            |
+| Undo, redo                    | `Ctrl+Z`; `Ctrl+Shift+Z` or `Ctrl+Y` (also the buttons)             |
+| Cancel                        | `Esc` or **Cancel** (asks first if anything changed)                |
+
+Lines and labels are sized to the photo (a label is 4 % of its long edge), so they look the same
+on screen, on a thumbnail and on paper. On a black-and-white printer red stays clear; yellow and
+white marks fade on light surfaces (labels keep a dark outline).
+
+**How they are stored.** A photo is `{ imageId, caption, annotations, renderedImageId }` in the
+inspection: in the NOK row's result (`results[itemId].photos`) or in the extra deviation. The marks
+are vectors, coordinates as fractions (0–1) of the photo's width and height, so they stay
+editable. `renderedImageId` is the flattened copy: a JPEG (quality 0.9) at the photo's own size,
+uploaded through `/api/images/upload-url` like any photo (`images/{id}.jpg`). A photo without marks
+has none, and print uses the photo itself; changing only the caption keeps the copy. Photos stay
+with a row whose status changes from NOK, but count and print only while it is NOK. Replaced
+copies, removed photos and photos added and then cancelled stay in storage, like replaced cover
+photos.
+
+## Printing
+
+Printing is the browser's own: each print route shows a preview of A4 sheets, and **Print /
+Save PDF** opens the print dialog. In it, in **Chrome or Edge**:
+
+- **Destination**: _Save as PDF_ (or a printer). The paper size is A4, set by the page.
+- **Margins**: _Default_. **Scale**: _Default_ (100 %).
+- **Headers and footers**: off. The document prints its own footer.
+- **Background graphics**: either way; the light grey header fills print regardless.
+
+Chrome and Edge print the footer on every page: the inspection, machine, serial number and
+revision bottom left, "Page X of Y" bottom right. Firefox and Safari can't; they print the left
+part at the foot of each table and no page numbers.
+
+**What to print.**
+
+- **From an inspection**: **Print / Save PDF** → _Blank checklist_ or _Report_. It saves pending
+  changes, opens the preview in a new tab and the print dialog once everything (photos, fonts) has
+  loaded. The preview's toolbar switches between the two.
+- **From a template** (the editor or a revision): **Print preview**. Admins see the draft, marked
+  "Draft – Rev 3"; inspectors the latest published revision. It prints as a new inspection's
+  blank checklist would, with an empty front page.
+- Addresses: `/inspections/{id}/print?mode=blank|report[&deviationsPerPage=2|4]` (without a mode:
+  the report once finalised, else the blank checklist), `/templates/{id}/print[?revision=n]`.
+
+**The document** (brief §6):
+
+- **Front page.** Logo, "Final Inspection", company name, the machine photo, Machine name, Model,
+  Serial number, Participants, Location and Date, signature lines (Inspected by, Date, Signature)
+  and the checklist's revision bottom right ("Rev: 2"). A report also has its number, who
+  finalised it and when, and "90 / 90 rows filled · 6 NOK · 8 deviations"; a report of an
+  inspection in progress says "NOT FINALISED – DRAFT REPORT" instead, and "Not finalised" in every
+  footer.
+- **Checklist.** One table per section: No. | Checkpoint | Comment | OK | NOK | N/A | Resp. Its
+  title and column labels repeat on every page the section runs onto; a row is never split, and a
+  section title never stands alone at the foot of a page. _Blank_: tick boxes, rows at least
+  9 mm high for handwriting, and the template's spare lines after each section, lettered on. _Report_:
+  the status as a symbol and a word (✓ OK, ✗ NOK, – N/A), a NOK row's severity above its comment
+  ("Severity: Major"), and Resp.
+- **Deviations**, starting on a new page. _Blank_: the Deviation Summary to fill in by hand, lines
+  D-01 to D-15 (No. | Ref | Description | Severity | Resp | Closed). _Report_: a card per
+  deviation: "D-03 · 4.c · MAJOR" (an extra deviation says "Not on the checklist"), the section,
+  the checkpoint or description, comment, Resp, its photos as marked up (with captions), and a
+  "Closed · Sign · Date" line to sign off. A deviation without photos gets an empty frame to sketch
+  in. "No deviations recorded." when there are none.
+
+**2 or 4 deviations per page.** The report's toolbar has _Deviations: 2 per page | 4 per page_
+(kept in the address). With 2, a card has the full width and half a page: one photo prints at
+about 10 × 8 cm. With 4, each card is a row, the text on the left and the photos on the right: one
+photo prints at about 7 × 5 cm. Cards share their page equally, and a card whose text needs more
+room takes it from the others. If the cards don't all fit, the page holds fewer and the next card
+starts the next page; a card is never split. 2 per page is the default.
+
+Everything is laid out for black and white: statuses and severities in words, light grey fills
+only, thin rules. Inter is bundled with the app, so a printout looks the same offline.
 
 ## API
 
@@ -348,10 +458,30 @@ because it usually means the command that produced it failed.
   `finalised` flag, a row deleted when NOK becomes OK); Finalise blocked by a missing row, its
   jump link, the locked page and the API's 409; Reopen refused to an inspector (403) and done by
   an admin; an inspection unchanged after its template publishes a new revision; and two
-  inspectors in conflict. They sign in by setting the SWA CLI's `StaticWebAppsAuthCookie`
-  directly. Each test writes its own throwaway templates into the local Azurite and deletes them
-  afterwards with their inspections and deviation rows, so local edits to the seeded RigiMill MG
-  never break them. The New template test needs one machine model that has no template yet.
+  inspectors in conflict. For deviation photos: a photo added to a deviation, an arrow and a
+  label drawn on it with the mouse in the real editor, saved, and after a reload the marks stored
+  as fractions, the flattened copy a JPEG of the photo's size that is red along the arrow, shown
+  as the thumbnail and on the printed card. The smoke test of brief §9: an inspection created from
+  the seeded RigiMill MG in the UI, marked from the keyboard, finalised, and its report printed
+  from the Print menu.
+- **Print tests** (`e2e/print.spec.ts`) print real PDFs with Chromium's `page.pdf` (A4, the
+  page's own `@page` rule, background graphics on) and measure them with `pdfjs-dist`: a blank
+  checklist of the 90-row RigiMill MG, a finalised report in both deviation layouts (long
+  comments, N/A rows, extra deviations, photos with and without a marked-up copy), a report whose
+  long texts leave fewer cards on a page, and a template preview with spare lines lettered past z.
+  They check that every page is A4, the page count is in a range derived from the layout, page 1
+  is the front page, every page has the footer and "Page X of Y" with the right total and nothing
+  else in the bottom margin, every row is whole on the one page that has its ref, no section
+  title is left without a row after it, no text crosses the right margin, blank rows are at least
+  9 mm apart, spare lines carry on the lettering, the blank Deviation Summary is the last page
+  with D-01 to D-15, and the report's cards are 2 or 4 to a page, each whole on one page with its
+  photos painted there. Each PDF is kept in `test-results/` to look at.
+
+The end-to-end tests sign in by setting the SWA CLI's `StaticWebAppsAuthCookie` directly. Each
+test writes its own throwaway templates into the local Azurite (the print tests a copy of the
+seeded checklist) and deletes them afterwards with their inspections, deviation rows and photos,
+so local edits to the seeded RigiMill MG never break them. The New template test needs one
+machine model that has no template yet; the smoke test uses the seeded template as it is.
 
 CI (`.github/workflows/azure-static-web-apps.yml`) runs `typecheck`, `lint`, `format:check`, a
 Bicep lint, `test` and `build` on every pull request and push to `main`. The end-to-end tests run
@@ -387,8 +517,7 @@ latest version."
 templates/{templateId}/draft.json        draft being edited
 templates/{templateId}/rev-{n}.json      published revisions, never changed
 inspections/{inspectionId}.json          with its list row in the blob's metadata
-images/{imageId}.jpg                     photos (originals)
-images/{imageId}.annotated.png           annotations flattened for print
+images/{imageId}.jpg                     photos, and flattened copies of marked-up photos
 config/settings.json                     machine models, default location, company name
 config/inspection-counter.json           counter for FI-YYYY-NNNN numbers
 table deviations                         one row per deviation, the source for KPIs
@@ -399,8 +528,9 @@ IDs are 16-character alphanumeric nanoids. Names are defined in `shared/src/stor
 Photos never pass through the API. The browser asks `/api/images/upload-url` for a new image id
 and a URL that can only write that one blob, valid for 10 minutes, and uploads the scaled-down
 JPEG straight to the `images` container. To show it, it asks for a read-only URL valid for 15
-minutes. Template drafts and revisions store only the image id (`coverImageId`). Replacing or
-removing a cover photo leaves the old file in storage. Locally the API sets Azurite's blob CORS
+minutes. Documents store only image ids: a template's `coverImageId`, an inspection's
+`front.photoId` and its deviation photos (see [Deviation photos](#deviation-photos)). Replacing or
+removing a photo leaves the old file in storage. Locally the API sets Azurite's blob CORS
 rule for the dev origins (ports 4280 and 5173) on its first storage call; in Azure the rule comes
 from the Bicep file.
 

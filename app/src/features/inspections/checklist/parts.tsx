@@ -1,6 +1,7 @@
 import { STATUS_LABELS, STATUSES, type Guide, type Status } from '@modig/shared';
 import clsx from 'clsx';
-import { Camera, Info } from 'lucide-react';
+import { Camera, ImagePlus, Info } from 'lucide-react';
+import { photoCountText } from '../deviations';
 import { CONTROL_HEIGHT } from './layout';
 import { STATUS_ICONS, STATUS_TONES } from './status';
 
@@ -114,5 +115,42 @@ export function GuideButton({ guide, rowRef, noteOpen, onClick }: GuideButtonPro
         </span>
       )}
     </span>
+  );
+}
+
+type PhotoCountProps = {
+  /** Photos of the row's deviation. */
+  count: number;
+  rowRef: string;
+  onClick: () => void;
+};
+
+/**
+ * A NOK row's photos, which are added on the Deviations tab: "2 photos", or "Add photo" while it
+ * has none. A click shows them there. Not a tab stop, like the guide icon (Tab goes row →
+ * comment → resp); screen readers hear the count with the row's status.
+ */
+export function PhotoCount({ count, rowRef, onClick }: PhotoCountProps) {
+  const Icon = count > 0 ? Camera : ImagePlus;
+  const text = photoCountText(count) ?? 'Add photo';
+  const label =
+    count > 0
+      ? `${text} of row ${rowRef}: show on the Deviations tab`
+      : `Add a photo to row ${rowRef} on the Deviations tab`;
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={clsx(
+        'inline-flex items-center gap-1.5 rounded-md px-2 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50 hover:text-brand-800',
+        CONTROL_HEIGHT,
+      )}
+    >
+      <Icon size={15} aria-hidden="true" />
+      {text}
+    </button>
   );
 }

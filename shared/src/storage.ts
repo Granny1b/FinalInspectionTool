@@ -4,8 +4,7 @@
  *   templates/{templateId}/draft.json
  *   templates/{templateId}/rev-{n}.json      immutable published revisions
  *   inspections/{inspectionId}.json
- *   images/{imageId}.jpg                     originals
- *   images/{imageId}.annotated.png           flattened annotation render
+ *   images/{imageId}.jpg                     photos, and flattened copies of marked-up photos
  *   config/settings.json                     machine models, default location, company info
  *   config/inspection-counter.json           counter for FI-YYYY-NNNN numbers
  *
@@ -31,7 +30,6 @@ export const blobNames = {
   templateRevisionPattern: /^rev-(\d+)\.json$/,
   inspection: (inspectionId: string) => `${inspectionId}.json`,
   image: (imageId: string) => `${imageId}.jpg`,
-  annotatedImage: (imageId: string) => `${imageId}.annotated.png`,
   settings: 'settings.json',
   inspectionCounter: 'inspection-counter.json',
 } as const;

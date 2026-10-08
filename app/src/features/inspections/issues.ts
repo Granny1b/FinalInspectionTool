@@ -20,6 +20,8 @@ export const FRONT_FIELD_IDS = {
 
 export const rowElementId = (itemId: string) => `row-${itemId}`;
 export const extraDescriptionId = (extraId: string) => `extra-${extraId}-description`;
+/** A deviation's photos on the Deviations tab, by deviation key (item id or extra id). */
+export const deviationPhotosId = (key: string) => `deviation-${key}-photos`;
 /** The tabs and their panels; `prefix` keeps the ids unique on the page. */
 export const tabId = (prefix: string, tab: InspectionTab) => `${prefix}-tab-${tab}`;
 export const panelId = (prefix: string, tab: InspectionTab) => `${prefix}-panel-${tab}`;
