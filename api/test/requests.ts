@@ -25,13 +25,15 @@ export function request(
     method?: string;
     /** Route parameters, e.g. `{ id }` for `templates/{id}`. */
     params?: Record<string, string>;
+    /** The URL's query string, e.g. `{ model: 'RMMG' }`. */
+    query?: Record<string, string>;
   } = {},
 ): HttpRequest {
   const headers = { ...options.headers };
   if (options.principal) headers[CLIENT_PRINCIPAL_HEADER] = encodePrincipal(options.principal);
   return new HttpRequest({
     method: options.method ?? (options.body === undefined ? 'GET' : 'PUT'),
-    url: 'http://localhost/api/test',
+    url: `http://localhost/api/test?${new URLSearchParams(options.query)}`,
     headers,
     params: options.params,
     body: options.body === undefined ? undefined : { string: options.body },

@@ -143,8 +143,11 @@ describe('loadSummaries', () => {
       date: '2026-10-07',
       state: 'in_progress',
       nokCount: 1,
+      okCount: 0,
       filled: 2,
       total: 3,
+      templateId: base.templateId,
+      templateRevision: 2,
       updatedAt: base.updatedAt,
     } satisfies InspectionSummary);
   });

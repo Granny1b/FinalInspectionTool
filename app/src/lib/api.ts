@@ -106,6 +106,31 @@ export async function apiFetch<T = unknown>(
   }
 }
 
+/**
+ * A file from the API (a CSV export), with the name its Content-Disposition gives. Errors, an
+ * ended session and a missing role are handled as for `apiFetch`.
+ */
+export async function apiDownload(
+  path: string,
+  { signal }: { signal?: AbortSignal } = {},
+): Promise<{ blob: Blob; fileName: string | null }> {
+  const res = await fetch(path, { credentials: 'same-origin', redirect: 'manual', signal });
+  if (res.type === 'opaqueredirect') return sessionEnded('GET', 401);
+  if (!res.ok) {
+    const apiError = ApiErrorSchema.safeParse(await readJson(res));
+    if (!apiError.success && (res.status === 401 || res.status === 403)) {
+      return sessionEnded('GET', res.status);
+    }
+    throw new ApiRequestError(
+      res.status,
+      apiError.success ? apiError.data : fallbackError(res.status),
+    );
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? null;
+  return { blob: await res.blob(), fileName };
+}
+
 /** `undefined` for an empty body (e.g. 204), INVALID_JSON for anything that isn't JSON. */
 async function readJson(res: Response): Promise<unknown> {
   const text = await res.text();

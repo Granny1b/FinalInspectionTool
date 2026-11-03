@@ -58,8 +58,13 @@ export const InspectionSummarySchema = z.object({
   state: InspectionStateSchema,
   /** Rows marked NOK (the list's #NOK column). */
   nokCount: z.number().int().min(0),
+  /** Rows marked OK (with nokCount and filled, the first-pass rate in Insights). */
+  okCount: z.number().int().min(0),
   filled: z.number().int().min(0),
   total: z.number().int().min(0),
+  /** The template and published revision it was made from (which rows its checklist has). */
+  templateId: IdSchema,
+  templateRevision: z.number().int().min(1),
   updatedAt: IsoDateTime,
 });
 export type InspectionSummary = z.infer<typeof InspectionSummarySchema>;
@@ -159,6 +164,8 @@ export type InspectionProgress = {
   total: number;
   /** Rows that have a status. */
   filled: number;
+  /** Rows marked OK. */
+  ok: number;
   /** Rows marked NOK. */
   nok: number;
 };
@@ -169,16 +176,18 @@ export function inspectionProgress(
 ): InspectionProgress {
   let total = 0;
   let filled = 0;
+  let ok = 0;
   let nok = 0;
   for (const section of inspection.templateSnapshot.sections) {
     for (const item of section.items) {
       total += 1;
       const status = inspection.results[item.id]?.status;
       if (status) filled += 1;
+      if (status === 'OK') ok += 1;
       if (status === 'NOK') nok += 1;
     }
   }
-  return { total, filled, nok };
+  return { total, filled, ok, nok };
 }
 
 // ---------------------------------------------------------------------------------------------

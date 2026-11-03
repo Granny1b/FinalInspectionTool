@@ -1589,3 +1589,130 @@ The calls with product, data or paper impact. Each is explained in its section b
   breaks, tall rows and blocks, the shrinking photo, the 12.5 mm column), upload timeouts and
   stopping, `pastesText`, guides in the unpublished-changes check, and the API's guide image cap
   and a guide frozen by publishing.
+
+## Phase 6 – Insights
+
+### Worth reviewing first
+
+The calls with product or KPI impact. Each is explained in its section below.
+
+- **First-pass rate = OK rows ÷ (OK + NOK rows)** of the inspections in the selection. N/A rows
+  were not checked, so they count neither way. "On first inspection" is the status as recorded:
+  the app has no re-inspection, and a NOK row stays NOK when the fault is fixed (Contract).
+- **Deviations per machine is per inspection** in the selection: a machine inspected twice
+  counts twice (Contract).
+- **"% of inspections where it failed" divides by the inspections whose checklist had the row**,
+  read from the published revisions they were made from, not by every inspection of the model: a
+  row added in revision 5 is not diluted by inspections from revisions 1–4 (Contract).
+- **"Current ref + text" comes from the template's latest published revision.** A row removed
+  since shows the ref and text it had when it last failed, marked "No longer in the checklist"
+  (Contract).
+- **By severity is one bar for the whole selection**, split into minor, major and critical.
+  Severity per month or per model would repeat the totals of the month line and the model bars.
+  Easy to change if you meant one of those (Page).
+- **Recharts draws the month line only.** Sections, models and resps are ranked bars in plain
+  HTML: long section titles wrap instead of being cut off, and every value is printed (Page).
+- **The default period is the last 12 months** (this month and the eleven before). Dates are
+  front-page dates. A period in a link is relative; only a custom range keeps its dates (Page).
+- **The CSV uses semicolons and a UTF-8 byte order mark**, which Excel with Swedish regional
+  settings opens straight into columns, and a cell starting with `=`, `+`, `-` or `@` gets a
+  leading `'` so it never runs as a formula. A comment typed as "- loose screw" shows as
+  "'- loose screw" in Excel (API).
+- **Which inspections count comes from the inspection list (the blobs)**; their deviation rows
+  are matched to them by id, so a row left behind by a deleted inspection never counts
+  (Contract).
+- **The inspection list row gained `okCount`, `templateId` and `templateRevision`.** An
+  inspection saved before this phase has an outdated summary and is read in full by the list
+  until its next write; a finalised one until it is reopened. Nothing is deployed yet, so only
+  local data is affected (Contract).
+- **Editing the settings is still not built:** the brief describes the screen (§5.6) but puts it
+  in no phase.
+
+### Contract (shared)
+
+- **`shared/src/insights.ts`** holds the filters (`parseInsightsQuery`, `insightsQueryParams`),
+  the answer (`InsightsSchema`) and the aggregation (`aggregateInsights`), a pure function of the
+  inspection list, the deviation rows and a lookup of published revisions. The API gathers the
+  data; unit tests cover the rules without storage. The answer carries counts; the rates
+  (`firstPassRate`, `deviationsPerInspection`) are computed where they are shown.
+- **Filters:** `from` and `to` are inclusive front-page dates in 2000–2099 (a typo like year 0026
+  would otherwise ask for a 24 000-month axis), `from` must not be after `to`, `model` is a model
+  code, `includeInProgress` is `true` or `false`. An empty value counts as not given. The model
+  filter's choices (`modelCodes`) are the models of every inspection, whatever the filters.
+- **Months:** every month from `from` to `to`, empty months included; an open end reaches the
+  first or last inspection in the selection. A deviation counts in the month of its inspection's
+  date (from the blob, which the row's `inspectionDate` mirrors).
+- **Grouping:** sections and resps are grouped trimmed and ignoring case, shown in the spelling
+  most rows use (the first one met on a tie), most deviations first. Extra deviations (no row, no
+  section) and deviations without a resp come last whatever their count: the ranking is about
+  sections and people. Sections with the same title count together across models.
+- **Top 10:** grouped by item id. Most failures first, then the higher share, then model code
+  and checklist order (`1.z` before `1.aa`). Extra deviations are not checkpoints and are left
+  out. If a revision can't be read, every inspection of the checkpoint's template counts as
+  having had it.
+- **Ties at the tenth place are cut,** not extended: the brief asks for ten.
+
+### API
+
+- **Two registrations, 15 in all:** `GET /api/insights` and `GET /api/insights/export.csv`
+  (`functions/insights.ts`), admins only, with the filters in the query string. A bad filter is
+  a 400 with the zod issues in `details`.
+- **The table is queried with the filters** (model as PartitionKey, date range, `finalised eq
+true` unless in-progress is included) and only the 17 columns. A row that fails the schema is
+  skipped with a warning, so one hand-edited row can't take the dashboard down. The inspection
+  list is the same blob listing `GET /api/inspections` uses.
+- **Published revisions are cached in memory** for the life of the Functions instance: they never
+  change, so after the first request the dashboard reads only the template listing for them. A
+  missing revision is not cached (and logged), so it is looked for again next time.
+- **CSV:** the table's columns in the brief's order as the header row, CRLF line ends, values
+  with a quote, semicolon, line break or surrounding spaces quoted. Rows: oldest inspection first
+  (date, then number), each inspection's rows in checklist order, extra deviations last.
+  `Content-Disposition: attachment` with a name made of the filters (`Deviations start to
+2026-11-03, RMMG, incl. in progress.csv`; an open end is "start", or today in Sweden), all
+  ASCII, and `Cache-Control: no-store`.
+
+### Page
+
+- **Filters live in the URL** (`?period=&from=&to=&model=&includeInProgress=`), only those that
+  differ from the defaults. Changes replace the history entry and render at once (`flushSync`,
+  as on the inspections list): the checkbox and date fields show what the URL holds, so a
+  transition would make a click seem to do nothing for a moment.
+- **A custom range that ends before it starts says so under the dates and asks for nothing;**
+  the numbers come back when the range makes sense.
+- **While new numbers load, the previous ones stay on screen, dimmed** (TanStack Query's
+  `keepPreviousData`): no skeleton flash, no layout jump.
+- **Layout:** the filter row; four headline tiles; the top 10 table (the brief's most important
+  table, so second); the month line and the severity bar; then sections, models and resps. On a
+  phone everything is one column and the top 10 table fits 390 px without scrolling sideways.
+- **The top 10 table shows a Model column only when the selection has more than one model:**
+  refs like 1.a repeat across models.
+- **Colours:** counts are one hue (brand 600, 4.5:1 on white); severity is one red ramp from
+  light (minor) to NOK red (critical), checked as an ordinal ramp (lightness falls in visible
+  steps, minor still 2.2:1 on white). Both are theme tokens in `index.css`. Status is never colour
+  alone: the severity legend names each part with its count.
+- **The month line:** hairline grid, muted axis text, a 2 px line with dots (dots hidden past
+  36 months), a crosshair tooltip with the count first and the month and inspections after it,
+  and a table of the same numbers for screen readers. One month of data is a single dot.
+  Recharts' default colours are restyled with CSS from the theme tokens; it sets inline styles
+  through the DOM, which the Content-Security-Policy (`style-src 'self'`) allows (the e2e test
+  checks the console).
+- **The CSV is downloaded with `fetch`, not a plain link,** so an ended session goes to the
+  sign-in page instead of saving the login page as a .csv, and an error shows on the page.
+- **Model choices** are the models with inspections, by name, plus one from a shared link that
+  has none, as on the inspections list.
+- **Recharts (3.10) is loaded with the chart only** (about 105 kB gzipped, its own chunk), so
+  inspectors never download it.
+
+### Tests and tooling
+
+- **`shared/src/insights.test.ts`:** filters and their URL form, months across New Year, ref
+  order, scope by state, date and model, orphan rows, months with open ends, grouping, models
+  without deviations, severity, the top 10's share against the revisions that had the row, a
+  removed row, an unreadable revision, the limit of ten, and the two rates.
+- **`api/src/functions/insights.test.ts`** against the test Azurite: registrations, roles, a bad
+  filter, an empty store, the counts of finalised and in-progress inspections, date range and
+  model, a row moved and reworded in a later revision (current ref, share), orphan rows, and the
+  CSV (headers, BOM, column order, row order, quoting, the formula guard, Swedish text, the file
+  name). The test request helper takes a query string.
+- **`e2e/insights.spec.ts`:** each test publishes a template with a model code of its own
+  (`createTemplate` takes one), so other tests' inspections never mix into its numbers.

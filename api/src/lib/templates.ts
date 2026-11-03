@@ -160,7 +160,7 @@ function revisionInfo(revision: Template): TemplateRevisionInfo {
 }
 
 /** Template ids under `prefix` with their published revision numbers, ascending. */
-async function listRevisions(prefix?: string): Promise<Map<string, number[]>> {
+export async function listRevisions(prefix?: string): Promise<Map<string, number[]>> {
   const revisionsById = new Map<string, number[]>();
   for (const name of await listBlobNames(templates, prefix)) {
     const [id, file, ...rest] = name.split('/');
