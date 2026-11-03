@@ -14,8 +14,8 @@ type DeviationEntity = TableEntity<DeviationRow>;
 /** The service's limit on operations in one transactional batch. */
 const BATCH_SIZE = 100;
 
-/** The brief's columns, in its order: the only properties a row has. */
-const COLUMNS = [
+/** The brief's columns, in its order: the only properties a row has (and the CSV's columns). */
+export const DEVIATION_COLUMNS = [
   'inspectionId',
   'inspectionNumber',
   'serialNumber',
@@ -49,7 +49,7 @@ export async function syncDeviations(inspection: Inspection): Promise<void> {
   const actions: TransactionAction[] = [];
   for (const entity of wanted) {
     const current = existing.get(entity.rowKey);
-    if (!current || COLUMNS.some((column) => current[column] !== entity[column])) {
+    if (!current || DEVIATION_COLUMNS.some((column) => current[column] !== entity[column])) {
       actions.push(['upsert', entity, 'Replace']);
     }
   }

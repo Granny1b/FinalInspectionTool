@@ -88,7 +88,7 @@ export async function syncSettled(
 // ---------------------------------------------------------------------------------------------
 
 export function inspectionSummary(inspection: Inspection): InspectionSummary {
-  const { total, filled, nok } = inspectionProgress(inspection);
+  const { total, filled, ok, nok } = inspectionProgress(inspection);
   const { machineName, serialNumber, modelCode, date } = inspection.front;
   return {
     id: inspection.id,
@@ -99,8 +99,11 @@ export function inspectionSummary(inspection: Inspection): InspectionSummary {
     date,
     state: inspection.state,
     nokCount: nok,
+    okCount: ok,
     filled,
     total,
+    templateId: inspection.templateId,
+    templateRevision: inspection.templateRevision,
     updatedAt: inspection.updatedAt,
   };
 }

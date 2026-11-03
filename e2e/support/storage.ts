@@ -90,17 +90,19 @@ const CHECKLIST = [
 /**
  * A two-section, six-row template, or the given checklist (e.g. a copy of the seeded one).
  * `published` adds revision 1 with the same content, so the draft continues as revision 2
- * without unpublished changes.
+ * without unpublished changes. A test that counts across inspections (Insights) passes a model
+ * code of its own, so other tests' inspections never mix in.
  */
 export async function createTemplate(
   name: string,
   published = false,
   checklist?: { sections: Section[]; spareRowsPerSection?: number },
+  modelCode = TEST_MODEL,
 ): Promise<Template> {
   const draft: Template = {
     id: newId(),
     name,
-    modelCode: TEST_MODEL,
+    modelCode,
     revision: published ? 2 : 1,
     status: 'draft',
     printSettings: {

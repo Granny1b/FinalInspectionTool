@@ -6,3 +6,4 @@ export * from './schemas';
 export * from './storage';
 export * from './templates';
 export * from './inspections';
+export * from './insights';

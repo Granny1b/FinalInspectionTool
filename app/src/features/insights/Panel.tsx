@@ -1,0 +1,42 @@
+import clsx from 'clsx';
+import { useId, type ReactNode } from 'react';
+
+type Props = {
+  title: string;
+  /** One line under the title: what is counted. */
+  description?: string;
+  /** Next to the title, e.g. a total. */
+  aside?: ReactNode;
+  className?: string;
+  children: ReactNode;
+};
+
+/** A card on the Insights page: one chart or table under a heading. */
+export function Panel({ title, description, aside, className, children }: Props) {
+  const titleId = useId();
+  return (
+    <section
+      aria-labelledby={titleId}
+      className={clsx(
+        'flex min-w-0 flex-col rounded-lg border border-ink-200 bg-surface',
+        className,
+      )}
+    >
+      <div className="flex items-start justify-between gap-4 px-5 pt-4">
+        <div className="min-w-0">
+          <h2 id={titleId} className="text-sm font-semibold text-ink-900">
+            {title}
+          </h2>
+          {description && <p className="mt-0.5 text-xs text-ink-500">{description}</p>}
+        </div>
+        {aside && <div className="shrink-0 text-xs text-ink-500">{aside}</div>}
+      </div>
+      <div className="flex-1 px-5 pt-4 pb-5">{children}</div>
+    </section>
+  );
+}
+
+/** What a panel shows when its slice of the data is empty. */
+export function PanelEmpty({ children }: { children: ReactNode }) {
+  return <p className="py-6 text-center text-sm text-ink-500">{children}</p>;
+}

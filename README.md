@@ -7,7 +7,7 @@ walk-round, transcribe the results, and finalise a printable report. Every devia
 central table for KPIs. It runs on Azure Static Web Apps (Free) with managed Functions, Blob
 Storage and Table Storage: no database, about 1 SEK a month.
 
-## Status: phase 5 of 6 (guides, reference images and Word export)
+## Status: all 6 phases built (insights was the last)
 
 Working now:
 
@@ -15,8 +15,8 @@ Working now:
   users with the role `inspector` or `admin` get past `/login.html`; signed-in users without a
   role see a "You don't have access yet" page. Pages and `/api/*` are locked alike.
 - **App shell.** Sidebar with Inspections and Templates, plus Insights and Settings for admins; a
-  drawer on tablets. Insights and Settings are still placeholders whose actions say which phase
-  delivers them. Settings explains how to invite users.
+  drawer on tablets. Settings explains how to invite users; editing the settings is not built yet
+  (the brief schedules it in no phase).
 - **Templates (phase 2).** The template list; a new template for a machine model that has none;
   the template editor, which looks like the printed checklist and is edited in place (sections and
   rows, drag and drop, automatic 1.a numbering, cover photo, spare rows); autosave of the draft
@@ -27,7 +27,7 @@ Working now:
   model's latest published checklist, which it keeps as a frozen copy; the front page; the
   checklist, filled in from the keyboard; the live Deviation Summary with extra deviations;
   autosave with conflict detection; Finalise, which locks it, and Reopen for admins. Every
-  deviation is mirrored into the `deviations` table for the KPIs of phase 6. See
+  deviation is mirrored into the `deviations` table for the KPIs. See
   [Inspections](#inspections).
 - **Deviation photos (phase 4).** Up to two photos per deviation, added from a file, the camera,
   the clipboard or by drag and drop, and marked up in the app with arrows, boxes, ellipses, text
@@ -52,9 +52,15 @@ Working now:
 - **Local dev, infrastructure and CI/CD.** One `npm run dev`, a Bicep file, and a GitHub Actions
   workflow that checks every pull request and deploys `main`.
 
-Not yet: insights (phase 6) and editing the settings.
+- **Insights (phase 6).** The admins' KPI dashboard: inspections, deviations, deviations per
+  machine and the first-pass rate; the top 10 recurring checkpoints; deviations per month, by
+  severity, per section, per model and by resp; filtered by period, model and in-progress, and
+  exported as CSV for Excel or Power BI. See [Insights](#insights).
 
-Next phase: 6 insights.
+Not yet: editing the settings (machine models, default location, company name and logo). They
+come from the seed; the brief puts the screen in §5.6 but in no phase.
+
+Next: deploy to Azure (see [Deploy to Azure](#deploy-to-azure)).
 
 ## Prerequisites
 
@@ -458,6 +464,39 @@ off), but Word lays out its own pages, so they break differently from the PDF. T
 `– Draft report`, a template's `… – Checklist preview`); a very long name is shortened before
 that last part. The Word library is loaded only on the first export.
 
+## Insights
+
+Admins only (Insights in the sidebar). The numbers come from the inspection list and the
+`deviations` table, so the page needs one blob listing and one table query.
+
+- **Filters**, in one row above everything they scope, and in the URL, so a view can be shared:
+  the period (last 12 months, the default; this year; last year; all time; or a custom range),
+  the model, and **Include inspections in progress** (off: only finalised inspections count, as
+  the brief asks). Dates are the inspection's front-page date. A period is relative: a link to
+  "last 12 months" shows the 12 months before the day it is opened.
+- **Headline numbers:** inspections finalised (with in-progress ones, how many of each),
+  deviations (NOK rows plus extra deviations), deviations per machine (deviations ÷ inspections),
+  and the first-pass rate: the share of checked rows that were OK. N/A rows were not checked, so
+  they don't count either way.
+- **Top 10 recurring checkpoints**, the most important table: grouped by the row's stable id, so
+  a checkpoint keeps its history when it moves or is reworded. It shows where the checkpoint is in
+  the template's latest published revision (ref, text, section), how many inspections it failed in,
+  and that as a share of the inspections whose checklist had the row: an inspection made before
+  the row was added says nothing about it. A row removed since shows its last ref and text, marked
+  "No longer in the checklist".
+- **Charts:** deviations per month (a line; every month of the period, empty ones included),
+  by severity (one bar split into minor, major and critical), and per section, per model and by
+  resp (ranked bars). Sections and resps are grouped ignoring case and surrounding spaces, in the
+  spelling most rows use; extra deviations and deviations without a resp come last.
+- **Export CSV** saves the deviation rows behind the page, under the same filters: the table's
+  17 columns in the brief's order, oldest inspection first, rows in checklist order. It is UTF-8
+  with a byte order mark and semicolons, which is what Excel with Swedish regional settings opens
+  directly; Power BI reads it too. A cell that starts with `=`, `+`, `-` or `@` gets a leading `'`
+  so that Excel never runs it as a formula. The file is named after the filters, e.g.
+  `Deviations 2025-12-01 to 2026-11-03, RMMG.csv`.
+
+The chart library (Recharts) loads only when Insights opens.
+
 ## API
 
 Managed Functions under `/api`, all JSON. Every function checks the role itself; errors are
@@ -482,6 +521,8 @@ nothing was changed and the same request can be sent again.
 | `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                 |
 | `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                       |
 | `GET /api/resp-suggestions`             | inspector | "Resp" values used in earlier deviations, for autocomplete       |
+| `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)       |
+| `GET /api/insights/export.csv`          | admin     | The deviation rows under the same filters, as a CSV file         |
 | `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                   |
 | `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                |
 
@@ -561,7 +602,12 @@ because it usually means the command that produced it failed.
   large view, `Esc` back to the row) and keeps it unchanged after the template publishes a new
   version of it, which a new inspection gets. The smoke test of brief §9: an inspection created
   from the seeded RigiMill MG in the UI, marked from the keyboard, finalised, and its report
-  printed from the Print menu.
+  printed from the Print menu. For insights (`e2e/insights.spec.ts`, each test with a model code
+  of its own, so other tests' inspections never mix in): the headline numbers, the top
+  checkpoints with their shares, the month, severity, section and resp figures, in-progress
+  inspections joining in, the CSV download (name, header, rows) and no console errors under the
+  Content-Security-Policy; a custom range that ends before it starts; and inspectors refused the
+  page and both endpoints.
 - **Print tests** (`e2e/print.spec.ts`) print real PDFs with Chromium's `page.pdf` (A4, the
   page's own `@page` rule, background graphics on) and measure them with `pdfjs-dist`: a blank
   checklist of the 90-row RigiMill MG, a finalised report in both deviation layouts (long

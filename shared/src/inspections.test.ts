@@ -146,7 +146,7 @@ describe('deriveDeviations', () => {
 });
 
 describe('inspectionProgress', () => {
-  it('counts filled and NOK rows', () => {
+  it('counts filled, OK and NOK rows', () => {
     expect(
       inspectionProgress(
         inspection({
@@ -157,7 +157,7 @@ describe('inspectionProgress', () => {
           },
         }),
       ),
-    ).toEqual({ total: 4, filled: 2, nok: 1 });
+    ).toEqual({ total: 4, filled: 2, ok: 1, nok: 1 });
   });
 });
 

@@ -20,8 +20,11 @@ function summary(patch: Partial<InspectionSummary>): InspectionSummary {
     date: '2026-10-07',
     state: 'in_progress',
     nokCount: 0,
+    okCount: 0,
     filled: 0,
     total: 90,
+    templateId: 'Tpl0000000000001',
+    templateRevision: 2,
     updatedAt: '2026-10-07T08:00:00.000Z',
     ...patch,
   };
