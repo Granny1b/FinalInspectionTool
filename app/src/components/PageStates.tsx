@@ -1,5 +1,6 @@
 import { RefreshCw, TriangleAlert } from 'lucide-react';
 import { Button } from './Button';
+import { StateCard } from './StateCard';
 
 type PageLoadingProps = {
   label?: string;
@@ -38,19 +39,22 @@ type LoadErrorProps = {
 /** A request for the page's data failed; says why and offers to try again. */
 export function LoadError({ title, message, onRetry, retrying }: LoadErrorProps) {
   return (
-    <section
+    <StateCard
       role="alert"
-      className="rounded-lg border border-ink-200 bg-surface px-6 py-14 text-center"
-    >
-      <div className="mx-auto flex size-11 items-center justify-center rounded-full bg-nok-bg text-nok-fg ring-1 ring-nok-border">
-        <TriangleAlert size={20} strokeWidth={1.75} aria-hidden="true" />
-      </div>
-      <h2 className="mt-4 text-base font-semibold text-ink-900">{title}</h2>
-      <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-500">{message}</p>
-      <Button variant="secondary" className="mt-6" onClick={onRetry} disabled={retrying}>
-        <RefreshCw size={16} aria-hidden="true" className={retrying ? 'animate-spin' : undefined} />
-        {retrying ? 'Trying again…' : 'Try again'}
-      </Button>
-    </section>
+      icon={TriangleAlert}
+      tone="nok"
+      title={title}
+      hint={message}
+      action={
+        <Button variant="secondary" onClick={onRetry} disabled={retrying}>
+          <RefreshCw
+            size={16}
+            aria-hidden="true"
+            className={retrying ? 'animate-spin' : undefined}
+          />
+          {retrying ? 'Trying again…' : 'Try again'}
+        </Button>
+      }
+    />
   );
 }

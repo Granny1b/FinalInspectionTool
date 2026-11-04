@@ -21,10 +21,11 @@ export function InspectionFilters({ filter, models, onChange }: Props) {
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-500"
         />
+        {/* Short enough for a 320 px phone; the icon and the name already say it is a search. */}
         <input
           type="search"
           aria-label="Search inspections"
-          placeholder="Search number, machine or serial number"
+          placeholder="Number, machine or S/N"
           autoComplete="off"
           spellCheck={false}
           value={filter.query}

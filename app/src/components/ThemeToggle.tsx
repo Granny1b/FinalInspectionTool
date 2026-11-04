@@ -12,6 +12,10 @@ const OPTIONS: { value: ThemeChoice; label: string; icon: LucideIcon }[] = [
 /**
  * System / Light / Dark as a segmented control: native radio buttons, so it is one Tab stop and
  * the arrow keys pick. The choice applies at once and is kept in this browser (lib/theme.ts).
+ *
+ * It has the look of every segmented control in the app (track, raised choice, hover), at the
+ * smaller size the sidebar allows: three equal columns across the user panel in text-xs, because
+ * "System" and its icon don't fit a third of it at text-sm with the usual side padding.
  */
 export function ThemeToggle() {
   const [choice, setChoice] = useThemeChoice();
@@ -20,7 +24,7 @@ export function ThemeToggle() {
   return (
     <fieldset className="min-w-0">
       <legend className="sr-only">Theme</legend>
-      <div className="grid grid-cols-3 gap-0.5 rounded-md bg-ink-100 p-0.5">
+      <div className="grid grid-cols-3 gap-0.5 rounded-lg bg-ink-100 p-0.5 ring-1 ring-ink-200 ring-inset">
         {OPTIONS.map(({ value, label, icon: Icon }) => {
           const checked = value === choice;
           return (
@@ -33,11 +37,12 @@ export function ThemeToggle() {
                   : undefined
               }
               className={clsx(
-                'relative inline-flex h-7 min-w-0 cursor-pointer items-center justify-center gap-1 rounded text-xs font-medium transition-colors pointer-coarse:h-9',
+                'relative inline-flex h-7 min-w-0 cursor-pointer items-center justify-center gap-1 rounded-md px-1 text-xs font-medium transition-colors pointer-coarse:h-9',
                 'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-brand-600',
+                // Raised, not surface: in the dark theme a surface fill is darker than the track.
                 checked
-                  ? 'bg-surface text-ink-900 shadow-xs ring-1 ring-ink-200'
-                  : 'text-ink-500 hover:text-ink-900',
+                  ? 'bg-raised text-ink-900 shadow-xs ring-1 ring-ink-200'
+                  : 'text-ink-600 hover:bg-raised/60 hover:text-ink-900',
               )}
             >
               <input

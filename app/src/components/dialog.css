@@ -1,0 +1,18 @@
+@reference '../index.css';
+
+/*
+ * The row of buttons at the end of a dialog (Dialog and ConfirmDialog, in their `.dialog-body`)
+ * stays in view. When the dialog is taller than the screen, as a form is on a small phone, the
+ * row sticks to its bottom above a divider while the rest scrolls under it, rather than sitting
+ * below the fold with nothing to show that it is there. It spans the dialog edge to edge, over
+ * the body's p-6 padding.
+ *
+ * It is found by where it is rather than by a class, because every dialog ends with it: as the
+ * last element of the body, or as the last element of the form that ends the body. Plain CSS
+ * outside Tailwind's layers, so its padding wins over the row's own spacing (pt-1 and the like)
+ * and every dialog's footer is the same.
+ */
+.dialog-body > div:last-child,
+.dialog-body > form:last-child > div:last-child {
+  @apply sticky bottom-0 -mx-6 -mb-6 border-t border-ink-200 bg-overlay px-6 py-4 dark:border-ink-300;
+}

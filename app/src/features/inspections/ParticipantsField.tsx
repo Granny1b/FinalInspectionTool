@@ -64,7 +64,8 @@ export function ParticipantsField({ control, value, onChange, pending }: Props) 
   }, [typing, onPendingChange]);
 
   return (
-    <div className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-ink-500/80 bg-surface px-2 py-0.5 shadow-xs transition-colors hover:border-ink-600 has-[input:focus-visible]:border-brand-600 has-[input:focus-visible]:outline-1 has-[input:focus-visible]:outline-brand-600">
+    // Outlined like INPUT (Field.tsx), dark theme included.
+    <div className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-ink-500/80 bg-surface px-2 py-0.5 shadow-xs transition-colors hover:border-ink-600 has-[input:focus-visible]:border-brand-600 has-[input:focus-visible]:outline-1 has-[input:focus-visible]:outline-brand-600 dark:border-ink-400 dark:hover:border-ink-500 dark:has-[input:focus-visible]:border-brand-600">
       {value.length > 0 && (
         <ul aria-label="Added participants" className="flex max-w-full flex-wrap gap-1.5">
           {value.map((name) => (
@@ -80,8 +81,10 @@ export function ParticipantsField({ control, value, onChange, pending }: Props) 
                   onChange(value.filter((other) => other !== name));
                   inputRef.current?.focus();
                 }}
-                // The hit area reaches 4 px past the 20 px circle, short of the next row's chips.
-                className="relative flex size-5 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors after:absolute after:-inset-1 hover:bg-ink-200 hover:text-ink-900"
+                // The hit area reaches 4 px past the 20 px circle, short of the next row's chips;
+                // 8 px on a touch screen (36 px for a finger), which just meets the next row and
+                // the next chip, as rows and chips are 6 px apart.
+                className="relative flex size-5 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors after:absolute after:-inset-1 hover:bg-ink-200 hover:text-ink-900 pointer-coarse:after:-inset-2"
               >
                 <X size={12} aria-hidden="true" />
               </button>
