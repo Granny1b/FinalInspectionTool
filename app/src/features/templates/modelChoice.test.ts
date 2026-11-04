@@ -51,7 +51,7 @@ describe('initialChoice', () => {
     );
     // A template here already uses the code: a code from the name instead.
     expect(initialChoice(context, { code: 'e2e', name: 'E2E rig' })).toEqual(
-      newModel('E2E rig', 'E2ERIG'),
+      newModel('E2E rig', 'E2ER'),
     );
   });
 
@@ -66,7 +66,7 @@ describe('initialChoice', () => {
 describe('a new model', () => {
   it('suggests a free code from the name until the code is edited', () => {
     const typed = withModelName(newModel('', ''), 'RigiMill MG', context);
-    expect(typed).toEqual(newModel('RigiMill MG', 'RIGIMILLMG'));
+    expect(typed).toEqual(newModel('RigiMill MG', 'RMMG2'));
     expect(withModelName(typed, 'IM', context).code).toBe('IM2');
     expect(withModelName(typed, 'E2E', context).code).toBe('E2E2');
     const edited = { ...typed, code: 'RMX', codeEdited: true };

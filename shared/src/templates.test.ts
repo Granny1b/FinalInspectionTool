@@ -7,7 +7,6 @@ import {
   TemplateDraftInputSchema,
   hasUnpublishedChanges,
   newModelConflict,
-  suggestModelCode,
   validateForPublish,
 } from './templates';
 
@@ -228,25 +227,6 @@ describe('new machine models', () => {
     { code: 'RMMG', name: 'RigiMill MG' },
     { code: 'IM', name: 'IM8' },
   ];
-
-  it("suggests the name's letters and digits in upper case", () => {
-    expect(suggestModelCode('HMC 800-2', models)).toBe('HMC8002');
-    expect(suggestModelCode('Åsa Öland', models)).toBe('ASAOLAND');
-    expect(suggestModelCode(' – ', models)).toBe('');
-  });
-
-  it('adds a number when the code is taken, ignoring case', () => {
-    expect(suggestModelCode('im', models)).toBe('IM2');
-    expect(suggestModelCode('IM', [...models, { code: 'im2', name: 'x' }])).toBe('IM3');
-  });
-
-  it('keeps within the longest code allowed, number included', () => {
-    const long = 'A'.repeat(40);
-    expect(suggestModelCode(long, models)).toBe('A'.repeat(32));
-    expect(suggestModelCode(long, [{ code: 'A'.repeat(32), name: 'x' }])).toBe(
-      `${'A'.repeat(31)}2`,
-    );
-  });
 
   it('refuses a code or a name another model has, whatever the case', () => {
     expect(newModelConflict(models, { code: 'HMC800', name: 'HMC 800' })).toBeNull();

@@ -2,13 +2,7 @@
  * `config/settings.json` (brief §5.6): machine models, company details and the pick lists
  * (responsibles, deviation categories). Created by the seed, then edited by admins.
  */
-import {
-  blobNames,
-  CONTAINERS,
-  SettingsSchema,
-  type MachineModel,
-  type Settings,
-} from '@modig/shared';
+import { blobNames, CONTAINERS, SettingsSchema, type Settings } from '@modig/shared';
 import { ConflictError, PreconditionFailedError, ServiceUnavailableError } from './http';
 import { readJson, writeJson } from './storage';
 
@@ -60,15 +54,4 @@ export async function updateSettings(
       }
     }
   }
-}
-
-/** Adds a machine model to the settings unless its code is already there. */
-export async function addMachineModel(model: MachineModel, by: string): Promise<Settings> {
-  return updateSettings(
-    (settings) =>
-      settings.machineModels.some((existing) => existing.code === model.code)
-        ? null
-        : { ...settings, machineModels: [...settings.machineModels, model] },
-    by,
-  );
 }

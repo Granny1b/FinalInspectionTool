@@ -634,7 +634,7 @@ test.describe('an admin', () => {
     const dialog = page.getByRole('dialog', { name: 'New template' });
     await dialog.getByLabel('Machine model').selectOption({ label: 'New machine model…' });
     await dialog.getByLabel('Model name').fill('Hydra Mill 9 – e2e');
-    await expect(dialog.getByLabel('Model code')).toHaveValue('HYDRAMILL9E2E');
+    await expect(dialog.getByLabel('Model code')).toHaveValue('HM92');
     await expect(dialog.getByLabel('Template name')).toHaveValue(
       'Final inspection – Hydra Mill 9 – e2e',
     );

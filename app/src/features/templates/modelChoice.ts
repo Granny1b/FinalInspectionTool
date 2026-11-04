@@ -63,7 +63,7 @@ export function initialChoice(
     const name = preferred.name ?? '';
     const taken = takenModels(context);
     return taken.some(isPreferred)
-      ? { selected: NEW_MODEL, name, code: suggestModelCode(name, taken), codeEdited: false }
+      ? { selected: NEW_MODEL, name, code: suggestModelCode(name, codes(taken)), codeEdited: false }
       : { selected: NEW_MODEL, name, code: preferred.code, codeEdited: true };
   }
   const first = context.free[0];
@@ -79,7 +79,7 @@ export function withModelName(
   return {
     ...choice,
     name,
-    code: choice.codeEdited ? choice.code : suggestModelCode(name, takenModels(context)),
+    code: choice.codeEdited ? choice.code : suggestModelCode(name, codes(takenModels(context))),
   };
 }
 
@@ -150,3 +150,5 @@ export function modelLabel(choice: ModelChoice, context: ModelContext): string {
 export function defaultTemplateName(modelName: string): string {
   return modelName ? `Final inspection – ${modelName}` : '';
 }
+
+const codes = (models: readonly MachineModel[]) => models.map((model) => model.code);

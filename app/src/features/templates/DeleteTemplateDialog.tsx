@@ -51,7 +51,7 @@ export function DeleteTemplateDialog({ name, revisions, busy, error, onDelete, o
           type="button"
           onClick={onDelete}
           disabled={busy}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-nok-fg px-3.5 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-colors hover:bg-nok-fg/90 disabled:pointer-events-none disabled:opacity-50"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-nok-solid px-3.5 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-colors hover:bg-nok-solid/90 disabled:pointer-events-none disabled:opacity-50"
         >
           {busy && <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />}
           {busy ? 'Deleting…' : 'Delete template'}

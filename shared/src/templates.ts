@@ -275,30 +275,3 @@ export function newModelConflict(
   }
   return null;
 }
-
-const MAX_MODEL_CODE = ModelCodeSchema.maxLength ?? 32;
-
-/**
- * A code for a new model, from its name: its letters and digits in upper case ("RigiMill MG 2" →
- * "RIGIMILLMG2", "Åsa" → "ASA"), with a number added if a model already has it. '' for a name
- * without any.
- */
-export function suggestModelCode(name: string, models: readonly MachineModel[]): string {
-  const base = name
-    .normalize('NFD')
-    .replace(/[^A-Za-z0-9]/g, '')
-    .toUpperCase()
-    .slice(0, MAX_MODEL_CODE);
-  if (!base) return '';
-  const taken = (code: string) => models.some((model) => sameText(model.code, code));
-  let n = 1;
-  while (taken(candidate(base, n))) n++;
-  return candidate(base, n);
-}
-
-/** `base` for 1, else `base` shortened to leave room for the number. */
-function candidate(base: string, n: number): string {
-  if (n === 1) return base;
-  const suffix = String(n);
-  return `${base.slice(0, MAX_MODEL_CODE - suffix.length)}${suffix}`;
-}
