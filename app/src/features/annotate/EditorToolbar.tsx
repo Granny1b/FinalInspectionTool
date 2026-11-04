@@ -86,7 +86,7 @@ export function EditorToolbar({
             <span
               aria-hidden="true"
               style={{ backgroundColor: value }}
-              className="size-5 rounded-full border border-ink-950/25 group-aria-pressed:ring-2 group-aria-pressed:ring-brand-600 group-aria-pressed:ring-offset-2"
+              className="size-5 rounded-full border border-ink-950/25 group-aria-pressed:ring-2 group-aria-pressed:ring-brand-600 group-aria-pressed:ring-offset-2 group-aria-pressed:ring-offset-surface"
             />
           </BarButton>
         ))}

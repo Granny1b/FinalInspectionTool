@@ -11,7 +11,9 @@
     { "route": "/forbidden.html", "allowedRoles": ["anonymous"] },
     { "route": "/login-assets/auth.js", "allowedRoles": ["anonymous"] },
     { "route": "/login-assets/auth.css", "allowedRoles": ["anonymous"] },
+    { "route": "/theme.js", "allowedRoles": ["anonymous"] },
     { "route": "/modig-logo.png", "allowedRoles": ["anonymous"] },
+    { "route": "/modig-logo-dark.png", "allowedRoles": ["anonymous"] },
     { "route": "/favicon.png", "allowedRoles": ["anonymous"] },
     { "route": "/*", "allowedRoles": ["inspector", "admin"] }
   ],

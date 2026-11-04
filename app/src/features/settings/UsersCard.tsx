@@ -47,7 +47,7 @@ export function UsersCard() {
         tabIndex={0}
         role="region"
         aria-label="Invite command"
-        className="mt-2 overflow-x-auto rounded-lg bg-ink-900 px-4 py-3 font-mono text-xs leading-relaxed text-ink-100"
+        className="mt-2 overflow-x-auto rounded-lg bg-stage px-4 py-3 font-mono text-xs leading-relaxed text-on-stage"
       >
         <code>{INVITE_COMMAND}</code>
       </pre>

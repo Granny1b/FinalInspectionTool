@@ -1,7 +1,8 @@
 /*
  * The printed document (brief §6): A4 portrait, clean in black and white. Everything about the
- * paper lives here, for the screen preview (white sheets on a grey desk) and for print alike; the
- * toolbar around it is ordinary app UI (Tailwind classes, hidden in print).
+ * paper lives here, for the screen preview (white sheets on a grey desk, also in the dark theme)
+ * and for print alike; the toolbar around it is ordinary app UI (Tailwind classes, hidden in
+ * print). The sheets keep paper's own colours whatever the theme; only the desk follows it.
  *
  * Plain CSS, outside Tailwind's layers, so it wins over the base styles without !important.
  * The page footer is not here: its text depends on the document, so usePageFooter adds the
@@ -30,6 +31,8 @@
      text keeps this far in, so it never crosses the margin (footer.ts does the same). */
   --paper-edge-inset: 0.5mm;
 
+  /* Paper is light in either theme: its own greys and white sheets, light browser defaults. */
+  color-scheme: light;
   color: var(--paper-ink);
   font-size: 9pt;
   line-height: 1.3;
