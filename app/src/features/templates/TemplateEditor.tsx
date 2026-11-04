@@ -299,6 +299,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           </Button>
           <ActionMenu
             label="Template actions"
+            triggerData={{ 'data-template-menu': '' }}
             trigger={
               <>
                 <Ellipsis size={16} aria-hidden="true" />
@@ -408,7 +409,13 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           busy={remove.isPending || deleted}
           error={remove.error}
           onDelete={deleteTemplate}
-          onClose={() => setConfirmingDelete(false)}
+          onClose={() => {
+            setConfirmingDelete(false);
+            // The menu item that opened it is gone with its menu: back to the menu's button.
+            if (!deleted) {
+              document.querySelector<HTMLElement>('[data-template-menu]')?.focus();
+            }
+          }}
         />
       )}
       {reload.dialog}
