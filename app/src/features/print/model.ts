@@ -141,6 +141,8 @@ export type PrintContext = {
   companyName: string;
   /** "RigiMill MG" for the model code. */
   modelLabel: string;
+  /** The name for a stored email ("finalised by"), from the people list; else the email. */
+  personName?: (email: string) => string;
 };
 
 const SEPARATOR = ' · ';
@@ -183,7 +185,7 @@ export function inspectionPrint(
       }),
       photoId: front.photoId,
       revision: `Rev: ${templateRevision}`,
-      report: report ? reportState(inspection, deviations.length) : null,
+      report: report ? reportState(inspection, deviations.length, context) : null,
     },
     checklistTitle: `${templateSnapshot.name}${SEPARATOR}Rev ${templateRevision}`,
     sections: printSections(
@@ -271,7 +273,11 @@ function frontFields(values: {
   ];
 }
 
-function reportState(inspection: Inspection, deviationCount: number): ReportState {
+function reportState(
+  inspection: Inspection,
+  deviationCount: number,
+  { personName = (email) => email }: PrintContext,
+): ReportState {
   const { total, filled, nok } = inspectionProgress(inspection);
   const summary = [
     `${filled} / ${total} rows filled`,
@@ -282,7 +288,7 @@ function reportState(inspection: Inspection, deviationCount: number): ReportStat
     return { finalised: false, text: NOT_FINALISED_MARKER, summary };
   }
   const when = inspection.finalisedAt ? ` ${formatDateTime(inspection.finalisedAt)}` : '';
-  const who = inspection.finalisedBy ? ` by ${inspection.finalisedBy}` : '';
+  const who = inspection.finalisedBy ? ` by ${personName(inspection.finalisedBy)}` : '';
   return { finalised: true, text: `Finalised${when}${who}`, summary };
 }
 

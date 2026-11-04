@@ -12,7 +12,9 @@ export function AppShell() {
   const me = useMe();
 
   if (me.isPending) return <LoadingShell />;
-  if (me.isError) {
+  // Only when nothing has loaded: Settings refetches /api/me after a change to the people list,
+  // and a refetch that fails keeps the user loaded before instead of replacing the whole app.
+  if (!me.data) {
     return (
       <AccountError error={me.error} retrying={me.isFetching} onRetry={() => void me.refetch()} />
     );

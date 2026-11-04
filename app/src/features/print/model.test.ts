@@ -359,6 +359,16 @@ describe('a report', () => {
     expect(model.footer).not.toContain('Not finalised');
   });
 
+  it('names who finalised it by the people list, when given one', () => {
+    const named = inspectionPrint(finalised, 'report', {
+      ...CONTEXT,
+      personName: (email) => (email === 'anna.andersson@modig.se' ? 'Anna Andersson' : email),
+    });
+    expect(named.front.report?.text).toBe(
+      `Finalised ${formatDateTime('2026-10-08T12:32:00.000Z')} by Anna Andersson`,
+    );
+  });
+
   it('marks an inspection in progress as a draft, on the front page and in every footer', () => {
     const draft = inspectionPrint(
       inspection({ results: { [row1a!.id]: { status: 'OK' } } }),

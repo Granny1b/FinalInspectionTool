@@ -1,6 +1,7 @@
 import { ApiErrorSchema, CONFLICT_MESSAGE, MachineModelSchema } from '@modig/shared';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { context, principal, request } from '../../test/requests';
+import { resetStorage, storePeople, useTestStorage } from '../../test/storage';
 import {
   BadRequestError,
   ConflictError,
@@ -8,6 +9,7 @@ import {
   etagHeader,
   ForbiddenError,
   json,
+  NO_ACCESS_MESSAGE,
   NotFoundError,
   PreconditionFailedError,
   readJsonBody,
@@ -17,6 +19,10 @@ import {
 
 const inspector = principal('sam.andersson@modig.se', ['inspector']);
 const admin = principal('boss@modig.se', ['admin']);
+
+// endpoint() reads the people list for every caller.
+beforeAll(useTestStorage);
+beforeEach(resetStorage);
 
 /** Runs `handler` behind endpoint() as a signed-in inspector. */
 function run(handler: EndpointHandler, req = request({ principal: inspector })) {
@@ -40,6 +46,33 @@ describe('endpoint', () => {
   it('lets admins through inspector endpoints', async () => {
     const response = await run(async () => json(204, null), request({ principal: admin }));
     expect(response.status).toBe(204);
+  });
+
+  it('tells a sign-in without any role that it has no access yet', async () => {
+    const response = await run(
+      vi.fn<EndpointHandler>(),
+      request({ principal: principal('guest@outlook.com', []) }),
+    );
+    expect(response.status).toBe(403);
+    expect(ApiErrorSchema.parse(response.jsonBody)).toEqual({
+      error: 'forbidden',
+      message: NO_ACCESS_MESSAGE,
+    });
+  });
+
+  it('uses the role from the people list', async () => {
+    await storePeople([
+      { email: 'guest@outlook.com', name: 'Guest', role: 'admin' },
+      { email: 'sam.andersson@modig.se', name: 'Sam', role: 'inspector' },
+    ]);
+    const adminOnly = endpoint({ role: 'admin' }, async (_req, _context, user) =>
+      json(200, { name: user.name }),
+    );
+    const guest = request({ principal: principal('guest@outlook.com', []) });
+    expect(await adminOnly(guest, context())).toEqual({ status: 200, jsonBody: { name: 'Guest' } });
+    // Invited as admin, but the list says inspector.
+    const sam = request({ principal: principal('sam.andersson@modig.se', ['admin']) });
+    expect((await adminOnly(sam, context())).status).toBe(403);
   });
 
   it.each([

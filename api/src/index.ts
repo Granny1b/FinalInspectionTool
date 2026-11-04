@@ -11,3 +11,4 @@ import './functions/me';
 import './functions/settings';
 import './functions/template-revisions';
 import './functions/templates';
+import './functions/users';

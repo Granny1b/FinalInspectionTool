@@ -1,3 +1,4 @@
+import type { PeopleDirectory } from '@modig/shared';
 import { useCallback, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { InspectionNotFound } from '../features/inspections/InspectionNotFound';
@@ -8,7 +9,11 @@ import { PrintLoadError, PrintLoading, PrintMessage } from '../features/print/Pr
 import { PrintView } from '../features/print/PrintView';
 import { usePrintImages } from '../features/print/usePrintImages';
 import { isMissing } from '../lib/api';
+import { personName, usePeopleDirectory } from '../lib/usePeople';
 import { modelName, useSettings } from '../lib/useSettings';
+
+/** One empty directory, so the model isn't rebuilt on every render after a failed load. */
+const NO_PEOPLE: PeopleDirectory = [];
 
 /**
  * /inspections/:id/print?mode=blank|report[&deviationsPerPage=2|4][&appendix=1][&autoprint=1] —
@@ -28,15 +33,21 @@ export function InspectionPrintPage() {
     parseDeviationsPerPage(params.get('deviationsPerPage')) ?? DEFAULT_DEVIATIONS_PER_PAGE;
   const appendix = parseAppendix(params.get('appendix'));
 
+  const people = usePeopleDirectory();
+  // Waited for (an autoprint would otherwise print emails), but not needed: a failed load prints
+  // the emails.
+  const directory = people.isPending ? null : (people.data ?? NO_PEOPLE);
+
   const model = useMemo(
     () =>
-      inspection && settings.data
+      inspection && settings.data && directory
         ? inspectionPrint(inspection, mode, {
             companyName: settings.data.companyName,
             modelLabel: modelName(settings.data.machineModels, inspection.front.modelCode),
+            personName: (email) => personName(directory, email),
           })
         : null,
-    [inspection, settings.data, mode],
+    [inspection, settings.data, mode, directory],
   );
   const images = usePrintImages(model, settings.data?.logoImageId, { appendix });
 
