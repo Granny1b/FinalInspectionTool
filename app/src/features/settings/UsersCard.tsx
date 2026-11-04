@@ -74,8 +74,13 @@ function PeopleEditor({ users }: { users: LoadedUsers }) {
   const [removed, setRemoved] = useState<string | null>(null);
   const addRef = useRef<HTMLButtonElement>(null);
 
+  const searchable = users.people.length >= SEARCH_FROM;
   const sorted = useMemo(() => sortPeople(users.people), [users.people]);
-  const visible = useMemo(() => filterPeople(sorted, query), [sorted, query]);
+  // Only while the search box is there: a removal can take it away with a query still typed in.
+  const visible = useMemo(
+    () => (searchable ? filterPeople(sorted, query) : sorted),
+    [searchable, sorted, query],
+  );
   const personName = (email: string) => nameIn(users.people, email);
   const listed = isListed(users.people, me.email);
   const admins = users.people.filter((person) => person.role === 'admin').length;
@@ -139,7 +144,7 @@ function PeopleEditor({ users }: { users: LoadedUsers }) {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {users.people.length >= SEARCH_FROM && (
+        {searchable && (
           <div role="search" className="relative w-full sm:w-72">
             <Search
               size={16}
@@ -198,7 +203,18 @@ function PeopleEditor({ users }: { users: LoadedUsers }) {
       </div>
 
       {dialog && (
-        <PersonDialog mode={dialog} users={users} me={me} onClose={() => setDialog(null)} />
+        <PersonDialog
+          mode={dialog}
+          users={users}
+          me={me}
+          onClose={() => {
+            setDialog(null);
+            // Closing hands the focus back to the button that opened the dialog, unless saving
+            // took that button away (Add yourself): then it would be lost, so it goes here.
+            const focused = document.activeElement;
+            if (!focused || focused === document.body) addRef.current?.focus();
+          }}
+        />
       )}
       {removing && (
         <ConfirmDialog
