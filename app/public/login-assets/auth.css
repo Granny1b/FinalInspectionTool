@@ -154,6 +154,29 @@ h1 {
   user-select: all;
 }
 
+/* "Sign out" under the primary button on the refused page. */
+.secondary {
+  display: inline-block;
+  margin-top: 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--brand-700);
+}
+
+.lead code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  color: var(--ink-800);
+  overflow-wrap: anywhere;
+}
+
+button.button {
+  width: 100%;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .note {
   margin: 1rem 0 0;
   font-size: 0.8125rem;

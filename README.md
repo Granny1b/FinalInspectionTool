@@ -872,6 +872,10 @@ come back with the other: same email, different account, no role. The no-access 
   private window). Both sign-ins then have the role, and either one works.
 - **In the list, with the role:** sign out and in again; a role applies from the next sign-in.
 
+If the app itself is refused while the sign-in has a role, the page says **The server refused a
+request** instead, with the request, its status, the time and the account ID: send that screen
+to whoever maintains the app.
+
 ### 6. Check the lock after each deploy
 
 Anonymous requests must never reach the app or the API:
