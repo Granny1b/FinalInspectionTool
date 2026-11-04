@@ -184,15 +184,27 @@ function ModelLine({ row, number, errors, onName, onCode, onRemove }: LineProps)
       </div>
       <div className="col-start-1 row-start-2 min-w-0 sm:col-start-2 sm:row-start-1">
         {row.saved ? (
-          <p
-            title="Saved codes can’t be changed"
-            className="flex h-9 items-center gap-1.5 px-1 font-mono text-sm text-ink-800"
-          >
-            <span className="sr-only">Code, model {number}: </span>
-            {row.code}
-            <Lock size={13} aria-hidden="true" className="text-ink-400" />
-            <span className="sr-only">(fixed)</span>
-          </p>
+          <>
+            {/* Focusable from script: Save moves the focus to a problem, which can be this code
+                (two saved codes that differ only in case). */}
+            <p
+              id={codeId}
+              tabIndex={-1}
+              title="Saved codes can’t be changed"
+              aria-describedby={codeError ? `${codeId}-error` : undefined}
+              className="flex h-9 items-center gap-1.5 px-1 font-mono text-sm text-ink-800 outline-none"
+            >
+              <span className="sr-only">Code, model {number}: </span>
+              {row.code}
+              <Lock size={13} aria-hidden="true" className="text-ink-400" />
+              <span className="sr-only">(fixed)</span>
+            </p>
+            {codeError && (
+              <p id={`${codeId}-error`} className="mt-1 text-xs font-medium text-nok-fg">
+                {codeError}
+              </p>
+            )}
+          </>
         ) : (
           <>
             <input

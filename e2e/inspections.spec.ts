@@ -596,7 +596,8 @@ test.describe('an inspector', () => {
     await openInspection(page, created);
 
     const options = (itemId: string) => resp(page, itemId).locator('option').allTextContents();
-    await expect.poll(() => options(b1!)).toEqual(expect.arrayContaining(responsibles));
+    // The first two only: another test may change the end of the list meanwhile.
+    await expect.poll(() => options(b1!)).toEqual(expect.arrayContaining(responsibles.slice(0, 2)));
     expect((await options(b1!))[0]).toBe('Responsible');
     await expect(resp(page, a1!)).toHaveValue(offList);
     expect((await options(a1!)).slice(0, 3)).toEqual([

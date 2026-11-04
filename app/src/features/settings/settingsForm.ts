@@ -5,6 +5,7 @@
  */
 import {
   listEntryKey,
+  MAX_LIST_ENTRIES,
   SettingsInputSchema,
   suggestModelCode,
   type SettingsInput,
@@ -218,6 +219,9 @@ export function addProblem(rows: readonly ListRow[], value: string): string | nu
   const key = listEntryKey(value);
   if (!key) return 'Type a name first';
   if (rows.some((row) => listEntryKey(row.value) === key)) return 'Already on the list';
+  // Said now rather than at Save, which would refuse the whole form for it.
+  if (rows.length >= MAX_LIST_ENTRIES)
+    return `The list is full: at most ${MAX_LIST_ENTRIES} entries`;
   return null;
 }
 

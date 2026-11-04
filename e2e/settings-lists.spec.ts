@@ -18,6 +18,10 @@ import { createTemplate, deleteInspection, deleteTemplate } from './support/stor
 
 const ADMIN = 'anna.andersson@modig.se';
 
+// One after the other: each save here changes the ETag, so a test saving while another has the
+// card open would turn the other's Save into a conflict.
+test.describe.configure({ mode: 'default' });
+
 test.beforeEach(({ context }) => signIn(context, ADMIN, ['admin']));
 
 async function storedSettings(

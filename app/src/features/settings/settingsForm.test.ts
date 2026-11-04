@@ -1,4 +1,4 @@
-import type { SettingsInput } from '@modig/shared';
+import { MAX_LIST_ENTRIES, type SettingsInput } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
 import {
   addEntry,
@@ -147,10 +147,15 @@ describe('machine models', () => {
 describe('pick lists', () => {
   const rows = formFromInput(saved).responsibles;
 
-  it('adds a trimmed name at the end, unless it is blank or already there', () => {
+  it('adds a trimmed name at the end, unless it is blank, already there or the list is full', () => {
     expect(addProblem(rows, '  ')).toBe('Type a name first');
     expect(addProblem(rows, ' mechanical ')).toBe('Already on the list');
     expect(addProblem(rows, 'Hydraulics')).toBeNull();
+    const full = Array.from({ length: MAX_LIST_ENTRIES }, (_, index) => ({
+      key: `full${index}`,
+      value: `Entry ${index}`,
+    }));
+    expect(addProblem(full, 'Hydraulics')).toBe('The list is full: at most 50 entries');
     expect(values(addEntry(rows, ' Hydraulics '))).toEqual([
       'Mechanical',
       'Electrical',
