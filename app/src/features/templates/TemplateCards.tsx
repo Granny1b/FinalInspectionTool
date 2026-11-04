@@ -41,9 +41,10 @@ export function TemplateCards({ templates, models, showDrafts }: Props) {
                 {modelName(models, template.modelCode)}
               </p>
             </div>
+            {/* The list's badges: the draft is only mentioned when it differs from the published
+                revision, as otherwise there is nothing to publish. */}
             <div className="flex flex-wrap gap-1.5">
               <PublishedBadge revision={template.publishedRevision} />
-              {showDrafts && <Badge>Draft · Rev {template.draftRevision}</Badge>}
               {showDrafts && template.hasUnpublishedChanges && (
                 <Badge tone="brand">Unpublished changes</Badge>
               )}

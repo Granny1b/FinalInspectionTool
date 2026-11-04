@@ -25,6 +25,7 @@ import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
 import { useReload } from '../../lib/autosave/useReload';
 import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { useSettings } from '../../lib/useSettings';
+import { useScrollPaddingBelow } from '../inspections/useScrollPaddingBelow';
 import { templatePrintHref } from '../print/links';
 import { Badge } from './Badge';
 import { ChecklistHeading } from './ChecklistHeading';
@@ -144,6 +145,11 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   const [published, setPublished] = useState<number | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
+  // Whatever is scrolled into view (the focus moving between rows, jump links) stops below the
+  // header while it sticks, and below the tablet top bar. Measured, as the header's height
+  // changes with the window and a name that wraps.
+  const headerRef = useRef<HTMLElement>(null);
+  useScrollPaddingBelow(headerRef);
 
   // A publish leaves nothing new to publish, so the Publish button is disabled under the keyboard
   // focus: the "Published" notice takes the focus instead.
@@ -253,22 +259,27 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   }
 
   return (
-    // While the editor is open, whatever is scrolled into view (focus moving between rows, jump
-    // links) stops below the sticky header and the tablet top bar. Padding on the page's scroller,
-    // because Chrome ignores an element's scroll-margin for block: 'nearest'. Below md the header
-    // takes two lines (title, then the buttons), so it needs more.
-    <div className="[:root:has(&)]:scroll-pt-36 max-md:[:root:has(&)]:scroll-pt-48 lg:[:root:has(&)]:scroll-pt-24">
+    <div>
       <title>{`${title} · ${APP_NAME}`}</title>
       <BackLink to="/templates" label="Templates" />
 
-      <header className="sticky top-14 z-20 mt-2 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-ink-200 bg-canvas py-3 lg:top-0">
-        {/* At least 16rem beside the buttons, or it takes a line of its own above them. */}
-        <div className="min-w-0 flex-1 basis-64">
+      {/*
+        Sticky where it leaves room to work, as the inspection's header. On a phone, upright or on
+        its side, it takes several lines (a third of the screen, more with the keyboard open), so
+        it scrolls away there.
+      */}
+      <header
+        ref={headerRef}
+        className="top-14 z-20 mt-2 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-ink-200 bg-canvas py-3 lg:top-0 sm:[@media(min-height:40rem)]:sticky"
+      >
+        {/* At least 20rem beside the buttons, or it takes a line of its own above them: a long
+            name then wraps instead of being cut to "Final inspection – RigiMill …". */}
+        <div className="min-w-0 flex-1 basis-80">
           {/* Focusable from script: it takes the focus when the "Published" notice is dismissed. */}
           <h1
             ref={titleRef}
             tabIndex={-1}
-            className="truncate text-xl font-semibold tracking-tight text-ink-900 outline-none"
+            className="line-clamp-2 text-xl font-semibold tracking-tight wrap-break-word text-ink-900 outline-none"
           >
             {title}
           </h1>
@@ -291,9 +302,10 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             onRetry={() => void saver.flush()}
             onReload={reload.askReload}
           />
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2">
             {/* The draft as it prints; leaving the editor saves first, like any link. On a phone
-                just the printer, so the sticky header keeps to one row of buttons. */}
+                just the printer, so the header keeps to one row of buttons. Spaced as the
+                inspection's header buttons. */}
             <ButtonLink variant="secondary" to={templatePrintHref(id)} className="max-sm:px-2.5">
               <Printer size={16} aria-hidden="true" />
               <span className="max-sm:sr-only">Print preview</span>

@@ -213,8 +213,9 @@ export function SettingsForm({ loaded, onReload }: Props) {
         </div>
       </section>
 
-      {/* Stays in view at the bottom of the screen while the long card scrolls past. */}
-      <div className="sticky bottom-0 -mx-4 mt-8 -mb-6 space-y-3 rounded-b-lg border-t border-ink-200 bg-surface px-4 py-4 sm:-mx-6 sm:px-6">
+      {/* Stays in view at the bottom of the screen while the long card scrolls past. Out to the
+          edges of SettingsCard's body (its padding, negated). */}
+      <div className="sticky bottom-0 -mx-4 mt-8 -mb-5 space-y-3 rounded-b-lg border-t border-ink-200 bg-surface px-4 py-4 sm:-mx-5 sm:px-5">
         {save.status === 'conflict' && (
           <Callout
             tone="error"

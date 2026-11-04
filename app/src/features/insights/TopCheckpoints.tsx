@@ -1,6 +1,7 @@
 import type { Insights, MachineModel } from '@modig/shared';
+import clsx from 'clsx';
 import { modelName } from '../../lib/useSettings';
-import { formatCount, formatPercent } from './format';
+import { formatCount, formatPercent, plural } from './format';
 import { PanelEmpty } from './Panel';
 
 type Props = {
@@ -16,6 +17,11 @@ type Props = {
  */
 const HEAD = 'px-2 py-2 font-medium whitespace-nowrap first:pl-0 last:pr-0 sm:px-3';
 const CELL = 'px-2 py-3 align-top first:pl-0 last:pr-0 sm:px-3';
+/**
+ * The two number columns, from sm. On a phone they took half the table and squeezed the
+ * checkpoint to a word a line; there the numbers are a line under the checkpoint instead.
+ */
+const NUMBER = 'text-right max-sm:hidden';
 
 /**
  * The checkpoints that fail most often (brief §5.5, "the most important table"): where each one
@@ -41,46 +47,54 @@ export function TopCheckpoints({ checkpoints, models, showModel }: Props) {
                 Model
               </th>
             )}
-            <th scope="col" className={`${HEAD} text-right`}>
+            <th scope="col" className={clsx(HEAD, NUMBER)}>
               Failed
             </th>
-            <th scope="col" className={`${HEAD} text-right`}>
+            <th scope="col" className={clsx(HEAD, NUMBER)}>
               Of inspections
             </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-ink-100">
-          {checkpoints.map((checkpoint, index) => (
-            <tr key={checkpoint.itemId}>
-              <td className={`${CELL} text-ink-500 tabular-nums`}>{index + 1}</td>
-              <td className={`${CELL} min-w-32 sm:min-w-64`}>
-                <p className="wrap-break-word text-ink-900">
-                  <span className="font-semibold">{checkpoint.ref}</span>{' '}
-                  {checkpoint.text || <span className="text-ink-500">No text</span>}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-500">
-                  {checkpoint.sectionTitle || 'Untitled section'}
-                  {checkpoint.removed && ' · No longer in the checklist'}
-                </p>
-              </td>
-              {showModel && (
-                <td className={`${CELL} whitespace-nowrap text-ink-700`}>
-                  {modelName(models, checkpoint.modelCode)}
+          {checkpoints.map((checkpoint, index) => {
+            const share = formatPercent(checkpoint.failed / checkpoint.inspections);
+            return (
+              <tr key={checkpoint.itemId}>
+                <td className={clsx(CELL, 'text-ink-500 tabular-nums')}>{index + 1}</td>
+                {/* The last cell on a phone, without a model: flush with the card's edge. */}
+                <td className={clsx(CELL, 'min-w-32 sm:min-w-64', !showModel && 'max-sm:pr-0')}>
+                  <p className="wrap-break-word text-ink-900">
+                    <span className="font-semibold">{checkpoint.ref}</span>{' '}
+                    {checkpoint.text || <span className="text-ink-500">No text</span>}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-500">
+                    {checkpoint.sectionTitle || 'Untitled section'}
+                    {checkpoint.removed && ' · No longer in the checklist'}
+                  </p>
+                  <p className="mt-1 text-xs text-ink-500 tabular-nums sm:hidden">
+                    <span className="font-semibold text-ink-900">
+                      {formatCount(checkpoint.failed)} failed
+                    </span>{' '}
+                    · {share} of {plural(checkpoint.inspections, 'inspection')}
+                  </p>
                 </td>
-              )}
-              <td className={`${CELL} text-right font-semibold text-ink-900 tabular-nums`}>
-                {formatCount(checkpoint.failed)}
-              </td>
-              <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>
-                <span className="text-ink-900">
-                  {formatPercent(checkpoint.failed / checkpoint.inspections)}
-                </span>
-                <span className="block text-xs text-ink-500">
-                  of {formatCount(checkpoint.inspections)}
-                </span>
-              </td>
-            </tr>
-          ))}
+                {showModel && (
+                  <td className={clsx(CELL, 'whitespace-nowrap text-ink-700 max-sm:pr-0')}>
+                    {modelName(models, checkpoint.modelCode)}
+                  </td>
+                )}
+                <td className={clsx(CELL, NUMBER, 'font-semibold text-ink-900 tabular-nums')}>
+                  {formatCount(checkpoint.failed)}
+                </td>
+                <td className={clsx(CELL, NUMBER, 'whitespace-nowrap tabular-nums')}>
+                  <span className="text-ink-900">{share}</span>
+                  <span className="block text-xs text-ink-500">
+                    of {formatCount(checkpoint.inspections)}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

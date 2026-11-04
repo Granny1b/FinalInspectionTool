@@ -3,8 +3,9 @@ import clsx from 'clsx';
 import { formatCount, formatPercent } from './format';
 
 /**
- * One red ramp, minor → critical (index.css tokens): the order reads in the colour. Each fill
- * has its own label colour, at 4.5:1 in both themes (the dark theme turns the ramp round).
+ * The severity tokens (index.css), the same as the badges on a deviation card: minor a neutral
+ * grey, major red, critical the strongest red (on the dark card, the lightest). Each fill has its
+ * own label colour, at 4.5:1 in both themes.
  */
 const FILL: Record<Severity, string> = {
   minor: 'bg-severity-minor text-on-severity-minor',

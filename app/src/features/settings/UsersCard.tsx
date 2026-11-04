@@ -1,6 +1,6 @@
 import type { Person } from '@modig/shared';
 import clsx from 'clsx';
-import { ChevronRight, RefreshCw, Search, UserRoundPlus, UsersRound } from 'lucide-react';
+import { ChevronRight, RefreshCw, Search, UserRoundPlus } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Callout } from '../../components/Callout';
@@ -26,7 +26,6 @@ export function UsersCard() {
   const users = useUsers();
   return (
     <SettingsCard
-      icon={UsersRound}
       title="Users & access"
       description="Who can sign in, with which role, and the name shown for them on inspections and reports."
     >
