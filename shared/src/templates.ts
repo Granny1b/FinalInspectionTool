@@ -256,17 +256,23 @@ const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 
 /**
  * Why `model` can't be added next to `models` (its code or its name is taken), or null. The API
- * answers 409 with this message; the dialogs show it before sending.
+ * answers 409 with the message; the dialogs show it at the field before sending.
  */
 export function newModelConflict(
   models: readonly MachineModel[],
   model: MachineModel,
-): string | null {
+): { field: 'code' | 'name'; message: string } | null {
   const sameCode = models.find((existing) => sameText(existing.code, model.code));
-  if (sameCode) return `${sameCode.code} is already the code of ${sameCode.name}.`;
+  if (sameCode) {
+    return { field: 'code', message: `${sameCode.code} is already the code of ${sameCode.name}.` };
+  }
   const sameName = models.find((existing) => sameText(existing.name, model.name));
-  if (sameName)
-    return `There is already a machine model called ${sameName.name} (${sameName.code}).`;
+  if (sameName) {
+    return {
+      field: 'name',
+      message: `There is already a machine model called ${sameName.name} (${sameName.code}).`,
+    };
+  }
   return null;
 }
 

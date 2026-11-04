@@ -250,11 +250,13 @@ describe('new machine models', () => {
 
   it('refuses a code or a name another model has, whatever the case', () => {
     expect(newModelConflict(models, { code: 'HMC800', name: 'HMC 800' })).toBeNull();
-    expect(newModelConflict(models, { code: 'rmmg', name: 'New' })).toBe(
-      'RMMG is already the code of RigiMill MG.',
-    );
-    expect(newModelConflict(models, { code: 'IM9', name: ' im8 ' })).toBe(
-      'There is already a machine model called IM8 (IM).',
-    );
+    expect(newModelConflict(models, { code: 'rmmg', name: 'New' })).toEqual({
+      field: 'code',
+      message: 'RMMG is already the code of RigiMill MG.',
+    });
+    expect(newModelConflict(models, { code: 'IM9', name: ' im8 ' })).toEqual({
+      field: 'name',
+      message: 'There is already a machine model called IM8 (IM).',
+    });
   });
 });

@@ -217,7 +217,7 @@ async function prepareModel(
   // here rather than a second template for their model.
   await updateSettings((settings) => {
     const conflict = newModelConflict(settings.machineModels, newModel);
-    if (conflict) throw new ConflictError(conflict);
+    if (conflict) throw new ConflictError(conflict.message);
     return { ...settings, machineModels: [...settings.machineModels, newModel] };
   }, by);
 }
