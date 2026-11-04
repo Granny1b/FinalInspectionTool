@@ -1,4 +1,4 @@
-import { rowLetter, rowRef, sectionNumber, type Section } from '@modig/shared';
+import { rowLetter, rowRef, sectionNumber, sectionSpareRows, type Section } from '@modig/shared';
 import clsx from 'clsx';
 import { useState } from 'react';
 import { guideRow } from '../../guides/guide';
@@ -106,7 +106,10 @@ function Sections({
             );
           })}
         </ol>
-        <SpareRows start={section.items.length} count={spareRowsPerSection} />
+        <SpareRows
+          start={section.items.length}
+          count={sectionSpareRows(section, { spareRowsPerSection })}
+        />
       </div>
     );
   });

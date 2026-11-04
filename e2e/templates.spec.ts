@@ -1,12 +1,16 @@
+import { readFile } from 'node:fs/promises';
 import {
+  checklistIds,
   CONFLICT_MESSAGE,
+  MachineModelSchema,
   TemplateDetailSchema,
+  TemplateExportSchema,
   TemplateListSchema,
   type Template,
 } from '@modig/shared';
 import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
 import { signIn } from './support/auth';
-import { createTemplate, deleteTemplate } from './support/storage';
+import { createTemplate, deleteInspection, deleteTemplate } from './support/storage';
 
 const ADMIN = 'anna.andersson@modig.se';
 
@@ -492,52 +496,285 @@ test.describe('an admin', () => {
     expect((await savedDraft(page.request, template.id)).coverImageId).toEqual(expect.any(String));
   });
 
-  test('a new template starts empty; an empty row blocks publishing and links to it', async ({
+  test('spare lines: one deleted comes back with Undo, one added; each section keeps its own', async ({
+    page,
+    template,
+  }) => {
+    const spare = (ref: string) => page.getByRole('button', { name: `Delete spare line ${ref}` });
+    const addSpare = page.getByRole('button', { name: 'Add spare line to section 1' });
+    const spareRows = async () =>
+      (await savedDraft(page.request, template.id)).sections[0]!.spareRows;
+    await openEditor(page, template);
+    // Three rows and the template's three spare lines in each section.
+    await expect(spare('1.f')).toHaveCount(1);
+
+    // Shown on hover, like a row's actions.
+    await spare('1.f').hover();
+    await spare('1.f').click();
+    await expect(spare('1.f')).toHaveCount(0);
+    // The line before it keeps the keyboard focus; section 2 is as it was.
+    await expect(spare('1.e')).toBeFocused();
+    await expect(spare('2.f')).toHaveCount(1);
+    const undo = page.getByRole('status').filter({ hasText: 'Spare line 1.f deleted.' });
+    await expect(undo).toBeVisible();
+    await expect.poll(spareRows).toBe(2);
+
+    await undo.getByRole('button', { name: 'Undo' }).click();
+    await expect(spare('1.f')).toHaveCount(1);
+    await expect(addSpare).toBeFocused();
+    await expect.poll(spareRows).toBeUndefined();
+
+    await addSpare.click();
+    await expect(spare('1.g')).toHaveCount(1);
+    await expect.poll(spareRows).toBe(4);
+
+    // The template's number is the default: it changes only the sections left as they were.
+    await page.getByLabel('Spare lines per section (default)').fill('1');
+    await expect(spare('2.d')).toHaveCount(1);
+    await expect(spare('2.e')).toHaveCount(0);
+    await expect(spare('1.g')).toHaveCount(1);
+    await expect(saveStatus(page)).toHaveText('Saved');
+
+    // And so it prints: four spare lines after section 1, one after section 2.
+    await page.getByRole('link', { name: 'Print preview' }).click();
+    await expect(page.locator('tr[data-spare]')).toHaveCount(5);
+    await expect(page.locator('tr[data-row-ref="1.g"][data-spare]')).toHaveCount(1);
+    await expect(page.locator('tr[data-row-ref="2.d"][data-spare]')).toHaveCount(1);
+  });
+
+  test('the templates can be shown as cards, and stay that way', async ({ page, published }) => {
+    await page.goto('/templates');
+    const views = page.getByRole('group', { name: 'Show templates as' });
+    await expect(views.getByRole('button', { name: 'List' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await views.getByRole('button', { name: 'Cards' }).click();
+    await expect(views.getByRole('button', { name: 'Cards' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByRole('main').getByRole('table')).toHaveCount(0);
+    const link = page.getByRole('link', { name: published.name, exact: true });
+    const card = page.getByRole('listitem').filter({ has: link });
+    // E2E is not in the settings, so the code stands for the model's name.
+    await expect(card).toContainText('E2E');
+    await expect(card).toContainText('Rev 1');
+    await expect(card.locator('dd').first()).toHaveText('6');
+
+    // Remembered in this browser.
+    await page.reload();
+    await expect(views.getByRole('button', { name: 'Cards' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await link.click();
+    await expect(page.getByRole('heading', { level: 1, name: published.name })).toBeVisible();
+  });
+
+  test('deleting a template asks first, keeps its inspections and goes back to the list', async ({
+    page,
+    published,
+  }) => {
+    const created = await page.request.post('/api/inspections', {
+      data: {
+        templateId: published.id,
+        front: {
+          machineName: 'RigiMill MG – Volvo Cars Skövde',
+          serialNumber: 'RM-2026-061',
+          participants: [],
+          location: 'Kalmar, Sweden',
+          date: '2026-11-04',
+        },
+      },
+    });
+    expect(created.status()).toBe(201);
+    const inspectionId = ((await created.json()) as { id: string }).id;
+    try {
+      await openEditor(page, published);
+      const menu = page.getByRole('button', { name: 'Template actions' });
+      await menu.click();
+      await page.getByRole('menuitem', { name: 'Delete template' }).click();
+      const confirm = page.getByRole('dialog', { name: `Delete “${published.name}”?` });
+      await expect(confirm).toContainText('Its draft and its published revision will be deleted');
+      await expect(confirm).toContainText('Inspections already made from it are kept');
+      // Cancel keeps it, and the focus goes back to the menu.
+      await confirm.getByRole('button', { name: 'Cancel' }).click();
+      await expect(confirm).toBeHidden();
+      await expect(menu).toBeFocused();
+
+      await menu.click();
+      await page.getByRole('menuitem', { name: 'Delete template' }).click();
+      await confirm.getByRole('button', { name: 'Delete template' }).click();
+      await page.waitForURL(/\/templates$/);
+      await expect(
+        page.getByRole('status').filter({ hasText: `“${published.name}” was deleted.` }),
+      ).toBeVisible();
+      await expect(page.getByRole('link', { name: published.name, exact: true })).toHaveCount(0);
+      expect((await page.request.get(`/api/templates/${published.id}`)).status()).toBe(404);
+      expect((await page.request.get(`/api/templates/${published.id}/revisions/1`)).status()).toBe(
+        404,
+      );
+      // The inspection keeps its own copy of the checklist.
+      expect((await page.request.get(`/api/inspections/${inspectionId}`)).status()).toBe(200);
+    } finally {
+      await deleteInspection(inspectionId);
+    }
+  });
+
+  test('a new machine model gets a code from its name, checked against the settings', async ({
     page,
   }) => {
+    const settings = (await (await page.request.get('/api/settings')).json()) as {
+      machineModels: unknown;
+    };
+    const [existing] = MachineModelSchema.array().parse(settings.machineModels);
     await page.goto('/templates');
     await page.getByRole('button', { name: 'New template' }).click();
     const dialog = page.getByRole('dialog', { name: 'New template' });
-    // One template per model: models that have one are not offered.
-    const list = await page.request.get('/api/templates');
-    for (const { modelCode } of TemplateListSchema.parse(await list.json())) {
-      await expect(dialog.getByRole('option', { name: `(${modelCode})` })).toHaveCount(0);
-    }
-    // Delete what the test creates, even if a step after the click fails.
-    const created = page.waitForResponse(
-      (response) =>
-        response.request().method() === 'POST' &&
-        new URL(response.url()).pathname === '/api/templates',
+    await dialog.getByLabel('Machine model').selectOption({ label: 'New machine model…' });
+    await dialog.getByLabel('Model name').fill('Hydra Mill 9 – e2e');
+    await expect(dialog.getByLabel('Model code')).toHaveValue('HYDRAMILL9E2E');
+    await expect(dialog.getByLabel('Template name')).toHaveValue(
+      'Final inspection – Hydra Mill 9 – e2e',
     );
-    await dialog.getByRole('button', { name: 'Create template' }).click();
-    let id: string | undefined;
-    try {
-      id = ((await (await created).json()) as { draft: { id: string } }).draft.id;
-      await page.waitForURL(`**/templates/${id}`);
-      await expect(page.getByRole('heading', { name: 'No sections yet' })).toBeVisible();
-      await expect(page.getByText('Draft · Rev 1')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Create template' })).toBeEnabled();
 
-      await page.getByRole('button', { name: 'Add section' }).click();
-      await page.keyboard.type('Doors and guards');
-      await page.keyboard.press('Enter');
-      await expect(page.getByRole('textbox', { name: 'Row 1.a text' })).toBeFocused();
-      await page.keyboard.type('Front door - Interlock stops the spindle');
-      await page.keyboard.press('Enter');
+    // A code the settings already have, whatever the case, is refused before anything is sent.
+    await dialog.getByLabel('Model code').fill(existing!.code.toLowerCase());
+    await expect(
+      dialog.getByText(`${existing!.code} is already the code of ${existing!.name}.`),
+    ).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Create template' })).toBeDisabled();
+    // Closed without creating anything: the settings stay as they were.
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+  });
 
-      await page.getByRole('button', { name: 'Publish', exact: true }).click();
-      const problems = page.getByRole('dialog', { name: 'Fix one problem before publishing' });
-      await problems.getByRole('button', { name: /Row 1\.b is empty\./ }).click();
-      await expect(problems).toBeHidden();
-      const empty = page.getByRole('textbox', { name: 'Row 1.b text' });
-      await expect(empty).toBeFocused();
-      await expect(empty).toHaveAttribute('aria-invalid', 'true');
+  // Both take the first machine model without a template: one after the other, never together.
+  test.describe('for a machine model without a template', () => {
+    test.describe.configure({ mode: 'serial' });
 
-      await page.keyboard.type('Rear door - Interlock stops the spindle');
-      await expect(empty).not.toHaveAttribute('aria-invalid');
-      await expect(saveStatus(page)).toHaveText('Saved');
-    } finally {
-      if (id) await deleteTemplate(id);
-    }
+    test('a new template starts empty; an empty row blocks publishing and links to it', async ({
+      page,
+    }) => {
+      await page.goto('/templates');
+      await page.getByRole('button', { name: 'New template' }).click();
+      const dialog = page.getByRole('dialog', { name: 'New template' });
+      // One template per model: models that have one are not offered.
+      const list = await page.request.get('/api/templates');
+      for (const { modelCode } of TemplateListSchema.parse(await list.json())) {
+        await expect(dialog.getByRole('option', { name: `(${modelCode})` })).toHaveCount(0);
+      }
+      // Delete what the test creates, even if a step after the click fails.
+      const created = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname === '/api/templates',
+      );
+      await dialog.getByRole('button', { name: 'Create template' }).click();
+      let id: string | undefined;
+      try {
+        id = ((await (await created).json()) as { draft: { id: string } }).draft.id;
+        await page.waitForURL(`**/templates/${id}`);
+        await expect(page.getByRole('heading', { name: 'No sections yet' })).toBeVisible();
+        await expect(page.getByText('Draft · Rev 1')).toBeVisible();
+
+        await page.getByRole('button', { name: 'Add section' }).click();
+        await page.keyboard.type('Doors and guards');
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('textbox', { name: 'Row 1.a text' })).toBeFocused();
+        await page.keyboard.type('Front door - Interlock stops the spindle');
+        await page.keyboard.press('Enter');
+
+        await page.getByRole('button', { name: 'Publish', exact: true }).click();
+        const problems = page.getByRole('dialog', { name: 'Fix one problem before publishing' });
+        await problems.getByRole('button', { name: /Row 1\.b is empty\./ }).click();
+        await expect(problems).toBeHidden();
+        const empty = page.getByRole('textbox', { name: 'Row 1.b text' });
+        await expect(empty).toBeFocused();
+        await expect(empty).toHaveAttribute('aria-invalid', 'true');
+
+        await page.keyboard.type('Rear door - Interlock stops the spindle');
+        await expect(empty).not.toHaveAttribute('aria-invalid');
+        await expect(saveStatus(page)).toHaveText('Saved');
+      } finally {
+        if (id) await deleteTemplate(id);
+      }
+    });
+
+    test('Export JSON downloads the draft as shown; Import JSON makes a new draft of it', async ({
+      page,
+      template,
+    }) => {
+      const row = template.sections[0]!.items[0]!;
+      await openEditor(page, template);
+      // Not saved yet: the file has what the editor shows.
+      await appendToRow(page, row.id, ' (exported)');
+      const downloading = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Template actions' }).click();
+      await page.getByRole('menuitem', { name: 'Export JSON' }).click();
+      const download = await downloading;
+      expect(download.suggestedFilename()).toBe(`${template.name}.json`);
+      const content = await readFile((await download.path())!, 'utf8');
+      const file = TemplateExportSchema.parse(JSON.parse(content));
+      expect(file.template).toMatchObject({ name: template.name, modelCode: 'E2E' });
+      expect(file.template.sections[0]!.items[0]!.text).toBe(`${row.text} (exported)`);
+      expect(checklistIds(file.template.sections)).toEqual(checklistIds(template.sections));
+
+      await backLink(page).click();
+      await page.waitForURL(/\/templates$/);
+      const chooseFile = async (chosen: { name: string; buffer: Buffer }) => {
+        const chooser = page.waitForEvent('filechooser');
+        await page.getByRole('button', { name: 'Import JSON' }).click();
+        await (await chooser).setFiles({ ...chosen, mimeType: 'application/json' });
+      };
+
+      // A file that is not a template is explained, and nothing is imported.
+      await chooseFile({ name: 'notes.json', buffer: Buffer.from('{"notes":"Bring gloves"}') });
+      await expect(page.getByRole('alert')).toContainText(
+        '“notes.json” can’t be imported. This is not a template file.',
+      );
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+
+      await chooseFile({ name: download.suggestedFilename(), buffer: Buffer.from(content) });
+      const dialog = page.getByRole('dialog', { name: 'Import template' });
+      await expect(dialog).toContainText(
+        `From “${download.suggestedFilename()}”: 2 sections, 6 rows.`,
+      );
+      await expect(dialog.getByLabel('Template name')).toHaveValue(template.name);
+      // E2E is not in the settings; the first model without a template takes it.
+      await dialog.getByLabel('Machine model').selectOption({ index: 0 });
+      await dialog.getByLabel('Template name').fill(`${template.name} (imported)`);
+      const imported = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname === '/api/templates/import',
+      );
+      await dialog.getByRole('button', { name: 'Import template' }).click();
+      let id: string | undefined;
+      try {
+        const response = await imported;
+        expect(response.status()).toBe(201);
+        id = ((await response.json()) as { draft: { id: string } }).draft.id;
+        await page.waitForURL(`**/templates/${id}`);
+        await expect(
+          page.getByRole('heading', { level: 1, name: `${template.name} (imported)` }),
+        ).toBeVisible();
+        await expect(page.getByText('Draft · Rev 1')).toBeVisible();
+        await expect(page.getByText('Not published', { exact: true })).toBeVisible();
+
+        const draft = await savedDraft(page.request, id);
+        expect(draft.sections.map((section) => section.items.map((item) => item.text))).toEqual(
+          file.template.sections.map((section) => section.items.map((item) => item.text)),
+        );
+        // The original still uses its ids, so the copy's sections and rows got new ones.
+        const ids = new Set(checklistIds(template.sections));
+        expect(checklistIds(draft.sections).filter((itemId) => ids.has(itemId))).toEqual([]);
+      } finally {
+        if (id) await deleteTemplate(id);
+      }
+    });
   });
 });
 
@@ -550,7 +787,7 @@ test.describe('an inspector', () => {
   }) => {
     await page.goto('/templates');
     await expect(page.getByRole('row', { name: published.name })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'New template' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /New template|Import JSON/ })).toHaveCount(0);
 
     await page.getByRole('link', { name: published.name }).click();
     await expect(page.getByRole('heading', { level: 1, name: published.name })).toBeVisible();
@@ -558,7 +795,9 @@ test.describe('an inspector', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'Loading area' })).toBeVisible();
     await expect(page.locator('main').locator('input, textarea, select')).toHaveCount(0);
     await expect(
-      page.getByRole('button', { name: /Publish|Add row|Add section|Move/ }),
+      page.getByRole('button', {
+        name: /Publish|Add row|Add section|Add spare line|Delete spare line|Move|Template actions/,
+      }),
     ).toHaveCount(0);
 
     // Through the SWA CLI with the inspector's own sign-in: the API refuses every draft call.
@@ -568,6 +807,8 @@ test.describe('an inspector', () => {
       await page.request.get(`/api/templates/${id}`),
       await page.request.put(`/api/templates/${id}`, { headers: ifMatch, data: { name: 'x' } }),
       await page.request.post(`/api/templates/${id}/publish`, { headers: ifMatch, data: {} }),
+      await page.request.delete(`/api/templates/${id}`, { headers: ifMatch }),
+      await page.request.post('/api/templates/import', { data: {} }),
     ];
     for (const response of refused) {
       expect(response.status()).toBe(403);

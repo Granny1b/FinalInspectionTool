@@ -13,6 +13,7 @@ import {
   findRow,
   focusAfterRowDelete,
   focusAfterSectionDelete,
+  MAX_SPARE_ROWS,
   moveRow,
   moveSection,
   renameSection,
@@ -20,7 +21,9 @@ import {
   restoreSection,
   setRowGuide,
   setRowText,
+  setSpareRows,
   singleLine,
+  spareLineAfterDelete,
 } from './ops';
 
 /** Two sections with rows a1..a3 / b1..b2, plus an empty third section. */
@@ -126,6 +129,28 @@ describe('sections', () => {
     expect(restored[0]).toBe(section);
     expect(layout(restoreSection(deleted, 9, section))).toBe('sB:b1,b2 | sC: | sA:a1,a2,a3');
     expect(restoreSection(before, 0, section)).toBe(before); // already there
+  });
+
+  it('setSpareRows gives a section its own spare lines, clamped, and undefined takes them away', () => {
+    const before = fixture();
+    const own = setSpareRows(before, 'sB', 2);
+    expect(own[1]).toEqual({ ...before[1], spareRows: 2 });
+    expect(own[1]?.items).toBe(before[1]?.items);
+    expect(own[0]).toBe(before[0]);
+    expect(setSpareRows(own, 'sB', 2)).toBe(own);
+    expect(setSpareRows(before, 'sB', -1)[1]?.spareRows).toBe(0);
+    expect(setSpareRows(before, 'sB', 99)[1]?.spareRows).toBe(MAX_SPARE_ROWS);
+
+    const back = setSpareRows(own, 'sB', undefined);
+    expect(back[1]).toEqual(before[1]);
+    expect('spareRows' in back[1]!).toBe(false);
+    expect(setSpareRows(before, 'sB', undefined)).toBe(before);
+    expect(setSpareRows(before, 'nope', 1)).toBe(before);
+  });
+
+  it('duplicateSection keeps the spare lines', () => {
+    const before = setSpareRows(fixture(), 'sA', 1);
+    expect(duplicateSection(before, 'sA')?.sections[1]?.spareRows).toBe(1);
   });
 
   it('moveSection moves up and down, keeps ids and clamps out-of-range targets', () => {
@@ -326,6 +351,13 @@ describe('focus', () => {
       kind: 'add-section',
     });
     expect(focusAfterSectionDelete(sections, 'nope')).toBeNull();
+  });
+
+  it('after deleting a spare line: the same line, the one before the last, else none', () => {
+    expect(spareLineAfterDelete(3, 0)).toBe(0);
+    expect(spareLineAfterDelete(3, 1)).toBe(1);
+    expect(spareLineAfterDelete(3, 2)).toBe(1);
+    expect(spareLineAfterDelete(1, 0)).toBeNull();
   });
 
   it('adjacentField walks titles and rows in reading order and stops at the ends', () => {

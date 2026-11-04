@@ -3,8 +3,11 @@
  * `templates/{id}/rev-{n}.json` are the immutable published revisions. Revision numbers always
  * come from the blob listing, never from the number stored in a draft.
  */
+import type { InvocationContext } from '@azure/functions';
+import { isRestError } from '@azure/storage-blob';
 import {
   blobNames,
+  checklistIds,
   CONTAINERS,
   hasUnpublishedChanges,
   TemplateSchema,
@@ -14,8 +17,8 @@ import {
   type TemplateRevisionInfo,
   type TemplateSummary,
 } from '@modig/shared';
-import { NotFoundError } from './http';
-import { listBlobNames, readJson } from './storage';
+import { NotFoundError, PreconditionFailedError } from './http';
+import { containerClient, ensureStorage, listBlobNames, readJson } from './storage';
 
 const { templates } = CONTAINERS;
 
@@ -84,9 +87,10 @@ const byName = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
 /** GET /api/templates: one summary per template, sorted by name. */
 export async function loadSummaries(): Promise<TemplateSummary[]> {
   const summaries = await Promise.all(
-    (await loadAllTemplates()).map(async (template): Promise<TemplateSummary> => {
+    (await loadAllTemplates()).map(async (template): Promise<TemplateSummary | null> => {
       const { id, draft } = template;
-      const published = await loadLatestPublished(template);
+      const published = await loadLatestPublished(template).catch(unlessDeleted(id));
+      if (published === DELETED) return null;
       return {
         id,
         name: draft.name,
@@ -97,12 +101,15 @@ export async function loadSummaries(): Promise<TemplateSummary[]> {
         draftRevision: draft.revision,
         hasUnpublishedChanges: hasUnpublishedChanges(draft, published),
         itemCount: draft.sections.reduce((count, section) => count + section.items.length, 0),
+        ...(draft.coverImageId && { coverImageId: draft.coverImageId }),
         updatedAt: draft.updatedAt,
         updatedBy: draft.updatedBy,
       };
     }),
   );
-  return summaries.sort((a, b) => byName.compare(a.name, b.name) || a.id.localeCompare(b.id));
+  return summaries
+    .filter((summary) => summary !== null)
+    .sort((a, b) => byName.compare(a.name, b.name) || a.id.localeCompare(b.id));
 }
 
 /** The draft, its revision history and its ETag, or null if there is no draft. */
@@ -111,7 +118,10 @@ export async function loadDetail(
 ): Promise<{ detail: TemplateDetail; etag: string } | null> {
   const template = await loadTemplate(id);
   if (!template) return null;
-  const published = await Promise.all(template.revisions.map((n) => loadListedRevision(id, n)));
+  const published = await Promise.all(
+    template.revisions.map((n) => loadListedRevision(id, n)),
+  ).catch(unlessDeleted(id));
+  if (published === DELETED) return null;
   const detail: TemplateDetail = {
     draft: template.draft,
     revisions: published.map(revisionInfo).reverse(),
@@ -174,11 +184,102 @@ export async function listRevisions(prefix?: string): Promise<Map<string, number
   return revisionsById;
 }
 
-/** A revision the listing just showed; revisions are never deleted, so a miss is a server error. */
+/** A listed revision that was gone by the time it was read. */
+class RevisionVanishedError extends Error {
+  override name = 'RevisionVanishedError';
+}
+
+/**
+ * A revision the listing just showed. Only deleting the whole template removes revisions, and it
+ * deletes the draft first; so a miss with the draft still there is a server error.
+ */
 async function loadListedRevision(id: string, revision: number): Promise<Template> {
   const loaded = await loadRevision(id, revision);
-  if (!loaded) throw new Error(`templates/${blobNames.templateRevision(id, revision)} vanished`);
+  if (!loaded) {
+    throw new RevisionVanishedError(
+      `templates/${blobNames.templateRevision(id, revision)} vanished`,
+    );
+  }
   return loaded;
+}
+
+const DELETED = Symbol('deleted');
+
+/** For `.catch`: a revision that vanished because the template was deleted meanwhile. */
+function unlessDeleted(id: string) {
+  return async (error: unknown): Promise<typeof DELETED> => {
+    if (error instanceof RevisionVanishedError) {
+      const draft = await readJson(templates, blobNames.templateDraft(id), TemplateSchema);
+      if (!draft) return DELETED;
+    }
+    throw error;
+  };
+}
+
+/**
+ * Deletes a template: its draft, only while it is still version `ifMatch` (412 otherwise), and
+ * then every published revision. The draft goes first, so the template is gone for everyone at
+ * once (a folder without a draft is never listed). Images stay: inspections share the cover and
+ * the guide images through their snapshots. Inspections and their deviation rows keep their own
+ * copies. A revision that can't be deleted is logged and left behind, unlisted: the template is
+ * already gone, and a retry would find nothing to delete.
+ */
+export async function deleteTemplate(
+  id: string,
+  ifMatch: string,
+  context: InvocationContext,
+): Promise<void> {
+  await ensureStorage();
+  const container = containerClient(templates);
+  await container
+    .getBlobClient(blobNames.templateDraft(id))
+    .delete({ conditions: { ifMatch } })
+    .catch((error: unknown) => {
+      if (isRestError(error) && error.statusCode === 412) throw new PreconditionFailedError();
+      if (isRestError(error) && error.statusCode === 404) throw templateNotFound();
+      throw error;
+    });
+  // Listed again: a publish may have added a revision since the caller read the template.
+  const names = await listBlobNames(templates, `${id}/`);
+  const results = await Promise.allSettled(
+    names.map((name) => container.getBlobClient(name).deleteIfExists()),
+  );
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      context.warn(`Deleted template ${id}; templates/${names[index]} was left`, result.reason);
+    }
+  });
+}
+
+/**
+ * Every section and row id any template uses, in its draft or in any published revision
+ * (inspections and KPIs know rows by these ids, so an imported template must not reuse one).
+ */
+export async function usedChecklistIds(): Promise<Set<string>> {
+  const revisionsById = await listRevisions();
+  const documents = await Promise.all(
+    [...revisionsById].flatMap(([id, revisions]) => [
+      readJson(templates, blobNames.templateDraft(id), TemplateSchema).then(
+        (stored) => stored?.data ?? null,
+      ),
+      ...revisions.map((revision) => loadRevision(id, revision)),
+    ]),
+  );
+  return new Set(
+    documents.flatMap((template) => (template ? checklistIds(template.sections) : [])),
+  );
+}
+
+/** The ids of these images that are stored here (`images/{id}.jpg`). */
+export async function storedImages(imageIds: readonly string[]): Promise<Set<string>> {
+  await ensureStorage();
+  const images = containerClient(CONTAINERS.images);
+  const stored = await Promise.all(
+    imageIds.map(async (imageId) =>
+      (await images.getBlobClient(blobNames.image(imageId)).exists()) ? imageId : null,
+    ),
+  );
+  return new Set(stored.filter((imageId) => imageId !== null));
 }
 
 /** The server owns revision numbers: whatever the stored draft says, it is the next one. */

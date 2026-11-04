@@ -447,6 +447,27 @@ describe('a template preview', () => {
     expect(refs(without.sections[1]!.rows)).toEqual(['2.a']);
   });
 
+  it("gives a section with its own spare lines that number, the others the template's", () => {
+    const sections = [{ ...section(1, 'Own', 1), spareRows: 0 }, section(2, 'Default', 1)];
+    const model = templatePrint(template({ sections }), { ...CONTEXT, draft: true });
+    expect(refs(model.sections[0]!.rows)).toEqual(['1.a']);
+    expect(refs(model.sections[1]!.rows)).toEqual(['2.a', '2.b', '2.c']);
+
+    // An inspection prints its snapshot's spare lines the same way.
+    const blank = inspectionPrint(
+      inspection({
+        templateSnapshot: {
+          name: 'Final inspection – RigiMill MG',
+          sections: [{ ...section(1, 'Own', 1), spareRows: 4 }],
+          printSettings: { spareRowsPerSection: 1 },
+        },
+      }),
+      'blank',
+      CONTEXT,
+    );
+    expect(refs(blank.sections[0]!.rows)).toEqual(['1.a', '1.b', '1.c', '1.d', '1.e']);
+  });
+
   it('names an untitled template', () => {
     const model = templatePrint(template({ name: '  ' }), { ...CONTEXT, draft: true });
     expect(model.footer).toBe('Modig Machine Tool · Untitled template · Rev 3 (draft)');

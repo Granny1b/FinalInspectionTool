@@ -9,8 +9,10 @@ import {
   type TemplateDraftInput,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Printer, Upload } from 'lucide-react';
+import { Ellipsis, FileDown, Printer, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { ActionMenu } from '../../components/ActionMenu';
 import { BackLink } from '../../components/BackLink';
 import { Button, ButtonLink } from '../../components/Button';
 import { Callout } from '../../components/Callout';
@@ -26,18 +28,22 @@ import { useSettings } from '../../lib/useSettings';
 import { templatePrintHref } from '../print/links';
 import { Badge } from './Badge';
 import { ChecklistHeading } from './ChecklistHeading';
+import { DeleteTemplateDialog } from './DeleteTemplateDialog';
 import { TemplateDocument } from './document/TemplateDocument';
+import type { TemplatesPageState } from './listView';
 import { PublishDialog, type FlushResult } from './PublishDialog';
 import {
   fetchTemplate,
   publishDraft,
   saveDraft,
   templateKeys,
+  useDeleteTemplate,
   useTemplates,
   type LoadedTemplate,
 } from './queries';
 import { RevisionHistory } from './RevisionHistory';
 import { TemplateSettingsCard } from './TemplateSettingsCard';
+import { downloadTemplate } from './transfer';
 
 type Props = {
   /** Read once, when the editor opens; from then on the editor's own state is the truth. */
@@ -107,7 +113,9 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   const dirty = saveState.status !== 'saved' || uploading;
   // An open guide editor with changes: leaving asks first, saving can't keep them.
   const [editorDirty, setEditorDirty] = useState(false);
-  const leaveGuard = useLeaveGuard(dirty, saveAll, editorDirty);
+  // Once deleted, there is nothing left to save: the editor just goes.
+  const [deleted, setDeleted] = useState(false);
+  const leaveGuard = useLeaveGuard(dirty && !deleted, saveAll, editorDirty && !deleted);
   const reload = useReload(dirty, onReload);
 
   const update = useCallback(
@@ -209,6 +217,41 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   );
   const title = draft.name.trim() || 'Untitled template';
 
+  const navigate = useNavigate();
+  const remove = useDeleteTemplate(id);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  function deleteTemplate() {
+    remove.mutate(
+      // Whatever is unsaved is saved first, so the delete names the draft's latest version (a
+      // failed save leaves the ETag of the last one that worked; a conflict refuses the delete).
+      async () => {
+        await saveAll();
+        return saver.etag();
+      },
+      {
+        onSuccess: () => {
+          saver.dispose();
+          setDeleted(true);
+        },
+      },
+    );
+  }
+
+  // After the render that let go of the leave guard.
+  useEffect(() => {
+    if (!deleted) return;
+    const state: TemplatesPageState = { deleted: draftRef.current.name.trim() };
+    void navigate('/templates', { replace: true, state });
+  }, [deleted, navigate]);
+
+  function exportJson() {
+    const model = settings.data?.machineModels.find(
+      (candidate) => candidate.code === draftRef.current.modelCode,
+    );
+    downloadTemplate(draftRef.current, model?.name);
+  }
+
   return (
     // While the editor is open, whatever is scrolled into view (focus moving between rows, jump
     // links) stops below the sticky header and the tablet top bar. Padding on the page's scroller,
@@ -254,6 +297,29 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             <Upload size={16} aria-hidden="true" />
             Publish
           </Button>
+          <ActionMenu
+            label="Template actions"
+            triggerData={{ 'data-template-menu': '' }}
+            trigger={
+              <>
+                <Ellipsis size={16} aria-hidden="true" />
+                <span className="sr-only">Template actions</span>
+              </>
+            }
+            items={[
+              // The draft as shown, unsaved changes included.
+              { label: 'Export JSON', icon: FileDown, onSelect: exportJson },
+              {
+                label: 'Delete template',
+                icon: Trash2,
+                danger: true,
+                onSelect: () => {
+                  remove.reset();
+                  setConfirmingDelete(true);
+                },
+              },
+            ]}
+          />
         </div>
       </header>
 
@@ -334,6 +400,22 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           onIssues={() => setChecking(true)}
           onConflict={() => setPublishConflict(true)}
           onClose={() => setPublishing(null)}
+        />
+      )}
+      {confirmingDelete && (
+        <DeleteTemplateDialog
+          name={title}
+          revisions={server.revisions.length}
+          busy={remove.isPending || deleted}
+          error={remove.error}
+          onDelete={deleteTemplate}
+          onClose={() => {
+            setConfirmingDelete(false);
+            // The menu item that opened it is gone with its menu: back to the menu's button.
+            if (!deleted) {
+              document.querySelector<HTMLElement>('[data-template-menu]')?.focus();
+            }
+          }}
         />
       )}
       {reload.dialog}

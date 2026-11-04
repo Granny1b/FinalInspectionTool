@@ -7,7 +7,10 @@
  * fresh ids. An unknown id, or a move to where the row already is, returns the input array itself,
  * so callers can skip a pointless save with `next === sections`.
  */
-import { newId, type Guide, type Item, type Section } from '@modig/shared';
+import { newId, PrintSettingsSchema, type Guide, type Item, type Section } from '@modig/shared';
+
+/** The most spare lines a section may print (the schema's limit). */
+export const MAX_SPARE_ROWS = PrintSettingsSchema.shape.spareRowsPerSection.maxValue ?? 30;
 
 /** Where a row ends up: the target section and its index there, counted without the moved row. */
 export type RowPosition = { sectionId: string; index: number };
@@ -77,6 +80,23 @@ export function deleteSection(sections: Section[], sectionId: string): Section[]
 export function restoreSection(sections: Section[], index: number, section: Section): Section[] {
   if (findSection(sections, section.id) >= 0) return sections;
   return insertAt(sections, clamp(index, 0, sections.length), section);
+}
+
+/**
+ * Gives a section its own number of spare lines (clamped to 0–MAX_SPARE_ROWS), or with undefined
+ * lets it follow the template's number again (the undo of its first delete).
+ */
+export function setSpareRows(
+  sections: Section[],
+  sectionId: string,
+  spareRows: number | undefined,
+): Section[] {
+  const count = spareRows === undefined ? undefined : clamp(spareRows, 0, MAX_SPARE_ROWS);
+  return updateSection(sections, sectionId, (section) => {
+    if (section.spareRows === count) return section;
+    const { spareRows: _previous, ...rest } = section;
+    return count === undefined ? rest : { ...rest, spareRows: count };
+  });
 }
 
 /** Moves a section to `toIndex` (clamped), as Move up/down and drag and drop do. */
@@ -229,6 +249,16 @@ export function focusAfterSectionDelete(
   if (index < 0) return null;
   const neighbour = sections[index + 1] ?? sections[index - 1];
   return neighbour ? { kind: 'title', sectionId: neighbour.id } : { kind: 'add-section' };
+}
+
+/**
+ * Which spare line keeps the focus when line `offset` of `count` is deleted. The lines are all
+ * alike, so it is the last one that goes: the same line keeps it, or the one before when the last
+ * was deleted; null when none is left (the section's "Add spare line" then).
+ */
+export function spareLineAfterDelete(count: number, offset: number): number | null {
+  const next = Math.min(offset, count - 2);
+  return next >= 0 ? next : null;
 }
 
 /** ArrowUp/ArrowDown between lines: the previous/next field in reading order, or null at an end. */

@@ -3,14 +3,19 @@ import type { HttpHandler, HttpResponseInit } from '@azure/functions';
 import {
   ApiErrorSchema,
   blobNames,
+  checklistIds,
   CONTAINERS,
+  ImportTemplateResponseSchema,
+  InspectionSchema,
   MAX_GUIDE_IMAGES,
   newId,
   SaveTemplateResponseSchema,
+  templateExport,
   TemplateDetailSchema,
   TemplateListSchema,
   TemplateSchema,
   type ApiError,
+  type GuideImage,
   type Role,
   type Template,
 } from '@modig/shared';
@@ -18,13 +23,26 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { context, principal, request } from '../../test/requests';
 import {
   draftTemplate,
+  MODELS,
   resetStorage,
+  sampleInspection,
   storeTemplate,
   useTestStorage,
   writeSettings,
 } from '../../test/storage';
+import { syncDeviations } from '../lib/deviations';
+import { writeInspection } from '../lib/inspections';
+import { clearRevisionCache, loadInsights } from '../lib/insights';
+import { loadSettings } from '../lib/settings';
 import { containerClient, readJson } from '../lib/storage';
-import { createTemplate, getTemplate, listTemplates, saveTemplate } from './templates';
+import {
+  createTemplate,
+  deleteTemplate,
+  getTemplate,
+  importTemplate,
+  listTemplates,
+  saveTemplate,
+} from './templates';
 
 // Record the registrations instead of letting the package (in "test mode") warn about them.
 const registrations = vi.hoisted((): unknown[][] => []);
@@ -95,9 +113,18 @@ describe('registration', () => {
         },
       ],
       [
+        'templateImport',
+        {
+          methods: ['POST'],
+          authLevel: 'anonymous',
+          route: 'templates/import',
+          handler: importTemplate,
+        },
+      ],
+      [
         'template',
         {
-          methods: ['GET', 'PUT'],
+          methods: ['GET', 'PUT', 'DELETE'],
           authLevel: 'anonymous',
           route: 'templates/{id}',
           handler: expect.any(Function),
@@ -116,14 +143,32 @@ describe('registration', () => {
     expect((await templates(asInspector('POST'), context())).status).toBe(403);
     expect((await template(asInspector('GET'), context())).status).toBe(403);
     expect((await template(asInspector('PUT'), context())).status).toBe(403);
+    expect((await template(asInspector('DELETE'), context())).status).toBe(403);
+  });
+
+  it('sends DELETE to the delete handler', async () => {
+    const template = draftTemplate();
+    const etag = await storeTemplate(template);
+    const response = await registered('template')!.handler(
+      request({
+        principal: admin,
+        method: 'DELETE',
+        params: { id: template.id },
+        headers: { 'If-Match': etag },
+      }),
+      context(),
+    );
+    expect(response.status).toBe(204);
   });
 });
 
 describe.each<[string, typeof listTemplates, Role]>([
   ['GET /api/templates', listTemplates, 'inspector'],
   ['POST /api/templates', createTemplate, 'admin'],
+  ['POST /api/templates/import', importTemplate, 'admin'],
   ['GET /api/templates/{id}', getTemplate, 'admin'],
   ['PUT /api/templates/{id}', saveTemplate, 'admin'],
+  ['DELETE /api/templates/{id}', deleteTemplate, 'admin'],
 ])('%s access', (_name, handler, role) => {
   it('401 without a client principal', async () => {
     expect((await handler(request({ params: { id: newId() } }), context())).status).toBe(401);
@@ -256,6 +301,390 @@ describe('POST /api/templates', () => {
         '"Final inspection – RigiMill MG" is already the template for RigiMill MG: ' +
         'there is one template per machine model.',
     });
+  });
+
+  describe('with a new machine model', () => {
+    const newModel = { code: 'HMC800', name: 'HMC 800' };
+
+    it('adds the model to the settings, then creates the template for it', async () => {
+      const response = await create({
+        name: 'Final inspection – HMC 800',
+        modelCode: 'HMC800',
+        newModel,
+      });
+      expect(response.status).toBe(201);
+      const { draft } = TemplateDetailSchema.parse(response.jsonBody);
+      expect(draft).toMatchObject({ modelCode: 'HMC800', revision: 1, sections: [] });
+      expect(await storedDraft(draft.id)).toMatchObject({ data: draft });
+      const settings = await loadSettings();
+      expect(settings?.machineModels).toEqual([...MODELS, newModel]);
+      expect(settings?.updatedBy).toBe('boss@modig.se');
+    });
+
+    it.each([
+      [
+        'its code',
+        { code: 'rmmg', name: 'RigiMill MG 2' },
+        'RMMG is already the code of RigiMill MG.',
+      ],
+      [
+        'its name',
+        { code: 'IM9', name: 'im8' },
+        'There is already a machine model called IM8 (IM).',
+      ],
+    ])('409 when the settings already have %s, changing nothing', async (_case, model, message) => {
+      const response = await create({ name: 'X', modelCode: model.code, newModel: model });
+      expect(response.status).toBe(409);
+      expect(errorOf(response)).toEqual({ error: 'conflict', message });
+      expect((await loadSettings())?.machineModels).toEqual(MODELS);
+      expect(
+        TemplateListSchema.parse(
+          (await listTemplates(request({ principal: admin }), context())).jsonBody,
+        ),
+      ).toEqual([]);
+    });
+
+    it('409 when a template already uses the code, though the settings do not have it', async () => {
+      await storeTemplate(draftTemplate({ name: 'Old HMC', modelCode: 'HMC800' }));
+      const response = await create({ name: 'X', modelCode: 'HMC800', newModel });
+      expect(response.status).toBe(409);
+      expect(errorOf(response).message).toBe('"Old HMC" already uses the model code HMC800.');
+      // Whatever the case: "hmc800" would be a second HMC800 to people.
+      const lower = { code: 'hmc800', name: 'HMC 800' };
+      const other = await create({ name: 'X', modelCode: 'hmc800', newModel: lower });
+      expect(other.status).toBe(409);
+      expect(errorOf(other).message).toBe('"Old HMC" already uses the model code HMC800.');
+      expect((await loadSettings())?.machineModels).toEqual(MODELS);
+    });
+
+    it("400 when the new model's code is not the template's", async () => {
+      const response = await create({ name: 'X', modelCode: 'IM', newModel });
+      expect(response.status).toBe(400);
+      expect((await loadSettings())?.machineModels).toEqual(MODELS);
+    });
+
+    it('409 before the seed has created the settings', async () => {
+      await resetStorage();
+      const response = await create({ name: 'X', modelCode: 'HMC800', newModel });
+      expect(response.status).toBe(409);
+      expect(errorOf(response).message).toMatch(/run the seed/);
+    });
+  });
+});
+
+describe('POST /api/templates/import', () => {
+  const EXPORTED_AT = '2026-11-04T08:00:00.000Z';
+
+  function importFile(body: unknown, who = admin) {
+    return importTemplate(
+      request({ principal: who, method: 'POST', body: JSON.stringify(body) }),
+      context(),
+    );
+  }
+
+  /** Stores an image blob, as an upload would. */
+  async function storeImage(): Promise<string> {
+    const imageId = newId();
+    await containerClient(CONTAINERS.images)
+      .getBlockBlobClient(blobNames.image(imageId))
+      .upload('jpeg', 4);
+    return imageId;
+  }
+
+  const guideImage = (imageId: string, renderedImageId?: string): GuideImage => ({
+    imageId,
+    annotations: [],
+    ...(renderedImageId && { renderedImageId }),
+    verdict: 'good',
+  });
+
+  /** An exported template from somewhere else: ids nobody here uses, one section with own spare lines. */
+  function exported(overrides: Partial<Template> = {}) {
+    const source = draftTemplate({ printSettings: { spareRowsPerSection: 2 }, ...overrides });
+    source.sections[0] = { ...source.sections[0]!, spareRows: 5 };
+    return { source, file: templateExport(source, 'RigiMill MG', EXPORTED_AT) };
+  }
+
+  it('creates an unpublished draft with the file’s checklist, ids and print settings', async () => {
+    const { source, file } = exported();
+    const response = await importFile({ name: ' Imported ', modelCode: 'IM', file });
+    expect(response.status).toBe(201);
+    const imported = ImportTemplateResponseSchema.parse(response.jsonBody);
+    expect(imported).toEqual({
+      draft: {
+        id: expect.any(String),
+        name: 'Imported',
+        modelCode: 'IM',
+        revision: 1,
+        status: 'draft',
+        printSettings: { spareRowsPerSection: 2 },
+        sections: source.sections,
+        updatedAt: expect.any(String),
+        updatedBy: 'boss@modig.se',
+      },
+      revisions: [],
+      hasUnpublishedChanges: true,
+      droppedImages: 0,
+    });
+    expect(imported.draft.id).not.toBe(source.id);
+    expect(await storedDraft(imported.draft.id)).toEqual({
+      data: imported.draft,
+      etag: etagOf(response),
+    });
+  });
+
+  it('gives every section and row a new id when any of them is in use, in a draft or a revision', async () => {
+    const { source, file } = exported();
+    // An old revision used one of the rows; the draft has moved on without it.
+    const inUse = draftTemplate({ modelCode: 'RMMT', sections: [source.sections[1]!] });
+    await storeTemplate(inUse, [1]);
+    await storeTemplate({ ...inUse, sections: [] });
+
+    const response = await importFile({ name: 'Copy', modelCode: 'IM', file });
+    expect(response.status).toBe(201);
+    const { draft } = ImportTemplateResponseSchema.parse(response.jsonBody);
+    const ids = checklistIds(draft.sections);
+    expect(ids).toHaveLength(5);
+    expect(ids.filter((id) => checklistIds(source.sections).includes(id))).toEqual([]);
+    // Only the ids change.
+    const stripped = (sections: Template['sections']) =>
+      sections.map(({ id: _s, items, ...section }) => ({
+        ...section,
+        items: items.map(({ id: _i, ...item }) => item),
+      }));
+    expect(stripped(draft.sections)).toEqual(stripped(source.sections));
+  });
+
+  it('keeps the images stored here and leaves out the others, counting them', async () => {
+    const [cover, photo, marked] = [await storeImage(), await storeImage(), await storeImage()];
+    const missing = newId();
+    const { source } = exported({ coverImageId: cover });
+    const [section, other] = source.sections;
+    const [first, second] = section!.items;
+    const sections = [
+      {
+        ...section!,
+        items: [
+          { ...first!, guide: { images: [guideImage(photo, marked), guideImage(missing)] } },
+          { ...second!, guide: { images: [guideImage(photo, newId())] } },
+        ],
+      },
+      other!,
+    ];
+    const file = templateExport({ ...source, sections }, undefined, EXPORTED_AT);
+
+    const kept = ImportTemplateResponseSchema.parse(
+      (await importFile({ name: 'Here', modelCode: 'IM', file })).jsonBody,
+    );
+    expect(kept.droppedImages).toBe(2);
+    expect(kept.draft.coverImageId).toBe(cover);
+    expect(kept.draft.sections[0]!.items.map((item) => item.guide)).toEqual([
+      { images: [guideImage(photo, marked)] },
+      { images: [guideImage(photo)] },
+    ]);
+
+    // From another installation, whose cover photo doesn't exist here.
+    const elsewhere = templateExport({ ...source, coverImageId: newId() }, undefined, EXPORTED_AT);
+    const bare = ImportTemplateResponseSchema.parse(
+      (await importFile({ name: 'Elsewhere', modelCode: 'RMMT', file: elsewhere })).jsonBody,
+    );
+    expect(bare.droppedImages).toBe(1);
+    expect(bare.draft.coverImageId).toBeUndefined();
+    expect(await storedDraft(bare.draft.id)).toMatchObject({ data: bare.draft });
+  });
+
+  it('adds a new machine model to the settings', async () => {
+    const { file } = exported();
+    const newModel = { code: 'HMC800', name: 'HMC 800' };
+    const response = await importFile({ name: 'HMC', modelCode: 'HMC800', newModel, file });
+    expect(response.status).toBe(201);
+    expect((await loadSettings())?.machineModels).toEqual([...MODELS, newModel]);
+  });
+
+  it.each([
+    ['not a template file', (file: object) => ({ ...file, format: 'something-else' })],
+    ['a newer file version', (file: object) => ({ ...file, version: 2 })],
+    [
+      'a template without a checklist',
+      (file: { template: object }) => ({
+        ...file,
+        template: { ...file.template, sections: undefined },
+      }),
+    ],
+  ])('400 for %s', async (_case, change) => {
+    const { file } = exported();
+    const response = await importFile({ name: 'X', modelCode: 'IM', file: change(file) });
+    expect(response.status).toBe(400);
+    expect(errorOf(response).error).toBe('bad_request');
+  });
+
+  it('400 for a file whose sections or rows share ids, writing nothing', async () => {
+    const { source } = exported();
+    const [one, two] = source.sections;
+    const file = templateExport(
+      { ...source, sections: [one!, { ...two!, items: [one!.items[0]!] }] },
+      undefined,
+      EXPORTED_AT,
+    );
+    const response = await importFile({ name: 'X', modelCode: 'IM', file });
+    expect(response.status).toBe(400);
+    expect(errorOf(response).message).toMatch(/needs its own id/);
+    expect((await listTemplates(request({ principal: admin }), context())).jsonBody).toEqual([]);
+  });
+
+  it('checks the model like creating a template, adding no model when refused', async () => {
+    await storeTemplate(draftTemplate({ modelCode: 'RMMG' }));
+    const { file } = exported();
+    expect((await importFile({ name: 'X', modelCode: 'RMMG', file })).status).toBe(409);
+    expect((await importFile({ name: 'X', modelCode: 'NOPE', file })).status).toBe(400);
+    const taken = await importFile({
+      name: 'X',
+      modelCode: 'IM9',
+      newModel: { code: 'IM9', name: 'IM8' },
+      file,
+    });
+    expect(taken.status).toBe(409);
+    expect((await loadSettings())?.machineModels).toEqual(MODELS);
+  });
+});
+
+describe('DELETE /api/templates/{id}', () => {
+  function remove(id: string, ifMatch?: string | null, who = admin) {
+    return deleteTemplate(
+      request({
+        principal: who,
+        method: 'DELETE',
+        params: { id },
+        headers: ifMatch ? { 'If-Match': ifMatch } : {},
+      }),
+      context(),
+    );
+  }
+
+  async function blobsOf(id: string): Promise<string[]> {
+    const names: string[] = [];
+    for await (const blob of containerClient(CONTAINERS.templates).listBlobsFlat({
+      prefix: `${id}/`,
+    })) {
+      names.push(blob.name);
+    }
+    return names;
+  }
+
+  it('deletes the draft and every revision, and keeps inspections and images', async () => {
+    const coverImageId = newId();
+    await containerClient(CONTAINERS.images)
+      .getBlockBlobClient(blobNames.image(coverImageId))
+      .upload('jpeg', 4);
+    const template = draftTemplate({ revision: 3, coverImageId });
+    const etag = await storeTemplate(template, [1, 2]);
+    const inspection = sampleInspection({}, { ...template, status: 'published', revision: 2 });
+    await writeInspection(inspection, {});
+
+    const response = await remove(template.id, etag);
+    expect(response).toMatchObject({ status: 204 });
+    expect(response.jsonBody).toBeUndefined();
+    expect(await blobsOf(template.id)).toEqual([]);
+    expect((await get(template.id)).status).toBe(404);
+    expect((await listTemplates(request({ principal: admin }), context())).jsonBody).toEqual([]);
+
+    const kept = await readJson(
+      CONTAINERS.inspections,
+      blobNames.inspection(inspection.id),
+      InspectionSchema,
+    );
+    expect(kept?.data).toEqual(inspection);
+    expect(
+      await containerClient(CONTAINERS.images)
+        .getBlobClient(blobNames.image(coverImageId))
+        .exists(),
+    ).toBe(true);
+  });
+
+  it('keeps the deviations in Insights, as they were last inspected', async () => {
+    clearRevisionCache();
+    const template = draftTemplate({ revision: 2 });
+    const etag = await storeTemplate(template, [1]);
+    const [row] = template.sections[0]!.items;
+    const inspection = sampleInspection(
+      { state: 'finalised', results: { [row!.id]: { status: 'NOK', severity: 'major' } } },
+      { ...template, status: 'published', revision: 1 },
+    );
+    await writeInspection(inspection, {});
+    await syncDeviations(inspection);
+
+    expect((await remove(template.id, etag)).status).toBe(204);
+    clearRevisionCache();
+    const insights = await loadInsights({ includeInProgress: false }, context());
+    expect(insights.inspections.finalised).toBe(1);
+    expect(insights.deviations).toBe(1);
+    expect(insights.bySeverity.major).toBe(1);
+    expect(insights.topCheckpoints).toEqual([
+      expect.objectContaining({
+        itemId: row!.id,
+        ref: '1.a',
+        text: row!.text,
+        sectionTitle: 'Loading area',
+        removed: true,
+        failed: 1,
+        inspections: 1,
+      }),
+    ]);
+  });
+
+  it('frees its ids: its exported file imports again with the same sections and rows', async () => {
+    const template = draftTemplate({ revision: 2 });
+    const etag = await storeTemplate(template, [1]);
+    const file = templateExport(template, 'RigiMill MG', '2026-11-04T08:00:00.000Z');
+    expect((await remove(template.id, etag)).status).toBe(204);
+
+    // Its model is free again, too.
+    const response = await importTemplate(
+      request({
+        principal: admin,
+        method: 'POST',
+        body: JSON.stringify({ name: template.name, modelCode: 'RMMG', file }),
+      }),
+      context(),
+    );
+    expect(response.status).toBe(201);
+    const { draft } = ImportTemplateResponseSchema.parse(response.jsonBody);
+    expect(draft.id).not.toBe(template.id);
+    // KPIs follow a row by its id, so the re-imported rows carry on their history.
+    expect(checklistIds(draft.sections)).toEqual(checklistIds(template.sections));
+  });
+
+  it('400 without If-Match, and with "*"', async () => {
+    const template = draftTemplate();
+    await storeTemplate(template);
+    for (const ifMatch of [null, '*']) {
+      expect((await remove(template.id, ifMatch)).status).toBe(400);
+    }
+    expect(await blobsOf(template.id)).toHaveLength(1);
+  });
+
+  it('412 for an outdated ETag, deleting nothing', async () => {
+    const template = draftTemplate();
+    const etag = await storeTemplate(template, [1]);
+    const saved = await put(template.id, { ...editable(template), name: 'Newer' }, etag);
+    expect(saved.status).toBe(200);
+
+    const response = await remove(template.id, etag);
+    expect(response.status).toBe(412);
+    expect(errorOf(response).error).toBe('precondition_failed');
+    expect(await blobsOf(template.id)).toHaveLength(2);
+  });
+
+  it('400 for a malformed id, 404 for an unknown template', async () => {
+    expect((await remove('../config', '"0x1"')).status).toBe(400);
+    expect((await remove(newId(), '"0x1"')).status).toBe(404);
+  });
+
+  it('403 for an inspector', async () => {
+    const template = draftTemplate();
+    const etag = await storeTemplate(template);
+    expect((await remove(template.id, etag, inspector)).status).toBe(403);
+    expect(await blobsOf(template.id)).toHaveLength(1);
   });
 });
 

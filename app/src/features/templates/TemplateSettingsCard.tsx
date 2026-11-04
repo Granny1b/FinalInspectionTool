@@ -31,7 +31,7 @@ type Props = {
 };
 
 /**
- * Name, model, spare rows and cover photo, laid out like the printed front page. Memoised: the
+ * Name, model, spare lines and cover photo, laid out like the printed front page. Memoised: the
  * editor re-renders on every keystroke in the checklist.
  */
 export const TemplateSettingsCard = memo(function TemplateSettingsCard({
@@ -100,8 +100,9 @@ export const TemplateSettingsCard = memo(function TemplateSettingsCard({
           />
         </div>
         <p className="text-xs text-ink-500">
-          Spare rows are blank lettered lines after each section of the printed checklist, for
-          findings written by hand. The checklist below previews them.
+          Spare lines are blank lettered lines after each section of the printed checklist, for
+          findings written by hand. Add or delete them per section in the checklist below; a section
+          you haven’t changed there gets this number.
         </p>
       </div>
     </FrontPageFrame>
@@ -112,7 +113,7 @@ export const TemplateSettingsCard = memo(function TemplateSettingsCard({
 function SpareRowsField({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   const [text, setText] = useState<string | null>(null);
   return (
-    <Field label="Spare rows per section">
+    <Field label="Spare lines per section (default)">
       {(control) => (
         <input
           {...control}
