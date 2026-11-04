@@ -2,7 +2,12 @@ import type { Inspection, Section, Template } from '@modig/shared';
 import { Packer } from 'docx';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
-import { inspectionPrint, templatePrint, type PrintModel } from '../print/model';
+import {
+  BLANK_DEVIATION_LINES,
+  inspectionPrint,
+  templatePrint,
+  type PrintModel,
+} from '../print/model';
 import { wordFileName } from './exportWord';
 import type { WordImage } from './images';
 import { wordDocument, type WordImages } from './wordDocument';
@@ -141,8 +146,8 @@ const tableRows = (xml: string) => xml.match(/<w:tr[ >](?:(?!<w:tbl>)[\s\S])*?<\
 
 const count = (xml: string, pattern: RegExp) => xml.match(pattern)?.length ?? 0;
 /**
- * A card's Category and Resp paragraphs as text, the tab between label and value as "\t": the
- * tab stop lines the values up.
+ * A card's Category and Responsible paragraphs as text, the tab between label and value as
+ * "\t": the tab stop lines the values up.
  */
 const detailLines = (xml: string) =>
   (xml.match(/<w:p>(?:(?!<\/w:p>)[\s\S])*<\/w:p>/g) ?? [])
@@ -151,7 +156,7 @@ const detailLines = (xml: string) =>
         .map((match) => match[1] ?? '\t')
         .join(''),
     )
-    .filter((line) => /^(Category|Resp)\t/.test(line));
+    .filter((line) => /^(Category|Responsible)\t/.test(line));
 /** The text of the document in order, without the XML. */
 const text = (xml: string) =>
   [...xml.matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)].map((match) => match[1]).join('');
@@ -181,10 +186,19 @@ describe('the Word export of a report', () => {
       'Inspected by',
       'Signature',
       'Rev: 2',
-      '3 / 3 rows filled · 1 NOK · 2 deviations',
+      '3 checkpoints: 1 OK · 1 NOK · 1 N/A · 2 deviations',
     ]) {
       expect(all).toContain(expected);
     }
+  });
+
+  it('leaves the room of a missing machine photo empty; a form has a frame for one', async () => {
+    const noPhoto = { ...INSPECTION, front: { ...INSPECTION.front, photoId: undefined } };
+    const report = text((await build(inspectionPrint(noPhoto, 'report', CONTEXT))).document);
+    expect(report).not.toContain('Machine photo');
+    expect(report).not.toContain('No machine photo');
+    const blank = text((await build(inspectionPrint(noPhoto, 'blank', CONTEXT))).document);
+    expect(blank).toContain('Machine photo');
   });
 
   it('has one table per section whose two header rows repeat on every page', async () => {
@@ -223,10 +237,10 @@ describe('the Word export of a report', () => {
     expect(all).toContain('Operator manual missing');
     expect(detailLines(document)).toEqual([
       'Category\tMissing parts',
-      'Resp\tMontage',
+      'Responsible\tMontage',
       // The extra deviation has neither: a dash, as on paper.
       'Category\t—',
-      'Resp\t—',
+      'Responsible\t—',
     ]);
     expect(all).toContain('Sketch / photo');
     expect(count(all, /Closed {2}Sign/g)).toBe(2);
@@ -458,7 +472,9 @@ describe('the Word export of a blank checklist', () => {
     expect(all).toContain('1.e');
     expect(all).not.toContain('Two screws have no torque mark.');
     expect(all).toContain('No.RefDescriptionSeverityCategoryRespClosed (sign/date)');
-    for (let n = 1; n <= 15; n += 1) expect(all).toContain(`D-${String(n).padStart(2, '0')}`);
+    for (let n = 1; n <= BLANK_DEVIATION_LINES; n += 1) {
+      expect(all).toContain(`D-${String(n).padStart(2, '0')}`);
+    }
     // Two header rows per section and the summary's own.
     expect(count(document, /<w:tblHeader\/>/g)).toBe(5);
   });
@@ -466,7 +482,9 @@ describe('the Word export of a blank checklist', () => {
   it('gives blank rows at least 9 mm to write in', async () => {
     const { document } = await build(model);
     // 9.5 mm in twips, "at least".
-    expect(count(document, /<w:trHeight w:val="539" w:hRule="atLeast"\/>/g)).toBe(9 + 15);
+    expect(count(document, /<w:trHeight w:val="539" w:hRule="atLeast"\/>/g)).toBe(
+      9 + BLANK_DEVIATION_LINES,
+    );
   });
 });
 
@@ -489,7 +507,7 @@ describe('the Word export of a template preview', () => {
     expect(text(document)).toContain('Draft – Rev 3');
     expect(text(document)).toContain('Appendix · Reference images');
     expect(text(footer)).toContain(
-      'Modig Machine Tool · Final inspection – RigiMill MG · Rev 3 (draft)',
+      'Modig Machine Tool · Final inspection – RigiMill MG · Draft – Rev 3',
     );
   });
 });

@@ -1,16 +1,17 @@
 import { LoaderCircle, Printer, X } from 'lucide-react';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { Button } from '../../components/Button';
 import { LoadError } from '../../components/PageStates';
 import { errorMessage } from '../../lib/api';
+import { FittedPages } from './FittedPages';
 import {
-  DEFAULT_DEVIATIONS_PER_PAGE,
+  defaultDeviationsPerPage,
   PRINT_MODE_LABELS,
   PRINT_MODES,
   type PrintMode,
   type PrintModel,
 } from './model';
-import { fitScale, isPrintShortcut, SHEET_WIDTH_PX } from './preview';
+import { isPrintShortcut } from './preview';
 import { PrintDocument } from './PrintDocument';
 import { Segmented, type Choice } from './PrintToolbar';
 import { usePrintDocument } from './usePrintDocument';
@@ -81,7 +82,7 @@ export function PrintPreviewDialog({
           print();
         }
       }}
-      className="m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-canvas p-0 text-ink-900 backdrop:bg-scrim/50"
+      className="m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-canvas p-0 text-ink-900 backdrop:bg-scrim/30 dark:backdrop:bg-scrim/70"
     >
       <div className="flex h-full flex-col">
         <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-ink-200 bg-surface px-4 py-3 sm:px-6">
@@ -138,73 +139,33 @@ function Preparing() {
 }
 
 /**
- * The document on the grey desk, its sheets scaled down to the desk's width on a narrow screen.
- * A transform, not `zoom`: the browser lays the pages out exactly as for print and only draws
- * them smaller, so lines break where they will on paper (useCardPages measures through it).
+ * The document on the grey desk, its sheets scaled down to the desk's width on a narrow screen
+ * (FittedPages), with the cards as the print route opens them.
  */
 function FittedDocument({ model, images }: { model: PrintModel; images: PrintImages }) {
-  const perPage = DEFAULT_DEVIATIONS_PER_PAGE;
+  const perPage = defaultDeviationsPerPage(model);
   const { rootRef, cards, ready } = usePrintDocument(model, images, { perPage, appendix: false });
-  const deskRef = useRef<HTMLDivElement>(null);
-  const pagesRef = useRef<HTMLDivElement>(null);
-  const width = useContentSize(deskRef, 'width');
-  const height = useContentSize(pagesRef, 'height');
-  const scale = fitScale(width);
 
   return (
     // Focusable, so the pages scroll from the keyboard too. In the dark theme its ring is a
     // lighter cyan: brand 600 is below 3:1 on the dark desk (ink-200).
     <div
-      ref={deskRef}
       tabIndex={0}
       role="region"
       aria-label="Printed pages"
       className="paper-desk min-h-0 flex-1 overflow-y-auto -outline-offset-2 dark:focus-visible:outline-brand-500"
     >
-      <div
-        className="mx-auto overflow-hidden"
-        style={{ width: SHEET_WIDTH_PX * scale, height: height * scale }}
-      >
-        <div
-          ref={pagesRef}
-          style={{ width: SHEET_WIDTH_PX, transform: `scale(${scale})`, transformOrigin: '0 0' }}
-        >
-          <PrintDocument
-            model={model}
-            images={images}
-            deviationsPerPage={perPage}
-            cardPages={cards}
-            appendix={false}
-            ready={ready}
-            rootRef={rootRef}
-          />
-        </div>
-      </div>
+      <FittedPages>
+        <PrintDocument
+          model={model}
+          images={images}
+          deviationsPerPage={perPage}
+          cardPages={cards}
+          appendix={false}
+          ready={ready}
+          rootRef={rootRef}
+        />
+      </FittedPages>
     </div>
   );
-}
-
-/**
- * An element's content-box width or height in CSS pixels, as laid out (a transform doesn't
- * change it), kept up to date as it resizes.
- */
-function useContentSize(ref: RefObject<HTMLElement | null>, side: 'width' | 'height'): number {
-  const [size, setSize] = useState(0);
-  // Measured before the first paint, so the pages never show at the wrong size.
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const style = getComputedStyle(element);
-    setSize(
-      side === 'width'
-        ? element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
-        : element.offsetHeight,
-    );
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setSize(entry.contentRect[side]);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [ref, side]);
-  return size;
 }

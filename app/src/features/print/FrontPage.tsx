@@ -40,15 +40,19 @@ export function FrontPage({ front, logoUrl, photoUrl }: Props) {
           </div>
         )}
 
-        {/* Without a photo its frame stays, so every front page has the same layout. */}
+        {/* Without a photo its room stays, so every front page has the same layout: a frame to
+            stick one in on a form to fill in, plain paper on a report (a frame saying there is
+            no photo read like an image missing from the customer's copy). */}
         <div className="paper-photo">
           <PaperPhoto
             url={front.photoId ? photoUrl : null}
             alt="Machine photo"
             missing={
-              <div className="paper-photo-missing">
-                {front.photoId ? 'The machine photo couldn’t be loaded.' : 'No machine photo'}
-              </div>
+              front.photoId ? (
+                <div className="paper-photo-missing">The machine photo couldn’t be loaded.</div>
+              ) : report ? null : (
+                <div className="paper-photo-missing paper-photo-slot">Machine photo</div>
+              )
             }
           />
         </div>

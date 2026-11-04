@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { Printer } from 'lucide-react';
-import { useId, type ReactNode } from 'react';
+import { Fragment, useId, type ReactNode } from 'react';
 import { BackLink } from '../../components/BackLink';
 import { Button } from '../../components/Button';
 import {
@@ -14,8 +14,10 @@ import {
 export type Choice<T> = { value: T; onChange: (value: T) => void };
 
 type Props = {
-  /** What is printed: "FI-2026-0042 · RigiMill MG – Volvo Skövde". */
+  /** What is printed: "FI-2026-0042 · RigiMill MG – Volvo Skövde"; cut short when long. */
   subject: string;
+  /** After the subject and never cut, as it tells what is printed: "Draft – Rev 3". */
+  revision?: string;
   back: { to: string; label: string };
   /** Inspections switch between the blank checklist and the report. */
   mode?: Choice<PrintMode>;
@@ -29,13 +31,23 @@ type Props = {
   children?: ReactNode;
 };
 
+/** What Chrome's print dialog needs for a clean PDF, each kept whole when the hint wraps. */
+const PDF_SETTINGS = [
+  'Chrome/Edge → Save as PDF',
+  'Margins: Default',
+  'Scale: 100 %',
+  'Headers and footers: off',
+];
+
 /**
  * Above the preview, never printed. First the way back, what is printed and the ways out (Word,
  * Print); under them the layout's choices, with the settings Print needs on the right. Each part
- * wraps within itself, so a choice never lands among the buttons.
+ * wraps within itself, so a choice never lands among the buttons. On a phone everything is
+ * left-aligned, one item under the other.
  */
 export function PrintToolbar({
   subject,
+  revision,
   back,
   mode,
   deviationsPerPage,
@@ -52,10 +64,13 @@ export function PrintToolbar({
           <BackLink to={back.to} label={back.label} />
           <div className="min-w-0 flex-1 basis-48">
             <h1 className="text-base font-semibold text-ink-900">Print preview</h1>
-            <p className="truncate text-xs text-ink-500">{subject}</p>
+            <p className="flex min-w-0 text-xs text-ink-500">
+              <span className="truncate">{subject}</span>
+              {revision && <span className="shrink-0 whitespace-pre"> · {revision}</span>}
+            </p>
           </div>
-          {/* Right-aligned, also when they wrap onto a line of their own. */}
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {/* Right-aligned from 640 px, also when they wrap onto a line of their own. */}
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:justify-end">
             {children}
             <Button onClick={() => window.print()} disabled={!ready} aria-describedby={hintId}>
               <Printer size={16} aria-hidden="true" />
@@ -80,8 +95,18 @@ export function PrintToolbar({
             />
           )}
           <AppendixToggle {...appendix} />
-          <p id={hintId} className="ml-auto text-right text-xs text-ink-500">
-            Chrome/Edge → Save as PDF · Margins: Default · Scale: 100 % · Headers and footers: off
+          {/* Each setting stays whole, its separator with it, so a wrapped line never starts
+              with a dot or splits "Headers and footers: off". */}
+          <p id={hintId} className="text-xs text-ink-500 sm:ml-auto sm:text-right">
+            {PDF_SETTINGS.map((setting, index) => (
+              <Fragment key={setting}>
+                {index > 0 && ' '}
+                <span className="whitespace-nowrap">
+                  {setting}
+                  {index < PDF_SETTINGS.length - 1 && ' ·'}
+                </span>
+              </Fragment>
+            ))}
           </p>
         </div>
       </div>
@@ -96,7 +121,10 @@ type SegmentedProps<T> = Choice<T> & {
   options: { value: T; label: string }[];
 };
 
-/** A few toggle buttons of which one is pressed. */
+/**
+ * A few toggle buttons of which one is pressed, drawn like every segmented control in the app:
+ * the chosen segment raised on a quiet track.
+ */
 export function Segmented<T extends string | number>({
   label,
   showLabel = false,
@@ -108,7 +136,7 @@ export function Segmented<T extends string | number>({
   return (
     <div className="flex items-center gap-2">
       {showLabel && (
-        <span id={labelId} className="text-sm text-ink-600">
+        <span id={labelId} className="text-xs font-medium text-ink-500">
           {label}
         </span>
       )}
@@ -116,7 +144,7 @@ export function Segmented<T extends string | number>({
         role="group"
         aria-label={showLabel ? undefined : label}
         aria-labelledby={showLabel ? labelId : undefined}
-        className="inline-flex rounded-lg bg-ink-100 p-1"
+        className="inline-flex gap-0.5 rounded-lg bg-ink-100 p-0.5 ring-1 ring-ink-200 ring-inset"
       >
         {options.map((option) => (
           <button
@@ -128,8 +156,8 @@ export function Segmented<T extends string | number>({
             className={clsx(
               'h-8 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors pointer-coarse:h-10',
               option.value === value
-                ? 'bg-surface text-ink-900 shadow-xs ring-1 ring-ink-200'
-                : 'text-ink-600 hover:text-ink-900',
+                ? 'bg-raised text-ink-900 shadow-xs ring-1 ring-ink-200'
+                : 'text-ink-600 hover:bg-raised/60 hover:text-ink-900',
             )}
           >
             {option.label}

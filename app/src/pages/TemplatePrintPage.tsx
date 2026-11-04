@@ -140,7 +140,8 @@ function TemplatePrint({
     <PrintView
       model={model}
       images={images}
-      subject={model.checklistTitle}
+      subject={model.checklistName}
+      revision={model.revisionLabel}
       back={back}
       appendix={{ value: appendix, onChange: setAppendix }}
     />

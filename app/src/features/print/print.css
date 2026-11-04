@@ -27,8 +27,9 @@
   /* Blank rows give room to write by hand (brief §6: at least 9 mm). */
   --paper-write-row: 9.5mm;
   --paper-report-row: 7mm;
-  /* Chrome's PDFs place the right content edge about 0.3 mm past the 12 mm margin; right-aligned
-     text keeps this far in, so it never crosses the margin (footer.ts does the same). */
+  /* Chrome's PDFs place the right content edge about 0.3 mm past the 12 mm margin and cut what
+     lies beyond: a box's right border printed as a hairline, right-aligned text crossed the
+     margin. Every sheet's content keeps this far in (footer.ts does the same). */
   --paper-edge-inset: 0.5mm;
 
   /* Paper is light in either theme: its own greys and white sheets, light browser defaults. */
@@ -52,12 +53,27 @@
     background: var(--color-ink-200);
   }
 
+  /* Fitted to the desk (FittedPages): drawn smaller on a narrow screen, laid out at A4 width. */
+  .paper-fit {
+    width: var(--paper-fit-width);
+    height: var(--paper-fit-height);
+    margin-inline: auto;
+    overflow: hidden;
+  }
+
+  .paper-fit-pages {
+    width: 210mm;
+    transform: scale(var(--paper-fit-scale));
+    transform-origin: 0 0;
+  }
+
+  /* The same content box as on paper, the edge inset included, so lines break alike. */
   .paper-sheet {
     box-sizing: border-box;
     width: 210mm;
     min-height: 297mm;
     margin: 0 auto 24px;
-    padding: 14mm 12mm 16mm;
+    padding: 14mm calc(12mm + var(--paper-edge-inset)) 16mm 12mm;
     background: #fff;
     box-shadow:
       0 1px 3px rgb(0 0 0 / 0.12),
@@ -78,6 +94,7 @@
 
   /* Every sheet starts a page: the front page, the checklist, each page of deviations. */
   .paper-sheet {
+    padding-right: var(--paper-edge-inset);
     break-before: page;
   }
 
@@ -127,7 +144,6 @@
 }
 
 .paper-front-number {
-  padding-right: var(--paper-edge-inset);
   font-size: 12pt;
   font-weight: 600;
   white-space: nowrap;
@@ -194,6 +210,14 @@
   color: var(--paper-muted);
 }
 
+/* A form's frame to stick a photo in, labelled in its corner like a card's sketch frame. */
+.paper-photo-slot {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 1.5mm 2mm;
+  font-size: 7.5pt;
+}
+
 /* Label and value on one baseline, low in the row: on the line, as on a paper form. Flex, not a
    table: Chromium loses table cells' baseline alignment when it lays out pages. */
 .paper-fields {
@@ -250,7 +274,6 @@
 
 .paper-revision {
   margin-top: 7mm;
-  padding-right: var(--paper-edge-inset);
   font-size: 9pt;
   text-align: right;
 }
@@ -275,7 +298,6 @@
 
 .paper-heading p {
   margin: 0;
-  padding-right: var(--paper-edge-inset);
   color: var(--paper-muted);
   text-align: right;
 }
@@ -379,8 +401,12 @@
   vertical-align: middle;
 }
 
+/* A report is read, not written on: its rows are as low as their text, with a table's tighter
+   leading (most checkpoints take two lines, so this saves a page of 90 rows). */
 [data-print-mode='report'] .paper-table tbody td {
   height: var(--paper-report-row);
+  padding-block: 1mm;
+  line-height: 1.2;
 }
 
 /* Proportional figures, as in the headings and the footer: Inter's tabular ones widen the hyphen
@@ -406,19 +432,26 @@
   vertical-align: middle;
 }
 
-/* A recorded status: its symbol over its name, so it never depends on colour. */
+/* A recorded status: its symbol over its name, so it never depends on colour. Small and tight,
+   with little room around it, so the mark is never what makes a one-line row taller than the
+   7 mm a report row has (a 4 mm symbol over 6.5 pt type made every row about 9.5 mm). */
+.paper-table .paper-mark-cell:has(.paper-mark) {
+  padding-block: 0.5mm;
+}
+
 .paper-mark {
   display: inline-flex;
   flex-direction: column;
+  gap: 0.3mm;
   align-items: center;
-  font-size: 6.5pt;
+  font-size: 6pt;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1;
 }
 
 .paper-mark svg {
-  width: 4mm;
-  height: 4mm;
+  width: 3.4mm;
+  height: 3.4mm;
 }
 
 .paper-severity {
@@ -549,18 +582,18 @@
   overflow-wrap: anywhere;
 }
 
-/* Label and value on one baseline, the values of Category and Resp lined up one above the other
-   (the labels' column fits "Category"); a long value wraps under its own first line. */
+/* Label and value on one baseline, the values of Category and Responsible lined up one above the
+   other (the labels' column fits "Responsible"); a long value wraps under its own first line. */
 .paper-card-resp {
   display: grid;
-  grid-template-columns: 12.5mm minmax(0, 1fr);
+  grid-template-columns: 18mm minmax(0, 1fr);
   align-items: baseline;
   column-gap: 2mm;
   margin-top: 1.5mm;
   overflow-wrap: anywhere;
 }
 
-/* Category, then Resp: one block of two lines. */
+/* Category, then Responsible: one block of two lines. */
 .paper-card-resp + .paper-card-resp {
   margin-top: 0.6mm;
 }

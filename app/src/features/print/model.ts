@@ -12,6 +12,7 @@ import {
   rowRef,
   sectionNumber,
   sectionSpareRows,
+  STATUS_LABELS,
   type AnnotatedImage,
   type Inspection,
   type InspectionDeviation,
@@ -35,13 +36,21 @@ export const PRINT_MODE_LABELS: Record<PrintMode, string> = {
   report: 'Report',
 };
 
-/** Numbered lines on a blank Deviation Summary (brief §6: "~15 numbered lines"). */
-export const BLANK_DEVIATION_LINES = 15;
+/**
+ * Numbered lines on a blank Deviation Summary: as many as its page holds at the 9.5 mm a line
+ * needs for handwriting, with room left for the footer that browsers without margin boxes
+ * repeat under the table. Brief §6 asks for about 15, which left the lower half of the sheet
+ * empty, where more findings could have been written.
+ */
+export const BLANK_DEVIATION_LINES = 24;
 
 /** A report's deviation cards per page: two with large photos, or four for long, short-text lists. */
 export const DEVIATIONS_PER_PAGE = [2, 4] as const;
 export type DeviationsPerPage = (typeof DEVIATIONS_PER_PAGE)[number];
-/** Chosen by the Quality department after comparing both sample reports; 4 stays in the toolbar. */
+/**
+ * Chosen by the Quality department after comparing both sample reports; 4 stays in the toolbar.
+ * A report without any photo opens with 4 instead (defaultDeviationsPerPage).
+ */
 export const DEFAULT_DEVIATIONS_PER_PAGE: DeviationsPerPage = 2;
 
 /** On the front page of a report that is not finalised, so it is never taken for the final one. */
@@ -107,7 +116,7 @@ export type ReportState = {
   finalised: boolean;
   /** "Finalised 8 Oct 2026, 14:32 by anna@modig.se", or NOT_FINALISED_MARKER. */
   text: string;
-  /** "90 / 90 rows filled · 6 NOK · 8 deviations" */
+  /** "90 checkpoints: 82 OK · 6 NOK · 2 N/A · 8 deviations" */
   summary: string;
 };
 
@@ -129,6 +138,10 @@ export type PrintModel = {
   front: FrontPage;
   /** Above the first section: "Final inspection – RigiMill MG · Rev 2". */
   checklistTitle: string;
+  /** The title's two parts, for the toolbar, which may cut the name but never the revision. */
+  checklistName: string;
+  /** "Rev 2", or "Draft – Rev 3" for a template's draft: in the title and the footer alike. */
+  revisionLabel: string;
   sections: PrintSection[];
   deviations: PrintDeviations;
   /**
@@ -176,6 +189,7 @@ export function inspectionPrint(
   const finalised = inspection.state === 'finalised';
   const report = mode === 'report';
   const deviations = deriveDeviations(inspection);
+  const revisionLabel = `Rev ${templateRevision}`;
 
   return {
     mode,
@@ -194,7 +208,9 @@ export function inspectionPrint(
       revision: `Rev: ${templateRevision}`,
       report: report ? reportState(inspection, deviations.length, context) : null,
     },
-    checklistTitle: `${templateSnapshot.name}${SEPARATOR}Rev ${templateRevision}`,
+    checklistTitle: `${templateSnapshot.name}${SEPARATOR}${revisionLabel}`,
+    checklistName: templateSnapshot.name,
+    revisionLabel,
     sections: printSections(
       templateSnapshot.sections,
       report ? { results: inspection.results } : { printSettings: templateSnapshot.printSettings },
@@ -209,7 +225,7 @@ export function inspectionPrint(
       number,
       clip(machine, FOOTER_MACHINE_LENGTH) || '—',
       `S/N ${front.serialNumber.trim() || '—'}`,
-      `Rev ${templateRevision}`,
+      revisionLabel,
       // A page of a draft report must not pass for the final one, even on its own.
       ...(report && !finalised ? ['Not finalised'] : []),
     ].join(SEPARATOR),
@@ -248,12 +264,14 @@ export function templatePrint(
       report: null,
     },
     checklistTitle: `${name}${SEPARATOR}${revision}`,
+    checklistName: name,
+    revisionLabel: revision,
     sections: printSections(template.sections, { printSettings: template.printSettings }),
     deviations: blankDeviationLines(),
     appendix: appendixEntries(template.sections),
-    footer: [companyName, name, `Rev ${template.revision}${draft ? ' (draft)' : ''}`].join(
-      SEPARATOR,
-    ),
+    // The revision as the front page and the checklist's heading name it, so a page never calls
+    // a draft two different things.
+    footer: [companyName, name, revision].join(SEPARATOR),
     fileName: `${name} – ${revision} – Checklist preview`,
   };
 }
@@ -285,12 +303,16 @@ function reportState(
   deviationCount: number,
   { personName = (email) => email }: PrintContext,
 ): ReportState {
-  const { total, filled, nok } = inspectionProgress(inspection);
-  const summary = [
-    `${filled} / ${total} rows filled`,
-    `${nok} NOK`,
-    deviationCount === 1 ? '1 deviation' : `${deviationCount} deviations`,
-  ].join(SEPARATOR);
+  const { total, filled, ok, nok } = inspectionProgress(inspection);
+  const open = total - filled;
+  // For the customer: what was found, status by status, not how far the form was filled in.
+  const summary = `${plural(total, 'checkpoint')}: ${[
+    `${ok} ${STATUS_LABELS.OK}`,
+    `${nok} ${STATUS_LABELS.NOK}`,
+    `${filled - ok - nok} ${STATUS_LABELS.NA}`,
+    ...(open > 0 ? [`${open} not checked`] : []),
+    plural(deviationCount, 'deviation'),
+  ].join(SEPARATOR)}`;
   if (inspection.state !== 'finalised') {
     return { finalised: false, text: NOT_FINALISED_MARKER, summary };
   }
@@ -340,6 +362,10 @@ function printSections(
   });
 }
 
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
 function blankDeviationLines(): PrintDeviations {
   return {
     kind: 'lines',
@@ -363,6 +389,17 @@ function deviationCard(deviation: InspectionDeviation): DeviationCard {
 
 function printedPhoto(photo: AnnotatedImage): DeviationPhoto {
   return { imageId: photo.renderedImageId ?? photo.imageId, caption: photo.caption?.trim() ?? '' };
+}
+
+/**
+ * The layout a report opens with when the address names none: two to a page, for large photos
+ * (DEFAULT_DEVIATIONS_PER_PAGE); four when no deviation has a photo, because two cards without
+ * one left three quarters of every page to empty sketch frames.
+ */
+export function defaultDeviationsPerPage(model: PrintModel): DeviationsPerPage {
+  const { deviations } = model;
+  const photos = deviations.kind === 'cards' && deviations.cards.some((card) => card.photos.length);
+  return photos ? DEFAULT_DEVIATIONS_PER_PAGE : 4;
 }
 
 /**
