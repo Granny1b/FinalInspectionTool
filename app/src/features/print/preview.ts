@@ -33,3 +33,13 @@ export function fitScale(width: number): number {
   if (!(width > 0)) return 1;
   return Math.min(1, Math.max(MIN_SCALE, width / SHEET_WIDTH_PX));
 }
+
+/**
+ * Ctrl+P (⌘P on a Mac), with or without Shift: the browser's Print, which over the preview would
+ * print the page behind it.
+ */
+export function isPrintShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey'>,
+): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'p';
+}

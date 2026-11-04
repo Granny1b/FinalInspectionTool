@@ -1,7 +1,7 @@
 import type { Inspection, InspectionDraftInput } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
 import { inspectionPrint } from './model';
-import { fitScale, inspectionOnScreen, SHEET_WIDTH_PX } from './preview';
+import { fitScale, inspectionOnScreen, isPrintShortcut, SHEET_WIDTH_PX } from './preview';
 
 const stored: Inspection = {
   id: 'Insp000000000001',
@@ -111,5 +111,27 @@ describe('fitScale', () => {
     expect(fitScale(120)).toBe(0.375);
     expect(fitScale(0)).toBe(1);
     expect(fitScale(Number.NaN)).toBe(1);
+  });
+});
+
+describe('isPrintShortcut', () => {
+  const key = (key: string, mods: { ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean }) => ({
+    key,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    ...mods,
+  });
+
+  it('is Ctrl+P or ⌘P, also with Shift (a capital P)', () => {
+    expect(isPrintShortcut(key('p', { ctrlKey: true }))).toBe(true);
+    expect(isPrintShortcut(key('p', { metaKey: true }))).toBe(true);
+    expect(isPrintShortcut(key('P', { ctrlKey: true }))).toBe(true);
+  });
+
+  it('is not P alone, another key, or with Alt', () => {
+    expect(isPrintShortcut(key('p', {}))).toBe(false);
+    expect(isPrintShortcut(key('o', { ctrlKey: true }))).toBe(false);
+    expect(isPrintShortcut(key('p', { ctrlKey: true, altKey: true }))).toBe(false);
   });
 });

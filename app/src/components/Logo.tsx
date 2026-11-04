@@ -20,7 +20,8 @@ export function Logo({ className }: { className?: string }) {
         alt="Modig Machine Tool"
         width={291}
         height={90}
-        className={clsx('hidden w-auto dark:inline', className)}
+        // Block, as preflight makes every <img> (the light logo's display).
+        className={clsx('hidden w-auto dark:block', className)}
       />
     </>
   );

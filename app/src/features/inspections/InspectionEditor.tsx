@@ -324,6 +324,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   // The quick preview shows what is on screen, so it needs no save first (unlike printing).
   // The same object while nothing changes, so its pages are laid out once.
   const [previewing, setPreviewing] = useState(false);
+  const previewRef = useRef<HTMLButtonElement>(null);
   const previewed = useMemo(
     () => (previewing ? inspectionOnScreen(inspection, draft, server) : null),
     [previewing, inspection, draft, server],
@@ -479,7 +480,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
                 />
               </div>
             )}
-            <Button variant="secondary" onClick={() => setPreviewing(true)}>
+            <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
               <Eye size={16} aria-hidden="true" />
               Preview
             </Button>
@@ -677,7 +678,12 @@ export function InspectionEditor({ loaded, onReload }: Props) {
         <InspectionPreview
           inspection={previewed}
           onPrint={(mode) => void openPrint(mode)}
-          onClose={() => setPreviewing(false)}
+          onClose={() => {
+            setPreviewing(false);
+            // The dialog hands the focus back to what had it, but Safari doesn't focus a button
+            // that is clicked or tapped: back to Preview in any case.
+            previewRef.current?.focus();
+          }}
         />
       )}
       {reload.dialog}

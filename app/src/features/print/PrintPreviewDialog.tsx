@@ -10,7 +10,7 @@ import {
   type PrintMode,
   type PrintModel,
 } from './model';
-import { fitScale, SHEET_WIDTH_PX } from './preview';
+import { fitScale, isPrintShortcut, SHEET_WIDTH_PX } from './preview';
 import { PrintDocument } from './PrintDocument';
 import { Segmented, type Choice } from './PrintToolbar';
 import { usePrintDocument } from './usePrintDocument';
@@ -39,7 +39,7 @@ type Props = {
  * A quick look at the printout without printing (or saving) first: a full-screen dialog with the
  * printed pages, the same components as the print route, built from what the page holds and
  * scaled to fit the screen. Light paper in either theme, like the print preview. Escape or Close
- * closes it, and the focus goes back to what opened it.
+ * closes it, and the focus goes back to what opened it; Print / Save PDF (or Ctrl+P) prints it.
  */
 export function PrintPreviewDialog({
   subject,
@@ -74,6 +74,13 @@ export function PrintPreviewDialog({
       aria-labelledby={titleId}
       data-print-preview=""
       onClose={onClose}
+      onKeyDown={(event) => {
+        // Ctrl+P / ⌘P would print the page behind the dialog: print what is shown instead.
+        if (isPrintShortcut(event)) {
+          event.preventDefault();
+          print();
+        }
+      }}
       className="m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-canvas p-0 text-ink-900 backdrop:bg-scrim/50"
     >
       <div className="flex h-full flex-col">
@@ -145,13 +152,14 @@ function FittedDocument({ model, images }: { model: PrintModel; images: PrintIma
   const scale = fitScale(width);
 
   return (
-    // Focusable, so the pages scroll from the keyboard too.
+    // Focusable, so the pages scroll from the keyboard too. In the dark theme its ring is a
+    // lighter cyan: brand 600 is below 3:1 on the dark desk (ink-200).
     <div
       ref={deskRef}
       tabIndex={0}
       role="region"
       aria-label="Printed pages"
-      className="paper-desk min-h-0 flex-1 overflow-y-auto -outline-offset-2"
+      className="paper-desk min-h-0 flex-1 overflow-y-auto -outline-offset-2 dark:focus-visible:outline-brand-500"
     >
       <div
         className="mx-auto overflow-hidden"
