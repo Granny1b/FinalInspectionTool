@@ -4,7 +4,15 @@
  * so they come along only within the same installation, where those images exist.
  */
 import { z } from 'zod';
-import { PrintSettingsSchema, SectionSchema, IdSchema, ModelCodeSchema } from './schemas';
+import { newId } from './ids';
+import {
+  IdSchema,
+  ModelCodeSchema,
+  PrintSettingsSchema,
+  SectionSchema,
+  type Section,
+  type Template,
+} from './schemas';
 
 export const TEMPLATE_EXPORT_FORMAT = 'modig-final-inspection/template';
 
@@ -24,3 +32,94 @@ export const TemplateExportSchema = z.object({
   }),
 });
 export type TemplateExport = z.infer<typeof TemplateExportSchema>;
+
+/** What a file is made from, and what an import builds a draft from. */
+type Checklist = {
+  coverImageId?: string | undefined;
+  sections: Section[];
+};
+
+/** The file for a template: its draft as the editor shows it, with the model's name. */
+export function templateExport(
+  template: Pick<Template, 'name' | 'modelCode' | 'coverImageId' | 'printSettings' | 'sections'>,
+  modelName: string | undefined,
+  exportedAt: string,
+): TemplateExport {
+  const { name, modelCode, coverImageId, printSettings, sections } = template;
+  return {
+    format: TEMPLATE_EXPORT_FORMAT,
+    version: 1,
+    exportedAt,
+    template: {
+      name,
+      modelCode,
+      ...(modelName && { modelName }),
+      ...(coverImageId && { coverImageId }),
+      printSettings,
+      sections,
+    },
+  };
+}
+
+/** Every image id a template refers to: its cover, its guide images and their marked-up copies. */
+export function templateImageIds({ coverImageId, sections }: Checklist): string[] {
+  const ids = new Set<string>();
+  if (coverImageId) ids.add(coverImageId);
+  for (const image of sections.flatMap((s) => s.items.flatMap((i) => i.guide?.images ?? []))) {
+    ids.add(image.imageId);
+    if (image.renderedImageId) ids.add(image.renderedImageId);
+  }
+  return [...ids];
+}
+
+/**
+ * The checklist without the images that are not `available` (a file from another installation),
+ * and how many of its image ids were left out. A guide image goes when its photo is missing, and
+ * loses only its marked-up copy when that is; a guide left with nothing in it goes too.
+ */
+export function withAvailableImages<T extends Checklist>(
+  template: T,
+  available: ReadonlySet<string>,
+): { template: T; dropped: number } {
+  const before = templateImageIds(template).length;
+  const { coverImageId, ...rest } = template;
+  const sections = template.sections.map((section) => ({
+    ...section,
+    items: section.items.map(({ guide, ...item }) => {
+      if (!guide) return item;
+      const images = guide.images
+        .filter((image) => available.has(image.imageId))
+        .map((image) => {
+          if (!image.renderedImageId || available.has(image.renderedImageId)) return image;
+          const { renderedImageId: _missing, ...photo } = image;
+          return photo;
+        });
+      return guide.description || images.length > 0
+        ? { ...item, guide: { ...guide, images } }
+        : item;
+    }),
+  }));
+  const kept = {
+    ...rest,
+    ...(coverImageId && available.has(coverImageId) && { coverImageId }),
+    sections,
+  } as T;
+  return { template: kept, dropped: before - templateImageIds(kept).length };
+}
+
+/**
+ * The same sections with a fresh id for every section and row: for an import whose ids another
+ * template already uses (ids are unique for good, and KPIs follow a row by its id).
+ */
+export function withNewIds(sections: readonly Section[], makeId: () => string = newId): Section[] {
+  return sections.map((section) => ({
+    ...section,
+    id: makeId(),
+    items: section.items.map((item) => ({ ...item, id: makeId() })),
+  }));
+}
+
+/** Every section and row id of the sections. */
+export function checklistIds(sections: readonly Section[]): string[] {
+  return sections.flatMap((section) => [section.id, ...section.items.map((item) => item.id)]);
+}

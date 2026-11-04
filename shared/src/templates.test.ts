@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Guide, Template } from './schemas';
+import { templateExport } from './templateTransfer';
 import {
   CreateTemplateRequestSchema,
+  ImportTemplateRequestSchema,
   TemplateDraftInputSchema,
   hasUnpublishedChanges,
+  newModelConflict,
+  suggestModelCode,
   validateForPublish,
 } from './templates';
 
@@ -116,6 +120,18 @@ describe('hasUnpublishedChanges', () => {
     expect(hasUnpublishedChanges({ ...base, coverImageId: 'img1' }, published)).toBe(true);
   });
 
+  it("compares the spare lines each section prints, not how they're stored", () => {
+    const s = base.sections[0]!;
+    const withSpare = (spareRows: number): Template => ({
+      ...base,
+      sections: [{ ...s, spareRows }],
+    });
+    expect(hasUnpublishedChanges(withSpare(2), published)).toBe(true);
+    // Its own count equals the template's 3: the same lines on paper.
+    expect(hasUnpublishedChanges(withSpare(3), published)).toBe(false);
+    expect(hasUnpublishedChanges(base, { ...withSpare(0), status: 'published' })).toBe(true);
+  });
+
   it('detects a guide added, changed or removed, but not the same guide again', () => {
     const s = base.sections[0]!;
     const guide: Guide = {
@@ -167,5 +183,78 @@ describe('request schemas', () => {
       name: 'X',
       modelCode: 'RMMG',
     });
+  });
+
+  it("a new model must carry the template's model code", () => {
+    const newModel = { code: 'HMC800', name: 'HMC 800' };
+    expect(CreateTemplateRequestSchema.parse({ name: 'X', modelCode: 'HMC800', newModel })).toEqual(
+      { name: 'X', modelCode: 'HMC800', newModel },
+    );
+    const mismatch = CreateTemplateRequestSchema.safeParse({
+      name: 'X',
+      modelCode: 'IM',
+      newModel,
+    });
+    expect(mismatch.error?.issues).toEqual([
+      expect.objectContaining({ path: ['newModel', 'code'] }),
+    ]);
+    expect(
+      CreateTemplateRequestSchema.safeParse({
+        name: 'X',
+        modelCode: 'HMC800',
+        newModel: { code: 'HMC800', name: ' ' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('import takes a template file, the model and the name', () => {
+    const file = templateExport(base, 'RigiMill MG', '2026-11-04T08:00:00.000Z');
+    const request = { name: 'Copy', modelCode: 'IM', file };
+    expect(ImportTemplateRequestSchema.parse(request)).toEqual(request);
+    expect(
+      ImportTemplateRequestSchema.safeParse({ ...request, file: { ...file, version: 2 } }).success,
+    ).toBe(false);
+    expect(
+      ImportTemplateRequestSchema.safeParse({
+        ...request,
+        newModel: { code: 'RMMG', name: 'RigiMill MG' },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('new machine models', () => {
+  const models = [
+    { code: 'RMMG', name: 'RigiMill MG' },
+    { code: 'IM', name: 'IM8' },
+  ];
+
+  it("suggests the name's letters and digits in upper case", () => {
+    expect(suggestModelCode('HMC 800-2', models)).toBe('HMC8002');
+    expect(suggestModelCode('Åsa Öland', models)).toBe('ASAOLAND');
+    expect(suggestModelCode(' – ', models)).toBe('');
+  });
+
+  it('adds a number when the code is taken, ignoring case', () => {
+    expect(suggestModelCode('im', models)).toBe('IM2');
+    expect(suggestModelCode('IM', [...models, { code: 'im2', name: 'x' }])).toBe('IM3');
+  });
+
+  it('keeps within the longest code allowed, number included', () => {
+    const long = 'A'.repeat(40);
+    expect(suggestModelCode(long, models)).toBe('A'.repeat(32));
+    expect(suggestModelCode(long, [{ code: 'A'.repeat(32), name: 'x' }])).toBe(
+      `${'A'.repeat(31)}2`,
+    );
+  });
+
+  it('refuses a code or a name another model has, whatever the case', () => {
+    expect(newModelConflict(models, { code: 'HMC800', name: 'HMC 800' })).toBeNull();
+    expect(newModelConflict(models, { code: 'rmmg', name: 'New' })).toBe(
+      'RMMG is already the code of RigiMill MG.',
+    );
+    expect(newModelConflict(models, { code: 'IM9', name: ' im8 ' })).toBe(
+      'There is already a machine model called IM8 (IM).',
+    );
   });
 });
