@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { ArrowDown } from 'lucide-react';
 import { memo, useRef, type KeyboardEvent } from 'react';
 import { panelId, tabId, type InspectionTab } from './issues';
+import { LINK_TEXT } from './linkText';
 
 const TABS: { tab: InspectionTab; label: string }[] = [
   { tab: 'checklist', label: 'Checklist' },
@@ -78,7 +79,10 @@ export const TabBar = memo(function TabBar({
               <span
                 className={clsx(
                   'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums',
-                  deviationCount > 0 ? 'bg-nok-bg text-nok-fg' : 'bg-ink-100 text-ink-600',
+                  // Ringed like a Major badge: the red tint alone hardly shows on the light canvas.
+                  deviationCount > 0
+                    ? 'bg-nok-bg text-nok-fg ring-1 ring-nok-border ring-inset'
+                    : 'bg-ink-100 text-ink-600',
                 )}
               >
                 {deviationCount}
@@ -113,17 +117,24 @@ export const ProgressSummary = memo(function ProgressSummary({
 }: ProgressProps) {
   return (
     // Left-aligned on a phone, where it has a line of its own above the tabs (the header is a
-    // size container).
-    <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1 pb-2.5 text-sm @min-[36rem]:justify-end">
+    // size container). Beside the tabs, its line is centred on theirs: it is bottom-aligned with
+    // them, over the header's bottom border as they are (-mb-px), and as high as they are (40 px)
+    // less its padding below.
+    <div className="-mb-px flex min-h-9 flex-wrap items-center justify-start gap-x-4 gap-y-1 pb-1 text-sm @min-[36rem]:justify-end pointer-coarse:min-h-10 pointer-coarse:pb-0">
       {nextEmpty && (
+        // A link to look at, a button to hit: padded out to 32 px, and to 44 px for a finger (over
+        // the 2 px it lets into the space around it, so the header keeps its height), with the
+        // text where it was. The page focuses it on open; its ring is around the text (LINK_TEXT).
         <button
           id={continueId}
           type="button"
           onClick={() => onContinue(nextEmpty.itemId)}
-          className="inline-flex items-center gap-1 rounded-sm font-medium text-brand-700 underline-offset-2 hover:underline"
+          className="group -mx-2 inline-flex min-h-8 items-center px-2 font-medium text-brand-700 outline-none pointer-coarse:-my-0.5 pointer-coarse:min-h-11"
         >
-          <ArrowDown size={14} aria-hidden="true" />
-          Continue at {nextEmpty.ref}
+          <span className={LINK_TEXT}>
+            <ArrowDown size={14} aria-hidden="true" />
+            Continue at {nextEmpty.ref}
+          </span>
         </button>
       )}
       <div className="flex items-center gap-2.5">

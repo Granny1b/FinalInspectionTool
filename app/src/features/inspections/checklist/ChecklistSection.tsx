@@ -51,8 +51,9 @@ export const ChecklistSection = memo(function ChecklistSection({
               : 'Set remaining to OK · R on a row'
           }
           onClick={() => actions.setRemainingOk(section.id)}
+          // Outlined as heavily as the row's fields in either theme (see FIELD).
           className={clsx(
-            'inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-ink-500/80 bg-surface px-2.5 text-xs font-medium whitespace-nowrap text-ink-800 shadow-xs transition-colors',
+            'inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-ink-500/80 bg-surface px-2.5 text-xs font-medium whitespace-nowrap text-ink-800 shadow-xs transition-colors dark:border-ink-400',
             CONTROL_HEIGHT,
             remaining === 0
               ? 'cursor-default opacity-50'

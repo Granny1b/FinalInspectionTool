@@ -205,7 +205,7 @@ export function AnnotationEditor({
         onCancel={(event) => event.preventDefault()}
         onClose={() => (outcome.current ? onSave(outcome.current) : onCancel())}
         onKeyDown={onKeyDown}
-        className="m-auto h-[calc(100dvh-2rem)] max-h-none w-[min(80rem,calc(100vw-2rem))] max-w-none overflow-hidden rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl outline-none backdrop:bg-scrim/50"
+        className="m-auto h-[calc(100dvh-2rem)] max-h-none w-[min(80rem,calc(100vw-2rem))] max-w-none overflow-hidden rounded-xl border border-ink-200 bg-overlay p-0 text-ink-900 shadow-xl outline-none backdrop:bg-scrim/30 dark:border-ink-300 dark:backdrop:bg-scrim/70"
       >
         <div className="flex h-full flex-col">
           <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-ink-200 px-4 py-2">

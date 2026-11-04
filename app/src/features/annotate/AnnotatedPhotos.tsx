@@ -433,7 +433,7 @@ function EditorLoading() {
       ref={dialogRef}
       aria-label="Opening the photo editor"
       closedby="none"
-      className="m-auto rounded-xl border border-ink-200 bg-surface p-6 shadow-xl backdrop:bg-scrim/50"
+      className="m-auto rounded-xl border border-ink-200 bg-overlay p-6 shadow-xl backdrop:bg-scrim/30 dark:border-ink-300 dark:backdrop:bg-scrim/70"
     >
       <LoaderCircle size={22} aria-hidden="true" className="animate-spin text-ink-400" />
     </dialog>

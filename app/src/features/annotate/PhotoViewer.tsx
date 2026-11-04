@@ -49,7 +49,7 @@ export function PhotoViewer({ photo, title, label, onClose, badge, browse }: Pro
       data-photo-viewer=""
       onClose={onClose}
       onKeyDown={onKeyDown}
-      className="m-auto h-[calc(100dvh-2rem)] max-h-none w-[min(80rem,calc(100vw-2rem))] max-w-none overflow-hidden rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl backdrop:bg-scrim/50"
+      className="m-auto h-[calc(100dvh-2rem)] max-h-none w-[min(80rem,calc(100vw-2rem))] max-w-none overflow-hidden rounded-xl border border-ink-200 bg-overlay p-0 text-ink-900 shadow-xl backdrop:bg-scrim/30 dark:border-ink-300 dark:backdrop:bg-scrim/70"
     >
       <div className="flex h-full flex-col">
         <header className="border-b border-ink-200 px-4 py-2.5">
