@@ -12,6 +12,7 @@ import { AnnotatedPhotos } from '../annotate/AnnotatedPhotos';
 import { ExtraDeviationFields } from './ExtraDeviationFields';
 import type { ExtraDeviationPatch } from './extras';
 import { deviationPhotosId } from './issues';
+import { LINK_TEXT } from './linkText';
 
 type Props = {
   deviation: InspectionDeviation;
@@ -115,7 +116,11 @@ export function DeviationCard({
   );
 }
 
-/** The row's ref as a link to it: switches to the checklist and focuses the row. */
+/**
+ * The row's ref as a link to it: switches to the checklist and focuses the row. Padded out to a
+ * button's size with the text where it was (and its ring around the text, LINK_TEXT); 44 px high
+ * for a finger, over the bar's padding, so the bar keeps its height.
+ */
 function GoToRow({ deviationRef, onClick }: { deviationRef: string; onClick: () => void }) {
   return (
     <button
@@ -123,18 +128,24 @@ function GoToRow({ deviationRef, onClick }: { deviationRef: string; onClick: () 
       onClick={onClick}
       aria-label={`Row ${deviationRef}, go to it in the checklist`}
       title="Go to the row"
-      className="inline-flex items-center gap-1 rounded-sm text-sm font-medium text-brand-700 underline-offset-2 hover:underline"
+      className="group -mx-2 inline-flex min-h-8 items-center px-2 text-sm font-medium text-brand-700 outline-none pointer-coarse:-my-1.5 pointer-coarse:min-h-11"
     >
-      {deviationRef}
-      <CornerDownRight size={13} aria-hidden="true" />
+      <span className={LINK_TEXT}>
+        {deviationRef}
+        <CornerDownRight size={13} aria-hidden="true" />
+      </span>
     </button>
   );
 }
 
+/**
+ * Minor is neutral and major a red tint; critical is filled with the colour Insights gives it, so
+ * the most severe is the strongest red on both pages, in both themes.
+ */
 const SEVERITY_TONES: Record<Severity, string> = {
   minor: 'bg-ink-100 text-ink-700 ring-ink-300',
   major: 'bg-nok-bg text-nok-fg ring-nok-border',
-  critical: 'bg-nok-solid text-white ring-nok-solid',
+  critical: 'bg-severity-critical text-on-severity-critical ring-severity-critical',
 };
 
 /** The severity in words, never by colour alone; critical is the one filled badge. */

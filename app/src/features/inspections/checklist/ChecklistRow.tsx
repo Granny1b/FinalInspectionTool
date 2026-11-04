@@ -26,13 +26,11 @@ import {
   ISSUE_OUTLINE,
   NOK_BAR,
   ROW_FOCUS,
+  ROW_LABEL,
   ROW_LINE,
 } from './layout';
 import { GuideButton, PhotoCount, StatusControl } from './parts';
 import type { ChecklistActions } from './useChecklistActions';
-
-/** "Category" and "Severity" before a NOK row's selects. */
-const NOK_LABEL = 'shrink-0 text-xs font-medium text-nok-fg @max-[34rem]:w-14';
 
 type Props = {
   item: Item;
@@ -161,7 +159,14 @@ export const ChecklistRow = memo(function ChecklistRow({
             onKeyDown={onFieldKeyDown('comment')}
           />
         </div>
-        <div className={CELL.resp}>
+        <label className={clsx(CELL.resp, 'flex items-center gap-2 self-start')}>
+          {/*
+            A phone has no column labels: without one, "Mechanical" would read like a category.
+            While empty, the select's own "Responsible" says it (and its arrow that it is a list).
+          */}
+          <span className={clsx(ROW_LABEL, resp ? '@min-[34rem]:hidden' : 'hidden')}>
+            Responsible
+          </span>
           <select
             data-resp={item.id}
             aria-label={`Responsible, row ${ref}`}
@@ -170,7 +175,7 @@ export const ChecklistRow = memo(function ChecklistRow({
             data-empty={resp ? undefined : ''}
             onChange={(event) => actions.setText(item.id, 'resp', event.target.value)}
             onKeyDown={onFieldKeyDown('resp')}
-            className={clsx(FIELD, CONTROL_HEIGHT, EMPTY_SELECT)}
+            className={clsx(FIELD, CONTROL_HEIGHT, EMPTY_SELECT, 'flex-1')}
           >
             <ChoiceOptions
               list={responsibles}
@@ -180,13 +185,12 @@ export const ChecklistRow = memo(function ChecklistRow({
               optionClassName="text-ink-900"
             />
           </select>
-        </div>
+        </label>
         {status === 'NOK' && (
           <label
             className={clsx(CELL.category, 'flex items-center gap-2 @min-[34rem]:justify-end')}
           >
-            {/* Stacked (a phone), both labels are as wide, so the two selects line up. */}
-            <span className={NOK_LABEL}>Category</span>
+            <span className={ROW_LABEL}>Category</span>
             <select
               data-category={item.id}
               aria-label={`Category, row ${ref}`}
@@ -206,7 +210,7 @@ export const ChecklistRow = memo(function ChecklistRow({
         )}
         {status === 'NOK' && (
           <label className={clsx(CELL.severity, 'flex items-center gap-2')}>
-            <span className={NOK_LABEL}>Severity</span>
+            <span className={ROW_LABEL}>Severity</span>
             <select
               aria-label={`Severity, row ${ref}`}
               value={result?.severity ?? DEFAULT_SEVERITY}

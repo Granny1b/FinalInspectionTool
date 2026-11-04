@@ -116,33 +116,38 @@ export function ReadOnlyChecklist({
   ));
 }
 
+const NOTE_LABEL = 'font-medium text-ink-500';
+
 /**
  * Under the checkpoint: the comment, then a NOK row's category and severity (as in the fill-in
- * sheet, category first). Labelled, as there is no Comment column.
+ * sheet, category first). Labelled, as there is no Comment column, and all in one style with the
+ * Responsible line above them on a phone: grey labels, the values in text colour (the red bar
+ * and the NOK badge already mark the row).
  */
 function Notes({ result }: { result: RowResult | undefined }) {
   const nok = result?.status === 'NOK';
   if (!result?.comment && !nok) return null;
   return (
-    <div className={clsx(READ_CELL.notes, 'min-w-0 space-y-0.5 pb-1.5')}>
+    <div
+      className={clsx(READ_CELL.notes, 'min-w-0 space-y-0.5 pb-1.5 text-sm leading-5 text-ink-800')}
+    >
       {result?.comment && (
-        <p className="text-sm leading-5 wrap-break-word text-ink-800">
-          <span className="font-medium text-ink-500">Comment: </span>
+        <p className="wrap-break-word">
+          <span className={NOTE_LABEL}>Comment: </span>
           {result.comment}
         </p>
       )}
       {nok && (
-        <p className="flex flex-wrap gap-x-4 text-xs leading-5 font-medium text-nok-fg">
+        <p className="flex flex-wrap gap-x-4">
           {result.category && (
             <span className="wrap-break-word">
-              Category: <span className="text-ink-800">{result.category}</span>
+              <span className={NOTE_LABEL}>Category: </span>
+              {result.category}
             </span>
           )}
           <span>
-            Severity:{' '}
-            <span className="text-ink-800">
-              {SEVERITY_LABELS[result.severity ?? DEFAULT_SEVERITY]}
-            </span>
+            <span className={NOTE_LABEL}>Severity: </span>
+            {SEVERITY_LABELS[result.severity ?? DEFAULT_SEVERITY]}
           </span>
         </p>
       )}

@@ -37,6 +37,8 @@ type PickerProps = {
 /**
  * Good / Bad / Info as a segmented control: native radio buttons, so it is one Tab stop and the
  * arrow keys pick (the selected segment takes the verdict's colour, with its symbol and word).
+ * The app's segmented control otherwise (track, height, raised hover), filling the width of its
+ * image tile; in small type, as a third of an 11.5rem tile is too narrow for "✓ Good" in 14 px.
  */
 export function VerdictPicker({ value, onChange, label }: PickerProps) {
   const name = useId();
@@ -51,11 +53,11 @@ export function VerdictPicker({ value, onChange, label }: PickerProps) {
             <label
               key={verdict}
               className={clsx(
-                'relative inline-flex h-8 min-w-0 cursor-pointer items-center justify-center gap-1 rounded-md text-xs transition-colors pointer-coarse:h-10',
+                'relative inline-flex h-8 min-w-0 cursor-pointer items-center justify-center gap-1 rounded-md px-1 text-xs font-medium transition-colors pointer-coarse:h-10',
                 'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-brand-600',
                 checked
-                  ? clsx('font-semibold shadow-xs ring-1 ring-inset', VERDICT_TONES[verdict])
-                  : 'text-ink-600 hover:bg-surface hover:text-ink-900',
+                  ? clsx('font-semibold shadow-xs ring-1', VERDICT_TONES[verdict])
+                  : 'text-ink-600 hover:bg-raised/60 hover:text-ink-900',
               )}
             >
               <input

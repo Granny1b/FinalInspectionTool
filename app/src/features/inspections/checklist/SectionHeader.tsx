@@ -1,11 +1,9 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import { CELL, GRID, READ_GRID, READ_LABELS, SECTION_HEADER, WIDE_ONLY } from './layout';
+import { CELL, COLUMN_LABEL, GRID, READ_GRID, READ_LABELS, SECTION_HEADER } from './layout';
 
-const LABEL_TEXT =
-  'row-start-1 px-2 text-[0.6875rem] font-medium tracking-wide text-ink-500 uppercase';
-const LABEL = clsx(WIDE_ONLY, LABEL_TEXT);
-const READ_LABEL = clsx(READ_LABELS, LABEL_TEXT);
+const LABEL_TEXT = 'px-2 text-[0.6875rem] font-medium tracking-wide text-ink-500 uppercase';
+const READ_LABEL = clsx(READ_LABELS, LABEL_TEXT, 'row-start-1');
 
 type Props = {
   number: number;
@@ -16,7 +14,11 @@ type Props = {
   readOnly?: boolean;
 };
 
-/** The grey header row of a section, with the column labels of the printed table when wide. */
+/**
+ * The grey header row of a section, with the column labels of the printed table from 34rem: on a
+ * tablet on a line of their own under the title (the action stays beside it), on a desktop beside
+ * the title.
+ */
 export function SectionHeader({ number, title, children, readOnly = false }: Props) {
   const heading = (
     <>
@@ -48,19 +50,22 @@ export function SectionHeader({ number, title, children, readOnly = false }: Pro
   return (
     <div className={clsx(GRID, SECTION_HEADER)}>
       {heading}
-      <span aria-hidden="true" className={clsx(LABEL, 'col-start-3')}>
+      <span aria-hidden="true" className={clsx(COLUMN_LABEL.comment, LABEL_TEXT)}>
         Comment
       </span>
-      {children ? (
+      {children && (
         <div className="col-start-2 justify-self-start @min-[34rem]:col-span-2 @min-[34rem]:col-start-3 @min-[34rem]:row-start-1 @min-[34rem]:justify-self-end @min-[56rem]:col-span-1 @min-[56rem]:col-start-4 @min-[56rem]:justify-self-stretch">
           {children}
         </div>
-      ) : (
-        <span aria-hidden="true" className={clsx(LABEL, 'col-start-4')}>
-          Status
-        </span>
       )}
-      <span aria-hidden="true" className={clsx(LABEL, 'col-start-5')}>
+      {/* On a wide sheet the action takes the Status label's place, over the statuses. */}
+      <span
+        aria-hidden="true"
+        className={clsx(COLUMN_LABEL.status, LABEL_TEXT, children && '@min-[56rem]:hidden')}
+      >
+        Status
+      </span>
+      <span aria-hidden="true" className={clsx(COLUMN_LABEL.resp, LABEL_TEXT)}>
         Responsible
       </span>
     </div>

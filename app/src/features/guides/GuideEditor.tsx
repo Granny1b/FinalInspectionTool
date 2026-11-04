@@ -107,7 +107,7 @@ export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyC
           else onCancel();
         }}
         onKeyDown={onKeyDown}
-        className="m-auto max-h-[calc(100dvh-2rem)] w-[min(60rem,calc(100vw-2rem))] max-w-none flex-col overflow-hidden rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl backdrop:bg-scrim/50 open:flex"
+        className="m-auto max-h-[calc(100dvh-2rem)] w-[min(60rem,calc(100vw-2rem))] max-w-none flex-col overflow-hidden rounded-xl border border-ink-200 bg-overlay p-0 text-ink-900 shadow-xl backdrop:bg-scrim/30 open:flex dark:border-ink-300 dark:backdrop:bg-scrim/70"
       >
         <header className="border-b border-ink-200 px-5 py-3.5">
           <h2 id={titleId} title={title} className="truncate text-base font-semibold">
