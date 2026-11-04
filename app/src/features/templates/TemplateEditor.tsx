@@ -25,7 +25,7 @@ import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
 import { useReload } from '../../lib/autosave/useReload';
 import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { useSettings } from '../../lib/useSettings';
-import { useScrollPaddingBelow } from '../inspections/useScrollPaddingBelow';
+import { useScrollPaddingBelow } from '../../lib/useScrollPaddingBelow';
 import { templatePrintHref } from '../print/links';
 import { Badge } from './Badge';
 import { ChecklistHeading } from './ChecklistHeading';

@@ -80,7 +80,7 @@ import {
 } from './queries';
 import { StateBadge } from './StateBadge';
 import { StateChangeDialog, type StateOutcome } from './StateChangeDialog';
-import { useScrollPaddingBelow } from './useScrollPaddingBelow';
+import { useScrollPaddingBelow } from '../../lib/useScrollPaddingBelow';
 
 type Props = {
   /** Read once, when the page opens; from then on the page's own state is the truth. */
@@ -478,12 +478,13 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             {showSaveStatus && (
               // A line of its own on a phone, so the buttons share one. Beside the details (and
               // before the actions) it is only as high as its text, so their line keeps its height.
-              <div className="mt-3 @min-[42rem]:col-start-2 @min-[42rem]:row-start-2 @min-[42rem]:mt-1.5 @min-[42rem]:self-center @min-[42rem]:justify-self-end @min-[42rem]:*:h-5 @min-[52rem]:row-start-1 @min-[52rem]:mt-0 @min-[52rem]:-mr-2">
+              <div className="mt-3 @min-[42rem]:col-start-2 @min-[42rem]:row-start-2 @min-[42rem]:mt-1.5 @min-[42rem]:self-center @min-[42rem]:justify-self-end @min-[52rem]:row-start-1 @min-[52rem]:mt-0 @min-[52rem]:-mr-2">
                 <SaveStatus
                   state={participantPending && saveState.status === 'saved' ? TYPING : saveState}
                   conflict={stateConflict}
                   onRetry={() => void saver.flush()}
                   onReload={reload.askReload}
+                  height="h-9 @min-[42rem]:h-5"
                 />
               </div>
             )}

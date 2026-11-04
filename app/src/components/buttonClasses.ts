@@ -18,7 +18,10 @@ const VARIANTS: Record<ButtonVariant, string> = {
     'dark:bg-white/5 dark:hover:bg-white/10',
     'disabled:opacity-50',
   ),
-  ghost: 'text-ink-600 hover:bg-ink-100 hover:text-ink-900 disabled:opacity-50',
+  // In the dark theme ink-100 is also the overlay colour, so a hover in a dialog or menu would
+  // not show: one step lighter there.
+  ghost:
+    'text-ink-600 hover:bg-ink-100 hover:text-ink-900 disabled:opacity-50 dark:hover:bg-ink-200',
   // The confirming button of a delete or remove: nok-solid carries white text in both themes,
   // where nok-fg is a light red in the dark one.
   danger: clsx('bg-nok-solid text-white shadow-xs hover:bg-nok-solid/90', FILLED_DISABLED),

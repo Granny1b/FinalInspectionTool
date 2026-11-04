@@ -59,15 +59,15 @@ export function EditableDocument({
     <div ref={rootRef}>
       {shown.length === 0 ? (
         <div className="py-12 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-            <ListChecks size={22} strokeWidth={1.75} aria-hidden="true" />
+          <div className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+            <ListChecks size={20} strokeWidth={1.75} aria-hidden="true" />
           </div>
-          <h2 className="mt-5 text-base font-semibold text-ink-900">No sections yet</h2>
+          <h2 className="mt-4 text-base font-semibold text-ink-900">No sections yet</h2>
           <p className="mx-auto mt-1.5 max-w-sm text-sm text-balance text-ink-500">
             Sections group the checkpoints, like “Loading area” or “Electrical cabinets”. Add the
             first one to start the checklist.
           </p>
-          <Button data-add-section="" onClick={actions.addSection} className="mt-7">
+          <Button data-add-section="" onClick={actions.addSection} className="mt-6">
             <Plus size={16} aria-hidden="true" />
             Add section
           </Button>

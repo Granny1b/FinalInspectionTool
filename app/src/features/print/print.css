@@ -323,16 +323,18 @@
 }
 
 /* Never split a row; never leave a section title with one row at the foot of a page, or one row
-   alone on the next. */
+   alone on the next. Not for a row with a very long comment (data-long, a third of a page or
+   more): in a short section the two rules would chain every row into one block taller than a
+   page, and Chrome then splits a row rather than break between them. */
 .paper-table tr {
   break-inside: avoid;
 }
 
-.paper-table tbody tr:first-child {
+.paper-table tbody tr:first-child:not([data-long], :has(+ [data-long])) {
   break-after: avoid;
 }
 
-.paper-table tbody tr:last-child {
+.paper-table tbody tr:last-child:not([data-long], [data-long] + tr) {
   break-before: avoid;
 }
 

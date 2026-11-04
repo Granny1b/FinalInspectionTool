@@ -1082,6 +1082,7 @@ The calls with product, data or paper impact. Each is explained in its section b
   print toolbar (and the address); **2 is the default, chosen by the user** after comparing the
   two sample reports. The sample PDFs compare both: one photo
   prints at 103 × 77 mm with 2 per page, 68 × 51 mm with 4; labels at about 12 pt and 8 pt (Print).
+  (Superseded by UI pass, review fixes: 4 is the default when no deviation has a photo.)
 - **4 per page is four stacked rows** (text left, photos right), not a 2 × 2 grid (Print).
 - **A page holds fewer cards when their text doesn't fit.** The cards are measured in the browser
   before they are put on pages; a card is never split, and no text is cut (Print). (Phase 5: a
@@ -1234,6 +1235,7 @@ The calls with product, data or paper impact. Each is explained in its section b
   address, so a reload doesn't print again.
 - **Template preview:** admins see the draft ("Draft – Rev 3" on the front page, "(draft)" in the
   footer), inspectors the latest published revision, `?revision=n` any published one.
+  (Superseded by UI pass, review fixes: the footer says "Draft – Rev 3" too, as does the editor's front-page card.)
 - **The footer is one `@page` rule with both margin boxes**, added at runtime through the CSSOM to
   the app's own stylesheet: the production CSP (`style-src 'self'`) blocks inline styles but not
   CSSOM edits. The text is escaped as a CSS string (control characters become spaces).
@@ -1247,7 +1249,8 @@ The calls with product, data or paper impact. Each is explained in its section b
 - **The PDF's file name** comes from the document title: "FI-2026-0042 RigiMill MG – Volvo Cars
   Skövde – Inspection report".
 - **The front page is exactly one page** (a 265 mm column; the photo takes what the text leaves).
-  Without a photo its frame stays, so every front page has the same layout. The finaliser is
+  Without a photo its frame stays, so every front page has the same layout. (Superseded by UI pass, review fixes: a report
+  leaves the space blank; only blank and template forms keep a "Machine photo" frame.) The finaliser is
   printed as stored, by email. (Review: values far beyond the usual, such as names and locations
   near their 200 characters or twenty participants, used to push the signatures and Rev over the
   checklist's first page. The column is now at least a page, the photo gives way down to 20 mm,
@@ -1267,16 +1270,18 @@ The calls with product, data or paper impact. Each is explained in its section b
   moves to a new page and then runs on, so the page before may hold only the heading. No text is
   lost; Word has its own rule for this, see Word export.)
 - **Right-aligned text stays 0.5 mm inside the margin:** Chrome's PDFs put the right content edge
-  about 0.3 mm further out.
+  about 0.3 mm further out. (Superseded by UI pass, review fixes: the whole sheet's content keeps the inset, so box borders
+  are not clipped either.)
 - **Black and white:** light grey fills (`print-color-adjust: exact`, so they print without
   "Background graphics"), thin rules, words for statuses and severities; a critical card's badge
   is the one filled black.
 - **Report cards:** "D-03 · 4.c · MAJOR" (an extra deviation: "Not on the checklist"), the section,
-  checkpoint or description, comment, Resp ("—" when empty), up to two photos as marked up with
+  checkpoint or description, comment, Resp ("—" when empty; "Responsible" since the UI pass), up to two photos as marked up with
   their captions, and a "Closed · Sign · Date" line. No photo: an empty "Sketch / photo" frame. A
   photo that can't be loaded says so in its place. No deviations: "No deviations recorded."
 - **`deviationsPerPage` lives in the address only** (default 2); the toolbar's switch replaces the
-  history entry. The inspection's Report menu opens 2 per page.
+  history entry. The inspection's Report menu opens 2 per page. (Superseded by UI pass, review fixes: the default is 4 when
+  no deviation has a photo.)
 - **2 per page never prints a photo under 50 mm** (review). With the 24 mm floor alone, a card
   with about 1 000 characters of text (or a neighbour with them) printed its photos at 24 mm,
   smaller than 4 per page prints them (the 4-per-page row puts text beside the photos). Measured
@@ -1828,7 +1833,8 @@ true` unless in-progress is included) and only the table's columns (17 then, 18 
   text, as before.
 - **"Responsible" on screen, "Resp" on paper and in Word.** The printed checklist's column (not
   this package's file) and the cards keep the workbook's short label; the template editor's column
-  label (templates package) also still says Resp.
+  label (templates package) also still says Resp. (Superseded by UI pass, review fixes: the cards say Responsible; the
+  checklist's narrow column and the blank summary keep Resp.)
 - **On a wide sheet an empty Responsible select looks like an empty text field.** Its
   "Responsible" text is hidden like the inputs' placeholders, because the column label already
   says it; it shows again when the keyboard reaches the select. Options set their own colour, so
@@ -2082,7 +2088,7 @@ The people list in Settings → Users & access, and names instead of emails.
   print route), so it waits for fonts and images and packs the cards as on paper.
 - **It opens on the report** (what an inspector wants to check), with a switch to the blank
   checklist. Deviation cards are 2 to a page and there is no appendix, as the Print / Save PDF
-  menu opens them. The print route keeps the other layout switches.
+  menu opens them. (Superseded by UI pass, review fixes: 4 to a page when no deviation has a photo, as the print route.) The print route keeps the other layout switches.
 - **Sheets are scaled with a transform, not `zoom`**: the browser lays the pages out exactly as
   for print and only draws them smaller, so lines break where they will on paper. The scale fits
   the desk's width, never above 100 % and never below 37.5 %. Card measuring (`useCardPages`)
@@ -2116,7 +2122,7 @@ widths, against local demo data. No page scrolls sideways at 320 to 1366 px any 
   set their own heights, and a global touch height would change their layouts.
 - **Below lg the page has `scroll-padding-top: 4.5rem`** for the sticky top bar, so a field
   reached by Shift+Tab or a link to an id is never scrolled under it.
-- **In the dark theme modal backdrops are scrim at 60 %** (30 % in light): 30 % of near-black over
+- **In the dark theme modal backdrops are scrim at 70 %** (30 % in light): 30 % of near-black over
   a near-black page dimmed almost nothing. The drawer and the skip link have a border there.
 - **`Button` has a `danger` variant** (nok-solid with white text in both themes), used by every
   delete and remove confirmation.
@@ -2148,8 +2154,96 @@ widths, against local demo data. No page scrolls sideways at 320 to 1366 px any 
 ### Report
 
 - **Refs and card heads use proportional figures:** Inter's tabular ones spaced "D-01" out.
-- **A card's Category and Resp values line up** in a 12.5 mm label column, in Word too (a tab stop
-  and a hanging indent).
+- **A card's Category and Responsible values line up** in an 18 mm label column (Word: a 20 mm
+  tab stop and hanging indent).
 - **The print toolbar has two parts:** the way back, the subject and Export / Print, then the
   layout choices with the PDF hint on the right. It is sticky from 640 px up only.
 - **The Preview names the finaliser as the print route does.**
+
+### Review fixes
+
+Two reviewers then went over the screenshots of the pass (41 findings); these came out of fixing
+them.
+
+- **Two new tokens: `raised` and `overlay`.** `raised` is the chosen segment of a segmented
+  control on its ink-100 track; `overlay` is a menu, popover or dialog. Both are white in light; in
+  dark they are lighter than the surface (#353c46, #232931), because there elevation is lightness
+  and a shadow doesn't show. Inside an overlay a hover is ink-200 in dark (ink-100 is the overlay
+  colour), the ghost button's hover included.
+- **One segmented control look:** a ringed ink-100 track, rounded-md segments, the chosen one
+  raised, a raised/60 hover. The sidebar theme toggle keeps its own size (three columns of the
+  215 px panel, h-7, text-xs), the checklist status keeps its status colours and the row height
+  (28 px with a mouse, 40 px on touch), the guide verdict picker keeps text-xs.
+- **Minor severity is a neutral grey,** in Insights and its badge alike; major and critical stay
+  red, critical the strongest. The critical badge uses the severity token, so it matches Insights.
+- **Overlays share one frame** (`DIALOG_FRAME` in components/Dialog.tsx): bg-overlay, an ink-300
+  border in dark, a scrim backdrop at 30 % (light) and 70 % (dark). The guide, annotation and photo
+  dialogs, which are not built on Dialog, use the same classes. **A dialog's closing row of buttons
+  sticks to its bottom** above a divider (components/dialog.css, found by position, as every
+  dialog ends with it), so a long dialog on a phone keeps Save in view.
+- **Secondary buttons in dark are a faint white wash** (5 %, hover 10 %): on a dialog a surface
+  fill sank in and read as a text field. **Disabled primary and danger buttons turn ink-200 with
+  ink-500 text;** half-faded white on pale cyan read as loading. Settings' Save, which is
+  aria-disabled to keep the focus, looks the same, but still fades while saving.
+- **Dark field outlines are ink-400** (3.7:1 on the surface). Tailwind emits `dark:hover` after
+  `focus-visible` and `aria-invalid`, so the focus and error borders are restated for dark.
+- **Empty and error states share `StateCard`** (a size-11 rounded-xl tile, title, hint, action),
+  so a retry that turns an error into an empty list keeps its height. The template editor's "No
+  sections yet" matches it.
+- **One card header:** a small semibold title, an xs description, an ink-200 divider and an
+  optional aside, no icon tiles, on Settings, Insights, the front page card, the revision history
+  and the New inspection Checklist card (whose h2 sits in the fieldset's legend, so the radio
+  group keeps its name). The five differ in alignment and phone padding, so they stay inline
+  rather than one component.
+- **A focused, checked template card shows one 2 px frame**, the outline drawn over its border.
+- **Link-styled buttons with a touch-sized box** ("Continue at 3.b", a card's "1.d ↳") keep the
+  focus ring and hover underline around the text (`linkText.ts`), so the focus on load reads as a
+  focused link.
+- **Labels in rows are grey** (Category, Severity, Responsible, the finalised notes). Red is kept
+  for the NOK bar and chip, the Major and Critical badges and real errors.
+- **Inspection header on a tablet:** from 42rem the actions sit beside the title, and below 52rem
+  the save status moves to the end of the details line, at its text's height (`SaveStatus`'s
+  `height`). The sticky header drops from 162 to 122 px and never changes height while typing.
+- **Phone checklist:** below 34rem the fields span the ref column, inset to line up with the row
+  letter and clear the NOK bar, on a sheet with 12 px sides; controls are 294 px wide at 360 px
+  (250 before). Status and Responsible stay on separate lines: side by side the status segments
+  would be too narrow to tap. A chosen Responsible gets a grey label on a phone; tablets get the
+  column labels on a second line of the section header.
+- **The template editor's header follows the inspection's rules:** sticky only from sm and 40rem
+  tall, scroll padding measured from the header (`lib/useScrollPaddingBelow.ts`, shared), a long
+  name wraps to two lines.
+- **Template cards show the list's badges;** "Unpublished changes" only when the draft differs.
+- **Insights:** with one or two months the chart draws 24 px columns with their count on top (a
+  line needs three points to show a trend), and from three months the line. The count axis has
+  whole, round ticks with at least 15 % headroom; ticks read "Oct 2026". The panels share one
+  two-column grid, "By severity" takes its own height, and on a phone the KPI tiles are two to a
+  row (a subgrid keeps their values level) and the Top 10 table moves its numbers under the
+  checkpoint ("2 failed · 100% of 2 inspections"), staying a real table.
+- **Report, Chrome PDFs:** every sheet's content keeps the 0.5 mm inset off the right margin, so no
+  box's right border is clipped to a hairline.
+- **Report on a phone or tablet:** the print route fits its sheets to the screen with the
+  Preview's `FittedPages` (a transform, 37.5–100 %, screen only), so paper stays 1:1.
+- **A report without a machine photo leaves its space blank;** a "No machine photo" frame read
+  like a missing image in the customer's copy. Blank and template forms keep a "Machine photo"
+  frame to stick one in. Word does the same.
+- **4 deviations per page when none has a photo** (`defaultDeviationsPerPage`): with 2, three
+  quarters of each card page were empty sketch frames. 2 stays the default with photos, and a
+  choice in the address always wins.
+- **The summary counts statuses for the customer:** "90 checkpoints: 82 OK · 5 NOK · 3 N/A ·
+  7 deviations", plus "N not checked" on a draft report.
+- **A row with a very long comment (over 600 characters, about a third of a page) is free of the
+  keep-with-next rules.** In a short section, first-keeps-with-next and last-keeps-with-previous
+  chained every row into one block; three such rows were taller than a page, and Chrome then split
+  a row (and left the checklist's first page with only its heading) rather than break between
+  rows.
+- **Lower report rows:** a 3.4 mm status symbol over 6 pt type and tighter cell padding take a
+  90-row checklist from 5 pages to 4. The OK/NOK/N/A columns stay, as on the paper form.
+- **The blank Deviation Summary has 24 lines,** as many as its page holds (the brief says about 15),
+  instead of half a page left empty.
+- **Revision wording:** running text (checklist heading, footer, toolbar) says "Rev 2" or "Draft –
+  Rev 3". The front-page corner keeps the workbook's form field "Rev: n" for a published revision.
+- **The print toolbar truncates only the subject's name,** never "Draft – Rev 3", and the PDF hint
+  wraps between whole settings.
+- **The search placeholder is "Number, machine or S/N",** which fits a 320 px phone.
+- **A participant chip's 36 px remove area is for coarse pointers only,** so a mouse click near the
+  end of a name doesn't remove it.

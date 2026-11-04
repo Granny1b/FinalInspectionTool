@@ -259,7 +259,12 @@ export function SettingsForm({ loaded, onReload }: Props) {
             aria-disabled={
               saving || uploads > 0 || !changed || save.status === 'conflict' || undefined
             }
-            className="min-w-24 aria-disabled:opacity-50"
+            className={clsx(
+              'min-w-24',
+              saving
+                ? 'aria-disabled:opacity-50'
+                : 'aria-disabled:bg-ink-200 aria-disabled:text-ink-500 aria-disabled:shadow-none aria-disabled:hover:bg-ink-200',
+            )}
           >
             {saving && <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />}
             {saving ? 'Saving…' : 'Save'}

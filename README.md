@@ -460,10 +460,12 @@ machine name longer than 60 characters is shortened in the footer.
 
 - **Front page.** Logo, "Final Inspection", company name, the machine photo, Machine name, Model,
   Serial number, Participants, Location and Date, signature lines (Inspected by, Date, Signature)
-  and the checklist's revision bottom right ("Rev: 2"). A report also has its number, who
-  finalised it and when, and "90 / 90 rows filled · 6 NOK · 8 deviations"; a report of an
-  inspection in progress says "NOT FINALISED – DRAFT REPORT" instead, and "Not finalised" in every
-  footer. The photo gives way to long values; values far beyond the usual (dozens of participants,
+  and the checklist's revision bottom right ("Rev: 2", or "Draft – Rev 3" for a template's draft).
+  A report also has its number, who finalised it and when, and "90 checkpoints: 82 OK · 6 NOK ·
+  2 N/A · 8 deviations"; a report of an inspection in progress adds "N not checked", says
+  "NOT FINALISED – DRAFT REPORT", and "Not finalised" in every footer. A report without a machine
+  photo leaves its space blank; the blank and template forms show a "Machine photo" frame to
+  stick one in. The photo gives way to long values; values far beyond the usual (dozens of participants,
   names near their 200 characters) move the signatures and revision to a second page.
 - **Checklist.** One table per section: No. | Checkpoint | Comment | OK | NOK | N/A | Resp. Its
   title and column labels repeat on every page the section runs onto; a row is never split, and a
@@ -472,13 +474,15 @@ machine name longer than 60 characters is shortened in the footer.
   the status as a symbol and a word (✓ OK, ✗ NOK, – N/A), a NOK row's severity above its comment
   ("Severity: Major"), and Resp.
 - **Deviations**, starting on a new page. _Blank_: the Deviation Summary to fill in by hand, lines
-  D-01 to D-15 (No. | Ref | Description | Severity | Category | Resp | Closed). _Report_: a card
-  per deviation: "D-03 · 4.c · MAJOR" (an extra deviation says "Not on the checklist"), the
-  section, the checkpoint or description, comment, Category and Resp ("—" when none), its photos
+  D-01 to D-24, filling the page (No. | Ref | Description | Severity | Category | Resp | Closed).
+  _Report_: a card per deviation: "D-03 · 4.c · MAJOR" (an extra deviation says "Not on the
+  checklist"), the section, the checkpoint or description, comment, Category and Responsible ("—"
+  when none), its photos
   as marked up (with captions), and a "Closed · Sign · Date" line to sign off. A deviation without
   photos gets an empty frame to sketch in. "No deviations recorded." when there are none.
 
-The printed checklist and cards keep the paper's short "Resp" label; the screens say Responsible.
+The printed checklist's narrow column and the blank summary keep the paper's short "Resp" label;
+the cards and the screens say Responsible.
 
 **2 or 4 deviations per page.** The report's toolbar has _Deviations: 2 per page | 4 per page_
 (kept in the address). With 2, a card has the full width and half a page: one photo prints at
@@ -489,7 +493,10 @@ then has a page of its own. If the cards don't all fit, the page holds fewer and
 starts the next page; a card is never split. A card too tall to share a page of four gets a page
 of its own, laid out full width as with 2. Only a card whose text alone is longer than a page
 (thousands of characters) runs on to the next page, with its photos whole. 2 per page is the
-default.
+default, or 4 when no deviation has a photo (an address choice always wins).
+
+On a phone or tablet the print route and the Preview fit the sheets to the screen; paper is always
+printed 1:1.
 
 Everything is laid out for black and white: statuses and severities in words, light grey fills
 only, thin rules. Inter is bundled with the app, so a printout looks the same offline.
@@ -511,7 +518,7 @@ preview, and an inspection prints the guides it was created with.
 **Export to Word (.docx)** in the print toolbar saves what the preview shows as an editable Word
 file, made in the browser: the front page, one table per section with the same columns (blank:
 ☐ boxes; report: ✓ / ✗ / – and the word, a NOK row's severity in its comment), the deviations
-(blank: the D-01 to D-15 table; report: a framed block per deviation with its photos and a line
+(blank: the D-01 to D-24 table; report: a framed block per deviation with its photos and a line
 to sign it off), the reference images when they are included, and the footer with
 "Page X of Y". It is A4 portrait with the print margins; header rows repeat on every page and rows
 and deviation blocks never split (only one taller than a page may, so that Word doesn't cut it
@@ -735,7 +742,7 @@ because it usually means the command that produced it failed.
   else in the bottom margin, every row is whole on the one page that has its ref, no section
   title is left without a row after it, no text crosses the right margin, blank rows are at least
   9 mm apart, spare lines carry on the lettering, the blank Deviation Summary is the last page
-  with D-01 to D-15, and the report's cards are 2 or 4 to a page, each whole on one page with its
+  with D-01 to D-24, and the report's cards are 2 or 4 to a page, each whole on one page with its
   photos painted there. The reference images: turned on in the toolbar, the page is not ready to
   print until their images are in; the appendix follows the deviations, the images two to a row
   (side by side on one line), captioned with the ref and verdict, every page painting as many
@@ -743,7 +750,7 @@ because it usually means the command that produced it failed.
   is downloaded from the toolbar: its file name, and inside the .docx a table per section with two
   repeating header rows, every checkpoint, the deviation, the reference images with their
   captions, the logo and images embedded, and "Page X of Y" as Word fields in the footer; the
-  blank checklist's file has D-01 to D-15. Each PDF and .docx is kept in `test-results/`.
+  blank checklist's file has D-01 to D-24. Each PDF and .docx is kept in `test-results/`.
 
 The end-to-end tests sign in by setting the SWA CLI's `StaticWebAppsAuthCookie` directly. Each
 test writes its own throwaway templates into the local Azurite (the print tests a copy of the

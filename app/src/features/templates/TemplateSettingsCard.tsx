@@ -53,7 +53,7 @@ export const TemplateSettingsCard = memo(function TemplateSettingsCard({
       : (models ?? [{ code: modelCode, name: modelCode }]);
 
   return (
-    <FrontPageFrame revisionLabel={`Rev: ${revision} (draft)`}>
+    <FrontPageFrame revisionLabel={`Draft – Rev ${revision}`}>
       <PhotoField
         imageId={coverImageId}
         noun="cover photo"
