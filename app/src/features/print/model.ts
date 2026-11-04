@@ -27,6 +27,11 @@ import { appendixEntries, appendixImageIds, type AppendixEntry } from './appendi
 /** `blank`: the checklist to fill in by hand. `report`: what was recorded. */
 export const PRINT_MODES = ['blank', 'report'] as const;
 export type PrintMode = (typeof PRINT_MODES)[number];
+/** How the print toolbar and the preview dialog name each mode. */
+export const PRINT_MODE_LABELS: Record<PrintMode, string> = {
+  blank: 'Blank checklist',
+  report: 'Report',
+};
 
 /** Numbered lines on a blank Deviation Summary (brief §6: "~15 numbered lines"). */
 export const BLANK_DEVIATION_LINES = 15;

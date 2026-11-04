@@ -2,22 +2,16 @@ import { useEffect, useRef } from 'react';
 import { WordExportButton } from '../export/WordExportButton';
 import {
   DEFAULT_DEVIATIONS_PER_PAGE,
-  printedImageIds,
-  type DeviationCard,
   type DeviationsPerPage,
   type PrintMode,
   type PrintModel,
 } from './model';
 import { PrintDocument } from './PrintDocument';
 import { PrintToolbar, type Choice } from './PrintToolbar';
-import { useAssetsReady } from './useAssetsReady';
-import { useCardPages } from './useCardPages';
 import { usePageFooter } from './usePageFooter';
+import { usePrintDocument } from './usePrintDocument';
 import type { PrintImages } from './usePrintImages';
 import './print.css';
-
-/** A blank checklist has no cards to put on pages. */
-const NO_CARDS: DeviationCard[] = [];
 
 type Props = {
   model: PrintModel;
@@ -52,28 +46,11 @@ export function PrintView({
   autoprint = false,
   onAutoprinted,
 }: Props) {
-  const rootRef = useRef<HTMLDivElement>(null);
   const perPage = deviationsPerPage?.value ?? DEFAULT_DEVIATIONS_PER_PAGE;
-  const cards = useCardPages(
-    model.deviations.kind === 'cards' ? model.deviations.cards : NO_CARDS,
+  const { rootRef, cards, withAppendix, appendixShown, ready } = usePrintDocument(model, images, {
     perPage,
-  );
-  // Asked for and there is something to show: the appendix (in print and Word alike).
-  const withAppendix = appendix.value && model.appendix.length > 0;
-  // Its images' addresses arrive a moment after it is turned on.
-  const appendixShown = withAppendix && !images.appendixLoading;
-  // What is laid out and every image address in it: when any changes, readiness waits again.
-  const shown = [
-    model.mode,
-    perPage,
-    appendixShown,
-    cards.pages?.map((page) => page.map((card) => card.number).join()).join('|'),
-    images.logoUrl,
-    ...printedImageIds(model, { appendix: appendixShown }).map((id) => images.urls.get(id) ?? ''),
-  ].join(' ');
-  // Not while the cards are being measured onto pages, nor before the appendix is in.
-  const ready =
-    useAssetsReady(rootRef, shown) && cards.pages !== null && appendixShown === withAppendix;
+    appendix: appendix.value,
+  });
   usePageFooter(model.footer);
 
   const printed = useRef(false);
