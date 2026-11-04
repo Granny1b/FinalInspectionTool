@@ -11,9 +11,12 @@ export function useScrollPaddingBelow(header: RefObject<HTMLElement | null>): vo
     if (!element) return;
     const root = document.documentElement;
     const update = () => {
-      // `top` is where it sticks: below the tablet top bar, or at 0 on wide screens.
-      const top = Number.parseFloat(getComputedStyle(element).top) || 0;
-      root.style.scrollPaddingTop = `${top + element.offsetHeight + 8}px`;
+      // `top` is where it sticks: below the tablet top bar, or at 0 on wide screens. Where the
+      // header doesn't stick (a phone), only the top bar covers the page.
+      const style = getComputedStyle(element);
+      const top = Number.parseFloat(style.top) || 0;
+      const covered = style.position === 'sticky' ? element.offsetHeight : 0;
+      root.style.scrollPaddingTop = `${top + covered + 8}px`;
     };
     update();
     const observer = new ResizeObserver(update);

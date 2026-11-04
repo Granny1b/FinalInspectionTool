@@ -1,6 +1,7 @@
 /**
- * Geometry of the fill-in sheet, shared by section headers, editable rows and read-only rows so
- * everything lines up like the printed table: ref | checkpoint | Comment | Status | Responsible.
+ * Geometry of the fill-in sheet, shared by section headers and editable rows so everything lines
+ * up like the printed table: ref | checkpoint | Comment | Status | Responsible. Read-only rows
+ * have a grid of their own (READ_GRID, below).
  *
  * The sheet adapts to its own width (container queries), not the viewport's:
  * - wide (≥ 56rem, a desktop): one line per row, in the print's column order;
@@ -32,6 +33,29 @@ export const CELL = {
 
 /** Wide sheets only: the column labels of a section header. */
 export const WIDE_ONLY = 'hidden @min-[56rem]:block';
+
+/**
+ * Read-only rows (a finalised inspection) have nothing left to fill in, so they don't keep an
+ * empty column for each field: ref | checkpoint, with its comment and a NOK row's category and
+ * severity under it | Status | Responsible. From 34rem (a tablet) a row without a comment is one
+ * line, so 90 rows of "✓ OK" stay short and the statuses form one column next to the text;
+ * below that everything stacks, as in the fill-in sheet. Status is as wide as its badge.
+ */
+export const READ_GRID =
+  'grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2 gap-y-1 @min-[34rem]:grid-cols-[2.25rem_minmax(0,1fr)_7rem_10rem] @min-[34rem]:gap-y-0';
+
+export const READ_CELL = {
+  ref: 'col-start-1 row-start-1',
+  text: 'col-start-2 row-start-1',
+  status: 'col-start-2 @min-[34rem]:col-start-3 @min-[34rem]:row-start-1',
+  resp: 'col-start-2 @min-[34rem]:col-start-4 @min-[34rem]:row-start-1',
+  /** The comment and a NOK row's category and severity, under the checkpoint. */
+  notes: 'col-start-2 @min-[34rem]:row-start-2',
+  photos: 'col-start-2 @min-[34rem]:col-start-4 @min-[34rem]:row-start-2',
+} as const;
+
+/** Read-only sheets: the Status and Responsible column labels, from 34rem. */
+export const READ_LABELS = 'hidden @min-[34rem]:block';
 
 /**
  * Controls are 44 px high for fingers (tablet layout, or any touch screen), so a status segment

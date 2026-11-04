@@ -80,7 +80,8 @@ export function DeviationCard({
             onClick={() => onRemove(deviation)}
             aria-label={`Remove ${number}`}
             title="Remove"
-            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-nok-bg hover:text-nok-fg"
+            // 44 px for a finger, over the bar's padding, so the bar keeps its height.
+            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-nok-bg hover:text-nok-fg pointer-coarse:-my-1.5 pointer-coarse:size-11"
           >
             <Trash2 size={16} aria-hidden="true" />
           </button>

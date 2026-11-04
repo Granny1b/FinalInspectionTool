@@ -112,7 +112,9 @@ export const ProgressSummary = memo(function ProgressSummary({
   continueId,
 }: ProgressProps) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 pb-2.5 text-sm">
+    // Left-aligned on a phone, where it has a line of its own above the tabs (the header is a
+    // size container).
+    <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1 pb-2.5 text-sm @min-[36rem]:justify-end">
       {nextEmpty && (
         <button
           id={continueId}

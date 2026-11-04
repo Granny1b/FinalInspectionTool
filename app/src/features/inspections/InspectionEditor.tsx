@@ -420,24 +420,34 @@ export function InspectionEditor({ loaded, onReload }: Props) {
       <title>{`${number}${machine ? ` · ${machine}` : ''} · ${APP_NAME}`}</title>
       {backLink}
 
+      {/*
+        Sticky where it leaves room to work. On a phone, upright or on its side, the header takes
+        several lines (a third of the screen, more with the keyboard open), so it scrolls away.
+      */}
       <header
         ref={headerRef}
-        className="sticky top-14 z-20 mt-2 border-b border-ink-200 bg-canvas pt-3 lg:top-0"
+        className="top-14 z-20 mt-2 border-b border-ink-200 bg-canvas pt-3 lg:top-0 sm:[@media(min-height:40rem)]:sticky"
       >
-        <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-          <div className="min-w-0 flex-1">
+        {/*
+          Laid out by its own width. From 52rem (a desktop, a tablet on its side) the actions are
+          beside the title and the details run under both, so a change in the save status (Saved,
+          Unsaved changes) never re-wraps them and the header never changes height while typing.
+          Narrower, the actions go under the details, so a machine name is never cut to "R…".
+        */}
+        <div className="@container">
+          <div className="grid grid-cols-[minmax(0,1fr)] @min-[52rem]:grid-cols-[minmax(0,1fr)_auto] @min-[52rem]:gap-x-6">
             {/* Focusable from script: it takes the focus when a notice is dismissed. */}
             <h1
               ref={titleRef}
               tabIndex={-1}
-              className="truncate text-xl font-semibold tracking-tight text-ink-900 outline-none"
+              className="truncate text-xl font-semibold tracking-tight text-ink-900 outline-none @min-[52rem]:self-center"
             >
               {number}
               <span className="font-normal text-ink-500"> · </span>
               {machine || <span className="font-normal text-ink-500">No machine name</span>}
             </h1>
             {/* Spaced, not separated by dots: on a narrow screen a dot would dangle at a line end. */}
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500 @min-[52rem]:col-span-2">
               <StateBadge state={server.state} />
               <span>{modelLabel}</span>
               <span>S/N {draft.front.serialNumber.trim() || '—'}</span>
@@ -451,76 +461,89 @@ export function InspectionEditor({ loaded, onReload }: Props) {
                 </span>
               )}
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {(!finalised || saveState.status !== 'saved') && (
-              <div className="mr-2">
-                <SaveStatus
-                  state={participantPending && saveState.status === 'saved' ? TYPING : saveState}
-                  conflict={stateConflict}
-                  onRetry={() => void saver.flush()}
-                  onReload={reload.askReload}
-                />
-              </div>
-            )}
-            <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
-              <Eye size={16} aria-hidden="true" />
-              Preview
-            </Button>
-            <ActionMenu
-              label="Print / Save PDF"
-              trigger={
-                <>
-                  <Printer size={16} aria-hidden="true" />
-                  Print / Save PDF
-                  <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
-                </>
-              }
-              items={[
-                {
-                  label: 'Blank checklist',
-                  icon: ClipboardList,
-                  onSelect: () => void openPrint('blank'),
-                },
-                { label: 'Report', icon: ClipboardCheck, onSelect: () => void openPrint('report') },
-              ]}
-            />
-            {!finalised ? (
-              <Button onClick={openFinalise} disabled={conflict}>
-                <Lock size={16} aria-hidden="true" />
-                Finalise
+            <div className="mt-3 flex flex-wrap items-center gap-2 @max-[36rem]:gap-x-1.5 @min-[52rem]:col-start-2 @min-[52rem]:row-start-1 @min-[52rem]:mt-0">
+              {(!finalised || saveState.status !== 'saved') && (
+                // A line of its own on a phone, so the buttons share one.
+                <div className="@max-[36rem]:basis-full @min-[52rem]:mr-2">
+                  <SaveStatus
+                    state={participantPending && saveState.status === 'saved' ? TYPING : saveState}
+                    conflict={stateConflict}
+                    onRetry={() => void saver.flush()}
+                    onReload={reload.askReload}
+                  />
+                </div>
+              )}
+              <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
+                <Eye size={16} aria-hidden="true" />
+                Preview
               </Button>
-            ) : (
-              // Inspectors never see Reopen (brief §5.3: admin can reopen).
-              isAdmin && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setNotice(null);
-                    setDialog({ change: 'reopen' });
-                  }}
-                  disabled={conflict}
-                >
-                  <LockOpen size={16} aria-hidden="true" />
-                  Reopen
+              <ActionMenu
+                label="Print / Save PDF"
+                trigger={
+                  <>
+                    <Printer size={16} aria-hidden="true" />
+                    {/* "Print" on a phone, so the three buttons share a line; the name stays whole. */}
+                    <span>
+                      Print<span className="@max-[36rem]:sr-only"> / Save PDF</span>
+                    </span>
+                    <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
+                  </>
+                }
+                items={[
+                  {
+                    label: 'Blank checklist',
+                    icon: ClipboardList,
+                    onSelect: () => void openPrint('blank'),
+                  },
+                  {
+                    label: 'Report',
+                    icon: ClipboardCheck,
+                    onSelect: () => void openPrint('report'),
+                  },
+                ]}
+              />
+              {!finalised ? (
+                <Button onClick={openFinalise} disabled={conflict}>
+                  <Lock size={16} aria-hidden="true" />
+                  Finalise
                 </Button>
-              )
-            )}
+              ) : (
+                // Inspectors never see Reopen (brief §5.3: admin can reopen).
+                isAdmin && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setNotice(null);
+                      setDialog({ change: 'reopen' });
+                    }}
+                    disabled={conflict}
+                  >
+                    <LockOpen size={16} aria-hidden="true" />
+                    Reopen
+                  </Button>
+                )
+              )}
+            </div>
           </div>
-        </div>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6">
-          <TabBar
-            idPrefix={idPrefix}
-            selected={tab}
-            deviationCount={deviations.length}
-            onSelect={selectTab}
-          />
-          <ProgressSummary
-            {...progress}
-            nextEmpty={finalised ? null : nextEmpty}
-            onContinue={goToRow}
-            continueId={continueId}
-          />
+          {/*
+            Wrapped in reverse: when the progress doesn't fit beside the tabs (a phone), it goes
+            above them, so the tabs stay on the header's bottom line. `items-start` is the bottom
+            edge here.
+          */}
+          <div className="mt-2 flex flex-wrap-reverse items-start justify-between gap-x-6">
+            <TabBar
+              idPrefix={idPrefix}
+              selected={tab}
+              deviationCount={deviations.length}
+              onSelect={selectTab}
+            />
+            <ProgressSummary
+              {...progress}
+              nextEmpty={finalised ? null : nextEmpty}
+              onContinue={goToRow}
+              continueId={continueId}
+            />
+          </div>
         </div>
       </header>
 

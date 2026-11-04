@@ -17,10 +17,14 @@ const HINTS: { keys: string[]; label: string }[] = [
   { keys: ['Esc'], label: 'Back to row' },
 ];
 
-/** The small shortcut hint bar; the page decides where it goes. */
+/**
+ * The small shortcut hint bar; the page decides where it goes. Not on a touch phone, which has no
+ * keys to press and where it took four lines above the sheet (a tablet keeps it: it may have a
+ * keyboard).
+ */
 export function ShortcutHints(): JSX.Element {
   return (
-    <div className="flex items-start gap-2 text-xs text-ink-500">
+    <div className="flex items-start gap-2 text-xs text-ink-500 max-sm:pointer-coarse:hidden">
       <Keyboard size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-ink-400" />
       <ul aria-label="Keyboard shortcuts" className="flex flex-wrap gap-x-4 gap-y-1.5">
         {HINTS.map(({ keys, label }) => (
