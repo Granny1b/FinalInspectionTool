@@ -109,8 +109,8 @@ const SUMMARY_COLUMNS = [13, REF_WIDTH, 61.5, 17, 24, 30, 28];
 /** Inside a deviation card's padding. */
 const CARD_PADDING = 3;
 const CARD_WIDTH = CONTENT_WIDTH - 2 * CARD_PADDING;
-/** Where a card's Category and Resp values start, as on paper: a 12.5 mm label and 2 mm. */
-const DETAIL_INDENT = 14.5;
+/** Where a card's Category and Responsible values start, as on paper: an 18 mm label and 2 mm. */
+const DETAIL_INDENT = 20;
 
 /** Blank rows leave room to write by hand (brief §6: at least 9 mm); report rows are lower. */
 const ROW_HEIGHT: Record<PrintMode, number> = { blank: 9.5, report: 7 };
@@ -431,21 +431,31 @@ function machinePhoto(front: FrontPage, images: WordImages): (Paragraph | Table)
       }),
     ];
   }
-  // Without a photo its frame stays, like on paper.
-  const label = front.photoId ? 'The machine photo couldn’t be loaded.' : 'No machine photo';
-  return [
-    space(),
-    frame(label, { width: CONTENT_WIDTH, height: machinePhotoHeight(front, 60), centred: true }),
-    space(),
-  ];
+  // Without a photo its room stays, like on paper: a frame to stick one in on a form to fill in,
+  // plain paper on a report.
+  const box = { width: CONTENT_WIDTH, height: machinePhotoHeight(front, 60) };
+  const room = front.photoId
+    ? frame('The machine photo couldn’t be loaded.', { ...box, centred: true })
+    : front.report
+      ? frame('', { ...box, borders: false })
+      : frame('Machine photo', box);
+  return [space(), room, space()];
 }
 
-/** A dashed frame, e.g. to sketch in; its label in the corner or in the middle. */
+/**
+ * A dashed frame, e.g. to sketch in; its label in the corner or in the middle. Without
+ * `borders`, just its room on the page.
+ */
 function frame(
   label: string,
-  { width, height, centred = false }: Box & { centred?: boolean },
+  {
+    width,
+    height,
+    centred = false,
+    borders = true,
+  }: Box & { centred?: boolean; borders?: boolean },
 ): Table {
-  const dashed = rule(6, RULE, BorderStyle.DASHED);
+  const dashed = borders ? rule(6, RULE, BorderStyle.DASHED) : NONE;
   return table(
     [
       new TableRow({
@@ -713,16 +723,16 @@ function summaryTable(numbers: string[]): Table {
 
 /**
  * A report's deviation as a framed card: "D-03 · 4.c · Major", the section, checkpoint or
- * description, comment, category, Resp, up to two photos as marked up, and a line to sign it off. One table
- * row that can't split, so a card is never split across pages; only a card whose text makes it
- * taller than a page may (its photos still don't).
+ * description, comment, category, Responsible, up to two photos as marked up, and a line to sign
+ * it off. One table row that can't split, so a card is never split across pages; only a card
+ * whose text makes it taller than a page may (its photos still don't).
  */
 function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImage>): Table {
   const head = { bold: true, size: pt(11) };
   const labelStyle = { bold: true, size: pt(7.5), color: MUTED };
   const label = (text: string) => run(`${text}  `, labelStyle);
-  // Category and Resp: the values lined up at a tab stop, and a long one wrapping under its own
-  // first line, as on paper.
+  // Category and Responsible: the values lined up at a tab stop, and a long one wrapping under
+  // its own first line, as on paper.
   const detail = (name: string, value: string, spacing: IParagraphOptions['spacing']) =>
     paragraph([run(name, labelStyle), new TextRun({ children: [new Tab(), value || '—'] })], {
       tabStops: [{ type: TabStopType.LEFT, position: twips(DETAIL_INDENT) }],
@@ -750,7 +760,7 @@ function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImag
     paragraph([run(card.text, { bold: true, size: pt(9.5) })], { spacing: { before: twips(0.6) } }),
     ...(card.comment ? [paragraph([run(card.comment)], { spacing: { before: twips(1) } })] : []),
     detail('Category', card.category, { before: twips(1.5) }),
-    detail('Resp', card.resp, { before: twips(0.6), after: twips(2.5) }),
+    detail('Responsible', card.resp, { before: twips(0.6), after: twips(2.5) }),
     cardPhotos(card, photos),
     paragraph(
       [
@@ -776,7 +786,7 @@ function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImag
   const height =
     LINE_HEIGHT * (lines(card.text, CARD_WIDTH) + lines(card.comment, CARD_WIDTH)) +
     (card.photos.length === 0 ? 40 : card.photos.length === 1 ? 80 : 64) +
-    // The head, section, category, Resp and Closed lines, captions and spacing.
+    // The head, section, category, Responsible and Closed lines, captions and spacing.
     30 +
     LINE_HEIGHT;
   return table(

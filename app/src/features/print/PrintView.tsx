@@ -6,6 +6,7 @@ import {
   type PrintMode,
   type PrintModel,
 } from './model';
+import { FittedPages } from './FittedPages';
 import { PrintDocument } from './PrintDocument';
 import { PrintToolbar, type Choice } from './PrintToolbar';
 import { usePageFooter } from './usePageFooter';
@@ -16,8 +17,10 @@ import './print.css';
 type Props = {
   model: PrintModel;
   images: PrintImages;
-  /** What is printed, under "Print preview". */
+  /** What is printed, under "Print preview"; cut short on a narrow screen. */
   subject: string;
+  /** After the subject, never cut: "Draft – Rev 3". */
+  revision?: string;
   back: { to: string; label: string };
   /** Inspections switch between the blank checklist and the report. */
   mode?: Choice<PrintMode>;
@@ -39,6 +42,7 @@ export function PrintView({
   model,
   images,
   subject,
+  revision,
   back,
   mode,
   deviationsPerPage,
@@ -69,6 +73,7 @@ export function PrintView({
       <title>{model.fileName}</title>
       <PrintToolbar
         subject={subject}
+        revision={revision}
         back={back}
         mode={mode}
         // Only a report has deviation cards; the blank summary is a table.
@@ -78,16 +83,19 @@ export function PrintView({
       >
         <WordExportButton model={model} appendix={withAppendix} logoImageId={images.logoImageId} />
       </PrintToolbar>
+      {/* On a phone or a portrait tablet the sheets are drawn to fit, as in the preview dialog. */}
       <main className="paper-desk flex-1">
-        <PrintDocument
-          model={model}
-          images={images}
-          deviationsPerPage={perPage}
-          cardPages={cards}
-          appendix={appendixShown}
-          ready={ready}
-          rootRef={rootRef}
-        />
+        <FittedPages>
+          <PrintDocument
+            model={model}
+            images={images}
+            deviationsPerPage={perPage}
+            cardPages={cards}
+            appendix={appendixShown}
+            ready={ready}
+            rootRef={rootRef}
+          />
+        </FittedPages>
       </main>
     </div>
   );

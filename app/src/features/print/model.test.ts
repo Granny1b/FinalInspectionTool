@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { formatDateTime } from '../../lib/format';
 import {
   BLANK_DEVIATION_LINES,
+  defaultDeviationsPerPage,
   inspectionPrint,
   isOversizedPage,
   NOT_FINALISED_MARKER,
@@ -144,8 +145,9 @@ describe('a blank checklist', () => {
     expect(filled.sections[0]!.rows[0]).toMatchObject({ status: null, comment: '', resp: '' });
   });
 
-  it('has fifteen numbered deviation lines to fill in, even when deviations were recorded', () => {
-    expect(BLANK_DEVIATION_LINES).toBe(15);
+  it('has a page of numbered deviation lines to fill in, even when deviations were recorded', () => {
+    expect(BLANK_DEVIATION_LINES).toBe(24);
+    expect(blankNumbers.at(-1)).toBe('D-24');
     expect(model.deviations).toEqual({ kind: 'lines', numbers: blankNumbers });
     const recorded = inspectionPrint(
       inspection({ results: { [row1a!.id]: { status: 'NOK' } } }),
@@ -161,6 +163,10 @@ describe('a blank checklist', () => {
     );
     expect(model.fileName).toBe('FI-2026-0042 RigiMill MG – Volvo Skövde – Blank checklist');
     expect(model.checklistTitle).toBe('Final inspection – RigiMill MG · Rev 2');
+    expect([model.checklistName, model.revisionLabel]).toEqual([
+      'Final inspection – RigiMill MG',
+      'Rev 2',
+    ]);
   });
 
   it('falls back to the default company name and dashes for a missing machine or serial', () => {
@@ -341,6 +347,8 @@ describe('a report', () => {
       [{ imageId: 'Orig000000000003', caption: 'Door' }],
     ]);
     expect(cardsOf(withPhotos)[1]).toMatchObject({ ref: null, text: 'Paint damage' });
+    // Two to a page for the photos.
+    expect(defaultDeviationsPerPage(withPhotos)).toBe(2);
     expect(printedImageIds(withPhotos, { appendix: false })).toEqual([
       'Phot000000000001',
       'Rend000000000001',
@@ -349,11 +357,11 @@ describe('a report', () => {
     ]);
   });
 
-  it('says when and by whom it was finalised, and sums it up', () => {
+  it('says when and by whom it was finalised, and sums it up status by status', () => {
     expect(model.front.report).toEqual({
       finalised: true,
       text: `Finalised ${formatDateTime('2026-10-08T12:32:00.000Z')} by anna.andersson@modig.se`,
-      summary: '5 / 5 rows filled · 2 NOK · 3 deviations',
+      summary: '5 checkpoints: 2 OK · 2 NOK · 1 N/A · 3 deviations',
     });
     expect(model.fileName).toBe('FI-2026-0042 RigiMill MG – Volvo Skövde – Inspection report');
     expect(model.footer).not.toContain('Not finalised');
@@ -378,7 +386,7 @@ describe('a report', () => {
     expect(draft.front.report).toEqual({
       finalised: false,
       text: NOT_FINALISED_MARKER,
-      summary: '1 / 5 rows filled · 0 NOK · 0 deviations',
+      summary: '5 checkpoints: 1 OK · 0 NOK · 0 N/A · 4 not checked · 0 deviations',
     });
     expect(draft.footer).toMatch(/ · Rev 2 · Not finalised$/);
     expect(draft.fileName).toMatch(/ – Draft report$/);
@@ -393,7 +401,10 @@ describe('a report', () => {
       CONTEXT,
     );
     expect(clean.deviations).toEqual({ kind: 'cards', cards: [] });
-    expect(clean.front.report?.summary).toBe('1 / 5 rows filled · 0 NOK · 0 deviations');
+    expect(defaultDeviationsPerPage(clean)).toBe(4);
+    expect(clean.front.report?.summary).toBe(
+      '5 checkpoints: 1 OK · 0 NOK · 0 N/A · 4 not checked · 0 deviations',
+    );
   });
 });
 
@@ -416,9 +427,13 @@ describe('a template preview', () => {
     expect(model.deviations).toEqual({ kind: 'lines', numbers: blankNumbers });
     expect(printedImageIds(model, { appendix: false })).toEqual(['Covr000000000001']);
     expect(model.footer).toBe(
-      'Modig Machine Tool · Final inspection – RigiMill MG · Rev 3 (draft)',
+      'Modig Machine Tool · Final inspection – RigiMill MG · Draft – Rev 3',
     );
     expect(model.checklistTitle).toBe('Final inspection – RigiMill MG · Draft – Rev 3');
+    expect([model.checklistName, model.revisionLabel]).toEqual([
+      'Final inspection – RigiMill MG',
+      'Draft – Rev 3',
+    ]);
     expect(model.fileName).toBe(
       'Final inspection – RigiMill MG – Draft – Rev 3 – Checklist preview',
     );
@@ -470,7 +485,7 @@ describe('a template preview', () => {
 
   it('names an untitled template', () => {
     const model = templatePrint(template({ name: '  ' }), { ...CONTEXT, draft: true });
-    expect(model.footer).toBe('Modig Machine Tool · Untitled template · Rev 3 (draft)');
+    expect(model.footer).toBe('Modig Machine Tool · Untitled template · Draft – Rev 3');
   });
 });
 

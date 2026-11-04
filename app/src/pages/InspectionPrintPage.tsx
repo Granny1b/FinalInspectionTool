@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from 'react-router';
 import { InspectionNotFound } from '../features/inspections/InspectionNotFound';
 import { useInspection } from '../features/inspections/queries';
 import { parseAppendix, parseDeviationsPerPage, parseMode } from '../features/print/links';
-import { DEFAULT_DEVIATIONS_PER_PAGE, inspectionPrint } from '../features/print/model';
+import { defaultDeviationsPerPage, inspectionPrint } from '../features/print/model';
 import { PrintLoadError, PrintLoading, PrintMessage } from '../features/print/PrintStates';
 import { PrintView } from '../features/print/PrintView';
 import { usePrintImages } from '../features/print/usePrintImages';
@@ -18,8 +18,9 @@ const NO_PEOPLE: PeopleDirectory = [];
 /**
  * /inspections/:id/print?mode=blank|report[&deviationsPerPage=2|4][&appendix=1][&autoprint=1] —
  * the blank checklist for the walk-round or the report (brief §6). Without a mode: the report
- * once finalised, else the blank checklist. A report prints 2 deviation cards per page unless
- * asked for 4. `appendix=1` adds the frozen checklist's reference images.
+ * once finalised, else the blank checklist. A report prints 2 deviation cards per page, or 4 when
+ * none has a photo, unless the address asks for the other. `appendix=1` adds the frozen
+ * checklist's reference images.
  */
 export function InspectionPrintPage() {
   const { id = '' } = useParams();
@@ -29,8 +30,6 @@ export function InspectionPrintPage() {
   const inspection = query.data?.inspection;
   const mode =
     parseMode(params.get('mode')) ?? (inspection?.state === 'finalised' ? 'report' : 'blank');
-  const perPage =
-    parseDeviationsPerPage(params.get('deviationsPerPage')) ?? DEFAULT_DEVIATIONS_PER_PAGE;
   const appendix = parseAppendix(params.get('appendix'));
 
   const people = usePeopleDirectory();
@@ -80,6 +79,8 @@ export function InspectionPrintPage() {
   if (!inspection || !model || images.loading) return <PrintLoading />;
 
   const machine = inspection.front.machineName.trim();
+  const perPage =
+    parseDeviationsPerPage(params.get('deviationsPerPage')) ?? defaultDeviationsPerPage(model);
   return (
     <PrintView
       model={model}
