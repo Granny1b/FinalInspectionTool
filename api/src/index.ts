@@ -12,3 +12,4 @@ import './functions/resp-suggestions';
 import './functions/settings';
 import './functions/template-revisions';
 import './functions/templates';
+import './functions/users';

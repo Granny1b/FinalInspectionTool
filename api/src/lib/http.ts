@@ -73,13 +73,23 @@ export type EndpointHandler = (
 /** What `app.http()` gets as its handler. */
 type Endpoint = (req: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>;
 
-/** `role` is the minimum role: admins pass every `inspector` check (see `hasRole`). */
+/**
+ * A signed-in user without any app role. The app's no-access page acts on this 403 from /api/me
+ * (an inspector asking for an admin endpoint gets the plain ForbiddenError message instead).
+ */
+export const NO_ACCESS_MESSAGE =
+  "You don't have access to Final Inspection yet. Ask an admin to add your email in Settings.";
+
+/**
+ * `role` is the minimum role: admins pass every `inspector` check (see `hasRole`). The SWA route
+ * rules only require a sign-in (people on the app's list have no SWA role), so this is the gate.
+ */
 export function endpoint(options: { role: Role }, handler: EndpointHandler): Endpoint {
   return async (req, context) => {
     try {
-      // Re-checked here although SWA route rules gate /api/* too (defence in depth).
-      const user = getUser(req);
+      const user = await getUser(req);
       if (!user) throw new UnauthorizedError();
+      if (user.roles.length === 0) throw new ForbiddenError(NO_ACCESS_MESSAGE);
       if (!hasRole(user.roles, options.role)) throw new ForbiddenError();
       return await handler(req, context, user);
     } catch (error) {
