@@ -72,8 +72,10 @@ export function TemplatesPage() {
     }
   }
 
+  // One group, so on a narrow screen the two buttons wrap together below the view switch
+  // rather than one by one.
   const adminActions = isAdmin && (
-    <>
+    <div className="flex flex-wrap gap-2">
       <input
         ref={fileInputRef}
         type="file"
@@ -93,7 +95,7 @@ export function TemplatesPage() {
         <Plus size={16} aria-hidden="true" />
         New template
       </Button>
-    </>
+    </div>
   );
 
   return (
@@ -156,7 +158,7 @@ export function TemplatesPage() {
               ? 'Create the checklist for a machine model: sections, checkpoint rows and print settings. Or import one exported as JSON.'
               : 'Quality admins publish the checklist for each machine model. It will be listed here.'
           }
-          action={adminActions && <div className="flex gap-2">{adminActions}</div>}
+          action={adminActions || undefined}
         />
       ) : view === 'cards' ? (
         <TemplateCards templates={templates.data} models={models} showDrafts={isAdmin} />

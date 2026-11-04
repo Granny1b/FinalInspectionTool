@@ -255,13 +255,15 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   return (
     // While the editor is open, whatever is scrolled into view (focus moving between rows, jump
     // links) stops below the sticky header and the tablet top bar. Padding on the page's scroller,
-    // because Chrome ignores an element's scroll-margin for block: 'nearest'.
-    <div className="[:root:has(&)]:scroll-pt-36 lg:[:root:has(&)]:scroll-pt-24">
+    // because Chrome ignores an element's scroll-margin for block: 'nearest'. Below md the header
+    // takes two lines (title, then the buttons), so it needs more.
+    <div className="[:root:has(&)]:scroll-pt-36 max-md:[:root:has(&)]:scroll-pt-48 lg:[:root:has(&)]:scroll-pt-24">
       <title>{`${title} · ${APP_NAME}`}</title>
       <BackLink to="/templates" label="Templates" />
 
       <header className="sticky top-14 z-20 mt-2 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-ink-200 bg-canvas py-3 lg:top-0">
-        <div className="min-w-0 flex-1">
+        {/* At least 16rem beside the buttons, or it takes a line of its own above them. */}
+        <div className="min-w-0 flex-1 basis-64">
           {/* Focusable from script: it takes the focus when the "Published" notice is dismissed. */}
           <h1
             ref={titleRef}
@@ -280,46 +282,51 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             {unpublished && <Badge tone="brand">Unpublished changes</Badge>}
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        {/* The buttons stay together; when they don't fit beside the save status (a phone, a
+            long status), they wrap below it as one group instead of running off the screen. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <SaveStatus
             state={saveState}
             conflict={publishConflict}
             onRetry={() => void saver.flush()}
             onReload={reload.askReload}
           />
-          {/* The draft as it prints; leaving the editor saves first, like any link. */}
-          <ButtonLink variant="secondary" to={templatePrintHref(id)}>
-            <Printer size={16} aria-hidden="true" />
-            Print preview
-          </ButtonLink>
-          {/* Nothing to publish when the draft equals the latest revision (the badges say so). */}
-          <Button onClick={openPublish} disabled={!unpublished || conflict}>
-            <Upload size={16} aria-hidden="true" />
-            Publish
-          </Button>
-          <ActionMenu
-            label="Template actions"
-            triggerData={{ 'data-template-menu': '' }}
-            trigger={
-              <>
-                <Ellipsis size={16} aria-hidden="true" />
-                <span className="sr-only">Template actions</span>
-              </>
-            }
-            items={[
-              // The draft as shown, unsaved changes included.
-              { label: 'Export JSON', icon: FileDown, onSelect: exportJson },
-              {
-                label: 'Delete template',
-                icon: Trash2,
-                danger: true,
-                onSelect: () => {
-                  remove.reset();
-                  setConfirmingDelete(true);
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* The draft as it prints; leaving the editor saves first, like any link. On a phone
+                just the printer, so the sticky header keeps to one row of buttons. */}
+            <ButtonLink variant="secondary" to={templatePrintHref(id)} className="max-sm:px-2.5">
+              <Printer size={16} aria-hidden="true" />
+              <span className="max-sm:sr-only">Print preview</span>
+            </ButtonLink>
+            {/* Nothing to publish when the draft equals the latest revision (the badges say so). */}
+            <Button onClick={openPublish} disabled={!unpublished || conflict}>
+              <Upload size={16} aria-hidden="true" />
+              Publish
+            </Button>
+            <ActionMenu
+              label="Template actions"
+              triggerData={{ 'data-template-menu': '' }}
+              trigger={
+                <>
+                  <Ellipsis size={16} aria-hidden="true" />
+                  <span className="sr-only">Template actions</span>
+                </>
+              }
+              items={[
+                // The draft as shown, unsaved changes included.
+                { label: 'Export JSON', icon: FileDown, onSelect: exportJson },
+                {
+                  label: 'Delete template',
+                  icon: Trash2,
+                  danger: true,
+                  onSelect: () => {
+                    remove.reset();
+                    setConfirmingDelete(true);
+                  },
                 },
-              },
-            ]}
-          />
+              ]}
+            />
+          </div>
         </div>
       </header>
 
@@ -363,7 +370,9 @@ export function TemplateEditor({ loaded, onReload }: Props) {
         )}
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+      {/* One shrinkable column below xl: an implicit one would grow to the longest unbroken
+          line (a revision's date and author), wider than a phone. */}
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <TemplateSettingsCard
           name={draft.name}
           modelCode={draft.modelCode}

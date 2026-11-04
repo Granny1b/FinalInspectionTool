@@ -34,13 +34,15 @@ export function Invitation({ person }: { person: PersonInput }) {
       <label htmlFor={textId} className="block text-sm font-medium text-ink-800">
         Invitation to send
       </label>
+      {/* As tall as the message, where the browser can size a field to its content: on a phone
+          six rows cut off the line with the address and the account. */}
       <textarea
         id={textId}
         ref={textRef}
         readOnly
         rows={6}
         value={message.body}
-        className={clsx(INPUT, 'mt-1.5 resize-none py-2 leading-relaxed')}
+        className={clsx(INPUT, 'mt-1.5 [field-sizing:content] resize-none py-2 leading-relaxed')}
       />
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* Focused when this step opens: the next thing to do. */}

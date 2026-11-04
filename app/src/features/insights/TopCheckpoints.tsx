@@ -10,8 +10,12 @@ type Props = {
   showModel: boolean;
 };
 
-const HEAD = 'px-3 py-2 font-medium whitespace-nowrap first:pl-0 last:pr-0';
-const CELL = 'px-3 py-3 align-top first:pl-0 last:pr-0';
+/**
+ * Tighter on a phone, where the checkpoint column also gives up a little of its minimum: at the
+ * wider spacing the table overran the card's padding and its last column touched the border.
+ */
+const HEAD = 'px-2 py-2 font-medium whitespace-nowrap first:pl-0 last:pr-0 sm:px-3';
+const CELL = 'px-2 py-3 align-top first:pl-0 last:pr-0 sm:px-3';
 
 /**
  * The checkpoints that fail most often (brief §5.5, "the most important table"): where each one
@@ -26,7 +30,7 @@ export function TopCheckpoints({ checkpoints, models, showModel }: Props) {
       <table className="w-full text-left text-sm">
         <thead className="border-b border-ink-200 text-xs text-ink-500">
           <tr>
-            <th scope="col" className={`${HEAD} w-8`}>
+            <th scope="col" className={`${HEAD} w-6 sm:w-8`}>
               <span className="sr-only">Rank</span>
             </th>
             <th scope="col" className={HEAD}>
@@ -49,7 +53,7 @@ export function TopCheckpoints({ checkpoints, models, showModel }: Props) {
           {checkpoints.map((checkpoint, index) => (
             <tr key={checkpoint.itemId}>
               <td className={`${CELL} text-ink-500 tabular-nums`}>{index + 1}</td>
-              <td className={`${CELL} min-w-40 sm:min-w-64`}>
+              <td className={`${CELL} min-w-32 sm:min-w-64`}>
                 <p className="wrap-break-word text-ink-900">
                   <span className="font-semibold">{checkpoint.ref}</span>{' '}
                   {checkpoint.text || <span className="text-ink-500">No text</span>}

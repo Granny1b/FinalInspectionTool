@@ -3,6 +3,7 @@ import { ImageOff, LayoutTemplate, LoaderCircle } from 'lucide-react';
 import { Link } from 'react-router';
 import { formatDate } from '../../lib/format';
 import { useImageUrl } from '../../lib/images';
+import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
 import { Badge, PublishedBadge } from './Badge';
 
@@ -15,6 +16,8 @@ type Props = {
 
 /** The templates as cards with their cover photos; the whole card opens the template. */
 export function TemplateCards({ templates, models, showDrafts }: Props) {
+  // The name, as in the list; the email stays in the tooltip.
+  const personName = usePersonName();
   return (
     <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {templates.map((template) => (
@@ -50,7 +53,7 @@ export function TemplateCards({ templates, models, showDrafts }: Props) {
               <dd className="text-ink-800 tabular-nums">{template.itemCount}</dd>
               <dt className="text-ink-500">Last edited</dt>
               <dd className="truncate text-ink-800" title={template.updatedBy}>
-                {formatDate(template.updatedAt)} · {template.updatedBy}
+                {formatDate(template.updatedAt)} · {personName(template.updatedBy)}
               </dd>
             </dl>
           </div>

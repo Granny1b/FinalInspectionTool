@@ -1,4 +1,5 @@
 import type { Person } from '@modig/shared';
+import clsx from 'clsx';
 import { Pencil, Trash2 } from 'lucide-react';
 import { RoleBadge } from '../../components/RoleBadge';
 import { formatDate } from '../../lib/format';
@@ -14,23 +15,31 @@ type Props = {
 };
 
 const HEAD = 'px-4 py-2.5 font-medium whitespace-nowrap';
+/**
+ * On a phone the table is the person and the buttons: the role moves under the email, and when
+ * and by whom someone was added is left out, so names have room and Edit and Remove stay on the
+ * screen instead of off to the right.
+ */
+const FROM_SM = 'hidden sm:table-cell';
 const ACTION =
   'flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900';
 
 /** Everyone on the list: who, which role, who added them and when. */
 export function PeopleTable({ people, myEmail, personName, onEdit, onRemove }: Props) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-ink-200">
+    // Relative: the visually hidden "Actions" header is positioned, and would otherwise be placed
+    // against the page and widen it beyond a phone's screen.
+    <div className="relative overflow-x-auto rounded-lg border border-ink-200">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-ink-200 bg-ink-50 text-xs text-ink-500">
           <tr>
             <th scope="col" className={HEAD}>
               Person
             </th>
-            <th scope="col" className={HEAD}>
+            <th scope="col" className={clsx(HEAD, FROM_SM)}>
               Role
             </th>
-            <th scope="col" className={HEAD}>
+            <th scope="col" className={clsx(HEAD, FROM_SM)}>
               Added
             </th>
             <th scope="col" className={HEAD}>
@@ -43,19 +52,26 @@ export function PeopleTable({ people, myEmail, personName, onEdit, onRemove }: P
             const you = person.email === myEmail;
             return (
               <tr key={person.email}>
-                <td className="max-w-72 px-4 py-3">
+                {/* On a phone it takes the room the buttons leave, and long names and emails are
+                    cut short rather than widening the table. */}
+                <td className="px-4 py-3 max-sm:w-full max-sm:max-w-0 sm:max-w-72">
                   <div className="flex items-center gap-2">
-                    <span className="truncate font-medium text-ink-900">{person.name}</span>
+                    <span className="truncate font-medium text-ink-900" title={person.name}>
+                      {person.name}
+                    </span>
                     {you && <Badge tone="brand">You</Badge>}
                   </div>
                   <div className="truncate text-xs text-ink-500" title={person.email}>
                     {person.email}
                   </div>
+                  <div className="mt-1.5 sm:hidden">
+                    <RoleBadge roles={[person.role]} />
+                  </div>
                 </td>
-                <td className="px-4 py-3">
+                <td className={clsx(FROM_SM, 'px-4 py-3')}>
                   <RoleBadge roles={[person.role]} />
                 </td>
-                <td className="max-w-56 px-4 py-3 text-xs text-ink-500">
+                <td className={clsx(FROM_SM, 'max-w-56 px-4 py-3 text-xs text-ink-500')}>
                   <div className="whitespace-nowrap text-ink-700">{formatDate(person.addedAt)}</div>
                   <div className="truncate" title={person.addedBy}>
                     by {personName(person.addedBy)}
