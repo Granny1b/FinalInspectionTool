@@ -12,6 +12,7 @@ import { ImportTemplateDialog } from '../features/templates/ImportTemplateDialog
 import {
   loadTemplateView,
   saveTemplateView,
+  type TemplatesPageState,
   type TemplateView,
 } from '../features/templates/listView';
 import type { ModelContext } from '../features/templates/modelChoice';
@@ -23,9 +24,6 @@ import { ViewSwitch } from '../features/templates/ViewSwitch';
 import { errorMessage } from '../lib/api';
 import { useCurrentUser } from '../lib/useMe';
 import { useSettings } from '../lib/useSettings';
-
-/** What the template editor hands over after deleting a template (router state). */
-export type TemplatesPageState = { deleted?: string };
 
 export function TemplatesPage() {
   const isAdmin = hasRole(useCurrentUser().roles, 'admin');

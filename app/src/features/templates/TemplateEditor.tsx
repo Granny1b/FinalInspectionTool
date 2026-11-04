@@ -25,12 +25,12 @@ import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
 import { useReload } from '../../lib/autosave/useReload';
 import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { useSettings } from '../../lib/useSettings';
-import type { TemplatesPageState } from '../../pages/TemplatesPage';
 import { templatePrintHref } from '../print/links';
 import { Badge } from './Badge';
 import { ChecklistHeading } from './ChecklistHeading';
 import { DeleteTemplateDialog } from './DeleteTemplateDialog';
 import { TemplateDocument } from './document/TemplateDocument';
+import type { TemplatesPageState } from './listView';
 import { PublishDialog, type FlushResult } from './PublishDialog';
 import {
   fetchTemplate,

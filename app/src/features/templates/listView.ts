@@ -7,6 +7,9 @@ export type TemplateView = (typeof TEMPLATE_VIEWS)[number];
 
 const VIEW_KEY = 'templates.view';
 
+/** Router state for the Templates page: the editor just deleted the template with this name. */
+export type TemplatesPageState = { deleted?: string };
+
 export function loadTemplateView(): TemplateView {
   try {
     return localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'list';
