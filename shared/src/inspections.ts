@@ -70,9 +70,6 @@ export const InspectionSummarySchema = z.object({
 export type InspectionSummary = z.infer<typeof InspectionSummarySchema>;
 export const InspectionListSchema = z.array(InspectionSummarySchema);
 
-/** GET /api/resp-suggestions — distinct "Resp" values used before, for autocomplete. */
-export const RespSuggestionsSchema = z.array(z.string());
-
 /** "FI-2026-0042" (brief §4). The sequence restarts every year. */
 export function formatInspectionNumber(year: number, sequence: number): string {
   return `FI-${year}-${String(sequence).padStart(4, '0')}`;

@@ -126,6 +126,8 @@ export const InsightsSchema = z.object({
   ),
   /** Most deviations first; `resp` '' (deviations without one) last. */
   byResp: z.array(z.object({ resp: z.string(), deviations: Count })),
+  /** As `byResp`, by the deviation category; `category` '' (none chosen) last. */
+  byCategory: z.array(z.object({ category: z.string(), deviations: Count })),
 });
 export type Insights = z.infer<typeof InsightsSchema>;
 
@@ -235,6 +237,10 @@ export function aggregateInsights({
       resp: key ?? '',
       deviations: count,
     })),
+    byCategory: grouped(rows, (row) => row.category).map(({ key, count }) => ({
+      category: key ?? '',
+      deviations: count,
+    })),
   };
 }
 
@@ -304,9 +310,9 @@ function perModel(
 const lower = (text: string) => text.toLocaleLowerCase('sv');
 
 /**
- * Counts rows by a free-text value (a section title, a "Resp"), trimmed and ignoring case: one
- * entry per name, spelled the way most rows spell it (the first one met on a tie). Null is a key
- * of its own. Most rows first, then alphabetically; null and '' (no name) always last.
+ * Counts rows by a free-text value (a section title, a "Resp", a category), trimmed and ignoring
+ * case: one entry per name, spelled the way most rows spell it (the first one met on a tie). Null
+ * is a key of its own. Most rows first, then alphabetically; null and '' (no name) always last.
  */
 function grouped(
   rows: readonly DeviationRow[],
@@ -341,7 +347,7 @@ function mostUsed(spellings: ReadonlyMap<string, number>): string {
 
 const collator = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
 
-/** Null (no section) and '' (no resp, an untitled section) after every name. */
+/** Null (no section) and '' (no resp or category, an untitled section) after every name. */
 function blankLast(a: string | null, b: string | null): number {
   return (a ? 0 : 1) - (b ? 0 : 1);
 }

@@ -8,4 +8,5 @@ export * from './templates';
 export * from './inspections';
 export * from './insights';
 export * from './people';
+export * from './settings';
 export * from './templateTransfer';
