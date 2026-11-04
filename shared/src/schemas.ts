@@ -20,6 +20,9 @@ const IsoDate = z.iso.date();
 // Machine models & settings
 // ---------------------------------------------------------------------------------------------
 
+/** Letters and digits only: see ModelCodeSchema. */
+export const MODEL_CODE_PATTERN = /^[A-Za-z0-9]+$/;
+
 /**
  * Machine model short code ("RMMG"). It is the deviations table's PartitionKey, which rejects
  * `/`, `\`, `#`, `?` and control characters: letters and digits only, wherever it appears.
@@ -29,7 +32,7 @@ export const ModelCodeSchema = z
   .trim()
   .min(1)
   .max(32)
-  .regex(/^[A-Za-z0-9]+$/, 'Model code must be letters and digits');
+  .regex(MODEL_CODE_PATTERN, 'Model code must be letters and digits');
 
 export const MachineModelSchema = z.object({
   code: ModelCodeSchema,
@@ -232,7 +235,10 @@ export const SEVERITY_LABELS: Record<Severity, string> = {
 export const RowResultSchema = z.object({
   status: StatusSchema.optional(),
   comment: z.string().max(2000).optional(),
-  /** Responsible person/department (free text with autocomplete from history). */
+  /**
+   * Responsible department ("Resp."), picked from the settings' `responsibles`. Stored as text, so
+   * a value removed from the list since (or typed before the list existed) is kept.
+   */
   resp: z.string().max(200).optional(),
   /** Only meaningful when status is NOK; defaults to "minor". */
   severity: SeveritySchema.optional(),

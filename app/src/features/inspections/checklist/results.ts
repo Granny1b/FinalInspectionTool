@@ -10,18 +10,20 @@ import type { AnnotatedImage, RowResult, Section, Severity, Status } from '@modi
 export type Results = Record<string, RowResult>;
 
 /**
- * Sets a row's status, or clears it with null. Comment and resp stay; the severity goes with
- * NOK, because it means nothing on an OK or N/A row.
+ * Sets a row's status, or clears it with null. Comment and resp stay; the severity and category
+ * go with NOK, because they describe the deviation and mean nothing on an OK or N/A row.
  */
 export function withStatus(results: Results, itemId: string, status: Status | null): Results {
   const current = results[itemId] ?? {};
   if ((current.status ?? null) === status) return results;
-  const { status: _previous, severity, ...rest } = current;
+  const { status: _previous, severity, category, ...rest } = current;
   if (status === null) return put(results, itemId, rest);
   return put(
     results,
     itemId,
-    status === 'NOK' && severity ? { ...rest, status, severity } : { ...rest, status },
+    status === 'NOK'
+      ? { ...rest, status, ...(severity && { severity }), ...(category && { category }) }
+      : { ...rest, status },
   );
 }
 
@@ -47,6 +49,14 @@ export function withPhotos(results: Results, itemId: string, photos: AnnotatedIm
   if (current.photos === photos || (!current.photos?.length && !photos.length)) return results;
   const { photos: _previous, ...rest } = current;
   return put(results, itemId, photos.length > 0 ? { ...rest, photos } : rest);
+}
+
+/** Sets a NOK row's deviation category (one of the settings' list); '' removes it. */
+export function withCategory(results: Results, itemId: string, category: string): Results {
+  const current = results[itemId] ?? {};
+  if ((current.category ?? '') === category) return results;
+  const { category: _previous, ...rest } = current;
+  return put(results, itemId, category ? { ...rest, category } : rest);
 }
 
 export function withSeverity(results: Results, itemId: string, severity: Severity): Results {

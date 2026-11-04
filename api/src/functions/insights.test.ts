@@ -125,6 +125,7 @@ describe('GET /api/insights', () => {
       bySeverity: { minor: 0, major: 0, critical: 0 },
       topCheckpoints: [],
       byResp: [],
+      byCategory: [],
     });
   });
 
@@ -134,7 +135,7 @@ describe('GET /api/insights', () => {
     await inspect(
       template,
       {
-        [a]: { status: 'NOK', severity: 'major', resp: 'Mechanics' },
+        [a]: { status: 'NOK', severity: 'major', resp: 'Mechanics', category: 'Leakage' },
         [b]: { status: 'OK' },
         [c]: { status: 'NA' },
       },
@@ -164,6 +165,10 @@ describe('GET /api/insights', () => {
     expect(result.byResp).toEqual([
       { resp: 'Mechanics', deviations: 2 },
       { resp: '', deviations: 1 },
+    ]);
+    expect(result.byCategory).toEqual([
+      { category: 'Leakage', deviations: 1 },
+      { category: '', deviations: 2 },
     ]);
     expect(result.topCheckpoints).toEqual([
       {

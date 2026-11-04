@@ -103,15 +103,24 @@ describe('rowCommand', () => {
 
 describe('fieldCommand', () => {
   it('Escape returns to the row from every field', () => {
-    for (const field of ['comment', 'resp', 'severity'] as const) {
+    for (const field of ['comment', 'resp', 'category', 'severity'] as const) {
       expect(fieldCommand(press('Escape'), field)).toBe('row');
     }
   });
 
-  it('Enter moves on to the next row from comment and resp, not from the severity select', () => {
+  it('Enter moves on to the next row from comment and responsible, not from category or severity', () => {
     expect(fieldCommand(press('Enter'), 'comment')).toBe('next-row');
     expect(fieldCommand(press('Enter'), 'resp')).toBe('next-row');
+    expect(fieldCommand(press('Enter'), 'category')).toBeNull();
     expect(fieldCommand(press('Enter'), 'severity')).toBeNull();
+  });
+
+  it('leaves letters, digits and arrows to the selects, which pick with them', () => {
+    for (const field of ['resp', 'category', 'severity'] as const) {
+      for (const key of ['m', '1', 'n', 'ArrowDown', 'ArrowUp', 'Home', ' ']) {
+        expect(fieldCommand(press(key), field)).toBeNull();
+      }
+    }
   });
 
   it('leaves modified and held keys, and everything else, to the field', () => {

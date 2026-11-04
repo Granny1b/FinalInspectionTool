@@ -18,8 +18,9 @@ type Props = {
   readOnly: boolean;
   /** Finalise problem of an extra deviation ("needs a description"). */
   issue: string | undefined;
-  /** The summary's one `<datalist>` of resp suggestions. */
-  respListId: string;
+  /** The settings' Responsible list and deviation categories, for an extra deviation's fields. */
+  responsibles: readonly string[];
+  categories: readonly string[];
   onGoToRow: (itemId: string) => void;
   onUpdate: (id: string, patch: ExtraDeviationPatch) => void;
   onRemove: (deviation: InspectionDeviation) => void;
@@ -29,7 +30,8 @@ type Props = {
 
 /**
  * One deviation, as it prints on the report's deviation pages: D-nn, ref, checkpoint (or the
- * extra deviation's description), comment, severity, resp, and up to two marked-up photos. A row
+ * extra deviation's description), comment, severity, category, responsible, and up to two
+ * marked-up photos. A row
  * deviation is edited in its row (the ref jumps there); an extra deviation in the card itself.
  * Photos are added here for both.
  */
@@ -37,7 +39,8 @@ export function DeviationCard({
   deviation,
   readOnly,
   issue,
-  respListId,
+  responsibles,
+  categories,
   onGoToRow,
   onUpdate,
   onRemove,
@@ -92,7 +95,8 @@ export function DeviationCard({
             <ExtraDeviationFields
               deviation={deviation}
               issue={issue}
-              respListId={respListId}
+              responsibles={responsibles}
+              categories={categories}
               onUpdate={onUpdate}
             />
           ) : (
@@ -154,11 +158,13 @@ function Details({ deviation }: { deviation: InspectionDeviation }) {
       <p className="text-sm leading-5 font-medium wrap-break-word text-ink-900">
         {deviation.text || <span className="font-normal text-ink-500">No description</span>}
       </p>
-      <dl className="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm leading-5">
+      <dl className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm leading-5">
         <dt className="text-ink-500">Comment</dt>
         <dd className="wrap-break-word text-ink-800">{deviation.comment || '—'}</dd>
-        <dt className="text-ink-500">Resp</dt>
+        <dt className="text-ink-500">Responsible</dt>
         <dd className="wrap-break-word text-ink-800">{deviation.resp || '—'}</dd>
+        <dt className="text-ink-500">Category</dt>
+        <dd className="wrap-break-word text-ink-800">{deviation.category || '—'}</dd>
       </dl>
     </>
   );

@@ -13,7 +13,9 @@ type Props = {
   readOnly: boolean;
   /** Finalise problems of extra deviations ("needs a description"), by id. */
   issues: ReadonlyMap<string, string>;
-  respSuggestions: string[];
+  /** The settings' Responsible list and deviation categories, for extra deviations. */
+  responsibles: readonly string[];
+  categories: readonly string[];
   onGoToRow: (itemId: string) => void;
   /** Adds an empty extra deviation and focuses its description. */
   onAdd: () => void;
@@ -26,14 +28,16 @@ type Props = {
 
 /**
  * The Deviation Summary (brief §5.3) as cards, one per NOK row and extra deviation, live: D-nn,
- * ref, checkpoint, comment, severity, resp and marked-up photos, as on the printed report.
+ * ref, checkpoint, comment, severity, category, responsible and marked-up photos, as on the
+ * printed report.
  * Memoised: the page re-renders on every key, the summary only when a deviation changes.
  */
 export const DeviationSummary = memo(function DeviationSummary({
   deviations,
   readOnly,
   issues,
-  respSuggestions,
+  responsibles,
+  categories,
   onGoToRow,
   onAdd,
   onUpdate,
@@ -42,7 +46,6 @@ export const DeviationSummary = memo(function DeviationSummary({
   onEditorDirtyChange,
 }: Props) {
   const titleId = useId();
-  const respListId = useId();
   const addRef = useRef<HTMLButtonElement>(null);
   const [confirming, setConfirming] = useState<InspectionDeviation | null>(null);
   useIgnoreStrayDrops();
@@ -83,7 +86,8 @@ export const DeviationSummary = memo(function DeviationSummary({
                 deviation={deviation}
                 readOnly={readOnly}
                 issue={issues.get(deviation.key)}
-                respListId={respListId}
+                responsibles={responsibles}
+                categories={categories}
                 onGoToRow={onGoToRow}
                 onUpdate={onUpdate}
                 onRemove={(target) =>
@@ -106,13 +110,6 @@ export const DeviationSummary = memo(function DeviationSummary({
           <p className="text-xs text-ink-500">For a finding that isn’t tied to a checklist row.</p>
         </div>
       )}
-
-      {/* One list for every Resp field of the extra deviations. */}
-      <datalist id={respListId}>
-        {respSuggestions.map((value) => (
-          <option key={value} value={value} />
-        ))}
-      </datalist>
 
       {confirming && (
         <ConfirmDialog

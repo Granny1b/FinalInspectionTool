@@ -122,32 +122,3 @@ async function loadRows(
   }
   return rows;
 }
-
-/** Most suggestions the list returns; plenty for an autocomplete. */
-const MAX_SUGGESTIONS = 500;
-
-const bySwedishName = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
-
-/**
- * Every responsible person/department used so far (brief §4: "free text with autocomplete from
- * history"), trimmed and sorted. Spellings that differ only in case are one name, offered in the
- * spelling most deviations use (the first one found on a tie), which nudges people towards it.
- */
-export async function loadRespSuggestions(): Promise<string[]> {
-  await ensureTable();
-  const uses = new Map<string, number>();
-  const entities = deviationsTable().listEntities<{ resp?: unknown }>({
-    queryOptions: { filter: odata`resp ne ${''}`, select: ['resp'] },
-  });
-  for await (const { resp } of entities) {
-    const value = typeof resp === 'string' ? resp.trim() : '';
-    if (value) uses.set(value, (uses.get(value) ?? 0) + 1);
-  }
-  const byName = new Map<string, string>();
-  for (const [value, count] of uses) {
-    const name = value.toLowerCase();
-    const best = byName.get(name);
-    if (best === undefined || count > (uses.get(best) ?? 0)) byName.set(name, value);
-  }
-  return [...byName.values()].sort(bySwedishName.compare).slice(0, MAX_SUGGESTIONS);
-}

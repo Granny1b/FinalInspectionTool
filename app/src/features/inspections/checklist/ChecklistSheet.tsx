@@ -1,5 +1,5 @@
 import type { FinaliseIssue, RowResult, Section } from '@modig/shared';
-import { useId, useMemo, useRef, useState, type JSX } from 'react';
+import { useMemo, useRef, useState, type JSX } from 'react';
 import { guideRow } from '../../guides/guide';
 import { GuideViewer } from '../../guides/GuideViewer';
 import { ChecklistSection } from './ChecklistSection';
@@ -9,13 +9,18 @@ import { useChecklistActions } from './useChecklistActions';
 
 export { ShortcutHints } from './ShortcutHints';
 
+/** One empty list while the settings load, so memoised rows see the same one. */
+const NONE: readonly string[] = [];
+
 export type ChecklistSheetProps = {
   sections: Section[];
   results: Record<string, RowResult>;
   /** Omit for read-only (finalised inspections). */
   onChange?: (results: Record<string, RowResult>) => void;
-  /** Resp autocomplete values (history + this inspection). */
-  respSuggestions?: string[];
+  /** The settings' Responsible list, offered on every row. */
+  responsibles?: readonly string[];
+  /** The settings' deviation categories, offered on NOK rows. */
+  categories?: readonly string[];
   /** Finalise problems to highlight (rows without a status). */
   issues?: FinaliseIssue[];
   /** A NOK row's photo count was clicked: show that deviation's photos. */
@@ -24,12 +29,13 @@ export type ChecklistSheetProps = {
 
 /**
  * The inspection's checklist, filled in from the keyboard (brief §5.3): the same sheet as the
- * print, with a status, comment and resp per row. A row's guide icon (or `G`) opens its guide,
+ * print, with a status, comment and responsible per row (and a NOK row's category and severity). A row's guide icon (or `G`) opens its guide,
  * read-only, as frozen in the inspection.
  *
  * DOM hooks for the page: each section root has `id="section-{sectionId}"`; each row root has
  * `id="row-{itemId}"` and is focusable (in the Tab order when editable); its comment field has
- * `data-comment={itemId}` and its resp field `data-resp={itemId}`. Moving the focus scrolls by
+ * `data-comment={itemId}`, its Responsible select `data-resp={itemId}` and a NOK row's category
+ * select `data-category={itemId}`. Moving the focus scrolls by
  * the smallest amount; the page keeps rows clear of a sticky header with `scroll-padding-top`
  * on its scroller.
  */
@@ -37,7 +43,8 @@ export function ChecklistSheet({
   sections,
   results,
   onChange,
-  respSuggestions,
+  responsibles = NONE,
+  categories = NONE,
   issues,
   onShowPhotos,
 }: ChecklistSheetProps): JSX.Element {
@@ -67,7 +74,8 @@ export function ChecklistSheet({
             sections={sections}
             results={results}
             onChange={onChange}
-            respSuggestions={respSuggestions}
+            responsibles={responsibles}
+            categories={categories}
             rowIssues={rowIssues}
             announce={setAnnouncement}
             onShowPhotos={onShowPhotos}
@@ -103,7 +111,8 @@ type EditableProps = {
   sections: Section[];
   results: Record<string, RowResult>;
   onChange: (results: Record<string, RowResult>) => void;
-  respSuggestions: string[] | undefined;
+  responsibles: readonly string[];
+  categories: readonly string[];
   rowIssues: ReadonlyMap<string, string>;
   announce: (message: string) => void;
   onShowPhotos: (itemId: string) => void;
@@ -114,14 +123,14 @@ function EditableChecklist({
   sections,
   results,
   onChange,
-  respSuggestions,
+  responsibles,
+  categories,
   rowIssues,
   announce,
   onShowPhotos,
   onShowGuide,
 }: EditableProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const respListId = useId();
   const actions = useChecklistActions({
     sections,
     results,
@@ -131,8 +140,6 @@ function EditableChecklist({
     onShowPhotos,
     onShowGuide,
   });
-  const suggestions = useMemo(() => [...new Set(respSuggestions)], [respSuggestions]);
-
   return (
     <div ref={rootRef}>
       {sections.map((section, index) => (
@@ -142,16 +149,11 @@ function EditableChecklist({
           index={index}
           results={results}
           rowIssues={rowIssues}
-          respListId={respListId}
+          responsibles={responsibles}
+          categories={categories}
           actions={actions}
         />
       ))}
-      {/* One list for every resp field. */}
-      <datalist id={respListId}>
-        {suggestions.map((value) => (
-          <option key={value} value={value} />
-        ))}
-      </datalist>
     </div>
   );
 }
