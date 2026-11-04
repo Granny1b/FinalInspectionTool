@@ -46,16 +46,10 @@ export function DeleteTemplateDialog({ name, revisions, busy, error, onDelete, o
         <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={busy}>
           Cancel
         </Button>
-        {/* Danger style, as in ConfirmDialog: Button has no danger variant. */}
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={busy}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-nok-solid px-3.5 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-colors hover:bg-nok-solid/90 disabled:pointer-events-none disabled:opacity-50"
-        >
+        <Button variant="danger" onClick={onDelete} disabled={busy}>
           {busy && <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />}
           {busy ? 'Deleting…' : 'Delete template'}
-        </button>
+        </Button>
       </div>
     </Dialog>
   );

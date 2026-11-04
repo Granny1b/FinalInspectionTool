@@ -75,7 +75,7 @@ export function InsightsPage() {
     return (
       <>
         {header}
-        <PageLoading label="Loading insights…" />
+        <PageLoading label="Loading insights…" header={false} />
       </>
     );
   }

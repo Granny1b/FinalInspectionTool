@@ -924,7 +924,7 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **The guide icon** (camera with photos, info without) and `G` show "Guide viewer arrives in
   phase 5." (Superseded in phase 5: they open the guide viewer, see Guides.)
 - **Read-only (finalised) is separate, simpler markup** with the same grid; rows stay focusable
-  from script for jump links.
+  from script for jump links. (Superseded by the UI pass: it has a tighter grid of its own.)
 - **Performance:** rows and sections are memoised and the actions object is stable, so a change
   re-renders one row and its section. Measured in a production build on 180 rows: 1.9 ms of
   script per status key (p95 2.6 ms).
@@ -936,7 +936,8 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 
 - **Tabs, not a side panel:** "Checklist | Deviations (n)". A side panel would squeeze the sheet
   below its one-line layout on most screens; the tabs sit in the sticky header, so the live count
-  is always in view.
+  is always in view. (Since the UI pass the header sticks only on screens at least 40rem wide and
+  tall.)
 - **The front page is the top of the Checklist tab** (brief: "Front page card at the top"), so a
   front-page problem jumps there.
 - **The sticky header's height is measured** and set as the page's `scroll-padding-top`; a fixed
@@ -2098,3 +2099,57 @@ The people list in Settings → Users & access, and names instead of emails.
 - **A template needs no new preview:** the template print page never prints by itself (only
   `autoprint=1` prints), so the editor's "Print preview" link already serves as its quick preview,
   and an e2e test checks it.
+
+## UI pass
+
+A review of every page in both themes, at phone (390 px), tablet (820 px) and desktop (1366 px)
+widths, against local demo data. No page scrolls sideways at 320 to 1366 px any more.
+
+### Shell and shared components
+
+- **Below md (768 px) the inspections list has one Inspection column** (number, machine,
+  "S/N … · date") beside State and NOK; from md the seven columns, 12 px apart so they fit a
+  portrait tablet and a landscape one beside the sidebar. Each layout's cells are `display: none`
+  in the other, so a test at desktop width still sees seven cells and one link per row.
+- **On touch screens** nav links are 44 px, menu items 40 px, Sign out 36 px and a participant
+  chip's remove button has a 28 px hit area. Buttons and inputs stay 36 px everywhere: many pages
+  set their own heights, and a global touch height would change their layouts.
+- **Below lg the page has `scroll-padding-top: 4.5rem`** for the sticky top bar, so a field
+  reached by Shift+Tab or a link to an id is never scrolled under it.
+- **In the dark theme modal backdrops are scrim at 60 %** (30 % in light): 30 % of near-black over
+  a near-black page dimmed almost nothing. The drawer and the skip link have a border there.
+- **`Button` has a `danger` variant** (nok-solid with white text in both themes), used by every
+  delete and remove confirmation.
+- **The loading skeleton matches the sidebar's user panel** row by row (shared sizes in
+  `components/layout.ts`), so nothing jumps when the account arrives. `PageLoading` draws no fake
+  header under a page's real one (`header={false}`).
+
+### Inspection page
+
+- **Read-only (finalised) has its own, tighter grid** (`READ_GRID`): ref | checkpoint | Status
+  (7rem) | Responsible (10rem) from 34rem, with the comment and a NOK row's category and severity
+  under the checkpoint. With nothing left to fill in, an empty Comment column only made 90 rows of
+  "✓ OK" twice as tall. Rows stay focusable from script for jump links.
+- **The header is laid out by its own width** (a container): from 52rem the actions sit beside
+  the title and the details run under both, so the save status changing never re-wraps them;
+  narrower, the actions go under the details. **It sticks only from 40rem wide and 40rem tall;**
+  on a phone it would take a third of the screen. On a phone the menu reads "Print" (its
+  accessible name stays "Print / Save PDF").
+- **The keyboard shortcut bar is hidden on touch-only devices,** where it took four lines.
+
+### Templates, Settings, Insights
+
+- **Every header's actions wrap** instead of pushing the page wider (template editor, Templates,
+  page headers in general).
+- **Template cards name the last editor** as the list does, not by email.
+- **The people table and the list editors fit a phone;** the invitation text grows with its
+  content instead of a fixed six rows.
+
+### Report
+
+- **Refs and card heads use proportional figures:** Inter's tabular ones spaced "D-01" out.
+- **A card's Category and Resp values line up** in a 12.5 mm label column, in Word too (a tab stop
+  and a hanging indent).
+- **The print toolbar has two parts:** the way back, the subject and Export / Print, then the
+  layout choices with the PDF hint on the right. It is sticky from 640 px up only.
+- **The Preview names the finaliser as the print route does.**

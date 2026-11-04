@@ -141,7 +141,7 @@ export function TemplatesPage() {
         </div>
       )}
       {templates.isPending ? (
-        <PageLoading label="Loading templates…" />
+        <PageLoading label="Loading templates…" header={false} />
       ) : templates.isError ? (
         <LoadError
           title="We couldn't load the templates"
