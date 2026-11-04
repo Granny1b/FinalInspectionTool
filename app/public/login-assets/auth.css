@@ -140,6 +140,20 @@ h1 {
   background: #fff;
 }
 
+/* The sign-in's id on the no-access page: selectable in one click, to send to an admin. */
+.account {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-500);
+}
+
+.account code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ink-800);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .note {
   margin: 1rem 0 0;
   font-size: 0.8125rem;

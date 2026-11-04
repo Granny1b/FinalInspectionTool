@@ -859,6 +859,19 @@ Limits: at most **25 users** with a custom role (on every plan), and an invitati
 after at most **168 hours (7 days)**; send a new one if it lapses. Remove someone's access in the
 portal under _Role management_. A user who gets a new role should sign out and in again.
 
+**Invited, but still "You don't have access yet"?** Static Web Apps gives the role to the one
+Microsoft sign-in that accepted the invitation (its account ID), not to the email address. Someone
+with two Microsoft accounts on the same email (a personal account and a work or school account,
+which also happens when a personal address was used to sign up for Azure) can accept with one and
+come back with the other: same email, different account, no role. The no-access page shows the
+**Account ID** of the current sign-in. Compare it with the `UserId` column of
+`az staticwebapp users list`:
+
+- **Not in the list:** that sign-in never accepted an invitation. Create a new invitation for the
+  same email and have them open it while signed in with _this_ account (same browser, not a
+  private window). Both sign-ins then have the role, and either one works.
+- **In the list, with the role:** sign out and in again; a role applies from the next sign-in.
+
 ### 6. Check the lock after each deploy
 
 Anonymous requests must never reach the app or the API:

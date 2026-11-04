@@ -105,7 +105,9 @@ test.describe('signed in', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: "You don't have access yet" })).toBeVisible();
-    await expect(page.getByText('visitor@example.com')).toBeVisible();
+    await expect(page.getByText('visitor@example.com', { exact: true })).toBeVisible();
+    // The sign-in's id, which an admin compares with Role management.
+    await expect(page.getByText(/^Account ID /)).toHaveText('Account ID e2e-visitor@example.com');
     await expect(
       page.getByRole('link', { name: 'Sign out and use another account' }),
     ).toBeVisible();

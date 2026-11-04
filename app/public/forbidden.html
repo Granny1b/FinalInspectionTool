@@ -20,6 +20,9 @@
           <span id="signed-in-fallback">You're signed in, but your account</span>
           hasn't been invited to Final Inspection.
         </p>
+        <!-- An invited role belongs to one Microsoft sign-in, not to an email address: this id
+             tells an admin which sign-in this is (Role management lists the same ids). -->
+        <p class="account" id="account" hidden>Account ID <code id="account-id"></code></p>
 
         <ol class="steps">
           <li>
@@ -30,6 +33,10 @@
             account.
           </li>
           <li>Already accepted an invitation? Sign out and sign in again to pick up your role.</li>
+          <li>
+            Still here? Microsoft may have signed you in with another account that has the same
+            email (a personal and a work account, say). Send your admin the account ID above.
+          </li>
         </ol>
 
         <!-- Relative return path on purpose: the SWA CLI turns an absolute one into a broken URL. -->

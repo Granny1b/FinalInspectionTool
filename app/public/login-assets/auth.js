@@ -3,7 +3,7 @@
 // its own file so the Content-Security-Policy needs no 'unsafe-inline'. Type-checked with
 // app/tsconfig.public.json.
 
-/** @typedef {{ userDetails?: string, userRoles?: string[] }} ClientPrincipal */
+/** @typedef {{ userId?: string, userDetails?: string, userRoles?: string[] }} ClientPrincipal */
 
 const APP_ROLES = ['inspector', 'admin'];
 const page = document.body.dataset.page;
@@ -27,7 +27,7 @@ if (hasAppRole) {
   // Signed in, but not invited: signing in again would only end up here.
   location.replace('/forbidden.html');
 } else if (page === 'forbidden') {
-  if (principal) showSignedInAs(principal.userDetails);
+  if (principal) showSignedInAs(principal);
   else location.replace('/login.html');
 }
 
@@ -55,13 +55,26 @@ function setHref(id, href) {
   if (link instanceof HTMLAnchorElement) link.href = href;
 }
 
-/** @param {string | undefined} email */
-function showSignedInAs(email) {
+/**
+ * The email and the account id of the sign-in without access. Static Web Apps gives an invited
+ * role to one sign-in (its id), not to an email: someone with two Microsoft accounts on the same
+ * email (personal and work) can accept an invitation with one and come back with the other. The
+ * id shows which one this is; Role management in the Azure portal lists the invited ids.
+ * @param {ClientPrincipal} principal
+ */
+function showSignedInAs({ userDetails: email, userId }) {
   const slot = document.getElementById('signed-in-email');
   const signedInAs = document.getElementById('signed-in-as');
   const fallback = document.getElementById('signed-in-fallback');
-  if (!email || !slot || !signedInAs || !fallback) return;
-  slot.textContent = email;
-  signedInAs.hidden = false;
-  fallback.hidden = true;
+  if (email && slot && signedInAs && fallback) {
+    slot.textContent = email;
+    signedInAs.hidden = false;
+    fallback.hidden = true;
+  }
+  const account = document.getElementById('account');
+  const accountId = document.getElementById('account-id');
+  if (userId && account && accountId) {
+    accountId.textContent = userId;
+    account.hidden = false;
+  }
 }
