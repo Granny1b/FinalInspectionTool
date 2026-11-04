@@ -20,13 +20,13 @@ type Month = Insights['perMonth'][number];
 
 /**
  * Recharts draws with its own default colours; the classes below restyle its parts from the
- * theme tokens (CSS beats SVG presentation attributes): a 2 px brand line, dots with a white
- * ring, a hairline grid and muted axis text.
+ * theme tokens (CSS beats SVG presentation attributes): a 2 px brand line, dots ringed in the
+ * card's colour, a hairline grid and muted axis text.
  */
 const CHART = [
   '[&_.recharts-line-curve]:stroke-brand-600',
-  '[&_.recharts-line-dot]:fill-brand-600 [&_.recharts-line-dot]:stroke-white',
-  '[&_.recharts-active-dot_circle]:fill-brand-600 [&_.recharts-active-dot_circle]:stroke-white',
+  '[&_.recharts-line-dot]:fill-brand-600 [&_.recharts-line-dot]:stroke-surface',
+  '[&_.recharts-active-dot_circle]:fill-brand-600 [&_.recharts-active-dot_circle]:stroke-surface',
   '[&_.recharts-cartesian-grid_line]:stroke-ink-200',
   '[&_.recharts-cartesian-axis-line]:stroke-ink-300 [&_.recharts-cartesian-axis-tick-line]:stroke-ink-300',
   '[&_.recharts-cartesian-axis-tick-value]:fill-ink-500 [&_.recharts-cartesian-axis-tick-value]:text-xs',

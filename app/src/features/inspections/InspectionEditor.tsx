@@ -14,7 +14,15 @@ import {
   type RowResult,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, ClipboardCheck, ClipboardList, Lock, LockOpen, Printer } from 'lucide-react';
+import {
+  ChevronDown,
+  ClipboardCheck,
+  ClipboardList,
+  Eye,
+  Lock,
+  LockOpen,
+  Printer,
+} from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { ActionMenu } from '../../components/ActionMenu';
@@ -34,8 +42,10 @@ import { formatDateTime } from '../../lib/format';
 import { useCurrentUser } from '../../lib/useMe';
 import { usePersonName } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
+import { InspectionPreview } from '../print/InspectionPreview';
 import { inspectionPrintHref } from '../print/links';
 import type { PrintMode } from '../print/model';
+import { inspectionOnScreen } from '../print/preview';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
 import { withPhotos } from './checklist/results';
 import { DeviationSummary } from './DeviationSummary';
@@ -301,6 +311,14 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const [notice, setNotice] = useState<StateChange | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [stateConflict, setStateConflict] = useState(false);
+  // The quick preview shows what is on screen, so it needs no save first (unlike printing).
+  // The same object while nothing changes, so its pages are laid out once.
+  const [previewing, setPreviewing] = useState(false);
+  const previewRef = useRef<HTMLButtonElement>(null);
+  const previewed = useMemo(
+    () => (previewing ? inspectionOnScreen(inspection, draft, server) : null),
+    [previewing, inspection, draft, server],
+  );
   const continueId = `${idPrefix}-continue`;
 
   // Finalise and Reopen swap places under the keyboard focus: the notice takes it instead.
@@ -445,6 +463,10 @@ export function InspectionEditor({ loaded, onReload }: Props) {
                 />
               </div>
             )}
+            <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
+              <Eye size={16} aria-hidden="true" />
+              Preview
+            </Button>
             <ActionMenu
               label="Print / Save PDF"
               trigger={
@@ -635,6 +657,18 @@ export function InspectionEditor({ loaded, onReload }: Props) {
           workingLabel="Reopening…"
           run={() => change('reopen')}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {previewed && (
+        <InspectionPreview
+          inspection={previewed}
+          onPrint={(mode) => void openPrint(mode)}
+          onClose={() => {
+            setPreviewing(false);
+            // The dialog hands the focus back to what had it, but Safari doesn't focus a button
+            // that is clicked or tapped: back to Preview in any case.
+            previewRef.current?.focus();
+          }}
         />
       )}
       {reload.dialog}

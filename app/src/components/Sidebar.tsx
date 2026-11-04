@@ -14,6 +14,7 @@ import { NavLink } from 'react-router';
 import { signOutUrl } from '../lib/auth';
 import { Logo } from './Logo';
 import { RoleBadge } from './RoleBadge';
+import { ThemeToggle } from './ThemeToggle';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 
@@ -34,7 +35,10 @@ type Props = {
   onClose?: () => void;
 };
 
-/** Logo, navigation and the signed-in user. Used by the desktop sidebar and the mobile drawer. */
+/**
+ * Logo, navigation, the signed-in user and the theme. Used by the desktop sidebar and the mobile
+ * drawer, whose theme controls stay in step (one store, lib/theme.ts).
+ */
 export function Sidebar({ me, onNavigate, onClose }: Props) {
   const adminLabelId = useId();
   return (
@@ -146,6 +150,9 @@ function UserPanel({ me }: { me: Me }) {
           <LogOut size={14} />
           Sign out
         </a>
+      </div>
+      <div className="mt-3 px-2 pb-1">
+        <ThemeToggle />
       </div>
     </div>
   );

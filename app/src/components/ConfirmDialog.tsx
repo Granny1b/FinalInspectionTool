@@ -35,7 +35,7 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
       onClick={(event) => {
         if (event.target === event.currentTarget) event.currentTarget.close();
       }}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl backdrop:bg-ink-950/30"
+      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl backdrop:bg-scrim/30"
     >
       <form method="dialog" className="p-6">
         <h2 id={titleId} className="text-base font-semibold">
@@ -52,7 +52,7 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
           <button
             type="submit"
             value="confirm"
-            className="inline-flex h-9 items-center justify-center rounded-md bg-nok-fg px-3.5 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-colors hover:bg-nok-fg/90"
+            className="inline-flex h-9 items-center justify-center rounded-md bg-nok-solid px-3.5 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-colors hover:bg-nok-solid/90"
           >
             {confirmLabel}
           </button>

@@ -3,9 +3,13 @@ import { Printer } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 import { BackLink } from '../../components/BackLink';
 import { Button } from '../../components/Button';
-import { DEVIATIONS_PER_PAGE, PRINT_MODES, type DeviationsPerPage, type PrintMode } from './model';
-
-const MODE_LABELS: Record<PrintMode, string> = { blank: 'Blank checklist', report: 'Report' };
+import {
+  DEVIATIONS_PER_PAGE,
+  PRINT_MODE_LABELS,
+  PRINT_MODES,
+  type DeviationsPerPage,
+  type PrintMode,
+} from './model';
 
 export type Choice<T> = { value: T; onChange: (value: T) => void };
 
@@ -47,7 +51,7 @@ export function PrintToolbar({
         {mode && (
           <Segmented
             label="What to print"
-            options={PRINT_MODES.map((value) => ({ value, label: MODE_LABELS[value] }))}
+            options={PRINT_MODES.map((value) => ({ value, label: PRINT_MODE_LABELS[value] }))}
             {...mode}
           />
         )}
@@ -87,7 +91,7 @@ type SegmentedProps<T> = Choice<T> & {
 };
 
 /** A few toggle buttons of which one is pressed. */
-function Segmented<T extends string | number>({
+export function Segmented<T extends string | number>({
   label,
   showLabel = false,
   options,

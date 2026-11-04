@@ -401,7 +401,7 @@ function Thumbnail({
             onClick={onRemove}
             aria-label={`Remove ${words.name} ${index + 1}`}
             title={`Remove ${words.name} ${index + 1}`}
-            className="absolute top-1 right-1 flex size-7 items-center justify-center rounded-full bg-ink-950/65 text-white transition-colors hover:bg-ink-950/85"
+            className="absolute top-1 right-1 flex size-7 items-center justify-center rounded-full bg-scrim/65 text-white transition-colors hover:bg-scrim/85"
           >
             <X size={14} aria-hidden="true" />
           </button>
@@ -433,7 +433,7 @@ function EditorLoading() {
       ref={dialogRef}
       aria-label="Opening the photo editor"
       closedby="none"
-      className="m-auto rounded-xl border border-ink-200 bg-surface p-6 shadow-xl backdrop:bg-ink-950/50"
+      className="m-auto rounded-xl border border-ink-200 bg-surface p-6 shadow-xl backdrop:bg-scrim/50"
     >
       <LoaderCircle size={22} aria-hidden="true" className="animate-spin text-ink-400" />
     </dialog>

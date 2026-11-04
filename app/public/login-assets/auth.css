@@ -1,11 +1,13 @@
 /*
  * Styles for the pre-login pages. They can't use the app's Tailwind build (it sits behind sign-in),
- * so the few tokens needed are mirrored by hand from src/index.css — keep the two in step.
+ * so the few tokens needed are mirrored by hand from src/index.css, light and dark — keep the two
+ * in step.
  */
 :root {
   --brand-50: #effafe;
   --brand-600: #0b7db3;
   --brand-700: #0c6894;
+  --primary-hover: #0c6894;
   --ink-200: #e3e7ec;
   --ink-500: #646e7a;
   --ink-600: #4c5561;
@@ -13,6 +15,8 @@
   --ink-900: #161b21;
   --canvas: #f6f7f9;
   --surface: #ffffff;
+  --glow: rgb(41 171 226 / 0.12);
+  --shadow: rgb(22 27 33 / 0.14);
 
   color-scheme: light;
   font-family:
@@ -31,6 +35,44 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* The dark theme, as the app has it: chosen (data-theme, set by /theme.js from the choice made in
+   the app) or, with no choice stored, the system's setting. The two blocks are the same. */
+:root[data-theme='dark'] {
+  --brand-50: #0e2530;
+  --brand-700: #5bbfe8;
+  --primary-hover: #0a6c9c;
+  --ink-200: #2f363f;
+  --ink-500: #99a3ae;
+  --ink-600: #b1b9c3;
+  --ink-800: #dde1e7;
+  --ink-900: #eef1f4;
+  --canvas: #0f1216;
+  --surface: #171b21;
+  --glow: rgb(41 171 226 / 0.1);
+  --shadow: rgb(0 0 0 / 0.5);
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --brand-50: #0e2530;
+    --brand-700: #5bbfe8;
+    --primary-hover: #0a6c9c;
+    --ink-200: #2f363f;
+    --ink-500: #99a3ae;
+    --ink-600: #b1b9c3;
+    --ink-800: #dde1e7;
+    --ink-900: #eef1f4;
+    --canvas: #0f1216;
+    --surface: #171b21;
+    --glow: rgb(41 171 226 / 0.1);
+    --shadow: rgb(0 0 0 / 0.5);
+
+    color-scheme: dark;
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -40,8 +82,7 @@
 body {
   margin: 0;
   background:
-    radial-gradient(60rem 28rem at 50% -8rem, rgb(41 171 226 / 0.12), transparent 70%),
-    var(--canvas);
+    radial-gradient(60rem 28rem at 50% -8rem, var(--glow), transparent 70%), var(--canvas);
 }
 
 [hidden] {
@@ -69,7 +110,7 @@ body {
   border-radius: 0.75rem;
   box-shadow:
     0 1px 2px rgb(22 27 33 / 0.04),
-    0 12px 32px -16px rgb(22 27 33 / 0.14);
+    0 12px 32px -16px var(--shadow);
 }
 
 @media (max-width: 30rem) {
@@ -83,6 +124,20 @@ body {
   height: 3.5rem;
   width: auto;
   margin: 0 auto 2rem;
+}
+
+/* On a dark card: the logo with a white wordmark. The pages' one <img> keeps its alt text; its
+   black logo is moved out of its box (and so clipped) to show the light one behind it. */
+:root[data-theme='dark'] .logo {
+  object-position: 0 -100rem;
+  background: url('/modig-logo-dark.png') center / contain no-repeat;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .logo {
+    object-position: 0 -100rem;
+    background: url('/modig-logo-dark.png') center / contain no-repeat;
+  }
 }
 
 h1 {
@@ -124,7 +179,7 @@ h1 {
 }
 
 .button:hover {
-  background: var(--brand-700);
+  background: var(--primary-hover);
 }
 
 :focus-visible {
@@ -223,8 +278,9 @@ button.button:disabled {
   margin-top: 0.5rem;
 }
 
+/* Brand 700: 600 is below 4.5:1 on the tint, in both themes. */
 .steps li::marker {
-  color: var(--brand-600);
+  color: var(--brand-700);
   font-weight: 600;
 }
 

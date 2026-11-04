@@ -133,7 +133,7 @@ function GoToRow({ deviationRef, onClick }: { deviationRef: string; onClick: () 
 const SEVERITY_TONES: Record<Severity, string> = {
   minor: 'bg-ink-100 text-ink-700 ring-ink-300',
   major: 'bg-nok-bg text-nok-fg ring-nok-border',
-  critical: 'bg-nok-fg text-white ring-nok-fg',
+  critical: 'bg-nok-solid text-white ring-nok-solid',
 };
 
 /** The severity in words, never by colour alone; critical is the one filled badge. */

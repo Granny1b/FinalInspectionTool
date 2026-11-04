@@ -3,7 +3,7 @@ import clsx from 'clsx';
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-600 text-white shadow-xs hover:bg-brand-700',
+  primary: 'bg-primary text-white shadow-xs hover:bg-primary-hover',
   secondary:
     'border border-ink-200 bg-surface text-ink-800 shadow-xs hover:border-ink-300 hover:bg-ink-50',
   ghost: 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
