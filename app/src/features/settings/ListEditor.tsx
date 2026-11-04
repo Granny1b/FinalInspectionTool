@@ -131,9 +131,11 @@ export function ListEditor({
             return (
               <li key={row.key} data-entry={row.key} className="px-2 py-1.5">
                 <div className="flex items-center gap-1">
+                  {/* Not on a phone: the field needs the width more ("Damage & scratches" was
+                      cut off), and the order shows anyway. */}
                   <span
                     aria-hidden="true"
-                    className="w-6 shrink-0 text-right text-xs text-ink-500 tabular-nums"
+                    className="hidden w-6 shrink-0 text-right text-xs text-ink-500 tabular-nums sm:block"
                   >
                     {index + 1}
                   </span>
@@ -146,7 +148,7 @@ export function ListEditor({
                     autoComplete="off"
                     value={row.value}
                     onChange={(event) => onChange(renameEntry(rows, row.key, event.target.value))}
-                    className={clsx(INPUT, 'ml-1 h-9 min-w-0 flex-1')}
+                    className={clsx(INPUT, 'h-9 min-w-0 flex-1 sm:ml-1')}
                   />
                   <IconButton
                     icon={ArrowUp}
@@ -171,7 +173,7 @@ export function ListEditor({
                   />
                 </div>
                 {error && (
-                  <p id={`${id}-error`} className="mt-1 ml-8 text-xs font-medium text-nok-fg">
+                  <p id={`${id}-error`} className="mt-1 text-xs font-medium text-nok-fg sm:ml-8">
                     {error}
                   </p>
                 )}

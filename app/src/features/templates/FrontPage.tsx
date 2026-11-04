@@ -26,7 +26,7 @@ export function FrontPageFrame({ revisionLabel, children }: FrameProps) {
         </h2>
         <Logo className="h-6" />
       </div>
-      <div className="grid gap-x-6 gap-y-5 p-5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-5 p-5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
         {children}
       </div>
       <p className="border-t border-ink-100 px-5 py-2.5 text-right text-xs text-ink-500 tabular-nums">
@@ -56,7 +56,8 @@ export function PublishedFrontPage({
         <Detail label="Spare lines per section (default)">
           {template.printSettings.spareRowsPerSection}
         </Detail>
-        <Detail label="Published">
+        {/* The whole row: nothing sits beside it, and the author's name needs the room. */}
+        <Detail label="Published" wide>
           {formatDateTime(template.updatedAt)}
           <span className="block truncate text-ink-500" title={template.updatedBy}>
             {personName(template.updatedBy)}
