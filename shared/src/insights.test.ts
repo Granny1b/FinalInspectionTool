@@ -50,6 +50,7 @@ function row(inspectionId: string, patch: Partial<DeviationRow> = {}): Deviation
     comment: '',
     resp: '',
     severity: 'minor',
+    category: '',
     inspectionDate: '2026-10-07',
     finalised: true,
     createdAt: '2026-10-07T08:00:00.000Z',

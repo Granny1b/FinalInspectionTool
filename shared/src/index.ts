@@ -7,3 +7,5 @@ export * from './storage';
 export * from './templates';
 export * from './inspections';
 export * from './insights';
+export * from './people';
+export * from './templateTransfer';

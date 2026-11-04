@@ -297,7 +297,7 @@ describe('GET /api/insights/export.csv', () => {
     expect(lines[0]).toBe(
       'inspectionId;inspectionNumber;serialNumber;machineName;modelCode;templateId;' +
         'templateRevision;itemId;sectionTitle;displayRef;checkpointText;comment;resp;severity;' +
-        'inspectionDate;finalised;createdAt',
+        'category;inspectionDate;finalised;createdAt',
     );
     const rows = lines.slice(1, -1).map((line) => line.split(';'));
     // Oldest inspection first; in each, checklist order, then the extra deviation.
@@ -309,8 +309,8 @@ describe('GET /api/insights/export.csv', () => {
     ]);
     expect(lines[2]).toContain(`;" Fräs ";RMMG;${template.id};2;${a};`);
     // Formulas stay text; quotes and separators are quoted.
-    expect(lines[2]).toContain(`;"'=HYPERLINK(""x"")";;critical;2026-10-08;true;`);
-    expect(lines[3]).toContain(';"Skruv ""lös""; åtdragen";Mekanik;minor;');
+    expect(lines[2]).toContain(`;"'=HYPERLINK(""x"")";;critical;;2026-10-08;true;`);
+    expect(lines[3]).toContain(';"Skruv ""lös""; åtdragen";Mekanik;minor;;');
     expect(lines[4]).toContain(";'-1 screw;");
   });
 

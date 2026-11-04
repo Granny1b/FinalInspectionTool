@@ -17,7 +17,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** The brief's 17 columns (§4), in its order. */
+/** The brief's 17 columns (§4), in its order, plus `category` after `severity`. */
 const COLUMNS = [
   'inspectionId',
   'inspectionNumber',
@@ -33,6 +33,7 @@ const COLUMNS = [
   'comment',
   'resp',
   'severity',
+  'category',
   'inspectionDate',
   'finalised',
   'createdAt',
@@ -68,7 +69,7 @@ function withResults(inspection: Inspection, results: Record<string, RowResult>)
 }
 
 describe('syncDeviations', () => {
-  it('writes one row per NOK row and extra deviation, with exactly the 17 columns', async () => {
+  it('writes one row per NOK row and extra deviation, with exactly the 18 columns', async () => {
     const base = sampleInspection();
     const [a, b, c] = itemIds(base);
     const extraId = newId();
@@ -119,6 +120,7 @@ describe('syncDeviations', () => {
       comment: 'Blue mark missing',
       resp: 'Mechanics',
       severity: 'major',
+      category: '',
     });
     expect(await rowOf(inspection, c!)).toMatchObject({
       itemId: c,
@@ -138,6 +140,7 @@ describe('syncDeviations', () => {
       comment: '',
       resp: 'Paint shop',
       severity: 'minor',
+      category: '',
     });
   });
 

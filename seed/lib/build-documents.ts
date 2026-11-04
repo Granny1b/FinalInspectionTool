@@ -3,6 +3,8 @@
  * document is validated with the shared schema so nothing malformed ever reaches storage.
  */
 import {
+  DEFAULT_DEVIATION_CATEGORIES,
+  DEFAULT_RESPONSIBLES,
   DEFAULT_COMPANY_NAME,
   DEFAULT_SPARE_ROWS_PER_SECTION,
   SettingsSchema,
@@ -67,6 +69,8 @@ export function buildSettings(parsed: ParsedWorkbook, now: string): Settings {
     machineModels: parsed.models,
     defaultLocation: parsed.defaultLocation,
     companyName: DEFAULT_COMPANY_NAME,
+    responsibles: [...DEFAULT_RESPONSIBLES],
+    deviationCategories: [...DEFAULT_DEVIATION_CATEGORIES],
     updatedAt: now,
     updatedBy: SEED_USER,
   } satisfies Settings);

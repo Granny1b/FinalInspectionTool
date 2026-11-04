@@ -4,6 +4,8 @@
  */
 import {
   blobNames,
+  DEFAULT_DEVIATION_CATEGORIES,
+  DEFAULT_RESPONSIBLES,
   CONTAINERS,
   newId,
   snapshotTemplate,
@@ -57,6 +59,8 @@ export async function writeSettings(machineModels = MODELS): Promise<Settings> {
     machineModels,
     defaultLocation: 'Kalmar, Sweden',
     companyName: 'Modig Machine Tool',
+    responsibles: [...DEFAULT_RESPONSIBLES],
+    deviationCategories: [...DEFAULT_DEVIATION_CATEGORIES],
     updatedAt: '2026-10-01T08:00:00.000Z',
     updatedBy: 'seed',
   };

@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  DEFAULT_DEVIATION_CATEGORIES,
+  DEFAULT_RESPONSIBLES,
   DEFAULT_COMPANY_NAME,
   DEFAULT_SPARE_ROWS_PER_SECTION,
   newId,
@@ -58,6 +60,8 @@ describe('buildTemplateDocuments', () => {
       machineModels: parsed.models,
       defaultLocation: 'Kalmar, Sweden',
       companyName: DEFAULT_COMPANY_NAME,
+      responsibles: [...DEFAULT_RESPONSIBLES],
+      deviationCategories: [...DEFAULT_DEVIATION_CATEGORIES],
       updatedAt: now,
       updatedBy: 'seed',
     });

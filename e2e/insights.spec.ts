@@ -188,7 +188,7 @@ test('an admin reads the KPIs of finalised inspections and exports their deviati
   expect(lines).toHaveLength(5);
   expect(lines.filter((line) => line.includes(first.number))).toHaveLength(1);
   expect(lines.filter((line) => line.includes(second.number))).toHaveLength(2);
-  expect(csv).toContain(';Blue mark missing;Mechanics;major;2026-10-07;true;');
+  expect(csv).toContain(';Blue mark missing;Mechanics;major;;2026-10-07;true;');
 
   // Recharts runs under the app's Content-Security-Policy without complaint.
   expect(errors).toEqual([]);

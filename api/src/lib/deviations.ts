@@ -14,7 +14,10 @@ type DeviationEntity = TableEntity<DeviationRow>;
 /** The service's limit on operations in one transactional batch. */
 const BATCH_SIZE = 100;
 
-/** The brief's columns, in its order: the only properties a row has (and the CSV's columns). */
+/**
+ * The brief's columns, in its order, plus `category` after `severity`: the only properties a row
+ * has (and the CSV's columns).
+ */
 export const DEVIATION_COLUMNS = [
   'inspectionId',
   'inspectionNumber',
@@ -30,6 +33,7 @@ export const DEVIATION_COLUMNS = [
   'comment',
   'resp',
   'severity',
+  'category',
   'inspectionDate',
   'finalised',
   'createdAt',
@@ -90,6 +94,7 @@ function deviationEntities(
       comment: deviation.comment,
       resp: deviation.resp,
       severity: deviation.severity,
+      category: deviation.category,
       inspectionDate: front.date,
       finalised: state === 'finalised',
       // When the deviation was first recorded; KPIs over time must not move on every save.
