@@ -14,7 +14,16 @@ import {
   type RowResult,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, ClipboardCheck, ClipboardList, Lock, LockOpen, Printer } from 'lucide-react';
+import clsx from 'clsx';
+import {
+  ChevronDown,
+  ClipboardCheck,
+  ClipboardList,
+  Eye,
+  Lock,
+  LockOpen,
+  Printer,
+} from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { ActionMenu } from '../../components/ActionMenu';
@@ -32,9 +41,12 @@ import { useReload } from '../../lib/autosave/useReload';
 import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { formatDateTime } from '../../lib/format';
 import { useCurrentUser } from '../../lib/useMe';
+import { usePersonName } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
+import { InspectionPreview } from '../print/InspectionPreview';
 import { inspectionPrintHref } from '../print/links';
 import type { PrintMode } from '../print/model';
+import { inspectionOnScreen } from '../print/preview';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
 import { withPhotos } from './checklist/results';
 import { DeviationSummary } from './DeviationSummary';
@@ -63,14 +75,12 @@ import {
   inspectionKeys,
   isUnavailable,
   saveInspection,
-  useRespHistory,
   type LoadedInspection,
   type StateChange,
 } from './queries';
-import { respSuggestions } from './resp';
 import { StateBadge } from './StateBadge';
 import { StateChangeDialog, type StateOutcome } from './StateChangeDialog';
-import { useScrollPaddingBelow } from './useScrollPaddingBelow';
+import { useScrollPaddingBelow } from '../../lib/useScrollPaddingBelow';
 
 type Props = {
   /** Read once, when the page opens; from then on the page's own state is the truth. */
@@ -85,6 +95,8 @@ type ServerState = Pick<Inspection, 'state' | 'finalisedAt' | 'finalisedBy'>;
 type DialogState = { change: 'finalise'; issues: FinaliseIssue[] } | { change: 'reopen' };
 
 const NO_ISSUES: FinaliseIssue[] = [];
+/** Until the settings have loaded: one array, so the memoised rows don't re-render for it. */
+const NO_CHOICES: readonly string[] = [];
 /** What the header says while a participant's name is typed but not yet added. */
 const TYPING: AutosaveState = { status: 'pending' };
 // One element for the page's lifetime: React skips it when the page re-renders per key.
@@ -103,7 +115,9 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const queryClient = useQueryClient();
   const isAdmin = hasRole(useCurrentUser().roles, 'admin');
   const settings = useSettings();
-  const respHistory = useRespHistory();
+  const responsibles = settings.data?.responsibles ?? NO_CHOICES;
+  const categories = settings.data?.deviationCategories ?? NO_CHOICES;
+  const personName = usePersonName();
   const idPrefix = useId();
   // Back to the list as it was left (search and filters); one element for the page's lifetime.
   const [backLink] = useState(() => <BackLink to={inspectionsListHref()} label="Inspections" />);
@@ -226,17 +240,6 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     () => (nextItemId && nextRef ? { itemId: nextItemId, ref: nextRef } : null),
     [nextItemId, nextRef],
   );
-  // History plus this inspection's own names, taken when a Resp field is left: the text being
-  // typed must not be offered to its own field (it would come first, as a prefix of the name it
-  // was going to complete). Same list → same array (stable datalists).
-  const [respNames, setRespNames] = useState(draft);
-  const commitRespNames = useCallback(() => setRespNames(draftRef.current), []);
-  const respKey = useMemo(
-    () => JSON.stringify(respSuggestions(respHistory.data, respNames)),
-    [respHistory.data, respNames],
-  );
-  const suggestions = useMemo(() => JSON.parse(respKey) as string[], [respKey]);
-
   // Tabs keep their own scroll position, so going back to the checklist returns to the row.
   const [tab, setTab] = useState<InspectionTab>('checklist');
   // The Deviations tab is rendered when first shown, then kept: opening an inspection doesn't
@@ -297,11 +300,9 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     field?.scrollIntoView({ block: 'nearest' });
   }, [update]);
   const removeExtraDeviation = useCallback(
-    (extraId: string) => {
-      update({ extraDeviations: removeExtra(draftRef.current.extraDeviations, extraId) });
-      commitRespNames();
-    },
-    [update, commitRespNames],
+    (extraId: string) =>
+      update({ extraDeviations: removeExtra(draftRef.current.extraDeviations, extraId) }),
+    [update],
   );
 
   const headerRef = useRef<HTMLElement>(null);
@@ -311,6 +312,14 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const [notice, setNotice] = useState<StateChange | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [stateConflict, setStateConflict] = useState(false);
+  // The quick preview shows what is on screen, so it needs no save first (unlike printing).
+  // The same object while nothing changes, so its pages are laid out once.
+  const [previewing, setPreviewing] = useState(false);
+  const previewRef = useRef<HTMLButtonElement>(null);
+  const previewed = useMemo(
+    () => (previewing ? inspectionOnScreen(inspection, draft, server) : null),
+    [previewing, inspection, draft, server],
+  );
   const continueId = `${idPrefix}-continue`;
 
   // Finalise and Reopen swap places under the keyboard focus: the notice takes it instead.
@@ -406,37 +415,53 @@ export function InspectionEditor({ loaded, onReload }: Props) {
 
   const modelLabel = modelName(settings.data?.machineModels, inspection.front.modelCode);
   const machine = draft.front.machineName.trim();
+  // Once finalised there is nothing left to save: the header says so only if saving failed.
+  const showSaveStatus = !finalised || saveState.status !== 'saved';
 
   return (
-    // A Resp field that is left adds its name to the suggestions (React's onBlur bubbles).
-    <div
-      onBlur={(event) => {
-        if (event.target instanceof HTMLInputElement && event.target.hasAttribute('list')) {
-          commitRespNames();
-        }
-      }}
-    >
+    <div>
       <title>{`${number}${machine ? ` · ${machine}` : ''} · ${APP_NAME}`}</title>
       {backLink}
 
+      {/*
+        Sticky where it leaves room to work. On a phone, upright or on its side, the header takes
+        several lines (a third of the screen, more with the keyboard open), so it scrolls away.
+      */}
       <header
         ref={headerRef}
-        className="sticky top-14 z-20 mt-2 border-b border-ink-200 bg-canvas pt-3 lg:top-0"
+        className="top-14 z-20 mt-2 border-b border-ink-200 bg-canvas pt-3 lg:top-0 sm:[@media(min-height:40rem)]:sticky"
       >
-        <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-          <div className="min-w-0 flex-1">
+        {/*
+          Laid out by its own width. From 42rem (a tablet, upright or on its side beside the
+          sidebar) the actions are beside the title and the details run under both, which keeps
+          the sticky header to three lines. The save status goes at the end of the details line,
+          under the actions, until 52rem (a desktop), where it fits before them. The details keep
+          room for its longest text, so a change in it (Saved, Unsaved changes) never re-wraps
+          anything and the header never changes height while typing. Narrower (a phone), the
+          status and then the actions go under the details, so a machine name is never cut to "R…".
+        */}
+        <div className="@container">
+          <div className="grid grid-cols-[minmax(0,1fr)] @min-[42rem]:grid-cols-[minmax(0,1fr)_auto] @min-[42rem]:gap-x-6 @min-[52rem]:grid-cols-[minmax(0,1fr)_auto_auto]">
             {/* Focusable from script: it takes the focus when a notice is dismissed. */}
             <h1
               ref={titleRef}
               tabIndex={-1}
-              className="truncate text-xl font-semibold tracking-tight text-ink-900 outline-none"
+              className="truncate text-xl font-semibold tracking-tight text-ink-900 outline-none @min-[42rem]:col-start-1 @min-[42rem]:row-start-1 @min-[42rem]:self-center"
             >
               {number}
               <span className="font-normal text-ink-500"> · </span>
               {machine || <span className="font-normal text-ink-500">No machine name</span>}
             </h1>
-            {/* Spaced, not separated by dots: on a narrow screen a dot would dangle at a line end. */}
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
+            {/*
+              Spaced, not separated by dots: on a narrow screen a dot would dangle at a line end.
+              On a tablet it keeps room at its end for the save status's longest text.
+            */}
+            <div
+              className={clsx(
+                'mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500 @min-[42rem]:col-span-2 @min-[42rem]:col-start-1 @min-[42rem]:row-start-2 @min-[52rem]:col-span-3',
+                showSaveStatus && '@min-[42rem]:pr-44 @min-[52rem]:pr-0',
+              )}
+            >
               <StateBadge state={server.state} />
               <span>{modelLabel}</span>
               <span>S/N {draft.front.serialNumber.trim() || '—'}</span>
@@ -446,76 +471,100 @@ export function InspectionEditor({ loaded, onReload }: Props) {
               {finalised && server.finalisedAt && (
                 <span>
                   Finalised {formatDateTime(server.finalisedAt)}
-                  {server.finalisedBy && ` by ${server.finalisedBy}`}
+                  {server.finalisedBy && ` by ${personName(server.finalisedBy)}`}
                 </span>
               )}
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {(!finalised || saveState.status !== 'saved') && (
-              <div className="mr-2">
+            {showSaveStatus && (
+              // A line of its own on a phone, so the buttons share one. Beside the details (and
+              // before the actions) it is only as high as its text, so their line keeps its height.
+              <div className="mt-3 @min-[42rem]:col-start-2 @min-[42rem]:row-start-2 @min-[42rem]:mt-1.5 @min-[42rem]:self-center @min-[42rem]:justify-self-end @min-[52rem]:row-start-1 @min-[52rem]:mt-0 @min-[52rem]:-mr-2">
                 <SaveStatus
                   state={participantPending && saveState.status === 'saved' ? TYPING : saveState}
                   conflict={stateConflict}
                   onRetry={() => void saver.flush()}
                   onReload={reload.askReload}
+                  height="h-9 @min-[42rem]:h-5"
                 />
               </div>
             )}
-            <ActionMenu
-              label="Print / Save PDF"
-              trigger={
-                <>
-                  <Printer size={16} aria-hidden="true" />
-                  Print / Save PDF
-                  <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
-                </>
-              }
-              items={[
-                {
-                  label: 'Blank checklist',
-                  icon: ClipboardList,
-                  onSelect: () => void openPrint('blank'),
-                },
-                { label: 'Report', icon: ClipboardCheck, onSelect: () => void openPrint('report') },
-              ]}
-            />
-            {!finalised ? (
-              <Button onClick={openFinalise} disabled={conflict}>
-                <Lock size={16} aria-hidden="true" />
-                Finalise
+            <div
+              className={clsx(
+                'flex flex-wrap items-center gap-2 @max-[36rem]:gap-x-1.5 @min-[42rem]:col-start-2 @min-[42rem]:row-start-1 @min-[42rem]:mt-0 @min-[52rem]:col-start-3',
+                showSaveStatus ? 'mt-2' : 'mt-3',
+              )}
+            >
+              <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
+                <Eye size={16} aria-hidden="true" />
+                Preview
               </Button>
-            ) : (
-              // Inspectors never see Reopen (brief §5.3: admin can reopen).
-              isAdmin && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setNotice(null);
-                    setDialog({ change: 'reopen' });
-                  }}
-                  disabled={conflict}
-                >
-                  <LockOpen size={16} aria-hidden="true" />
-                  Reopen
+              <ActionMenu
+                label="Print / Save PDF"
+                trigger={
+                  <>
+                    <Printer size={16} aria-hidden="true" />
+                    {/* "Print" on a phone, so the three buttons share a line; the name stays whole. */}
+                    <span>
+                      Print<span className="@max-[36rem]:sr-only"> / Save PDF</span>
+                    </span>
+                    <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
+                  </>
+                }
+                items={[
+                  {
+                    label: 'Blank checklist',
+                    icon: ClipboardList,
+                    onSelect: () => void openPrint('blank'),
+                  },
+                  {
+                    label: 'Report',
+                    icon: ClipboardCheck,
+                    onSelect: () => void openPrint('report'),
+                  },
+                ]}
+              />
+              {!finalised ? (
+                <Button onClick={openFinalise} disabled={conflict}>
+                  <Lock size={16} aria-hidden="true" />
+                  Finalise
                 </Button>
-              )
-            )}
+              ) : (
+                // Inspectors never see Reopen (brief §5.3: admin can reopen).
+                isAdmin && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setNotice(null);
+                      setDialog({ change: 'reopen' });
+                    }}
+                    disabled={conflict}
+                  >
+                    <LockOpen size={16} aria-hidden="true" />
+                    Reopen
+                  </Button>
+                )
+              )}
+            </div>
           </div>
-        </div>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6">
-          <TabBar
-            idPrefix={idPrefix}
-            selected={tab}
-            deviationCount={deviations.length}
-            onSelect={selectTab}
-          />
-          <ProgressSummary
-            {...progress}
-            nextEmpty={finalised ? null : nextEmpty}
-            onContinue={goToRow}
-            continueId={continueId}
-          />
+          {/*
+            Wrapped in reverse: when the progress doesn't fit beside the tabs (a phone), it goes
+            above them, so the tabs stay on the header's bottom line. `items-start` is the bottom
+            edge here.
+          */}
+          <div className="mt-2 flex flex-wrap-reverse items-start justify-between gap-x-6">
+            <TabBar
+              idPrefix={idPrefix}
+              selected={tab}
+              deviationCount={deviations.length}
+              onSelect={selectTab}
+            />
+            <ProgressSummary
+              {...progress}
+              nextEmpty={finalised ? null : nextEmpty}
+              onContinue={goToRow}
+              continueId={continueId}
+            />
+          </div>
         </div>
       </header>
 
@@ -595,7 +644,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             sections={sections}
             results={draft.results}
             onChange={finalised ? undefined : updateResults}
-            respSuggestions={suggestions}
+            responsibles={responsibles}
+            categories={categories}
             issues={issues}
             onShowPhotos={goToPhotos}
           />
@@ -613,7 +663,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             deviations={deviations}
             readOnly={finalised}
             issues={extraErrors}
-            respSuggestions={suggestions}
+            responsibles={responsibles}
+            categories={categories}
             onGoToRow={goToRow}
             onAdd={addExtraDeviation}
             onUpdate={updateExtraDeviation}
@@ -650,6 +701,18 @@ export function InspectionEditor({ loaded, onReload }: Props) {
           workingLabel="Reopening…"
           run={() => change('reopen')}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {previewed && (
+        <InspectionPreview
+          inspection={previewed}
+          onPrint={(mode) => void openPrint(mode)}
+          onClose={() => {
+            setPreviewing(false);
+            // The dialog hands the focus back to what had it, but Safari doesn't focus a button
+            // that is clicked or tapped: back to Preview in any case.
+            previewRef.current?.focus();
+          }}
         />
       )}
       {reload.dialog}

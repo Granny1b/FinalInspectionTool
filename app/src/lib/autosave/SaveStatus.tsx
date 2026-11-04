@@ -12,13 +12,15 @@ type Props = {
   onRetry: () => void;
   /** The way out of a conflict, here too: the banner may be scrolled out of view. */
   onReload: () => void;
+  /** The line's height classes: a button's height by default, so it lines up beside buttons. */
+  height?: string;
 };
 
 /**
  * "Saving… / Saved / Unsaved changes / Couldn't save — Retry / Not saved — Reload", in the page's
  * sticky header.
  */
-export function SaveStatus({ state, conflict, onRetry, onReload }: Props) {
+export function SaveStatus({ state, conflict, onRetry, onReload, height = 'h-9' }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   return (
     // Announced politely; the conflict and failed-save banners use role="alert" themselves.
@@ -27,7 +29,7 @@ export function SaveStatus({ state, conflict, onRetry, onReload }: Props) {
       ref={ref}
       role="status"
       tabIndex={-1}
-      className="flex h-9 items-center text-sm whitespace-nowrap text-ink-500 outline-none"
+      className={`flex items-center text-sm whitespace-nowrap text-ink-500 outline-none ${height}`}
     >
       {conflict || state.status === 'conflict' ? (
         <Line icon={<CircleAlert size={16} />} className="text-nok-fg" title={CONFLICT_MESSAGE}>

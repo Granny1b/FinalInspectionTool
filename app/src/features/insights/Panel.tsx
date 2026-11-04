@@ -11,7 +11,11 @@ type Props = {
   children: ReactNode;
 };
 
-/** A card on the Insights page: one chart or table under a heading. */
+/**
+ * A card on the Insights page: one chart or table under a heading. The header is the app's card
+ * header (Settings, the front page, the revision history): a small title, one line under it, and
+ * a divider.
+ */
 export function Panel({ title, description, aside, className, children }: Props) {
   const titleId = useId();
   return (
@@ -22,16 +26,17 @@ export function Panel({ title, description, aside, className, children }: Props)
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-4 px-5 pt-4">
+      <div className="flex items-start justify-between gap-4 border-b border-ink-200 px-5 py-3.5">
         <div className="min-w-0">
           <h2 id={titleId} className="text-sm font-semibold text-ink-900">
             {title}
           </h2>
           {description && <p className="mt-0.5 text-xs text-ink-500">{description}</p>}
         </div>
-        {aside && <div className="shrink-0 text-xs text-ink-500">{aside}</div>}
+        {/* Its smaller line centred on the title's. */}
+        {aside && <div className="shrink-0 pt-0.5 text-xs text-ink-500">{aside}</div>}
       </div>
-      <div className="flex-1 px-5 pt-4 pb-5">{children}</div>
+      <div className="flex-1 p-5">{children}</div>
     </section>
   );
 }

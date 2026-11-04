@@ -4,10 +4,14 @@
  * `{ identityProvider, userId, userDetails, userRoles }` (no claims). SWA replaces any value the
  * client sends, so in Azure the header can be trusted. Locally, only requests through the SWA CLI
  * (:4280) are trustworthy — the Functions host (:7071) accepts any forged header.
+ *
+ * The caller's role and name come from the people list (lib/people.ts), matched on the sign-in's
+ * email; someone not on it keeps the roles of their Static Web Apps role invitation, if any.
  */
 import type { HttpRequest } from '@azure/functions';
-import { appRoles, type Role } from '@modig/shared';
+import { appRoles, type Person, type Role } from '@modig/shared';
 import { z } from 'zod';
+import { cachedPeople } from './people';
 
 export const CLIENT_PRINCIPAL_HEADER = 'x-ms-client-principal';
 
@@ -24,9 +28,12 @@ export type ClientPrincipal = z.infer<typeof ClientPrincipalSchema>;
 export type User = {
   /** Lowercased: `userId` changes when a user is re-invited, so anything per-user keys on this. */
   email: string;
+  /** The name on the people list, else one made from the email. */
   name: string;
-  /** App roles only; built-in roles grant nothing. */
+  /** App roles: the person's role on the people list, else `invitedRoles`. */
   roles: Role[];
+  /** App roles from Static Web Apps role invitations; built-in roles grant nothing. */
+  invitedRoles: Role[];
   userId: string;
   identityProvider: string;
 };
@@ -46,18 +53,45 @@ export function parseClientPrincipal(
   return result.success ? result.data : null;
 }
 
-export function getUser(req: HttpRequest): User | null {
+/** The caller, or null without a (valid) principal. Reads the people list (cached briefly). */
+export async function getUser(req: HttpRequest): Promise<User | null> {
   const principal = parseClientPrincipal(req.headers.get(CLIENT_PRINCIPAL_HEADER));
   if (!principal) return null;
+  return resolveUser(principal, await cachedPeople());
+}
+
+export function resolveUser(principal: ClientPrincipal, people: readonly Person[]): User {
   const email = principal.userDetails.trim().toLowerCase();
+  const { identityProvider } = principal;
+  // SWA treats role names case-insensitively, so an invite for "Admin" must still count here.
+  const invitedRoles = appRoles(principal.userRoles.map((role) => role.toLowerCase()));
+  const person = listedPerson(people, { email, identityProvider });
   return {
     email,
-    name: nameFromEmail(email),
-    // SWA treats role names case-insensitively, so an invite for "Admin" must still count here.
-    roles: appRoles(principal.userRoles.map((role) => role.toLowerCase())),
+    name: person?.name ?? nameFromEmail(email),
+    roles: rolesOf(person, invitedRoles),
+    invitedRoles,
     userId: principal.userId,
-    identityProvider: principal.identityProvider,
+    identityProvider,
   };
+}
+
+/**
+ * The caller's entry on the people list. Only Microsoft sign-ins are matched: their
+ * `userDetails` is the account's email (a work account's UPN). The route rules switch the other
+ * providers off; were one ever back, its `userDetails` would be a user name anyone could pick.
+ */
+export function listedPerson<P extends Pick<Person, 'email'>>(
+  people: readonly P[],
+  caller: Pick<User, 'email' | 'identityProvider'>,
+): P | undefined {
+  if (caller.identityProvider !== 'aad') return undefined;
+  return people.find((person) => person.email === caller.email);
+}
+
+/** A person's role on the list replaces their invitation's roles; off the list, those count. */
+export function rolesOf(person: Pick<Person, 'role'> | undefined, invitedRoles: Role[]): Role[] {
+  return person ? [person.role] : invitedRoles;
 }
 
 /**

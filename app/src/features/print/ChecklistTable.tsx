@@ -67,9 +67,19 @@ export function ChecklistTable({ section, fallbackFooter }: Props) {
   );
 }
 
+/**
+ * A comment this long makes its row about a third of a page or more (the comment column holds
+ * some 30 characters a line). Such a row doesn't hold its neighbours on its page (print.css).
+ */
+const LONG_COMMENT = 600;
+
 function Row({ row }: { row: PrintRow }) {
   return (
-    <tr data-row-ref={row.ref} data-spare={row.spare || undefined}>
+    <tr
+      data-row-ref={row.ref}
+      data-spare={row.spare || undefined}
+      data-long={row.comment.length > LONG_COMMENT || undefined}
+    >
       <td className="paper-ref">{row.ref}</td>
       <td>{row.text}</td>
       <td>

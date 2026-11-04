@@ -6,6 +6,7 @@
     <title>No access yet · Modig Final Inspection</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="stylesheet" href="/login-assets/auth.css" />
+    <script src="/theme.js"></script>
     <script type="module" src="/login-assets/auth.js"></script>
   </head>
   <body data-page="forbidden">
@@ -16,56 +17,59 @@
           <h1>You don't have access yet</h1>
           <p class="lead">
             <span id="signed-in-as" hidden
-              >You're signed in as <strong id="signed-in-email"></strong>, but that account</span
+              >You're signed in as <strong id="signed-in-email"></strong>, but that email</span
             >
-            <span id="signed-in-fallback">You're signed in, but your account</span>
-            hasn't been invited to Final Inspection.
+            <span id="signed-in-fallback">You're signed in, but your email</span>
+            isn't on the list of people who can use Final Inspection.
           </p>
-          <!-- An invited role belongs to one Microsoft sign-in, not to an email address: this id
-               tells an admin which sign-in this is (Role management lists the same ids). -->
+          <!-- A role invitation (the older way in) belongs to one Microsoft sign-in, not to an
+               email: this id tells an admin which sign-in this is (Role management lists them). -->
           <p class="account" id="account" hidden>Account ID <code id="account-id"></code></p>
 
           <ol class="steps">
             <li>
-              Ask a Quality admin to invite your work email as <em>inspector</em> or <em>admin</em>.
+              Ask a Quality admin to add your email in <em>Settings</em> →
+              <em>Users &amp; access</em>.
             </li>
+            <li>Once they have, select <em>Check again</em>. There's no need to sign in again.</li>
             <li>
-              Open the invitation link before it expires (at most 7 days) and sign in with that same
-              account.
-            </li>
-            <li>
-              Already accepted an invitation? Sign out and sign in again to pick up your role.
-            </li>
-            <li>
-              Still here? Microsoft may have signed you in with another account that has the same
-              email (a personal and a work account, say). Send your admin the account ID above.
+              Signed in with a different account from the one your admin added? Sign out and use
+              that one.
             </li>
           </ol>
 
+          <button id="check-again" class="button" type="button">Check again</button>
+          <p id="check-status" class="note status" role="status"></p>
           <!-- Relative return path on purpose: the SWA CLI turns an absolute one into a broken URL. -->
-          <a id="sign-out" class="button" href="/.auth/logout?post_logout_redirect_uri=/login.html">
-            Sign out and use another account
-          </a>
+          <a
+            id="sign-out"
+            class="secondary"
+            href="/.auth/logout?post_logout_redirect_uri=/login.html"
+            >Sign out and use another account</a
+          >
           <p class="note">
             If Microsoft signs you straight back in, choose “Use another account” or use a private
             window.
           </p>
         </div>
 
-        <!-- Shown instead when this sign-in HAS a role but the app was just refused: the app and
-             this page would otherwise send the user back and forth for good (see auth.js). -->
+        <!-- Shown instead when the API lets this sign-in in but the app was just refused, or the
+             API failed: the app and this page would otherwise send the user back and forth for
+             good (see auth.js). -->
         <div id="refused" hidden>
           <h1>The server refused a request</h1>
+          <!-- auth.js fills in "with the role admin" after the email when the sign-in has one. -->
           <p class="lead">
-            You're signed in as <strong id="refused-email"></strong> with the role
-            <strong id="refused-roles"></strong>, but the app's request
-            <code id="refused-request"></code> was refused with HTTP
-            <strong id="refused-status"></strong> at <span id="refused-at"></span>.
+            You're signed in as <strong id="refused-email"></strong><span id="refused-role"></span>,
+            but the app's request <code id="refused-request"></code> was refused (<strong
+              id="refused-status"
+            ></strong
+            >) at <span id="refused-at"></span>.
           </p>
           <p class="account">Account ID <code id="refused-account"></code></p>
           <p class="note">
-            Your invitation is fine: this is a problem on the server side. Send a screenshot of this
-            page to whoever set up the app.
+            This is a problem on the server side. Send a screenshot of this page to whoever set up
+            the app.
           </p>
           <button id="try-again" class="button" type="button">Try again</button>
           <a class="secondary" href="/.auth/logout?post_logout_redirect_uri=/login.html"

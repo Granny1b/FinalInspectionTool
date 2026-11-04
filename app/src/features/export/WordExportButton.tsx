@@ -42,15 +42,16 @@ export function WordExportButton({ model, appendix, logoImageId }: Props) {
 
   return (
     <div className="flex items-center gap-2">
+      {/* In front of the button, so the toolbar's buttons stay side by side. */}
+      {failed && (
+        <p role="alert" className="max-w-56 text-right text-xs text-nok-fg">
+          Couldn’t create the Word file. Check your connection and try again.
+        </p>
+      )}
       <Button variant="secondary" onClick={() => void exportFile()} disabled={busy}>
         <FileDown size={16} aria-hidden="true" />
         {busy ? 'Exporting…' : 'Export to Word (.docx)'}
       </Button>
-      {failed && (
-        <p role="alert" className="max-w-56 text-xs text-nok-fg">
-          Couldn’t create the Word file. Check your connection and try again.
-        </p>
-      )}
     </div>
   );
 }

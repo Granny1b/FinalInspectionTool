@@ -1,10 +1,26 @@
+import { Mountain } from 'lucide-react';
 import { PhotoField, PhotoFrame } from '../../components/PhotoField';
 
 const NOUN = 'machine photo';
 
-/** The machine photo in the front page's 4:3 frame, read-only. */
+/**
+ * The machine photo in the front page's 4:3 frame, read-only. Without one, a phone (where the
+ * frame would be an empty box the width of the screen, with nothing left to add) says so in a
+ * line; wider, the empty frame stays beside the details, as on the printed front page.
+ */
 export function MachinePhoto({ imageId }: { imageId?: string }) {
-  return <PhotoFrame imageId={imageId} noun={NOUN} />;
+  if (imageId) return <PhotoFrame imageId={imageId} noun={NOUN} />;
+  return (
+    <>
+      <p className="flex items-center gap-2 text-sm text-ink-500 sm:hidden">
+        <Mountain size={16} strokeWidth={1.5} aria-hidden="true" className="text-ink-400" />
+        No {NOUN}
+      </p>
+      <div className="hidden sm:block">
+        <PhotoFrame noun={NOUN} />
+      </div>
+    </>
+  );
 }
 
 type FieldProps = {

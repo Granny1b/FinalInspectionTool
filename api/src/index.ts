@@ -8,7 +8,7 @@ import './functions/insights';
 import './functions/inspection-state';
 import './functions/inspections';
 import './functions/me';
-import './functions/resp-suggestions';
 import './functions/settings';
 import './functions/template-revisions';
 import './functions/templates';
+import './functions/users';

@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { blobNames, CONTAINERS, type Person, type Role } from '@modig/shared';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodePrincipal, principal, request } from '../../test/requests';
-import { getUser, nameFromEmail, parseClientPrincipal } from './auth';
+import { resetStorage, storePeople, useTestStorage } from '../../test/storage';
+import { getUser, nameFromEmail, parseClientPrincipal, resolveUser } from './auth';
+import { writeJson } from './storage';
 
 const base64 = (text: string) => Buffer.from(text, 'utf8').toString('base64');
 
@@ -50,32 +53,123 @@ describe('parseClientPrincipal', () => {
   });
 });
 
-describe('getUser', () => {
-  it('returns null without a principal', () => {
-    expect(getUser(request())).toBeNull();
-  });
+const listed = (email: string, name: string, role: Role): Person => ({
+  email,
+  name,
+  role,
+  addedAt: '2026-10-01T08:00:00.000Z',
+  addedBy: 'boss@modig.se',
+});
 
+describe('resolveUser', () => {
   it('lowercases the email, derives the name and keeps app roles only', () => {
-    const req = request({ principal: principal('Sam.Andersson@Modig.se', ['inspector']) });
-    expect(getUser(req)).toEqual({
+    expect(resolveUser(principal('Sam.Andersson@Modig.se', ['inspector']), [])).toEqual({
       email: 'sam.andersson@modig.se',
       name: 'Sam Andersson',
       roles: ['inspector'],
+      invitedRoles: ['inspector'],
       userId: 'd2f3c4b5a6e7f8091a2b3c4d5e6f7081',
       identityProvider: 'aad',
     });
   });
 
   it('matches role names case-insensitively, like SWA does', () => {
-    const req = request({ principal: principal('a@b.se', ['Admin', 'INSPECTOR']) });
-    expect(getUser(req)?.roles).toEqual(['inspector', 'admin']);
+    const user = resolveUser(principal('a@b.se', ['Admin', 'INSPECTOR']), []);
+    expect(user.roles).toEqual(['inspector', 'admin']);
   });
 
   it('keeps Swedish letters in the name', () => {
-    const req = request({ principal: principal('Åsa.Öberg@modig.se', ['inspector']) });
-    expect(getUser(req)?.name).toBe('Åsa Öberg');
+    expect(resolveUser(principal('Åsa.Öberg@modig.se', ['inspector']), []).name).toBe('Åsa Öberg');
+  });
+
+  it('takes the name and role from the people list, matched on the lowercased email', () => {
+    const people = [listed('sam.andersson@modig.se', 'Samuel Andersson', 'admin')];
+    const user = resolveUser(principal(' Sam.Andersson@Modig.se ', []), people);
+    expect(user).toMatchObject({
+      email: 'sam.andersson@modig.se',
+      name: 'Samuel Andersson',
+      roles: ['admin'],
+      invitedRoles: [],
+    });
+  });
+
+  it("lets the list's role replace the invitation's, also downwards", () => {
+    const people = [listed('boss@modig.se', 'The Boss', 'inspector')];
+    const user = resolveUser(principal('boss@modig.se', ['admin']), people);
+    expect(user).toMatchObject({ roles: ['inspector'], invitedRoles: ['admin'] });
+  });
+
+  it('keeps the invitation for someone not on the list', () => {
+    const people = [listed('boss@modig.se', 'The Boss', 'admin')];
+    const user = resolveUser(principal('sam.andersson@modig.se', ['inspector']), people);
+    expect(user).toMatchObject({ name: 'Sam Andersson', roles: ['inspector'] });
+  });
+
+  it('gives no role to someone neither invited nor listed', () => {
+    const people = [listed('boss@modig.se', 'The Boss', 'admin')];
+    expect(resolveUser(principal('guest@outlook.com', []), people).roles).toEqual([]);
+  });
+
+  it('matches only Microsoft sign-ins against the list', () => {
+    const people = [listed('boss@modig.se', 'The Boss', 'admin')];
+    const github = { ...principal('boss@modig.se', []), identityProvider: 'github' };
+    expect(resolveUser(github, people)).toMatchObject({ name: 'boss', roles: [] });
   });
 });
+
+describe('getUser', () => {
+  beforeAll(useTestStorage);
+  beforeEach(resetStorage);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns null without a principal', async () => {
+    expect(await getUser(request())).toBeNull();
+  });
+
+  it('resolves the caller against the stored people list', async () => {
+    await storePeople([{ email: 'sam.andersson@modig.se', name: 'Sam A.', role: 'admin' }]);
+    const user = await getUser(request({ principal: principal('sam.andersson@modig.se', []) }));
+    expect(user).toMatchObject({ name: 'Sam A.', roles: ['admin'] });
+  });
+
+  it('works without a people list, from the invitation alone', async () => {
+    const user = await getUser(request({ principal: principal('boss@modig.se', ['admin']) }));
+    expect(user).toMatchObject({ name: 'boss', roles: ['admin'] });
+  });
+
+  it('keeps the list for a few seconds, then reads it again', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const req = request({ principal: principal('sam.andersson@modig.se', []) });
+    await storePeople([{ email: 'sam.andersson@modig.se', name: 'Sam', role: 'inspector' }]);
+    expect((await getUser(req))?.roles).toEqual(['inspector']);
+
+    // Changed behind the cache's back, as by a save on another Functions instance.
+    await writeJson(CONTAINERS.config, blobNames.people, { ...peopleDocument, people: [] });
+    expect((await getUser(req))?.roles).toEqual(['inspector']);
+    vi.setSystemTime(Date.now() + 5_000);
+    expect((await getUser(req))?.roles).toEqual([]);
+  });
+
+  it('does not keep a failed read', async () => {
+    const req = request({ principal: principal('sam.andersson@modig.se', []) });
+    await writeJson(CONTAINERS.config, blobNames.people, { people: 'not a list' });
+    await expect(getUser(req)).rejects.toThrow(/people\.json is invalid/);
+
+    await writeJson(CONTAINERS.config, blobNames.people, {
+      ...peopleDocument,
+      people: [listed('sam.andersson@modig.se', 'Sam', 'inspector')],
+    });
+    expect((await getUser(req))?.roles).toEqual(['inspector']);
+  });
+});
+
+const peopleDocument = {
+  people: [],
+  updatedAt: '2026-10-01T08:00:00.000Z',
+  updatedBy: 'boss@modig.se',
+};
 
 describe('nameFromEmail', () => {
   it.each([

@@ -5,7 +5,8 @@
  *   templates/{templateId}/rev-{n}.json      immutable published revisions
  *   inspections/{inspectionId}.json
  *   images/{imageId}.jpg                     photos, and flattened copies of marked-up photos
- *   config/settings.json                     machine models, default location, company info
+ *   config/settings.json                     machine models, default location, company info, lists
+ *   config/people.json                       who may use the app: name, email, role
  *   config/inspection-counter.json           counter for FI-YYYY-NNNN numbers
  *
  * Table `deviations`: one row per deviation (KPI source).
@@ -31,6 +32,8 @@ export const blobNames = {
   inspection: (inspectionId: string) => `${inspectionId}.json`,
   image: (imageId: string) => `${imageId}.jpg`,
   settings: 'settings.json',
+  /** Who may use the app, with their names and roles (admin-managed in Settings). */
+  people: 'people.json',
   inspectionCounter: 'inspection-counter.json',
 } as const;
 

@@ -139,7 +139,13 @@ function DeviationCard({
         <p className="paper-card-text">{card.text}</p>
         {card.comment && <p className="paper-card-comment">{card.comment}</p>}
         <p className="paper-card-resp">
-          <span className="paper-card-label">Resp</span>
+          <span className="paper-card-label">Category</span>
+          {card.category || '—'}
+        </p>
+        {/* In full: a card has the room the checklist's narrow Resp column lacks, and a customer
+            reads it. */}
+        <p className="paper-card-resp">
+          <span className="paper-card-label">Responsible</span>
           {card.resp || '—'}
         </p>
       </div>

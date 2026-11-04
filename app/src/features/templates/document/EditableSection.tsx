@@ -17,9 +17,13 @@ import {
   SECTION_HEADER,
   TEXT_CELL,
 } from './layout';
+import { MAX_SPARE_ROWS } from './ops';
 import { ColumnLabels, DragHandle, IssueNote, SpareRows } from './parts';
 import type { DocumentActions } from './useDocumentActions';
 import type { DragKind } from './useDocumentDnd';
+
+const ADD_BUTTON =
+  'inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900';
 
 type Props = {
   section: Section;
@@ -202,16 +206,42 @@ export const EditableSection = memo(function EditableSection({
               : 'No rows yet. Add one, or drag rows here.'}
           </p>
         )}
-        <SpareRows start={rowCount} count={spareRows} />
-        <button
-          type="button"
-          onClick={() => actions.addRow(section.id)}
-          aria-label={`Add row to section ${number}`}
-          className="mt-1.5 ml-9 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
-        >
-          <Plus size={15} aria-hidden="true" />
-          Add row
-        </button>
+        <SpareRows
+          start={rowCount}
+          count={spareRows}
+          edit={{
+            sectionId: section.id,
+            sectionIndex: index,
+            onDelete: (offset) => actions.deleteSpareRow(section.id, offset),
+          }}
+        />
+        <div className="mt-1.5 ml-9 flex flex-wrap gap-x-1">
+          <button
+            type="button"
+            onClick={() => actions.addRow(section.id)}
+            aria-label={`Add row to section ${number}`}
+            className={ADD_BUTTON}
+          >
+            <Plus size={15} aria-hidden="true" />
+            Add row
+          </button>
+          <button
+            type="button"
+            data-add-spare={section.id}
+            onClick={() => actions.addSpareRow(section.id)}
+            disabled={spareRows >= MAX_SPARE_ROWS}
+            aria-label={`Add spare line to section ${number}`}
+            title={
+              spareRows >= MAX_SPARE_ROWS
+                ? `A section has at most ${MAX_SPARE_ROWS} spare lines`
+                : 'A blank lettered line on the printed checklist, for findings written by hand'
+            }
+            className={clsx(ADD_BUTTON, 'disabled:opacity-50')}
+          >
+            <Plus size={15} aria-hidden="true" />
+            Add spare line
+          </button>
+        </div>
       </div>
     </div>
   );

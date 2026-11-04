@@ -14,7 +14,10 @@ type DeviationEntity = TableEntity<DeviationRow>;
 /** The service's limit on operations in one transactional batch. */
 const BATCH_SIZE = 100;
 
-/** The brief's columns, in its order: the only properties a row has (and the CSV's columns). */
+/**
+ * The brief's columns, in its order, plus `category` after `severity`: the only properties a row
+ * has (and the CSV's columns).
+ */
 export const DEVIATION_COLUMNS = [
   'inspectionId',
   'inspectionNumber',
@@ -30,6 +33,7 @@ export const DEVIATION_COLUMNS = [
   'comment',
   'resp',
   'severity',
+  'category',
   'inspectionDate',
   'finalised',
   'createdAt',
@@ -90,6 +94,7 @@ function deviationEntities(
       comment: deviation.comment,
       resp: deviation.resp,
       severity: deviation.severity,
+      category: deviation.category,
       inspectionDate: front.date,
       finalised: state === 'finalised',
       // When the deviation was first recorded; KPIs over time must not move on every save.
@@ -116,33 +121,4 @@ async function loadRows(
     if (entity.rowKey) rows.set(entity.rowKey, entity);
   }
   return rows;
-}
-
-/** Most suggestions the list returns; plenty for an autocomplete. */
-const MAX_SUGGESTIONS = 500;
-
-const bySwedishName = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
-
-/**
- * Every responsible person/department used so far (brief §4: "free text with autocomplete from
- * history"), trimmed and sorted. Spellings that differ only in case are one name, offered in the
- * spelling most deviations use (the first one found on a tie), which nudges people towards it.
- */
-export async function loadRespSuggestions(): Promise<string[]> {
-  await ensureTable();
-  const uses = new Map<string, number>();
-  const entities = deviationsTable().listEntities<{ resp?: unknown }>({
-    queryOptions: { filter: odata`resp ne ${''}`, select: ['resp'] },
-  });
-  for await (const { resp } of entities) {
-    const value = typeof resp === 'string' ? resp.trim() : '';
-    if (value) uses.set(value, (uses.get(value) ?? 0) + 1);
-  }
-  const byName = new Map<string, string>();
-  for (const [value, count] of uses) {
-    const name = value.toLowerCase();
-    const best = byName.get(name);
-    if (best === undefined || count > (uses.get(best) ?? 0)) byName.set(name, value);
-  }
-  return [...byName.values()].sort(bySwedishName.compare).slice(0, MAX_SUGGESTIONS);
 }

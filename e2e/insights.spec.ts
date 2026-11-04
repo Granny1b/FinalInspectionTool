@@ -103,7 +103,13 @@ test('an admin reads the KPIs of finalised inspections and exports their deviati
   const first = await inspect(
     page.request,
     allOk(published, {
-      [a1]: { status: 'NOK', severity: 'major', resp: 'Mechanics', comment: 'Blue mark missing' },
+      [a1]: {
+        status: 'NOK',
+        severity: 'major',
+        resp: 'Mechanics',
+        category: 'Markings & labels',
+        comment: 'Blue mark missing',
+      },
       [b2]: { status: 'NA' },
     }),
     true,
@@ -134,23 +140,27 @@ test('an admin reads the KPIs of finalised inspections and exports their deviati
 
   const top = panel(page, 'Top 10 recurring checkpoints').getByRole('row');
   await expect(top).toHaveCount(3); // header and two checkpoints
-  // Rank, checkpoint (ref and text, then its section), failed, share of the inspections.
-  await expect(top.nth(1).getByRole('cell')).toHaveText([
-    '1',
-    /^1\.a Lifting columns - Marked screws, blue\/red\/yellow\s*Loading area$/,
-    '2',
-    /^100%\s*of 2$/,
-  ]);
-  await expect(top.nth(2).getByRole('cell')).toHaveText([
-    '2',
-    /^2\.a Tool magazine - All pockets clean\s*Tool arena$/,
-    '1',
-    /^50%\s*of 2$/,
-  ]);
+  // Rank, checkpoint (ref and text, then its section), failed, share of the inspections. As shown
+  // (inner text): the checkpoint cell also holds the numbers' line a phone shows instead.
+  await expect(top.nth(1).getByRole('cell')).toHaveText(
+    [
+      '1',
+      /^1\.a Lifting columns - Marked screws, blue\/red\/yellow\s*Loading area$/,
+      '2',
+      /^100%\s*of 2$/,
+    ],
+    { useInnerText: true },
+  );
+  await expect(top.nth(2).getByRole('cell')).toHaveText(
+    ['2', /^2\.a Tool magazine - All pockets clean\s*Tool arena$/, '1', /^50%\s*of 2$/],
+    { useInnerText: true },
+  );
 
-  // One month of data: the line is a single dot.
+  // One month of data: no line to draw, but a single column with its count on the cap.
   const perMonth = panel(page, 'Deviations per month');
-  await expect(perMonth.locator('.recharts-line-dot')).toHaveCount(1);
+  await expect(perMonth.locator('.recharts-bar-rectangle')).toHaveCount(1);
+  await expect(perMonth.locator('.recharts-line-dot')).toHaveCount(0);
+  await expect(perMonth.locator('.recharts-label-list .recharts-label')).toHaveText(['3']);
   await expect(perMonth.getByRole('table')).toContainText('October 202632');
   const severity = panel(page, 'By severity');
   await expect(severity.getByRole('img')).toHaveAccessibleName(
@@ -160,9 +170,13 @@ test('an admin reads the KPIs of finalised inspections and exports their deviati
     /^Loading area\s*2$/,
     /^Tool arena\s*1$/,
   ]);
-  await expect(panel(page, 'By resp').getByRole('listitem')).toHaveText([
+  await expect(panel(page, 'By responsible').getByRole('listitem')).toHaveText([
     /^Mechanics\s*1$/,
-    /^No resp given\s*2$/,
+    /^Not assigned\s*2$/,
+  ]);
+  await expect(panel(page, 'By category').getByRole('listitem')).toHaveText([
+    /^Markings & labels\s*1$/,
+    /^No category\s*2$/,
   ]);
 
   // In-progress inspections join in, and the choice is in the URL.
@@ -188,7 +202,7 @@ test('an admin reads the KPIs of finalised inspections and exports their deviati
   expect(lines).toHaveLength(5);
   expect(lines.filter((line) => line.includes(first.number))).toHaveLength(1);
   expect(lines.filter((line) => line.includes(second.number))).toHaveLength(2);
-  expect(csv).toContain(';Blue mark missing;Mechanics;major;2026-10-07;true;');
+  expect(csv).toContain(';Blue mark missing;Mechanics;major;Markings & labels;2026-10-07;true;');
 
   // Recharts runs under the app's Content-Security-Policy without complaint.
   expect(errors).toEqual([]);

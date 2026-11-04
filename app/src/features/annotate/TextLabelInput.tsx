@@ -41,7 +41,7 @@ export function TextLabelInput({ draft, shown, onChange, onCommit, onDone }: Pro
         fontSize: draft.size * shown.height,
         color: draft.color,
       }}
-      className="absolute m-0 [field-sizing:content] min-w-[4ch] rounded-xs border-0 bg-ink-950/25 p-0 leading-[1.1] font-bold outline-2 outline-offset-4 outline-white/90 outline-dashed [text-shadow:0_0_3px_rgb(0_0_0/0.9)]"
+      className="absolute m-0 [field-sizing:content] min-w-[4ch] rounded-xs border-0 bg-scrim/25 p-0 leading-[1.1] font-bold outline-2 outline-offset-4 outline-white/90 outline-dashed [text-shadow:0_0_3px_rgb(0_0_0/0.9)]"
     />
   );
 }

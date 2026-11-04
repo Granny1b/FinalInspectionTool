@@ -10,6 +10,7 @@ const empty: InspectionDeviation = {
   itemId: null,
   sectionTitle: '',
   ref: '—',
+  category: '',
   text: '',
   comment: '',
   severity: 'minor',

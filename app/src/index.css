@@ -3,11 +3,12 @@
 /*
  * Design tokens — the one place to tweak branding (brief §7).
  * The default Tailwind palette is switched off so every colour in the app comes from here.
- * The static pre-login pages (public/login-assets/auth.css) mirror a few of these values by hand:
- * change both.
+ * Each colour token has a dark value below (Dark theme); the static pre-login pages
+ * (public/login-assets/auth.css) mirror a few of both by hand: change all three.
  */
 @theme {
   --color-*: initial;
+  /* White text on the solid fills (primary, nok-solid), and marks drawn over photos. */
   --color-white: #ffffff;
 
   /* Modig cyan. 500 is the brand colour; 600 is the darkest shade that still reads as the brand
@@ -38,9 +39,27 @@
   --color-ink-900: #161b21;
   --color-ink-950: #0b0e12;
 
-  /* Layout surfaces: white cards on a very light grey app background. */
+  /* Layout surfaces: white cards on a very light grey app background. `raised` is the chosen
+     segment of a segmented control, on its ink-100 track; `overlay` is a menu, popover or dialog
+     above the cards. Both are white here; the dark theme lifts them off the surface. */
   --color-canvas: #f6f7f9;
   --color-surface: #ffffff;
+  --color-raised: #ffffff;
+  --color-overlay: #ffffff;
+
+  /* Nearly the same in both themes: paper is white (photo mattes, printed sheets), a scrim
+     darkens what is behind a dialog or under a control on a photo, and photos are viewed and
+     marked up on a dark stage, with light text on it. */
+  --color-paper: #ffffff;
+  --color-scrim: #0b0e12;
+  --color-stage: #161b21;
+  --color-on-stage: #e3e7ec;
+  --color-on-stage-muted: #cdd3da;
+
+  /* Primary buttons: brand 600 with white text (4.6:1), a darker shade on hover. Their own
+     tokens because the dark theme lightens the brand text shades they would otherwise share. */
+  --color-primary: #0b7db3;
+  --color-primary-hover: #0c6894;
 
   /* Inspection statuses — muted, never neon. NOK red doubles as the error colour. */
   --color-ok-bg: #edf7f1;
@@ -49,15 +68,23 @@
   --color-nok-bg: #fdf1f0;
   --color-nok-fg: #b42318;
   --color-nok-border: #f2c6c1;
+  /* A filled NOK (critical badge, the destructive button): white text on it at AA in both
+     themes, where nok-fg becomes a light red for text. */
+  --color-nok-solid: #b42318;
   --color-na-bg: #f1f3f5;
   --color-na-fg: #58616c;
   --color-na-border: #d6dbe0;
 
-  /* Deviation severity in Insights: one red ramp, minor → critical (critical is NOK red). Checked
-     as an ordinal ramp: lightness falls in visible steps, and minor still shows on white (2.2:1). */
-  --color-severity-minor: #f19a90;
+  /* Deviation severity, in Insights and on the critical badge of a deviation card: minor is a
+     neutral grey (as its badge), major and critical are red, critical the strongest (NOK red).
+     Minor still shows on white (1.9:1) beside a labelled legend. */
+  --color-severity-minor: #b4bcc6;
   --color-severity-major: #dc5a4b;
   --color-severity-critical: #b42318;
+  /* A label on each fill, at 4.5:1 or more. */
+  --color-on-severity-minor: #161b21;
+  --color-on-severity-major: #161b21;
+  --color-on-severity-critical: #ffffff;
 
   --font-sans:
     'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
@@ -72,9 +99,98 @@
   --radius-xl: 0.75rem;
 }
 
+/*
+ * `dark:` means the dark theme is showing: chosen (data-theme="dark" on <html>, set from the
+ * stored choice by public/theme.js before the first paint) or, with no choice stored, the
+ * system's preference. On screen only: printing always uses the light tokens, like paper.
+ */
+@custom-variant dark {
+  @media screen {
+    &:where([data-theme='dark'], [data-theme='dark'] *) {
+      @slot;
+    }
+    @media (prefers-color-scheme: dark) {
+      &:where(:root:not([data-theme='light']), :root:not([data-theme='light']) *) {
+        @slot;
+      }
+    }
+  }
+}
+
 @layer base {
   html {
     color-scheme: light;
+  }
+
+  /*
+   * Dark theme: the same tokens, designed for dark rather than inverted. The canvas is darker
+   * than the cards; the ink ramp is mirrored (ink-900 is near-white text, ink-200 a quiet
+   * border) and keeps the light theme's rule that text is ink-500 or lighter (≥ 4.5:1 on the
+   * canvas, cards and quiet fills). Brand 700/800 become light cyans for text (≥ 6:1); brand 600
+   * stays as it is, the fill under white text and the focus ring (≥ 3.2:1 on every dark
+   * surface). Status colours become dark tints with light text (≥ 6:1). Severity runs the other
+   * way round, from a dark red (minor) to a light one (critical), so on a dark card the more
+   * severe still stands out more. Checked in DECISIONS.md (Theme).
+   */
+  :root {
+    @variant dark {
+      color-scheme: dark;
+
+      --color-brand-50: #0e2530;
+      --color-brand-100: #123444;
+      --color-brand-200: #18465d;
+      --color-brand-300: #1f5e7d;
+      --color-brand-400: #2a82ab;
+      --color-brand-500: #29abe2;
+      --color-brand-600: #0b7db3;
+      --color-brand-700: #5bbfe8;
+      --color-brand-800: #8fd4f1;
+      --color-brand-900: #bde7f8;
+      --color-brand-950: #dcf2fb;
+
+      --color-ink-50: #1c2128;
+      --color-ink-100: #232931;
+      --color-ink-200: #2f363f;
+      --color-ink-300: #3f4752;
+      --color-ink-400: #6c7682;
+      --color-ink-500: #99a3ae;
+      --color-ink-600: #b1b9c3;
+      --color-ink-700: #c7cdd5;
+      --color-ink-800: #dde1e7;
+      --color-ink-900: #eef1f4;
+      --color-ink-950: #f8f9fb;
+
+      --color-canvas: #0f1216;
+      --color-surface: #171b21;
+      /* Lighter than the track and the surface: in the dark, elevation is lightness (a shadow
+         doesn't show on near-black). */
+      --color-raised: #353c46;
+      --color-overlay: #232931;
+
+      --color-scrim: #05070a;
+      --color-stage: #0b0e12;
+
+      --color-primary: #0b7db3;
+      --color-primary-hover: #0a6c9c;
+
+      --color-ok-bg: #12271c;
+      --color-ok-fg: #56c38a;
+      --color-ok-border: #235a3c;
+      --color-nok-bg: #33171a;
+      --color-nok-fg: #f68174;
+      --color-nok-border: #6e2c27;
+      --color-nok-solid: #c4382b;
+      --color-na-bg: #222830;
+      --color-na-fg: #a7b0ba;
+      --color-na-border: #3c444e;
+
+      --color-severity-minor: #6c7682;
+      --color-severity-major: #c8483a;
+      --color-severity-critical: #f68174;
+      --color-on-severity-minor: #ffffff;
+      --color-on-severity-major: #ffffff;
+      --color-on-severity-critical: #161b21;
+    }
   }
 
   body {
@@ -86,6 +202,15 @@
   :focus-visible {
     outline: 2px solid var(--color-brand-600);
     outline-offset: 2px;
+  }
+
+  /* Below `lg` the top bar (layout.ts, MOBILE_BAR: 3.5rem) sticks to the top: whatever is scrolled
+     into view, by the focus moving backwards or a link to an id, stops below it rather than
+     under it. Pages with a sticky header of their own set a larger value. */
+  @media (width < 64rem) {
+    html {
+      scroll-padding-top: 4.5rem;
+    }
   }
 
   /* A modal <dialog> (the navigation drawer) makes the page inert but would let it scroll. */

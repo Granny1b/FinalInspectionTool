@@ -1,4 +1,11 @@
-import { rowRef, sectionNumber, type Guide, type Item, type Section } from '@modig/shared';
+import {
+  rowRef,
+  sectionNumber,
+  sectionSpareRows,
+  type Guide,
+  type Item,
+  type Section,
+} from '@modig/shared';
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import {
   addRow,
@@ -20,7 +27,9 @@ import {
   restoreSection,
   setRowGuide,
   setRowText,
+  setSpareRows,
   singleLine,
+  spareLineAfterDelete,
   type Field,
   type FocusTarget,
   type RowPosition,
@@ -50,8 +59,12 @@ export type DocumentActions = {
   moveRowTo: (itemId: string, position: RowPosition) => void;
   /** ArrowUp/ArrowDown at the edge of a line; false when there is nowhere to go. */
   moveFocus: (from: Field, direction: 'up' | 'down') => boolean;
+  /** One more spare line at the end of the section. */
+  addSpareRow: (sectionId: string) => void;
+  /** One spare line fewer (they are all alike); can be undone. */
+  deleteSpareRow: (sectionId: string, offset: number) => void;
   focusSectionMenu: (sectionId: string) => void;
-  /** Puts the last deleted row or section back where it was, with the same ids. */
+  /** Puts the last deleted row, section or spare line back where it was, with the same ids. */
   undoDelete: (deleted: Deleted) => void;
   /** Opens the row's guide in the guide editor. */
   openGuide: (itemId: string) => void;
@@ -65,15 +78,24 @@ export type DocumentActions = {
  */
 export type Deleted =
   | { kind: 'row'; label: string; sectionId: string; index: number; item: Item }
-  | { kind: 'section'; label: string; index: number; section: Section };
+  | { kind: 'section'; label: string; index: number; section: Section }
+  /** `spareRows`: the section's own count before, undefined when it followed the template's. */
+  | { kind: 'spare'; label: string; sectionId: string; spareRows: number | undefined };
 
 /** Focus targets, plus two the UI needs: a section's ⋯ button, and a title with its text selected. */
 type FocusRequest =
-  FocusTarget | { kind: 'menu'; sectionId: string } | { kind: 'rename'; sectionId: string };
+  | FocusTarget
+  | { kind: 'menu'; sectionId: string }
+  | { kind: 'rename'; sectionId: string }
+  /** A spare line's delete button, or the section's "Add spare line". */
+  | { kind: 'spare'; sectionId: string; offset: number }
+  | { kind: 'add-spare'; sectionId: string };
 
 type Options = {
   sections: Section[];
   onChange: (sections: Section[]) => void;
+  /** The template's spare lines per section, for sections without a number of their own. */
+  spareRowsPerSection: number;
   rootRef: RefObject<HTMLElement | null>;
   confirmDelete: (sectionId: string) => void;
   /** A delete that can be undone, or null once the structure changes otherwise. */
@@ -89,16 +111,31 @@ type Options = {
 export function useDocumentActions({
   sections,
   onChange,
+  spareRowsPerSection,
   rootRef,
   confirmDelete,
   onDeleted,
   onOpenGuide,
 }: Options): DocumentActions {
-  const latest = useRef({ sections, onChange, confirmDelete, onDeleted, onOpenGuide });
+  const latest = useRef({
+    sections,
+    onChange,
+    spareRowsPerSection,
+    confirmDelete,
+    onDeleted,
+    onOpenGuide,
+  });
   const pendingFocus = useRef<FocusRequest | null>(null);
 
   useLayoutEffect(() => {
-    latest.current = { sections, onChange, confirmDelete, onDeleted, onOpenGuide };
+    latest.current = {
+      sections,
+      onChange,
+      spareRowsPerSection,
+      confirmDelete,
+      onDeleted,
+      onOpenGuide,
+    };
     const request = pendingFocus.current;
     if (request && focusElement(rootRef.current, request)) pendingFocus.current = null;
   });
@@ -124,6 +161,18 @@ export function useDocumentActions({
     ) => {
       if (next !== latest.current.sections) latest.current.onDeleted(deleted);
       commit(next, focus);
+    };
+    /** A section and the spare lines it shows. */
+    const spareRowsOf = (sectionId: string) => {
+      const index = findSection(current(), sectionId);
+      const section = current()[index];
+      if (!section) return null;
+      const { spareRowsPerSection: perSection } = latest.current;
+      return {
+        index,
+        section,
+        count: sectionSpareRows(section, { spareRowsPerSection: perSection }),
+      };
     };
     const removeSection = (sectionId: string) => {
       const sections = current();
@@ -227,18 +276,52 @@ export function useDocumentActions({
         );
         return true;
       },
+      addSpareRow: (sectionId) => {
+        const found = spareRowsOf(sectionId);
+        // Focus stays on "Add spare line", which moves down a line.
+        if (found) restructure(setSpareRows(current(), sectionId, found.count + 1));
+      },
+      deleteSpareRow: (sectionId, offset) => {
+        const found = spareRowsOf(sectionId);
+        if (!found || found.count === 0) return;
+        const { index, section, count } = found;
+        const next = spareLineAfterDelete(count, offset);
+        restructure(
+          setSpareRows(current(), sectionId, count - 1),
+          next === null
+            ? { kind: 'add-spare', sectionId }
+            : { kind: 'spare', sectionId, offset: next },
+          {
+            kind: 'spare',
+            label: `Spare line ${rowRef(index, section.items.length + offset)}`,
+            sectionId,
+            spareRows: section.spareRows,
+          },
+        );
+      },
       focusSectionMenu: (sectionId) => focusNow({ kind: 'menu', sectionId }),
-      undoDelete: (deleted) =>
-        deleted.kind === 'row'
-          ? restructure(restoreRow(current(), deleted.sectionId, deleted.index, deleted.item), {
+      undoDelete: (deleted) => {
+        if (deleted.kind === 'row') {
+          return restructure(
+            restoreRow(current(), deleted.sectionId, deleted.index, deleted.item),
+            {
               kind: 'row',
               itemId: deleted.item.id,
               caret: 'end',
-            })
-          : restructure(restoreSection(current(), deleted.index, deleted.section), {
-              kind: 'title',
-              sectionId: deleted.section.id,
-            }),
+            },
+          );
+        }
+        if (deleted.kind === 'spare') {
+          return restructure(setSpareRows(current(), deleted.sectionId, deleted.spareRows), {
+            kind: 'add-spare',
+            sectionId: deleted.sectionId,
+          });
+        }
+        restructure(restoreSection(current(), deleted.index, deleted.section), {
+          kind: 'title',
+          sectionId: deleted.section.id,
+        });
+      },
       openGuide: (itemId) => latest.current.onOpenGuide(itemId),
       // Not a change of structure: the undo of the last delete stays on offer.
       setGuide: (itemId, guide) => commit(setRowGuide(current(), itemId, guide)),
@@ -255,7 +338,11 @@ function focusElement(root: HTMLElement | null, request: FocusRequest): boolean 
         ? `[data-section-menu="${CSS.escape(request.sectionId)}"]`
         : request.kind === 'add-section'
           ? '[data-add-section]'
-          : `[data-section-title="${CSS.escape(request.sectionId)}"]`;
+          : request.kind === 'spare'
+            ? `[data-spare-delete="${CSS.escape(`${request.sectionId}:${request.offset}`)}"]`
+            : request.kind === 'add-spare'
+              ? `[data-add-spare="${CSS.escape(request.sectionId)}"]`
+              : `[data-section-title="${CSS.escape(request.sectionId)}"]`;
   const element = root?.querySelector<HTMLElement>(selector);
   if (!element) return false;
   element.focus();

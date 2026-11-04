@@ -7,12 +7,16 @@ import { z } from 'zod';
 import { rowRef } from './numbering';
 import {
   IdSchema,
+  MachineModelSchema,
   ModelCodeSchema,
+  sectionSpareRows,
   TemplateSchema,
+  type MachineModel,
   type PrintSettings,
   type Section,
   type Template,
 } from './schemas';
+import { TemplateExportSchema } from './templateTransfer';
 
 const IsoDateTime = z.iso.datetime({ offset: true });
 
@@ -29,12 +33,42 @@ export const TemplateDraftInputSchema = TemplateSchema.pick({
 });
 export type TemplateDraftInput = z.infer<typeof TemplateDraftInputSchema>;
 
-/** POST /api/templates */
-export const CreateTemplateRequestSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(200),
-  modelCode: ModelCodeSchema,
-});
+const TemplateNameSchema = z.string().trim().min(1, 'Name is required').max(200);
+
+/** A machine model created along with its template must have the template's model code. */
+const newModelMatches = {
+  check: (request: { modelCode: string; newModel?: MachineModel | undefined }) =>
+    !request.newModel || request.newModel.code === request.modelCode,
+  params: { message: "The new machine model's code must be the template's model code." },
+};
+
+/**
+ * POST /api/templates. `newModel` is a machine model launched since: the server adds it to the
+ * settings first (409 if its code or name is already there), so a template never waits for an
+ * admin to edit the settings.
+ */
+export const CreateTemplateRequestSchema = z
+  .object({
+    name: TemplateNameSchema,
+    modelCode: ModelCodeSchema,
+    newModel: MachineModelSchema.optional(),
+  })
+  .refine(newModelMatches.check, { ...newModelMatches.params, path: ['newModel', 'code'] });
 export type CreateTemplateRequest = z.infer<typeof CreateTemplateRequestSchema>;
+
+/**
+ * POST /api/templates/import: a new draft from a template file (templateTransfer.ts), for the
+ * model and under the name the admin chose; `newModel` as for creating a template.
+ */
+export const ImportTemplateRequestSchema = z
+  .object({
+    name: TemplateNameSchema,
+    modelCode: ModelCodeSchema,
+    newModel: MachineModelSchema.optional(),
+    file: TemplateExportSchema,
+  })
+  .refine(newModelMatches.check, { ...newModelMatches.params, path: ['newModel', 'code'] });
+export type ImportTemplateRequest = z.infer<typeof ImportTemplateRequestSchema>;
 
 /** POST /api/templates/{id}/publish */
 export const PublishTemplateRequestSchema = z.object({
@@ -68,6 +102,8 @@ export const TemplateSummarySchema = z.object({
   draftRevision: z.number().int().min(1),
   hasUnpublishedChanges: z.boolean(),
   itemCount: z.number().int().min(0),
+  /** The draft's cover photo, for the card view. */
+  coverImageId: IdSchema.optional(),
   updatedAt: IsoDateTime,
   updatedBy: z.string(),
 });
@@ -82,6 +118,16 @@ export const TemplateDetailSchema = z.object({
   hasUnpublishedChanges: z.boolean(),
 });
 export type TemplateDetail = z.infer<typeof TemplateDetailSchema>;
+
+/** 201 from POST /api/templates/import: the new draft (ETag in the header) and what was left out. */
+export const ImportTemplateResponseSchema = TemplateDetailSchema.extend({
+  /**
+   * Image ids of the file (cover, guide images, their marked-up copies) left out because those
+   * images are not stored in this installation.
+   */
+  droppedImages: z.number().int().min(0),
+});
+export type ImportTemplateResponse = z.infer<typeof ImportTemplateResponseSchema>;
 
 /** PUT /api/templates/{id} — the saved draft; the new ETag is in the ETag header. */
 export const SaveTemplateResponseSchema = z.object({
@@ -183,6 +229,8 @@ function publishedContent(t: TemplateContent): string {
     t.sections.map((s) => [
       s.id,
       s.title,
+      // The lines it prints: a section's own count equal to the default is no change on paper.
+      sectionSpareRows(s, t.printSettings),
       // Guides come out of zod parsing, which emits keys in schema order on both sides.
       s.items.map((i) => [i.id, i.text, i.guide ?? null]),
     ]),
@@ -197,4 +245,33 @@ export function sameTemplateContent(a: TemplateContent, b: TemplateContent): boo
 /** True when the draft differs from the latest published revision (or nothing is published). */
 export function hasUnpublishedChanges(draft: Template, latestPublished: Template | null): boolean {
   return !latestPublished || !sameTemplateContent(draft, latestPublished);
+}
+
+// ---------------------------------------------------------------------------------------------
+// New machine models
+// ---------------------------------------------------------------------------------------------
+
+/** Codes and names compare without regard to case: "rmmg" would be a second RMMG to people. */
+const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * Why `model` can't be added next to `models` (its code or its name is taken), or null. The API
+ * answers 409 with the message; the dialogs show it at the field before sending.
+ */
+export function newModelConflict(
+  models: readonly MachineModel[],
+  model: MachineModel,
+): { field: 'code' | 'name'; message: string } | null {
+  const sameCode = models.find((existing) => sameText(existing.code, model.code));
+  if (sameCode) {
+    return { field: 'code', message: `${sameCode.code} is already the code of ${sameCode.name}.` };
+  }
+  const sameName = models.find((existing) => sameText(existing.name, model.name));
+  if (sameName) {
+    return {
+      field: 'name',
+      message: `There is already a machine model called ${sameName.name} (${sameName.code}).`,
+    };
+  }
+  return null;
 }

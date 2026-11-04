@@ -205,7 +205,7 @@ export function AnnotationEditor({
         onCancel={(event) => event.preventDefault()}
         onClose={() => (outcome.current ? onSave(outcome.current) : onCancel())}
         onKeyDown={onKeyDown}
-        className="m-auto h-[calc(100dvh-2rem)] max-h-none w-[min(80rem,calc(100vw-2rem))] max-w-none overflow-hidden rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl outline-none backdrop:bg-ink-950/50"
+        className="m-auto h-[calc(100dvh-2rem)] max-h-none w-[min(80rem,calc(100vw-2rem))] max-w-none overflow-hidden rounded-xl border border-ink-200 bg-overlay p-0 text-ink-900 shadow-xl outline-none backdrop:bg-scrim/30 dark:border-ink-300 dark:backdrop:bg-scrim/70"
       >
         <div className="flex h-full flex-col">
           <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-ink-200 px-4 py-2">
@@ -230,7 +230,7 @@ export function AnnotationEditor({
             />
           </header>
 
-          <div className="flex min-h-0 flex-1 flex-col bg-ink-900">
+          <div className="flex min-h-0 flex-1 flex-col bg-stage">
             <div ref={setArea} className="flex min-h-0 flex-1 items-center justify-center p-4">
               {image && size && shown ? (
                 <AnnotationCanvas
@@ -253,7 +253,7 @@ export function AnnotationEditor({
                   onTextCancel={() => dispatch({ type: 'text-cancel' })}
                 />
               ) : failed || storedUrl.isError ? (
-                <p className="flex items-center gap-2 text-sm text-ink-200">
+                <p className="flex items-center gap-2 text-sm text-on-stage">
                   <ImageOff size={18} aria-hidden="true" />
                   The photo couldn’t be loaded. Close the editor and try again.
                 </p>
@@ -261,11 +261,13 @@ export function AnnotationEditor({
                 <LoaderCircle
                   size={22}
                   aria-label="Loading photo"
-                  className="animate-spin text-ink-300"
+                  className="animate-spin text-on-stage-muted"
                 />
               )}
             </div>
-            <p className="px-4 pb-2.5 text-center text-xs text-ink-300">{TOOL_HINTS[state.tool]}</p>
+            <p className="px-4 pb-2.5 text-center text-xs text-on-stage-muted">
+              {TOOL_HINTS[state.tool]}
+            </p>
           </div>
 
           <footer className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-ink-200 px-4 py-3">

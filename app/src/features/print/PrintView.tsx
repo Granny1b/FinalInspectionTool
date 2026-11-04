@@ -2,28 +2,25 @@ import { useEffect, useRef } from 'react';
 import { WordExportButton } from '../export/WordExportButton';
 import {
   DEFAULT_DEVIATIONS_PER_PAGE,
-  printedImageIds,
-  type DeviationCard,
   type DeviationsPerPage,
   type PrintMode,
   type PrintModel,
 } from './model';
+import { FittedPages } from './FittedPages';
 import { PrintDocument } from './PrintDocument';
 import { PrintToolbar, type Choice } from './PrintToolbar';
-import { useAssetsReady } from './useAssetsReady';
-import { useCardPages } from './useCardPages';
 import { usePageFooter } from './usePageFooter';
+import { usePrintDocument } from './usePrintDocument';
 import type { PrintImages } from './usePrintImages';
 import './print.css';
-
-/** A blank checklist has no cards to put on pages. */
-const NO_CARDS: DeviationCard[] = [];
 
 type Props = {
   model: PrintModel;
   images: PrintImages;
-  /** What is printed, under "Print preview". */
+  /** What is printed, under "Print preview"; cut short on a narrow screen. */
   subject: string;
+  /** After the subject, never cut: "Draft – Rev 3". */
+  revision?: string;
   back: { to: string; label: string };
   /** Inspections switch between the blank checklist and the report. */
   mode?: Choice<PrintMode>;
@@ -45,6 +42,7 @@ export function PrintView({
   model,
   images,
   subject,
+  revision,
   back,
   mode,
   deviationsPerPage,
@@ -52,28 +50,11 @@ export function PrintView({
   autoprint = false,
   onAutoprinted,
 }: Props) {
-  const rootRef = useRef<HTMLDivElement>(null);
   const perPage = deviationsPerPage?.value ?? DEFAULT_DEVIATIONS_PER_PAGE;
-  const cards = useCardPages(
-    model.deviations.kind === 'cards' ? model.deviations.cards : NO_CARDS,
+  const { rootRef, cards, withAppendix, appendixShown, ready } = usePrintDocument(model, images, {
     perPage,
-  );
-  // Asked for and there is something to show: the appendix (in print and Word alike).
-  const withAppendix = appendix.value && model.appendix.length > 0;
-  // Its images' addresses arrive a moment after it is turned on.
-  const appendixShown = withAppendix && !images.appendixLoading;
-  // What is laid out and every image address in it: when any changes, readiness waits again.
-  const shown = [
-    model.mode,
-    perPage,
-    appendixShown,
-    cards.pages?.map((page) => page.map((card) => card.number).join()).join('|'),
-    images.logoUrl,
-    ...printedImageIds(model, { appendix: appendixShown }).map((id) => images.urls.get(id) ?? ''),
-  ].join(' ');
-  // Not while the cards are being measured onto pages, nor before the appendix is in.
-  const ready =
-    useAssetsReady(rootRef, shown) && cards.pages !== null && appendixShown === withAppendix;
+    appendix: appendix.value,
+  });
   usePageFooter(model.footer);
 
   const printed = useRef(false);
@@ -92,6 +73,7 @@ export function PrintView({
       <title>{model.fileName}</title>
       <PrintToolbar
         subject={subject}
+        revision={revision}
         back={back}
         mode={mode}
         // Only a report has deviation cards; the blank summary is a table.
@@ -101,16 +83,19 @@ export function PrintView({
       >
         <WordExportButton model={model} appendix={withAppendix} logoImageId={images.logoImageId} />
       </PrintToolbar>
+      {/* On a phone or a portrait tablet the sheets are drawn to fit, as in the preview dialog. */}
       <main className="paper-desk flex-1">
-        <PrintDocument
-          model={model}
-          images={images}
-          deviationsPerPage={perPage}
-          cardPages={cards}
-          appendix={appendixShown}
-          ready={ready}
-          rootRef={rootRef}
-        />
+        <FittedPages>
+          <PrintDocument
+            model={model}
+            images={images}
+            deviationsPerPage={perPage}
+            cardPages={cards}
+            appendix={appendixShown}
+            ready={ready}
+            rootRef={rootRef}
+          />
+        </FittedPages>
       </main>
     </div>
   );

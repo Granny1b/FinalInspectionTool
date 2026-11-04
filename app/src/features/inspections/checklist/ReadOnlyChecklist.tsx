@@ -5,11 +5,12 @@ import {
   rowRef,
   sectionNumber,
   SEVERITY_LABELS,
+  type RowResult,
   type Section,
 } from '@modig/shared';
 import clsx from 'clsx';
 import { IssueNote } from '../../templates/document/parts';
-import { CELL, GRID, ISSUE_OUTLINE, NOK_BAR, ROW_FOCUS, ROW_LINE } from './layout';
+import { ISSUE_OUTLINE, NOK_BAR, READ_CELL, READ_GRID, ROW_FOCUS, ROW_LINE } from './layout';
 import { GuideButton, PhotoCount, StatusMark } from './parts';
 import type { Results } from './results';
 import { SectionHeader } from './SectionHeader';
@@ -23,9 +24,10 @@ type Props = {
 };
 
 /**
- * The same sheet without inputs (a finalised inspection): statuses as symbol and text, comment
- * and resp as text. Rows can take the focus from script (`tabIndex={-1}`), so the page's jump
- * links still work.
+ * The sheet without inputs (a finalised inspection), in a tighter grid of its own (READ_GRID):
+ * statuses as symbol and text in a column beside the checkpoints, responsible as text, and the
+ * comment and a NOK row's category and severity under the checkpoint. Rows can take the focus
+ * from script (`tabIndex={-1}`), so the page's jump links still work.
  */
 export function ReadOnlyChecklist({
   sections,
@@ -36,7 +38,7 @@ export function ReadOnlyChecklist({
 }: Props) {
   return sections.map((section, sectionIndex) => (
     <div key={section.id} id={`section-${section.id}`} className="mt-8 first:mt-0">
-      <SectionHeader number={sectionNumber(sectionIndex)} title={section.title} />
+      <SectionHeader number={sectionNumber(sectionIndex)} title={section.title} readOnly />
       <ol>
         {section.items.map((item, rowIndex) => {
           const ref = rowRef(sectionIndex, rowIndex);
@@ -56,14 +58,17 @@ export function ReadOnlyChecklist({
                 issue && ISSUE_OUTLINE,
               )}
             >
-              <div className={clsx(GRID, ROW_LINE)}>
+              <div className={clsx(READ_GRID, ROW_LINE)}>
                 <span
                   aria-hidden="true"
-                  className={clsx(CELL.ref, 'pl-2 text-sm leading-8 text-ink-500 tabular-nums')}
+                  className={clsx(
+                    READ_CELL.ref,
+                    'pl-2 text-sm leading-8 text-ink-500 tabular-nums',
+                  )}
                 >
                   {rowLetter(rowIndex)}
                 </span>
-                <div className={clsx(CELL.text, 'flex items-start gap-1')}>
+                <div className={clsx(READ_CELL.text, 'flex items-start gap-1')}>
                   <p className="min-w-0 flex-1 py-1.5 text-sm leading-5 wrap-break-word text-ink-900">
                     {item.text}
                   </p>
@@ -76,24 +81,28 @@ export function ReadOnlyChecklist({
                     />
                   )}
                 </div>
-                <div className={CELL.status}>
+                {/* Inset like the column labels above it. */}
+                <div className={clsx(READ_CELL.status, '@min-[34rem]:px-2')}>
                   <StatusMark status={result?.status} />
                 </div>
-                <ReadOnlyText className={CELL.comment} label="Comment" value={result?.comment} />
-                <ReadOnlyText className={CELL.resp} label="Resp" value={result?.resp} />
-                {result?.status === 'NOK' && (
+                {result?.resp && (
                   <p
                     className={clsx(
-                      CELL.severity,
-                      'self-center text-xs leading-6 font-medium text-nok-fg',
+                      READ_CELL.resp,
+                      'text-sm leading-5 wrap-break-word text-ink-800 @min-[34rem]:px-2 @min-[34rem]:py-1.5',
                     )}
                   >
-                    Severity: {SEVERITY_LABELS[result.severity ?? DEFAULT_SEVERITY]}
+                    {/* The column label says it on tablets and desktops. */}
+                    <span className="font-medium text-ink-500 @min-[34rem]:sr-only">
+                      Responsible:{' '}
+                    </span>
+                    {result.resp}
                   </p>
                 )}
+                <Notes result={result} />
                 {/* Nothing to add once finalised, so only photos that exist are shown. */}
                 {photos > 0 && (
-                  <div className={clsx(CELL.photos, 'flex items-center')}>
+                  <div className={clsx(READ_CELL.photos, 'flex items-center')}>
                     <PhotoCount count={photos} rowRef={ref} onClick={() => onShowPhotos(item.id)} />
                   </div>
                 )}
@@ -107,21 +116,41 @@ export function ReadOnlyChecklist({
   ));
 }
 
-/** Comment or resp as text; on narrow sheets, where there are no column labels, with its label. */
-function ReadOnlyText({
-  className,
-  label,
-  value,
-}: {
-  className: string;
-  label: string;
-  value: string | undefined;
-}) {
-  if (!value) return <span className={className} />;
+const NOTE_LABEL = 'font-medium text-ink-500';
+
+/**
+ * Under the checkpoint: the comment, then a NOK row's category and severity (as in the fill-in
+ * sheet, category first). Labelled, as there is no Comment column, and all in one style with the
+ * Responsible line above them on a phone: grey labels, the values in text colour (the red bar
+ * and the NOK badge already mark the row).
+ */
+function Notes({ result }: { result: RowResult | undefined }) {
+  const nok = result?.status === 'NOK';
+  if (!result?.comment && !nok) return null;
   return (
-    <p className={clsx(className, 'py-1.5 text-sm leading-5 wrap-break-word text-ink-800')}>
-      <span className="font-medium text-ink-500 @min-[56rem]:sr-only">{label}: </span>
-      {value}
-    </p>
+    <div
+      className={clsx(READ_CELL.notes, 'min-w-0 space-y-0.5 pb-1.5 text-sm leading-5 text-ink-800')}
+    >
+      {result?.comment && (
+        <p className="wrap-break-word">
+          <span className={NOTE_LABEL}>Comment: </span>
+          {result.comment}
+        </p>
+      )}
+      {nok && (
+        <p className="flex flex-wrap gap-x-4">
+          {result.category && (
+            <span className="wrap-break-word">
+              <span className={NOTE_LABEL}>Category: </span>
+              {result.category}
+            </span>
+          )}
+          <span>
+            <span className={NOTE_LABEL}>Severity: </span>
+            {SEVERITY_LABELS[result.severity ?? DEFAULT_SEVERITY]}
+          </span>
+        </p>
+      )}
+    </div>
   );
 }

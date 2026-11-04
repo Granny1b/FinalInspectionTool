@@ -4,16 +4,21 @@
  */
 import {
   blobNames,
+  DEFAULT_DEVIATION_CATEGORIES,
+  DEFAULT_RESPONSIBLES,
   CONTAINERS,
   newId,
   snapshotTemplate,
   STORAGE_CONNECTION_STRING_ENV,
   type Inspection,
   type MachineModel,
+  type People,
+  type Person,
   type Settings,
   type Template,
 } from '@modig/shared';
 import { inject } from 'vitest';
+import { forgetCachedPeople } from '../src/lib/people';
 import {
   containerClient,
   deviationsTable,
@@ -27,9 +32,9 @@ export function useTestStorage(): void {
 }
 
 /**
- * Deletes every template, inspection and deviation row, the settings and the inspection counter.
- * Safe only because the api project runs its test files one at a time (vitest.config.ts): no
- * other file is using them meanwhile.
+ * Deletes every template, inspection and deviation row, the settings, the people list and the
+ * inspection counter. Safe only because the api project runs its test files one at a time
+ * (vitest.config.ts): no other file is using them meanwhile.
  */
 export async function resetStorage(): Promise<void> {
   await Promise.all([ensureStorage(), ensureTable()]);
@@ -39,11 +44,34 @@ export async function resetStorage(): Promise<void> {
   }
   const config = containerClient(CONTAINERS.config);
   await config.getBlobClient(blobNames.settings).deleteIfExists();
+  await config.getBlobClient(blobNames.people).deleteIfExists();
   await config.getBlobClient(blobNames.inspectionCounter).deleteIfExists();
+  forgetCachedPeople();
   const table = deviationsTable();
   for await (const { partitionKey, rowKey } of table.listEntities()) {
     await table.deleteEntity(partitionKey!, rowKey!);
   }
+}
+
+/**
+ * Stores `config/people.json` with these people (email, name, role; the rest filled in) and
+ * returns the document and its ETag. Clears the API's short cache of the list.
+ */
+export async function storePeople(
+  people: Pick<Person, 'email' | 'name' | 'role'>[],
+): Promise<{ data: People; etag: string }> {
+  const data: People = {
+    people: people.map((person) => ({
+      ...person,
+      addedAt: '2026-10-01T08:00:00.000Z',
+      addedBy: 'boss@modig.se',
+    })),
+    updatedAt: '2026-10-01T08:00:00.000Z',
+    updatedBy: 'boss@modig.se',
+  };
+  const etag = await writeJson(CONTAINERS.config, blobNames.people, data);
+  forgetCachedPeople();
+  return { data, etag };
 }
 
 export const MODELS: MachineModel[] = [
@@ -57,6 +85,8 @@ export async function writeSettings(machineModels = MODELS): Promise<Settings> {
     machineModels,
     defaultLocation: 'Kalmar, Sweden',
     companyName: 'Modig Machine Tool',
+    responsibles: [...DEFAULT_RESPONSIBLES],
+    deviationCategories: [...DEFAULT_DEVIATION_CATEGORIES],
     updatedAt: '2026-10-01T08:00:00.000Z',
     updatedBy: 'seed',
   };

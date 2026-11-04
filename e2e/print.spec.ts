@@ -247,18 +247,31 @@ function smallestRowPitch(pages: PdfPage[]): number {
   return smallest;
 }
 
-/** The blank Deviation Summary: the last page, on its own, with lines D-01…D-15. */
+/** A blank Deviation Summary fills its page with lines to write in: D-01…D-24. */
+const BLANK_DEVIATION_LINES = 24;
+
+/** The blank Deviation Summary: the last page, on its own, with lines D-01…D-24. */
 function expectBlankDeviationTable(pages: PdfPage[]): void {
   const summary = pages.filter(isDeviationPage);
   expect(summary.map((page) => page.number)).toEqual([pages.length]);
+  expect(pageText(summary[0]!)).toContain(
+    compact('No.RefDescriptionSeverityCategoryRespClosed (sign/date)'),
+  );
   const lines = summary[0]!.texts.filter((text) => /^D-\d{2}$/.test(text.text));
   expect(lines.map((text) => text.text)).toEqual(
-    Array.from({ length: 15 }, (_, index) => deviationNumber(index)),
+    Array.from({ length: BLANK_DEVIATION_LINES }, (_, index) => deviationNumber(index)),
   );
   expect(refsOn(summary[0]!)).toEqual([]);
 }
 
-type ExpectedCard = { number: string; text: string; comment: string; photos: number };
+type ExpectedCard = {
+  number: string;
+  text: string;
+  comment: string;
+  /** The Category and Responsible lines, "—" for none. */
+  details: string;
+  photos: number;
+};
 
 /** Card numbers in pages of `perPage`: the layout when every card fits its share. */
 const pagesOf = (cards: ExpectedCard[], perPage: number) =>
@@ -269,7 +282,8 @@ const pagesOf = (cards: ExpectedCard[], perPage: number) =>
 /**
  * The report's deviation pages, after the checklist, hold the cards as `layout` says (card
  * numbers per page). Each page is headed with the inspection and its range of cards; each card is
- * whole on its page (number, text, comment and its Closed line) with its photos painted there.
+ * whole on its page (number, text, comment, category, Resp and its Closed line) with its photos
+ * painted there.
  */
 function expectCards(
   pages: PdfPage[],
@@ -300,7 +314,7 @@ function expectCards(
     ).toHaveLength(onPage.length);
     for (const card of onPage) {
       expect(pageText(page), `${card.number} whole on ${where}`).toContain(
-        compact(card.text + card.comment),
+        compact(card.text + card.comment + card.details),
       );
     }
     expect(page.images, `photos on ${where}`).toBe(
@@ -373,6 +387,7 @@ function expectedCards(
     number: deviationNumber(index),
     text: card.text,
     comment: card.comment ?? '',
+    details: `Category${card.category || '—'}Responsible${card.resp || '—'}`,
     photos: card.photos?.length ?? 0,
   }));
 }
@@ -421,6 +436,7 @@ async function createReport(
         comment: LONG_COMMENTS[0],
         resp: 'Montage',
         severity: 'major',
+        category: 'Loose or wrong torque',
         photos: [photo(0, 'Left lifting column, upper screws'), photo(1, 'The same screws', false)],
       },
     },
@@ -460,6 +476,7 @@ async function createReport(
       comment: 'Touch up before shipping.',
       resp: 'Lackering',
       severity: 'minor',
+      category: 'Damage & scratches',
       photos: [photo(4, 'Right-hand door')],
     },
     {
@@ -762,7 +779,7 @@ for (const perPage of [2, 4] as const) {
         .click();
       await expect(page).toHaveURL(/[?&]deviationsPerPage=4/);
     }
-    // 2 per page is the default.
+    // 2 per page is the default when a deviation has photos.
     const section = page.locator(`section[data-deviations-per-page="${perPage}"]`);
     await expect(section).toBeVisible();
     await expect(section.locator('article[data-deviation-card]')).toHaveCount(7);
@@ -790,7 +807,7 @@ for (const perPage of [2, 4] as const) {
     expectFrontPage(pdf[0]!, [
       inspection.number,
       new RegExp(`^Finalised .+ by ${INSPECTOR.replaceAll('.', '\\.')}$`),
-      '90 / 90 rows filled · 5 NOK · 7 deviations',
+      '90 checkpoints: 82 OK · 5 NOK · 3 N/A · 7 deviations',
     ]);
     // The front page shows the logo and the machine photo.
     expect(pdf[0]!.images).toBe(2);
@@ -960,7 +977,7 @@ test('a template preview prints the draft as a blank checklist; spare rows run o
   // page more is allowed.
   expect(pages.length).toBeGreaterThanOrEqual(7);
   expect(pages.length).toBeLessThanOrEqual(9);
-  expectPages(pages, `${await companyName(page.request)} · ${template.name} · Rev 2 (draft)`);
+  expectPages(pages, `${await companyName(page.request)} · ${template.name} · Draft – Rev 2`);
   expectFrontPage(pages[0]!, ['Draft – Rev 2', 'Inspected by']);
   const { checklistPages } = expectChecklist(pages, template.sections, 5);
   expect(checklistPages.flatMap(refsOn).map((ref) => ref.text)).toContain('5.aa');
@@ -1169,6 +1186,7 @@ test('reference images print in an appendix, two to a row, captioned with ref an
   const nok = {
     text: inspection.templateSnapshot.sections[0]!.items[1]!.text,
     comment: NOK_COMMENT,
+    details: 'Category—Responsible—',
   };
   expectCards(pages, [{ number: 'D-01', ...nok, photos: 0 }], [['D-01']], inspection.number);
   expectAppendix(appendixPages, rows);
@@ -1242,7 +1260,7 @@ test('a report exports to Word: tables per section, the deviations, reference im
   expect(pageFooter).toMatch(/<w:instrText[^>]*>\s*PAGE\s*<\/w:instrText>/);
   expect(pageFooter).toContain(footer.replaceAll('&', '&amp;'));
 
-  // The blank checklist exports its Deviation Summary to fill in, D-01 to D-15, and without the
+  // The blank checklist exports its Deviation Summary to fill in, D-01 to D-24, and without the
   // appendix once it is turned off.
   await page
     .getByRole('group', { name: 'What to print' })
@@ -1255,7 +1273,9 @@ test('a report exports to Word: tables per section, the deviations, reference im
   expect(blank.fileName).toBe(
     `${inspection.number} ${inspection.front.machineName} – Blank checklist.docx`,
   );
-  for (let line = 0; line < 15; line += 1) expect(blank.text).toContain(deviationNumber(line));
+  for (let line = 0; line < BLANK_DEVIATION_LINES; line += 1) {
+    expect(blank.text).toContain(deviationNumber(line));
+  }
   expect(blank.text).not.toContain(NOK_COMMENT);
   expect(blank.text).not.toContain(APPENDIX_TITLE);
   expect(blank.document.match(/<pic:pic\b/g)).toHaveLength(1);

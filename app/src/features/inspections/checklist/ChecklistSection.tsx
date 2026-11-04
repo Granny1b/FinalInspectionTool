@@ -14,7 +14,8 @@ type Props = {
   /** All results; the section only re-renders when one of its own rows changed. */
   results: Results;
   rowIssues: ReadonlyMap<string, string>;
-  respListId: string;
+  responsibles: readonly string[];
+  categories: readonly string[];
   actions: ChecklistActions;
 };
 
@@ -23,7 +24,8 @@ export const ChecklistSection = memo(function ChecklistSection({
   index,
   results,
   rowIssues,
-  respListId,
+  responsibles,
+  categories,
   actions,
 }: Props) {
   const number = sectionNumber(index);
@@ -49,8 +51,9 @@ export const ChecklistSection = memo(function ChecklistSection({
               : 'Set remaining to OK · R on a row'
           }
           onClick={() => actions.setRemainingOk(section.id)}
+          // Outlined as heavily as the row's fields in either theme (see FIELD).
           className={clsx(
-            'inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-ink-500/80 bg-surface px-2.5 text-xs font-medium whitespace-nowrap text-ink-800 shadow-xs transition-colors',
+            'inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-ink-500/80 bg-surface px-2.5 text-xs font-medium whitespace-nowrap text-ink-800 shadow-xs transition-colors dark:border-ink-400',
             CONTROL_HEIGHT,
             remaining === 0
               ? 'cursor-default opacity-50'
@@ -69,7 +72,8 @@ export const ChecklistSection = memo(function ChecklistSection({
           rowIndex={rowIndex}
           result={results[item.id]}
           issue={rowIssues.get(item.id)}
-          respListId={respListId}
+          responsibles={responsibles}
+          categories={categories}
           actions={actions}
         />
       ))}
@@ -82,7 +86,8 @@ function sameSection(previous: Props, next: Props): boolean {
   return (
     previous.section === next.section &&
     previous.index === next.index &&
-    previous.respListId === next.respListId &&
+    previous.responsibles === next.responsibles &&
+    previous.categories === next.categories &&
     previous.actions === next.actions &&
     next.section.items.every(
       (item) =>

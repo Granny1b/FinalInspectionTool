@@ -1,4 +1,3 @@
-import type { MachineModel } from '@modig/shared';
 import clsx from 'clsx';
 import { LoaderCircle } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
@@ -7,51 +6,50 @@ import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
 import { Field, INPUT } from '../../components/Field';
 import { errorMessage } from '../../lib/api';
+import { MachineModelFields } from './MachineModelFields';
+import {
+  defaultTemplateName,
+  initialChoice,
+  modelLabel,
+  resolvedModel,
+  type ModelChoice,
+  type ModelContext,
+} from './modelChoice';
 import { useCreateTemplate } from './queries';
 
 type Props = {
-  /** Models that don't have a template yet (one template per model, brief §1). */
-  models: MachineModel[];
+  /** The settings' models, which have a template and which don't (one per model, brief §1). */
+  models: ModelContext;
   onClose: () => void;
 };
 
-/** Same pattern as the seeded "Final inspection – RigiMill MG". */
-const defaultName = (model: MachineModel | undefined) =>
-  model ? `Final inspection – ${model.name}` : '';
-
-/** Picks a model and a name, creates an empty draft and opens it in the editor. */
+/**
+ * Picks a model (or names a new one) and a name, creates an empty draft and opens it in the
+ * editor.
+ */
 export function CreateTemplateDialog({ models, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const navigate = useNavigate();
   const create = useCreateTemplate();
-  const [modelCode, setModelCode] = useState(models[0]?.code ?? '');
-  const [name, setName] = useState(defaultName(models[0]));
+  const [choice, setChoice] = useState<ModelChoice>(() => initialChoice(models));
+  const [name, setName] = useState(() => defaultTemplateName(modelLabel(choice, models)));
   // The name follows the model until the user types their own.
   const [nameEdited, setNameEdited] = useState(false);
   const close = () => dialogRef.current?.close();
+  const model = resolvedModel(choice, models);
+
+  function changeModel(next: ModelChoice) {
+    setChoice(next);
+    if (!nameEdited) setName(defaultTemplateName(modelLabel(next, models)));
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (!model) return;
+    const { modelName: _name, ...fields } = model;
     create.mutate(
-      { name: name.trim(), modelCode },
+      { name: name.trim(), ...fields },
       { onSuccess: (created) => navigate(`/templates/${created.detail.draft.id}`) },
-    );
-  }
-
-  if (models.length === 0) {
-    return (
-      <Dialog
-        dialogRef={dialogRef}
-        title="Every machine model has a template"
-        description="There is one template per machine model. Open the model's template to change its checklist."
-        onClose={onClose}
-      >
-        <div className="mt-6 flex justify-end">
-          <Button variant="secondary" onClick={close}>
-            Close
-          </Button>
-        </div>
-      </Dialog>
     );
   }
 
@@ -64,42 +62,14 @@ export function CreateTemplateDialog({ models, onClose }: Props) {
       busy={create.isPending}
     >
       <form onSubmit={submit} className="mt-6 space-y-5">
-        <Field label="Machine model" hint="Each machine model has one template.">
-          {(control) => (
-            <select
-              {...control}
-              value={modelCode}
-              onChange={(event) => {
-                setModelCode(event.target.value);
-                if (!nameEdited) {
-                  setName(defaultName(models.find((model) => model.code === event.target.value)));
-                }
-              }}
-              className={clsx(INPUT, 'h-9')}
-            >
-              {models.map((model) => (
-                <option key={model.code} value={model.code}>
-                  {model.name} ({model.code})
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
-        <Field label="Template name">
-          {(control) => (
-            <input
-              {...control}
-              required
-              maxLength={200}
-              value={name}
-              onChange={(event) => {
-                setName(event.target.value);
-                setNameEdited(true);
-              }}
-              className={clsx(INPUT, 'h-9')}
-            />
-          )}
-        </Field>
+        <MachineModelFields choice={choice} context={models} onChange={changeModel} />
+        <TemplateNameField
+          value={name}
+          onChange={(value) => {
+            setName(value);
+            setNameEdited(true);
+          }}
+        />
 
         {create.isError && (
           <p role="alert" className="text-sm font-medium text-nok-fg">
@@ -111,7 +81,7 @@ export function CreateTemplateDialog({ models, onClose }: Props) {
           <Button variant="secondary" onClick={close} disabled={create.isPending}>
             Cancel
           </Button>
-          <Button type="submit" disabled={create.isPending || !name.trim()}>
+          <Button type="submit" disabled={create.isPending || !name.trim() || !model}>
             {create.isPending && (
               <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />
             )}
@@ -120,5 +90,29 @@ export function CreateTemplateDialog({ models, onClose }: Props) {
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** The new template's name (also in Import JSON). */
+export function TemplateNameField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field label="Template name">
+      {(control) => (
+        <input
+          {...control}
+          required
+          maxLength={200}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={clsx(INPUT, 'h-9')}
+        />
+      )}
+    </Field>
   );
 }

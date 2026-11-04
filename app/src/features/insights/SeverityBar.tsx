@@ -3,13 +3,14 @@ import clsx from 'clsx';
 import { formatCount, formatPercent } from './format';
 
 /**
- * One red ramp, minor → critical (index.css tokens): the order reads in the colour. The label on
- * a block is white or near-black by the fill's lightness.
+ * The severity tokens (index.css), the same as the badges on a deviation card: minor a neutral
+ * grey, major red, critical the strongest red (on the dark card, the lightest). Each fill has its
+ * own label colour, at 4.5:1 in both themes.
  */
 const FILL: Record<Severity, string> = {
-  minor: 'bg-severity-minor text-ink-900',
-  major: 'bg-severity-major text-white',
-  critical: 'bg-severity-critical text-white',
+  minor: 'bg-severity-minor text-on-severity-minor',
+  major: 'bg-severity-major text-on-severity-major',
+  critical: 'bg-severity-critical text-on-severity-critical',
 };
 
 /** Below this share a block is too narrow for its label; the legend still gives the count. */

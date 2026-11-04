@@ -9,7 +9,10 @@ export type TemplateDocumentProps = {
   sections: Section[];
   /** Omit for read-only rendering (inspectors, published revisions). */
   onChange?: (sections: Section[]) => void;
-  /** Print setting: empty lettered spare rows previewed at the end of each section. */
+  /**
+   * Print setting: how many empty lettered spare lines end a section that has no number of its
+   * own (`Section.spareRows`). Previewed after each section's rows.
+   */
   spareRowsPerSection: number;
   /** Publish problems to highlight (red outline + message) on the matching section/row. */
   issues?: PublishIssue[];

@@ -79,17 +79,21 @@ export function rowCommand(press: KeyPress): RowCommand | null {
   return command;
 }
 
-/** Fields inside a row: comment, resp and (NOK rows) severity. */
-export type RowField = 'comment' | 'resp' | 'severity';
+/** Fields inside a row: comment, responsible and (NOK rows) category and severity. */
+export type RowField = 'comment' | 'resp' | 'category' | 'severity';
 
 /**
  * Keys handled inside a row's fields, or null for the field's own behaviour:
  * - Escape returns the focus to the row, ready for the next status key.
- * - Enter in comment or resp finishes the row and moves to the next one. A select keeps Enter.
+ * - Enter in comment or responsible finishes the row and moves to the next one, as it did while
+ *   Responsible was typed (an open list takes the Enter that picks from it). The category and
+ *   severity selects keep Enter.
  */
 export function fieldCommand(press: KeyPress, field: RowField): 'row' | 'next-row' | null {
   if (press.ctrlKey || press.metaKey || press.altKey || press.shiftKey) return null;
   if (press.key === 'Escape') return 'row';
-  if (press.key === 'Enter' && field !== 'severity' && !press.repeat) return 'next-row';
+  if (press.key === 'Enter' && (field === 'comment' || field === 'resp') && !press.repeat) {
+    return 'next-row';
+  }
   return null;
 }

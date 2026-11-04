@@ -18,6 +18,8 @@ export type ApiFetchOptions<T> = {
   schema?: Parser<T>;
   /** ETag from an earlier read; the API answers 412 if the document changed since. */
   ifMatch?: string;
+  /** Instead of `ifMatch` when the read found no document: create it, 412 if one appeared. */
+  ifNoneMatch?: '*';
   signal?: AbortSignal;
 };
 
@@ -46,11 +48,12 @@ const INVALID_JSON = Symbol('invalid JSON');
 
 export async function apiFetch<T = unknown>(
   path: string,
-  { method = 'GET', body, schema, ifMatch, signal }: ApiFetchOptions<T> = {},
+  { method = 'GET', body, schema, ifMatch, ifNoneMatch, signal }: ApiFetchOptions<T> = {},
 ): Promise<ApiResponse<T>> {
   const headers = new Headers({ Accept: 'application/json' });
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   if (ifMatch) headers.set('If-Match', ifMatch);
+  if (ifNoneMatch) headers.set('If-None-Match', ifNoneMatch);
 
   const res = await fetch(path, {
     method,
@@ -68,10 +71,11 @@ export async function apiFetch<T = unknown>(
   const payload = await readJson(res);
   const apiError = ApiErrorSchema.safeParse(payload);
 
-  // A 401/403 without our JSON error body comes from SWA itself: the session has expired, or the
-  // user is signed in without an app role. One *with* it comes from a function and is thrown for
-  // the page to show. The pre-login pages send role holders straight back to '/', so navigating
-  // on the API's own 401 would loop whenever the SWA gate and the API's checks disagree.
+  // A 401/403 without our JSON error body comes from SWA itself: the session has expired, or
+  // something in front of the API refused. One *with* it comes from a function and is thrown for
+  // the page to show (useMe sends the API's "no access" 403 to the no-access page itself). The
+  // pre-login pages send anyone the API lets in straight back to '/', so navigating on the API's
+  // own 401 would loop whenever the SWA gate and the API's checks disagree.
   if (!apiError.success && (res.status === 401 || res.status === 403)) {
     return sessionEnded(method, res.status, path);
   }
@@ -178,11 +182,11 @@ export const SIGNED_OUT_MESSAGE =
 const NO_ACCESS_MESSAGE = 'Your account no longer has access to this app.';
 
 /**
- * SWA turned the request away: the session has ended (401) or the user has no app role (403).
- * A read leaves the SPA for the static auth page; its promise never settles, because the page is
- * unloading and settling would only flash an error state on the way out. A write is thrown
- * instead: the page may hold unsaved work, whose leave warning can keep the page open, and a
- * request that never settled would then leave the save hanging for good.
+ * SWA turned the request away: the session has ended (401) or something in front of the API
+ * refused it (403). A read leaves the SPA for the static auth page; its promise never settles,
+ * because the page is unloading and settling would only flash an error state on the way out. A
+ * write is thrown instead: the page may hold unsaved work, whose leave warning can keep the page
+ * open, and a request that never settled would then leave the save hanging for good.
  */
 function sessionEnded(method: string, status: 401 | 403, path: string): Promise<never> {
   if (method !== 'GET') {
@@ -190,16 +194,37 @@ function sessionEnded(method: string, status: 401 | 403, path: string): Promise<
       ? new ApiRequestError(401, { error: 'unauthorized', message: SIGNED_OUT_MESSAGE })
       : new ApiRequestError(403, { error: 'forbidden', message: NO_ACCESS_MESSAGE });
   }
-  recordRefusal({ path, status, at: new Date().toISOString() });
-  window.location.assign(status === 401 ? LOGIN_PAGE : FORBIDDEN_PAGE);
+  return leaveFor(status === 401 ? LOGIN_PAGE : FORBIDDEN_PAGE, { path, status });
+}
+
+/**
+ * The API's 403 for /api/me: this sign-in has no role at all (not on the people list, not
+ * invited). Anything else, such as an inspector asking for an admin endpoint, stays in the app.
+ */
+export function isNoAccess(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 403 && error.code === 'forbidden';
+}
+
+/**
+ * Off to the no-access page, which says who is signed in and how to get access. Like a refused
+ * read, the promise never settles: the app is unloading.
+ */
+export function leaveForNoAccess(path: string): Promise<never> {
+  return leaveFor(FORBIDDEN_PAGE, { path, status: 403 });
+}
+
+function leaveFor(page: string, refused: Omit<Refusal, 'at'>): Promise<never> {
+  recordRefusal({ ...refused, at: new Date().toISOString() });
+  window.location.assign(page);
   return new Promise<never>(() => {});
 }
 
 /**
- * Read by the pre-login pages (public/login-assets/auth.js), which send anyone whose sign-in has
- * a role straight back into the app. If the app was refused although the sign-in has a role, the
- * two would bounce between each other forever; with this record the page stays and says which
- * request was refused, so the cause can be seen instead of guessed.
+ * Read by the pre-login pages (public/login-assets/auth.js), which send anyone the API lets in
+ * straight back into the app. If the app was refused although the API lets the sign-in in (or
+ * the two disagree for a moment, as when a person was just added or removed), they would bounce
+ * between each other; with this record the page stays and says which request was refused, so the
+ * cause can be seen instead of guessed. The app records one before every trip to those pages.
  */
 export const REFUSAL_KEY = 'auth.refused';
 export type Refusal = { path: string; status: number; at: string };

@@ -7,6 +7,7 @@
  * belong to the specific action that needs them.
  */
 import { z } from 'zod';
+import { DEFAULT_DEVIATION_CATEGORIES, DEFAULT_RESPONSIBLES } from './constants';
 import { ID_PATTERN } from './ids';
 import { ROLES } from './roles';
 
@@ -19,6 +20,9 @@ const IsoDate = z.iso.date();
 // Machine models & settings
 // ---------------------------------------------------------------------------------------------
 
+/** Letters and digits only: see ModelCodeSchema. */
+export const MODEL_CODE_PATTERN = /^[A-Za-z0-9]+$/;
+
 /**
  * Machine model short code ("RMMG"). It is the deviations table's PartitionKey, which rejects
  * `/`, `\`, `#`, `?` and control characters: letters and digits only, wherever it appears.
@@ -28,7 +32,7 @@ export const ModelCodeSchema = z
   .trim()
   .min(1)
   .max(32)
-  .regex(/^[A-Za-z0-9]+$/, 'Model code must be letters and digits');
+  .regex(MODEL_CODE_PATTERN, 'Model code must be letters and digits');
 
 export const MachineModelSchema = z.object({
   code: ModelCodeSchema,
@@ -36,12 +40,22 @@ export const MachineModelSchema = z.object({
 });
 export type MachineModel = z.infer<typeof MachineModelSchema>;
 
+/** One entry of an admin-managed pick list (Responsible, deviation category). */
+export const ListEntrySchema = z.string().trim().min(1).max(100);
+
 /** `config/settings.json` — admin-managed app settings (brief §5.6). */
 export const SettingsSchema = z.object({
   machineModels: z.array(MachineModelSchema),
   defaultLocation: z.string().max(200),
   companyName: z.string().max(200),
   logoImageId: IdSchema.optional(),
+  /**
+   * The "Resp" choices on a deviation (responsible department), in the order shown. Settings
+   * written before the list existed get the defaults.
+   */
+  responsibles: z.array(ListEntrySchema).default(() => [...DEFAULT_RESPONSIBLES]),
+  /** The category choices on a deviation, in the order shown; defaults as for `responsibles`. */
+  deviationCategories: z.array(ListEntrySchema).default(() => [...DEFAULT_DEVIATION_CATEGORIES]),
   updatedAt: IsoDateTime,
   updatedBy: z.string(),
 });
@@ -147,10 +161,24 @@ export const SectionSchema = z.object({
   id: IdSchema,
   title: z.string().max(200),
   items: z.array(ItemSchema),
+  /**
+   * Spare (blank) lines printed after this section's rows. Absent: the template's
+   * `printSettings.spareRowsPerSection`. Set when an admin adds or deletes spare lines of one
+   * section. Use `sectionSpareRows()` to read it.
+   */
+  spareRows: z.number().int().min(0).max(30).optional(),
 });
 export type Section = z.infer<typeof SectionSchema>;
 
 export const DEFAULT_SPARE_ROWS_PER_SECTION = 3;
+
+/** The spare lines a section prints: its own count, else the template's. */
+export function sectionSpareRows(
+  section: { spareRows?: number },
+  printSettings: { spareRowsPerSection: number },
+): number {
+  return section.spareRows ?? printSettings.spareRowsPerSection;
+}
 
 export const PrintSettingsSchema = z.object({
   spareRowsPerSection: z.number().int().min(0).max(30),
@@ -207,10 +235,15 @@ export const SEVERITY_LABELS: Record<Severity, string> = {
 export const RowResultSchema = z.object({
   status: StatusSchema.optional(),
   comment: z.string().max(2000).optional(),
-  /** Responsible person/department (free text with autocomplete from history). */
+  /**
+   * Responsible department ("Resp."), picked from the settings' `responsibles`. Stored as text, so
+   * a value removed from the list since (or typed before the list existed) is kept.
+   */
   resp: z.string().max(200).optional(),
   /** Only meaningful when status is NOK; defaults to "minor". */
   severity: SeveritySchema.optional(),
+  /** What kind of deviation (one of the settings' `deviationCategories`); only when NOK. */
+  category: ListEntrySchema.optional(),
   /** Annotated evidence photos of a deviation (printed on the deviation pages). */
   photos: z.array(AnnotatedImageSchema).max(MAX_PHOTOS_PER_DEVIATION).optional(),
 });
@@ -227,6 +260,8 @@ export const ExtraDeviationSchema = z.object({
   comment: z.string().max(2000).optional(),
   resp: z.string().max(200).optional(),
   severity: SeveritySchema,
+  /** As on a row result. */
+  category: ListEntrySchema.optional(),
   photos: z.array(AnnotatedImageSchema).max(MAX_PHOTOS_PER_DEVIATION).optional(),
 });
 export type ExtraDeviation = z.infer<typeof ExtraDeviationSchema>;
@@ -311,6 +346,8 @@ export const DeviationRowSchema = z.object({
   comment: z.string(),
   resp: z.string(),
   severity: SeveritySchema,
+  /** '' when none was chosen (and on rows written before categories existed). */
+  category: z.string().default(''),
   /** "YYYY-MM-DD" */
   inspectionDate: z.string(),
   finalised: z.boolean(),

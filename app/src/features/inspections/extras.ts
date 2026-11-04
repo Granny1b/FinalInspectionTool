@@ -10,7 +10,10 @@ export function newExtraDeviation(): ExtraDeviation {
 
 export type ExtraDeviationPatch = Partial<Omit<ExtraDeviation, 'id'>>;
 
-/** Applies the patch; an empty comment, resp or photo list is removed rather than stored empty. */
+/**
+ * Applies the patch; an empty comment, resp, category or photo list is removed rather than
+ * stored empty.
+ */
 export function updateExtra(
   extras: readonly ExtraDeviation[],
   id: string,
@@ -21,6 +24,7 @@ export function updateExtra(
     const next: ExtraDeviation = { ...extra, ...patch };
     if (!next.comment) delete next.comment;
     if (!next.resp) delete next.resp;
+    if (!next.category) delete next.category;
     if (!next.photos?.length) delete next.photos;
     return next;
   });

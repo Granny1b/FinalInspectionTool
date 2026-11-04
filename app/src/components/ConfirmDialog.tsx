@@ -1,5 +1,7 @@
+import clsx from 'clsx';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Button } from './Button';
+import { DIALOG_FRAME } from './Dialog';
 
 type Props = {
   title: string;
@@ -35,9 +37,9 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
       onClick={(event) => {
         if (event.target === event.currentTarget) event.currentTarget.close();
       }}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl backdrop:bg-ink-950/30"
+      className={clsx(DIALOG_FRAME, 'w-[min(28rem,calc(100vw-2rem))]')}
     >
-      <form method="dialog" className="p-6">
+      <form method="dialog" className="dialog-body p-6">
         <h2 id={titleId} className="text-base font-semibold">
           {title}
         </h2>
@@ -49,13 +51,9 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
           <Button type="submit" value="cancel" variant="secondary">
             Cancel
           </Button>
-          <button
-            type="submit"
-            value="confirm"
-            className="inline-flex h-9 items-center justify-center rounded-md bg-nok-fg px-3.5 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-colors hover:bg-nok-fg/90"
-          >
+          <Button type="submit" value="confirm" variant="danger">
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </form>
     </dialog>

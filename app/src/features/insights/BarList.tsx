@@ -16,9 +16,10 @@ type Props = {
 };
 
 /**
- * Ranked horizontal bars (sections, models, resps): the label and the value on a line, the bar
- * under them. Long labels wrap instead of being cut off, and every value is printed, so nothing
- * hides in a tooltip. One hue: the bars are counts of one thing, the rank is in their length.
+ * Ranked horizontal bars (sections, models, resps, categories): the label and the value on a
+ * line, the bar under them. Long labels wrap instead of being cut off, and every value is
+ * printed, so nothing hides in a tooltip. One hue: the bars are counts of one thing, the rank is
+ * in their length.
  */
 export function BarList({ items, limit }: Props) {
   const [expanded, setExpanded] = useState(false);

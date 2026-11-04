@@ -125,6 +125,7 @@ describe('GET /api/insights', () => {
       bySeverity: { minor: 0, major: 0, critical: 0 },
       topCheckpoints: [],
       byResp: [],
+      byCategory: [],
     });
   });
 
@@ -134,7 +135,7 @@ describe('GET /api/insights', () => {
     await inspect(
       template,
       {
-        [a]: { status: 'NOK', severity: 'major', resp: 'Mechanics' },
+        [a]: { status: 'NOK', severity: 'major', resp: 'Mechanics', category: 'Leakage' },
         [b]: { status: 'OK' },
         [c]: { status: 'NA' },
       },
@@ -164,6 +165,10 @@ describe('GET /api/insights', () => {
     expect(result.byResp).toEqual([
       { resp: 'Mechanics', deviations: 2 },
       { resp: '', deviations: 1 },
+    ]);
+    expect(result.byCategory).toEqual([
+      { category: 'Leakage', deviations: 1 },
+      { category: '', deviations: 2 },
     ]);
     expect(result.topCheckpoints).toEqual([
       {
@@ -297,7 +302,7 @@ describe('GET /api/insights/export.csv', () => {
     expect(lines[0]).toBe(
       'inspectionId;inspectionNumber;serialNumber;machineName;modelCode;templateId;' +
         'templateRevision;itemId;sectionTitle;displayRef;checkpointText;comment;resp;severity;' +
-        'inspectionDate;finalised;createdAt',
+        'category;inspectionDate;finalised;createdAt',
     );
     const rows = lines.slice(1, -1).map((line) => line.split(';'));
     // Oldest inspection first; in each, checklist order, then the extra deviation.
@@ -309,8 +314,8 @@ describe('GET /api/insights/export.csv', () => {
     ]);
     expect(lines[2]).toContain(`;" Fräs ";RMMG;${template.id};2;${a};`);
     // Formulas stay text; quotes and separators are quoted.
-    expect(lines[2]).toContain(`;"'=HYPERLINK(""x"")";;critical;2026-10-08;true;`);
-    expect(lines[3]).toContain(';"Skruv ""lös""; åtdragen";Mekanik;minor;');
+    expect(lines[2]).toContain(`;"'=HYPERLINK(""x"")";;critical;;2026-10-08;true;`);
+    expect(lines[3]).toContain(';"Skruv ""lös""; åtdragen";Mekanik;minor;;');
     expect(lines[4]).toContain(";'-1 screw;");
   });
 

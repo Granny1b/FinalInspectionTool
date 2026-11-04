@@ -12,14 +12,16 @@ import { AnnotatedPhotos } from '../annotate/AnnotatedPhotos';
 import { ExtraDeviationFields } from './ExtraDeviationFields';
 import type { ExtraDeviationPatch } from './extras';
 import { deviationPhotosId } from './issues';
+import { LINK_TEXT } from './linkText';
 
 type Props = {
   deviation: InspectionDeviation;
   readOnly: boolean;
   /** Finalise problem of an extra deviation ("needs a description"). */
   issue: string | undefined;
-  /** The summary's one `<datalist>` of resp suggestions. */
-  respListId: string;
+  /** The settings' Responsible list and deviation categories, for an extra deviation's fields. */
+  responsibles: readonly string[];
+  categories: readonly string[];
   onGoToRow: (itemId: string) => void;
   onUpdate: (id: string, patch: ExtraDeviationPatch) => void;
   onRemove: (deviation: InspectionDeviation) => void;
@@ -29,7 +31,8 @@ type Props = {
 
 /**
  * One deviation, as it prints on the report's deviation pages: D-nn, ref, checkpoint (or the
- * extra deviation's description), comment, severity, resp, and up to two marked-up photos. A row
+ * extra deviation's description), comment, severity, category, responsible, and up to two
+ * marked-up photos. A row
  * deviation is edited in its row (the ref jumps there); an extra deviation in the card itself.
  * Photos are added here for both.
  */
@@ -37,7 +40,8 @@ export function DeviationCard({
   deviation,
   readOnly,
   issue,
-  respListId,
+  responsibles,
+  categories,
   onGoToRow,
   onUpdate,
   onRemove,
@@ -77,7 +81,8 @@ export function DeviationCard({
             onClick={() => onRemove(deviation)}
             aria-label={`Remove ${number}`}
             title="Remove"
-            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-nok-bg hover:text-nok-fg"
+            // 44 px for a finger, over the bar's padding, so the bar keeps its height.
+            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-nok-bg hover:text-nok-fg pointer-coarse:-my-1.5 pointer-coarse:size-11"
           >
             <Trash2 size={16} aria-hidden="true" />
           </button>
@@ -92,7 +97,8 @@ export function DeviationCard({
             <ExtraDeviationFields
               deviation={deviation}
               issue={issue}
-              respListId={respListId}
+              responsibles={responsibles}
+              categories={categories}
               onUpdate={onUpdate}
             />
           ) : (
@@ -110,7 +116,11 @@ export function DeviationCard({
   );
 }
 
-/** The row's ref as a link to it: switches to the checklist and focuses the row. */
+/**
+ * The row's ref as a link to it: switches to the checklist and focuses the row. Padded out to a
+ * button's size with the text where it was (and its ring around the text, LINK_TEXT); 44 px high
+ * for a finger, over the bar's padding, so the bar keeps its height.
+ */
 function GoToRow({ deviationRef, onClick }: { deviationRef: string; onClick: () => void }) {
   return (
     <button
@@ -118,18 +128,24 @@ function GoToRow({ deviationRef, onClick }: { deviationRef: string; onClick: () 
       onClick={onClick}
       aria-label={`Row ${deviationRef}, go to it in the checklist`}
       title="Go to the row"
-      className="inline-flex items-center gap-1 rounded-sm text-sm font-medium text-brand-700 underline-offset-2 hover:underline"
+      className="group -mx-2 inline-flex min-h-8 items-center px-2 text-sm font-medium text-brand-700 outline-none pointer-coarse:-my-1.5 pointer-coarse:min-h-11"
     >
-      {deviationRef}
-      <CornerDownRight size={13} aria-hidden="true" />
+      <span className={LINK_TEXT}>
+        {deviationRef}
+        <CornerDownRight size={13} aria-hidden="true" />
+      </span>
     </button>
   );
 }
 
+/**
+ * Minor is neutral and major a red tint; critical is filled with the colour Insights gives it, so
+ * the most severe is the strongest red on both pages, in both themes.
+ */
 const SEVERITY_TONES: Record<Severity, string> = {
   minor: 'bg-ink-100 text-ink-700 ring-ink-300',
   major: 'bg-nok-bg text-nok-fg ring-nok-border',
-  critical: 'bg-nok-fg text-white ring-nok-fg',
+  critical: 'bg-severity-critical text-on-severity-critical ring-severity-critical',
 };
 
 /** The severity in words, never by colour alone; critical is the one filled badge. */
@@ -154,11 +170,13 @@ function Details({ deviation }: { deviation: InspectionDeviation }) {
       <p className="text-sm leading-5 font-medium wrap-break-word text-ink-900">
         {deviation.text || <span className="font-normal text-ink-500">No description</span>}
       </p>
-      <dl className="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm leading-5">
+      <dl className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm leading-5">
         <dt className="text-ink-500">Comment</dt>
         <dd className="wrap-break-word text-ink-800">{deviation.comment || '—'}</dd>
-        <dt className="text-ink-500">Resp</dt>
+        <dt className="text-ink-500">Responsible</dt>
         <dd className="wrap-break-word text-ink-800">{deviation.resp || '—'}</dd>
+        <dt className="text-ink-500">Category</dt>
+        <dd className="wrap-break-word text-ink-800">{deviation.category || '—'}</dd>
       </dl>
     </>
   );

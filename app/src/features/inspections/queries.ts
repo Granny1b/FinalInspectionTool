@@ -6,7 +6,6 @@ import {
   FinaliseIssueSchema,
   InspectionListSchema,
   InspectionSchema,
-  RespSuggestionsSchema,
   type CreateInspectionRequest,
   type FinaliseIssue,
   type Inspection,
@@ -19,7 +18,6 @@ import { apiFetch, ApiRequestError, type ApiResponse } from '../../lib/api';
 export const inspectionKeys = {
   list: ['inspections', 'list'] as const,
   detail: (id: string) => ['inspections', 'detail', id] as const,
-  respSuggestions: ['inspections', 'resp-suggestions'] as const,
 };
 
 const inspectionPath = (id: string) => `/api/inspections/${encodeURIComponent(id)}`;
@@ -117,16 +115,6 @@ export async function changeState(
       signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
     }),
   );
-}
-
-/** "Resp" values from earlier deviations, for autocomplete. Rarely changes. */
-export function useRespHistory() {
-  return useQuery({
-    queryKey: inspectionKeys.respSuggestions,
-    queryFn: async ({ signal }) =>
-      (await apiFetch('/api/resp-suggestions', { schema: RespSuggestionsSchema, signal })).data,
-    staleTime: 5 * 60_000,
-  });
 }
 
 const FinaliseIssuesSchema = z.array(FinaliseIssueSchema);

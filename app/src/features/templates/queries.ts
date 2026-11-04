@@ -3,17 +3,25 @@
  * Query keys live here so invalidation after create/save/publish is in one place.
  */
 import {
+  ImportTemplateResponseSchema,
   PublishIssueSchema,
   SaveTemplateResponseSchema,
   TemplateDetailSchema,
   TemplateListSchema,
   TemplateSchema,
   type CreateTemplateRequest,
+  type ImportTemplateRequest,
   type PublishIssue,
   type TemplateDetail,
   type TemplateDraftInput,
 } from '@modig/shared';
-import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  skipToken,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiFetch, ApiRequestError, type ApiResponse } from '../../lib/api';
 
@@ -108,11 +116,71 @@ export function useCreateTemplate() {
       );
       return { detail: data, etag };
     },
-    onSuccess: (created) => {
-      // The editor opens straight from this answer instead of loading it again.
-      queryClient.setQueryData(templateKeys.detail(created.detail.draft.id), created);
-      return queryClient.invalidateQueries({ queryKey: templateKeys.list });
+    onSuccess: (created, request) => opened(queryClient, created, request),
+  });
+}
+
+/**
+ * The editor opens straight from a create's or an import's answer instead of loading it again.
+ * A new machine model went into the settings with it.
+ */
+function opened(
+  queryClient: QueryClient,
+  created: LoadedTemplate,
+  request: { newModel?: unknown },
+) {
+  queryClient.setQueryData(templateKeys.detail(created.detail.draft.id), created);
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: templateKeys.list }),
+    request.newModel ? queryClient.invalidateQueries({ queryKey: SETTINGS_KEY }) : null,
+  ]);
+}
+
+/** useSettings' key (lib/useSettings.ts): a prefix, so it matches however that query is keyed. */
+const SETTINGS_KEY = ['settings'];
+
+/** A new draft from a template file; resolves to it and the number of images left out. */
+export function useImportTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      request: ImportTemplateRequest,
+    ): Promise<{ loaded: LoadedTemplate; droppedImages: number }> => {
+      const { data, etag } = withEtag(
+        await apiFetch('/api/templates/import', {
+          method: 'POST',
+          body: request,
+          schema: ImportTemplateResponseSchema,
+        }),
+      );
+      const { droppedImages, ...detail } = data;
+      return { loaded: { detail, etag }, droppedImages };
     },
+    onSuccess: ({ loaded }, request) => opened(queryClient, loaded, request),
+  });
+}
+
+/**
+ * Deletes a template (admins), if its draft is still the version the editor holds: `ifMatch`
+ * resolves to that ETag (after saving what is unsaved). Already deleted by someone else counts as
+ * done.
+ */
+export function useDeleteTemplate(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ifMatch: () => Promise<string>) => {
+      const etag = await ifMatch();
+      await apiFetch(templatePath(id), {
+        method: 'DELETE',
+        ifMatch: etag,
+        signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
+      }).catch((error: unknown) => {
+        if (!(error instanceof ApiRequestError && error.status === 404)) throw error;
+      });
+    },
+    // The editor's own query is left alone: it is dropped once the editor has gone (gcTime 0).
+    // Removed now, it would refetch the deleted template under the open editor.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.list }),
   });
 }
 

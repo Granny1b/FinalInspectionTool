@@ -86,7 +86,7 @@ export function EditorToolbar({
             <span
               aria-hidden="true"
               style={{ backgroundColor: value }}
-              className="size-5 rounded-full border border-ink-950/25 group-aria-pressed:ring-2 group-aria-pressed:ring-brand-600 group-aria-pressed:ring-offset-2"
+              className="size-5 rounded-full border border-ink-950/25 group-aria-pressed:ring-2 group-aria-pressed:ring-brand-600 group-aria-pressed:ring-offset-2 group-aria-pressed:ring-offset-overlay"
             />
           </BarButton>
         ))}
@@ -125,12 +125,14 @@ export function EditorToolbar({
   );
 }
 
+/** Not on a phone: there the groups wrap onto lines of their own and it would dangle at an end. */
 function Divider() {
-  return <div aria-hidden="true" className="mx-0.5 h-6 w-px bg-ink-200" />;
+  return <div aria-hidden="true" className="mx-0.5 h-6 w-px bg-ink-200 max-sm:hidden" />;
 }
 
 /**
- * An icon button, 44 px for fingers and 36 px with a mouse; its name is also its tooltip.
+ * An icon button, 44 px for fingers and 36 px with a mouse; its name is also its tooltip. On the
+ * dialog's overlay colour, which in the dark theme is ink-100, it hovers a step lighter there.
  * `inactive` (aria-disabled, not disabled) is for Undo, Redo and Delete mark, which turn
  * themselves off: a disabled button would drop the focus out of the dialog, and its shortcuts
  * and Escape with it.
@@ -154,7 +156,7 @@ function BarButton({
       onClick={inactive ? undefined : onClick}
       className={clsx(
         'flex size-11 items-center justify-center rounded-md text-ink-600 transition-colors pointer-fine:size-9',
-        'hover:bg-ink-100 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-40',
+        'hover:bg-ink-100 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-ink-200',
         'aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ink-600',
         className,
       )}

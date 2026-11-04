@@ -3,6 +3,7 @@ import { useId, type ReactNode } from 'react';
 import { Logo } from '../../components/Logo';
 import { PhotoFrame } from '../../components/PhotoField';
 import { formatDateTime } from '../../lib/format';
+import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
 
 type FrameProps = {
@@ -19,16 +20,19 @@ export function FrontPageFrame({ revisionLabel, children }: FrameProps) {
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} className="rounded-lg border border-ink-200 bg-surface">
-      <div className="flex items-center justify-between gap-4 border-b border-ink-100 px-5 py-3.5">
+      {/* The app's card header, with the logo as its aside, centred on the title. At h-8 the
+          logo's "Machine Tool Sweden" line is still legible (smaller, it blurs into a smudge on
+          the dark card); the negative margin keeps the header as tall as the other cards'. */}
+      <div className="flex items-center justify-between gap-4 border-b border-ink-200 px-5 py-3.5">
         <h2 id={titleId} className="text-sm font-semibold text-ink-900">
           Front page
         </h2>
-        <Logo className="h-6" />
+        <Logo className="-my-1.5 h-8" />
       </div>
-      <div className="grid gap-x-6 gap-y-5 p-5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-5 p-5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
         {children}
       </div>
-      <p className="border-t border-ink-100 px-5 py-2.5 text-right text-xs text-ink-500 tabular-nums">
+      <p className="border-t border-ink-200 px-5 py-2.5 text-right text-xs text-ink-500 tabular-nums">
         {revisionLabel}
       </p>
     </section>
@@ -43,6 +47,7 @@ export function PublishedFrontPage({
   template: Template;
   models: MachineModel[] | undefined;
 }) {
+  const personName = usePersonName();
   return (
     <FrontPageFrame revisionLabel={`Rev: ${template.revision}`}>
       <PhotoFrame imageId={template.coverImageId} noun="cover photo" />
@@ -51,11 +56,14 @@ export function PublishedFrontPage({
           {template.name}
         </Detail>
         <Detail label="Machine model">{modelName(models, template.modelCode)}</Detail>
-        <Detail label="Spare rows per section">{template.printSettings.spareRowsPerSection}</Detail>
-        <Detail label="Published">
+        <Detail label="Spare lines per section (default)">
+          {template.printSettings.spareRowsPerSection}
+        </Detail>
+        {/* The whole row: nothing sits beside it, and the author's name needs the room. */}
+        <Detail label="Published" wide>
           {formatDateTime(template.updatedAt)}
           <span className="block truncate text-ink-500" title={template.updatedBy}>
-            {template.updatedBy}
+            {personName(template.updatedBy)}
           </span>
         </Detail>
         {template.changeNote && (

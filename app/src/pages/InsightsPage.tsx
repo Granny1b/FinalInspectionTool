@@ -75,7 +75,7 @@ export function InsightsPage() {
     return (
       <>
         {header}
-        <PageLoading label="Loading insights…" />
+        <PageLoading label="Loading insights…" header={false} />
       </>
     );
   }
@@ -165,9 +165,10 @@ function Dashboard({ insights, models, singleModel }: DashboardProps) {
         />
       </Panel>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* One two-column grid for every panel under the table, so the gutters line up with each
+          other and with the middle of the tiles above. */}
+      <div className="grid gap-6 md:grid-cols-2">
         <Panel
-          className="lg:col-span-2"
           title="Deviations per month"
           description="By the date on the inspection’s front page."
         >
@@ -175,16 +176,18 @@ function Dashboard({ insights, models, singleModel }: DashboardProps) {
             <MonthlyChart months={insights.perMonth} />
           </Suspense>
         </Panel>
-        <Panel title="By severity" aside={plural(severityTotal, 'deviation')}>
+        {/* As tall as its bar and legend: stretched to the chart beside it, it was mostly empty. */}
+        <Panel
+          className="md:self-start"
+          title="By severity"
+          aside={plural(severityTotal, 'deviation')}
+        >
           {severityTotal > 0 ? (
             <SeverityBar bySeverity={insights.bySeverity} />
           ) : (
             <p className="py-6 text-center text-sm text-ink-500">No deviations.</p>
           )}
         </Panel>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
         <Panel
           title="Per section"
           description={
@@ -196,8 +199,11 @@ function Dashboard({ insights, models, singleModel }: DashboardProps) {
         <Panel title="Per model" description="Deviations, with the inspections they come from.">
           <BarList items={modelBars(insights, models)} limit={10} />
         </Panel>
-        <Panel title="By resp" description="Who is responsible for fixing them.">
+        <Panel title="By responsible" description="Who is responsible for fixing them.">
           <BarList items={respBars(insights)} limit={10} />
+        </Panel>
+        <Panel title="By category" description="What kind of deviations they are.">
+          <BarList items={categoryBars(insights)} limit={10} />
         </Panel>
       </div>
     </>
@@ -225,7 +231,15 @@ function modelBars(insights: Insights, models: MachineModel[] | undefined): BarI
 function respBars(insights: Insights): BarItem[] {
   return insights.byResp.map(({ resp, deviations }) => ({
     key: resp || '\u0000none',
-    label: resp || 'No resp given',
+    label: resp || 'Not assigned',
+    value: deviations,
+  }));
+}
+
+function categoryBars(insights: Insights): BarItem[] {
+  return insights.byCategory.map(({ category, deviations }) => ({
+    key: category || '\u0000none',
+    label: category || 'No category',
     value: deviations,
   }));
 }

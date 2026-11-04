@@ -11,10 +11,10 @@ const PERCENT_DECIMAL = new Intl.NumberFormat('en-GB', {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
-// Read in UTC, so no time zone can move the month.
+// Read in UTC, so no time zone can move the month. The whole year: "Oct 26" reads as a date.
 const MONTH_SHORT = new Intl.DateTimeFormat('en-GB', {
   month: 'short',
-  year: '2-digit',
+  year: 'numeric',
   timeZone: 'UTC',
 });
 const MONTH_LONG = new Intl.DateTimeFormat('en-GB', {
@@ -35,7 +35,7 @@ export const formatPercent = (share: number, decimals: 0 | 1 = 0) =>
 
 const monthDate = (month: string) => new Date(`${month}-01T00:00:00Z`);
 
-/** "Oct 26" for "2026-10" (axis). */
+/** "Oct 2026" for "2026-10" (axis). */
 export const formatMonthShort = (month: string) => MONTH_SHORT.format(monthDate(month));
 
 /** "October 2026" for "2026-10" (tooltip, table). */

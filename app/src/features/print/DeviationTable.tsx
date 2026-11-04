@@ -11,7 +11,8 @@ type Props = {
 
 /**
  * The blank Deviation Summary, on a page of its own (brief §6): numbered lines with No. | Ref |
- * Description | Severity | Resp | Closed (sign/date), filled in by hand on the walk-round.
+ * Description | Severity | Category | Resp | Closed (sign/date), filled in by hand on the
+ * walk-round. Category takes its room from Description, which keeps about 60 mm.
  */
 export function DeviationTable({ numbers, subject, fallbackFooter }: Props) {
   const titleId = useId();
@@ -30,6 +31,7 @@ export function DeviationTable({ numbers, subject, fallbackFooter }: Props) {
           <col className="paper-col-ref" />
           <col />
           <col className="paper-col-severity" />
+          <col className="paper-col-category" />
           <col className="paper-col-resp" />
           <col className="paper-col-closed" />
         </colgroup>
@@ -39,6 +41,7 @@ export function DeviationTable({ numbers, subject, fallbackFooter }: Props) {
             <th scope="col">Ref</th>
             <th scope="col">Description</th>
             <th scope="col">Severity</th>
+            <th scope="col">Category</th>
             <th scope="col">Resp</th>
             <th scope="col">Closed (sign/date)</th>
           </tr>
@@ -46,7 +49,7 @@ export function DeviationTable({ numbers, subject, fallbackFooter }: Props) {
         {fallbackFooter && (
           <tfoot className="paper-fallback-footer">
             <tr>
-              <td colSpan={6}>{fallbackFooter}</td>
+              <td colSpan={7}>{fallbackFooter}</td>
             </tr>
           </tfoot>
         )}
@@ -54,6 +57,7 @@ export function DeviationTable({ numbers, subject, fallbackFooter }: Props) {
           {numbers.map((number) => (
             <tr key={number} data-deviation={number}>
               <td className="paper-ref">{number}</td>
+              <td />
               <td />
               <td />
               <td />

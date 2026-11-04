@@ -130,11 +130,15 @@ export function ActionMenu({ label, items, triggerData, trigger }: Props) {
         }}
         onToggle={onToggle}
         onKeyDown={onKeyDown}
-        className="fixed inset-auto m-0 min-w-44 rounded-lg border border-ink-200 bg-surface p-1 text-sm text-ink-800 shadow-lg"
+        // An overlay: in the dark theme it is lighter than the cards it covers, as a shadow
+        // doesn't show on near-black and the menu would otherwise blend into the card under it.
+        className="fixed inset-auto m-0 min-w-44 rounded-lg border border-ink-200 bg-overlay p-1 text-sm text-ink-800 shadow-lg dark:border-ink-300"
       >
         {items.map((item, index) => (
           <Fragment key={item.label}>
-            {item.danger && <div role="separator" className="mx-1 my-1 h-px bg-ink-100" />}
+            {item.danger && (
+              <div role="separator" className="mx-1 my-1 h-px bg-ink-200 dark:bg-ink-300" />
+            )}
             <button
               type="button"
               role="menuitem"
@@ -149,11 +153,13 @@ export function ActionMenu({ label, items, triggerData, trigger }: Props) {
                 menuRef.current?.hidePopover();
                 item.onSelect();
               }}
+              // Taller on a touch screen, where items 32 px apart are easy to miss with a finger.
+              // The dark overlay is ink-100 itself, so there the highlight is a step lighter.
               className={clsx(
-                'flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left whitespace-nowrap transition-colors focus-visible:-outline-offset-2 disabled:pointer-events-none disabled:text-ink-400',
+                'flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left whitespace-nowrap transition-colors focus-visible:-outline-offset-2 disabled:pointer-events-none disabled:text-ink-400 pointer-coarse:h-10',
                 item.danger
                   ? 'text-nok-fg hover:bg-nok-bg focus-visible:bg-nok-bg'
-                  : 'hover:bg-ink-100 focus-visible:bg-ink-100',
+                  : 'hover:bg-ink-100 focus-visible:bg-ink-100 dark:hover:bg-ink-200 dark:focus-visible:bg-ink-200',
               )}
             >
               <item.icon size={15} aria-hidden="true" className="shrink-0" />

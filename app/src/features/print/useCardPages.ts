@@ -65,13 +65,17 @@ export function useCardPages(cards: readonly DeviationCard[], perPage: Deviation
 /**
  * The cards' heights and the room a page has for them: the page less its heading and the gaps of
  * a full page (a page with fewer cards keeps the empty slots, so the gaps are always there).
+ *
+ * The page may be drawn scaled (the preview dialog fits A4 to the screen with a transform): its
+ * rectangles are then scaled too, its computed sizes are not, so the rectangles are scaled back.
  */
 function measure(page: HTMLElement, perPage: number): { heights: number[]; room: number } {
-  const mm = (px: number) => px / PX_PER_MM;
   const list = page.querySelector<HTMLElement>('[data-card-list]')!;
   const box = page.getBoundingClientRect();
+  const scale = box.height / parseFloat(getComputedStyle(page).height) || 1;
+  const mm = (px: number) => px / scale / PX_PER_MM;
   const heading = mm(list.getBoundingClientRect().top - box.top);
-  const gap = mm(parseFloat(getComputedStyle(list).rowGap) || 0);
+  const gap = (parseFloat(getComputedStyle(list).rowGap) || 0) / PX_PER_MM;
   const heights = Array.from(list.children, (card) => mm(card.getBoundingClientRect().height));
   return { heights, room: mm(box.height) - heading - (perPage - 1) * gap };
 }

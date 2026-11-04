@@ -50,6 +50,7 @@ function row(inspectionId: string, patch: Partial<DeviationRow> = {}): Deviation
     comment: '',
     resp: '',
     severity: 'minor',
+    category: '',
     inspectionDate: '2026-10-07',
     finalised: true,
     createdAt: '2026-10-07T08:00:00.000Z',
@@ -247,6 +248,28 @@ describe('aggregateInsights', () => {
       { resp: 'Electrical', deviations: 1 },
       { resp: '', deviations: 2 },
     ]);
+  });
+
+  it('groups categories like resps: trimmed, ignoring case, uncategorised last', () => {
+    const deviations = [
+      row('1', { category: 'Missing parts' }),
+      row('1', { itemId: 'i2', category: 'Leakage' }),
+      row('1', { itemId: 'i3', category: 'missing parts ' }),
+      row('1', { itemId: '', displayRef: '—', sectionTitle: '', category: 'Missing parts' }),
+      row('1', { itemId: 'i4', category: '' }),
+      row('1', { itemId: 'i5', category: '' }),
+      row('1', { itemId: 'i6', category: 'Cleanliness' }),
+      // Out of scope: not counted.
+      row('9', { category: 'Leakage' }),
+    ];
+    expect(aggregate(ALL, [inspection('1')], deviations).byCategory).toEqual([
+      { category: 'Missing parts', deviations: 3 },
+      // A tie is alphabetical.
+      { category: 'Cleanliness', deviations: 1 },
+      { category: 'Leakage', deviations: 1 },
+      { category: '', deviations: 2 },
+    ]);
+    expect(aggregate(ALL, [inspection('1')]).byCategory).toEqual([]);
   });
 
   it('lists every model in scope, with or without deviations, and splits by severity', () => {

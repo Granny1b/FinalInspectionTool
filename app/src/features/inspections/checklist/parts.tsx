@@ -17,6 +17,12 @@ type StatusControlProps = {
  * Segmented OK / NOK / N/A (brief §5.3) as three toggle buttons: the selected one is pressed, and
  * pressing it again clears the status. They are not tab stops; the keyboard sets the status on
  * the focused row (1/2/3), so Tab goes straight from the row to its comment.
+ *
+ * The app's segmented control (track, radius, type, raised hover), with two differences: the
+ * chosen segment takes its status colour, in bold as on a finalised sheet, and the track fills
+ * its cell at the row's control height, as the fields beside it (CONTROL_HEIGHT). So a segment is
+ * 40 px on a tablet, as usual for a finger, but 28 px rather than 32 px on a desktop with a
+ * mouse, where the track lines up with the row's 32 px fields and 90 rows stay compact.
  */
 export function StatusControl({ status, rowRef, onPick }: StatusControlProps) {
   return (
@@ -39,10 +45,11 @@ export function StatusControl({ status, rowRef, onPick }: StatusControlProps) {
             aria-pressed={selected}
             onClick={() => onPick(option)}
             className={clsx(
-              'inline-flex min-w-0 items-center justify-center gap-1 rounded-md text-[0.8125rem] transition-colors',
+              // A third of a 12rem column is too narrow for the usual px-3 around "✗ NOK".
+              'inline-flex min-w-0 items-center justify-center gap-1 rounded-md px-1 text-sm font-medium transition-colors',
               selected
-                ? clsx('font-semibold shadow-xs ring-1 ring-inset', STATUS_TONES[option])
-                : 'text-ink-600 hover:bg-surface hover:text-ink-900',
+                ? clsx('font-semibold shadow-xs ring-1', STATUS_TONES[option])
+                : 'text-ink-600 hover:bg-raised/60 hover:text-ink-900',
             )}
           >
             <Icon size={14} strokeWidth={selected ? 3 : 2} aria-hidden="true" />

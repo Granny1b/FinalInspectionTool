@@ -10,7 +10,8 @@ The calls with product, security or cost impact. Each is explained in its sectio
 
 - Node 22 instead of the brief's Node 20 (Platform).
 - Free plan: anyone with a Microsoft account can sign in, so access depends only on the invited
-  roles `inspector` and `admin`, written in lowercase (Auth).
+  roles `inspector` and `admin`, written in lowercase (Auth). (Superseded by Users and names: the
+  API takes the role from the people list, with invitations as the fallback.)
 - After sign-in users land on `/`; a deep link is lost (Auth).
 - A fourth storage container, `config`, for settings and the inspection counter (Data and
   storage).
@@ -49,13 +50,16 @@ The calls with product, security or cost impact. Each is explained in its sectio
   `updatedAt`/`updatedBy` of the immutable `rev-{n}.json`, so no extra fields are needed.
 - **N/A is stored as `"NA"`** (the brief's `RowResult` type) and displayed as "N/A".
 - **`updatedBy` and `finalisedBy` store the email.** It is stable and trustworthy; there is no user
-  table to look names up in.
+  table to look names up in. (Still the email; since Users and names the app shows the name from
+  the people list.)
 
 ### Auth
 
 - **Free plan with the pre-configured Entra ID provider; access is gated only on the custom roles
   `inspector` and `admin`, never on `authenticated`.** On the Free plan anyone with a Microsoft
   account can sign in, so the invited role is the only gate. At most 25 invited users.
+  (Superseded by Users and names: the route gate is `authenticated`, the API takes the role from
+  the people list, and invitations are the fallback.)
 - **Login is a static `/login.html`, not an SPA route.** The app bundle itself stays behind the role
   check. After sign-in users land on `/`: SWA's 401 redirect drops the deep link, which is
   acceptable for this tool.
@@ -64,7 +68,8 @@ The calls with product, security or cost impact. Each is explained in its sectio
   `/login-assets/..%2fassets/…` matched `/login-assets/*` and served the role-gated bundle to
   anyone. A new pre-login file needs its own route.
 - **`/api/me` derives the display name from the email.** SWA's `x-ms-client-principal` carries no
-  claims (no name) on managed functions, and the brief rules out a user table.
+  claims (no name) on managed functions, and the brief rules out a user table. (Since Users and
+  names: the name on the people list, else from the email.)
 - **Roles are invited in lowercase** (the Settings page and README say so). The API also
   lowercases role names before checking them, as defence in depth: Azure documents role names as
   case-insensitive. The pre-login script forwards a user to the app only on an exact match, like
@@ -170,7 +175,9 @@ The calls with product, security or cost impact. Each is explained in its sectio
   mismatch both become `ApiRequestError('internal')`, so the UI deals with one error type.
 - **`/api/me` is cached forever (`staleTime: Infinity`).** Roles only change at the next sign-in.
   `useCurrentUser()` reads the cached query instead of a React context, because pages render only
-  after `/api/me` has loaded.
+  after `/api/me` has loaded. (Since Users and names a role on the people list counts in the API
+  at once; the app still reads `/api/me` once per visit, and Settings refreshes it after a
+  change.)
 - **The tablet drawer is a native `<dialog>` opened with `showModal()`.** That gives the focus
   trap, Escape and an inert background for free; the page behind it is also kept from scrolling.
   It closes itself when the viewport crosses `lg`, so an invisible modal can't leave the page
@@ -205,12 +212,14 @@ The calls with product, security or cost impact. Each is explained in its sectio
   like the bundle, contain no secrets and make production stack traces readable.
 - **Planned actions are visible but disabled, labelled with their phase** (New inspection: phase 3,
   Export CSV: phase 6; New template arrived in phase 2). The settings form says "a later phase"
-  because the brief schedules no phase for it.
+  because the brief schedules no phase for it. (Superseded: the settings are edited since Settings
+  lists and deviation categories.)
 - **Inspectors see Templates without actions.** Insights and Settings are hidden from their
   navigation and guarded by `RequireRole` (UI only; the API checks again).
 - **The Settings page carries the brief's invite how-to:** portal steps, the
   `az staticwebapp users invite` command, the 25-user cap, and "role changes apply at the next
-  sign-in".
+  sign-in". (Superseded by Users and names: Settings manages the people list; the README keeps
+  the invitation for the first admin.)
 - **`vite.config.ts` has its own `tsconfig.node.json`**, so Node types never leak into browser
   code. `typecheck` runs both configs.
 - **`build` is plain `vite build`, without `tsc`.** Type-checking is a separate script that CI runs.
@@ -471,8 +480,9 @@ The calls with product, security or data impact. Each is explained in its sectio
 - **8 function registrations, one per route,** with GET/POST and GET/PUT dispatched inside the
   function; well under SWA's limit of 40.
 - **Published revisions are served with `Cache-Control: private, max-age=31536000, immutable`**
-  (successes only). Settings have no ETag yet (no settings editing). Create answers 201 without a
-  `Location` header; `upload-url` answers 200 (the browser's upload creates the image).
+  (successes only). Settings have no ETag yet (no settings editing; Settings lists added it with
+  `PUT /api/settings`). Create answers 201 without a `Location` header; `upload-url` answers 200
+  (the browser's upload creates the image).
 - **API test files run one after another** (`fileParallelism: false`): the endpoint tests reset
   the shared test Azurite before each test. Publish races are tested deterministically by
   running a second admin's write between the publish's two writes.
@@ -631,10 +641,12 @@ The calls with product, security or data impact. Each is explained in its sectio
 - **The model list disables models that have their own template;** a saved model no longer in the
   settings stays selectable as "CODE (not in the settings)".
 - **New template offers only models without a template.** The name defaults to "Final
-  inspection – {model}" and follows the model until edited.
+  inspection – {model}" and follows the model until edited. (Later it also offers a new machine
+  model: see Templates: delete, spare lines, cards, JSON files, new models.)
 - **Spare rows accept whole numbers in the schema's range (0–30);** anything else reverts on blur.
 - **"Who" is the stored email,** with dates in en-GB ("6 Oct 2026, 14:32"), so a Swedish browser
-  doesn't mix Swedish month names into the English UI.
+  doesn't mix Swedish month names into the English UI. (Since Users and names: the name on the
+  people list, else the email.)
 - **The list is a table whose whole row is a link.** Inspectors don't see New template or the
   unpublished badge; row count and "last edited" come from the draft for both roles.
 - **Inspectors at `/templates/:id` get the latest published revision, read-only** ("Not published
@@ -800,7 +812,8 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   answers 200 with the stored body and ETag; it still needs the current `If-Match` (412 first, as
   everywhere).
 - **Five new registrations, 13 in all:** `functions/inspections.ts` (list, create, read, save),
-  `functions/inspection-state.ts` (finalise, reopen) and `functions/resp-suggestions.ts`.
+  `functions/inspection-state.ts` (finalise, reopen) and one for the Resp autocomplete (removed
+  again with the Settings lists).
 - **`writeJson` takes optional blob metadata;** existing callers are unchanged.
 - **API tests:** `resetStorage()` also clears inspections, the counter and every deviation row,
   row by row (deleting the table would defeat `ensureTable`'s once-per-process memo).
@@ -810,9 +823,10 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 
 - **Each write makes the table equal `deriveDeviations(inspection)`:** one range query reads the
   inspection's rows (RowKeys from `{id}_` up to, not including, ``{id}` ``: the backtick is the
-  character after the underscore; built with the SDK's `odata` template), all 17 columns are
-  compared, and only new or changed rows are written (upsert, Replace) and vanished ones deleted.
-  Unchanged saves write nothing; most autosaves touch zero or one row.
+  character after the underscore; built with the SDK's `odata` template), all the columns (17
+  then, 18 since the category) are compared, and only new or changed rows are written (upsert,
+  Replace) and vanished ones deleted. Unchanged saves write nothing; most autosaves touch zero or
+  one row.
 - **Batches of at most 100 actions in the model's partition, upserts before deletes.** Each batch
   is atomic; a sync over 100 changes that fails part-way leaves the earlier batches applied until
   the retry or next write, which converges because the sync is idempotent.
@@ -837,16 +851,18 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **The table has its own `ensureTable()` memo,** apart from the containers' `ensureStorage()`.
   With one memo for both, a table outage on a fresh instance failed every blob request (saves,
   lists, image URLs) with a 500, so "the save still succeeds" held on warm instances only. Only
-  the sync and the resp suggestions need the table.
+  the sync and the Resp autocomplete needed the table then (Insights reads it since phase 6; the
+  autocomplete went with the Settings lists).
 - **`createdAt` is the time of the sync that first wrote the row,** as an ISO string, kept on
   later saves, so KPIs over time don't move with every edit.
 - **Column types:** `templateRevision` a number, `finalised` a boolean, `inspectionDate`
   (YYYY-MM-DD) and `createdAt` (ISO, UTC) strings; both sort correctly as text for range
   filters.
-- **`resp` is stored untrimmed,** mirroring `deriveDeviations`. Only the suggestions trim.
-- **Resp suggestions** filter on the server (`resp ne ''`) and select only `resp`. Values are
-  trimmed; spellings differing only in case count as one name, offered in the spelling most rows
-  use (the first found on a tie), sorted with a Swedish collation; at most 500, after sorting.
+- **`resp` is stored untrimmed,** mirroring `deriveDeviations`. Only the autocomplete trimmed.
+- **The Resp autocomplete** filtered on the server (`resp ne ''`) and selected only `resp`. Values
+  were trimmed; spellings differing only in case counted as one name, offered in the spelling most
+  rows use (the first found on a tie), sorted with a Swedish collation; at most 500, after
+  sorting. (Removed with the Settings lists: Responsible is picked from a list in Settings.)
 
 ### Checklist sheet
 
@@ -880,8 +896,9 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   whole next section. `R` is free (Shift+O is already OK, digits need Shift on some layouts) and,
   like the status keys, takes a press per row. The button stays clickable and focusable by click
   when nothing is left (`aria-disabled`); its accessible name includes the count.
-- **Resp suggestions use the browser's `<datalist>`,** one per sheet. In Chrome its popup takes the
-  first Enter (pick) or Escape (close); the next press reaches the sheet.
+- **The Resp autocomplete used the browser's `<datalist>`,** one per sheet. In Chrome its popup
+  took the first Enter (pick) or Escape (close); the next press reached the sheet. (Superseded by
+  the Settings lists: Responsible is a select of the list in Settings, see Deviations there.)
 - **Layout by the sheet's own width (container queries):** from 56rem one line per row in the
   print's column order; from 34rem the checkpoint above Comment | Status | Resp; narrower, stacked.
   Controls are 44 px on touch screens and narrow sheets, 32 px with a mouse on a wide sheet; the
@@ -907,7 +924,7 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **The guide icon** (camera with photos, info without) and `G` show "Guide viewer arrives in
   phase 5." (Superseded in phase 5: they open the guide viewer, see Guides.)
 - **Read-only (finalised) is separate, simpler markup** with the same grid; rows stay focusable
-  from script for jump links.
+  from script for jump links. (Superseded by the UI pass: it has a tighter grid of its own.)
 - **Performance:** rows and sections are memoised and the actions object is stable, so a change
   re-renders one row and its section. Measured in a production build on 180 rows: 1.9 ms of
   script per status key (p95 2.6 ms).
@@ -919,7 +936,8 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 
 - **Tabs, not a side panel:** "Checklist | Deviations (n)". A side panel would squeeze the sheet
   below its one-line layout on most screens; the tabs sit in the sticky header, so the live count
-  is always in view.
+  is always in view. (Since the UI pass the header sticks only on screens at least 40rem wide and
+  tall.)
 - **The front page is the top of the Checklist tab** (brief: "Front page card at the top"), so a
   front-page problem jumps there.
 - **The sticky header's height is measured** and set as the page's `scroll-padding-top`; a fixed
@@ -968,11 +986,11 @@ The calls with product, data or KPI impact. Each is explained in its section bel
   deviation**. A new extra deviation gets the focus in its description. Ids are `newId()`.
   (Superseded in phase 4: a card per deviation instead of a table, see Deviation cards on the
   inspection page; the rest still holds.)
-- **Resp suggestions** are the history merged with this inspection's own values, trimmed,
-  de-duplicated ignoring case and sorted (Swedish). **This inspection's values are taken when a
-  Resp field is left**, not as they are typed: otherwise the half-typed text was offered to its
-  own field, first (a prefix sorts before its completion), and ↓ Enter stored "El" instead of
-  "El-avdelningen", or a value one keystroke old.
+- **The Resp autocomplete offered** the history merged with this inspection's own values,
+  trimmed, de-duplicated ignoring case and sorted (Swedish). **This inspection's values were taken
+  when a Resp field was left**, not as they were typed: otherwise the half-typed text was offered
+  to its own field, first (a prefix sorts before its completion), and ↓ Enter stored "El" instead
+  of "El-avdelningen", or a value one keystroke old. (Removed with the Settings lists.)
 - **Finalise checks locally first** and lists problems without saving; after an attempt they stay
   marked and update as you type, with a **Show problems** callout. The confirmation names the
   number, rows and deviations, then saves pending changes (waiting for a photo upload) and
@@ -1019,11 +1037,12 @@ The calls with product, data or KPI impact. Each is explained in its section bel
 - **The keyboard test uses key presses only** once the page has opened (on Continue), and checks
   the stored results exactly, so a shortcut leaking from a text field would fail it.
 - **Review tests:** a Tab from a section's last field reaches the next section's row, `R`, the
-  ring on a row focused by a click, Resp suggestions while typing, an unsaved participant (Back
-  saves it, closing warns), the list's filters after "← Inspections", a finalise whose answer is
-  lost, a 503 with Try again, and Escape twice on the busy Finalise dialog; in the API, three
-  slow-sync races (save vs save, save vs finalise either side of its blob write), a lost counter,
-  a table outage on a fresh instance, and a draft whose model differs from its published one.
+  ring on a row focused by a click, the Resp autocomplete while typing (since removed), an
+  unsaved participant (Back saves it, closing warns), the list's filters after "← Inspections", a
+  finalise whose answer is lost, a 503 with Try again, and Escape twice on the busy Finalise
+  dialog; in the API, three slow-sync races (save vs save, save vs finalise either side of its
+  blob write), a lost counter, a table outage on a fresh instance, and a draft whose model differs
+  from its published one.
 - **The SWA CLI starts with a trimmed environment (`scripts/swa-start.mjs`).** A page load in dev
   took about 6 s through it but 0.6 s straight from Vite. Profiling showed why: SWA CLI 2.0.10
   copies the whole of `process.env` about a hundred times per request (its logger reads the
@@ -1063,6 +1082,7 @@ The calls with product, data or paper impact. Each is explained in its section b
   print toolbar (and the address); **2 is the default, chosen by the user** after comparing the
   two sample reports. The sample PDFs compare both: one photo
   prints at 103 × 77 mm with 2 per page, 68 × 51 mm with 4; labels at about 12 pt and 8 pt (Print).
+  (Superseded by UI pass, review fixes: 4 is the default when no deviation has a photo.)
 - **4 per page is four stacked rows** (text left, photos right), not a 2 × 2 grid (Print).
 - **A page holds fewer cards when their text doesn't fit.** The cards are measured in the browser
   before they are put on pages; a card is never split, and no text is cut (Print). (Phase 5: a
@@ -1215,6 +1235,7 @@ The calls with product, data or paper impact. Each is explained in its section b
   address, so a reload doesn't print again.
 - **Template preview:** admins see the draft ("Draft – Rev 3" on the front page, "(draft)" in the
   footer), inspectors the latest published revision, `?revision=n` any published one.
+  (Superseded by UI pass, review fixes: the footer says "Draft – Rev 3" too, as does the editor's front-page card.)
 - **The footer is one `@page` rule with both margin boxes**, added at runtime through the CSSOM to
   the app's own stylesheet: the production CSP (`style-src 'self'`) blocks inline styles but not
   CSSOM edits. The text is escaped as a CSS string (control characters become spaces).
@@ -1228,7 +1249,8 @@ The calls with product, data or paper impact. Each is explained in its section b
 - **The PDF's file name** comes from the document title: "FI-2026-0042 RigiMill MG – Volvo Cars
   Skövde – Inspection report".
 - **The front page is exactly one page** (a 265 mm column; the photo takes what the text leaves).
-  Without a photo its frame stays, so every front page has the same layout. The finaliser is
+  Without a photo its frame stays, so every front page has the same layout. (Superseded by UI pass, review fixes: a report
+  leaves the space blank; only blank and template forms keep a "Machine photo" frame.) The finaliser is
   printed as stored, by email. (Review: values far beyond the usual, such as names and locations
   near their 200 characters or twenty participants, used to push the signatures and Rev over the
   checklist's first page. The column is now at least a page, the photo gives way down to 20 mm,
@@ -1248,16 +1270,18 @@ The calls with product, data or paper impact. Each is explained in its section b
   moves to a new page and then runs on, so the page before may hold only the heading. No text is
   lost; Word has its own rule for this, see Word export.)
 - **Right-aligned text stays 0.5 mm inside the margin:** Chrome's PDFs put the right content edge
-  about 0.3 mm further out.
+  about 0.3 mm further out. (Superseded by UI pass, review fixes: the whole sheet's content keeps the inset, so box borders
+  are not clipped either.)
 - **Black and white:** light grey fills (`print-color-adjust: exact`, so they print without
   "Background graphics"), thin rules, words for statuses and severities; a critical card's badge
   is the one filled black.
 - **Report cards:** "D-03 · 4.c · MAJOR" (an extra deviation: "Not on the checklist"), the section,
-  checkpoint or description, comment, Resp ("—" when empty), up to two photos as marked up with
+  checkpoint or description, comment, Resp ("—" when empty; "Responsible" since the UI pass), up to two photos as marked up with
   their captions, and a "Closed · Sign · Date" line. No photo: an empty "Sketch / photo" frame. A
   photo that can't be loaded says so in its place. No deviations: "No deviations recorded."
 - **`deviationsPerPage` lives in the address only** (default 2); the toolbar's switch replaces the
-  history entry. The inspection's Report menu opens 2 per page.
+  history entry. The inspection's Report menu opens 2 per page. (Superseded by UI pass, review fixes: the default is 4 when
+  no deviation has a photo.)
 - **2 per page never prints a photo under 50 mm** (review). With the 24 mm floor alone, a card
   with about 1 000 characters of text (or a neighbour with them) printed its photos at 24 mm,
   smaller than 4 per page prints them (the 4-per-page row puts text beside the photos). Measured
@@ -1626,7 +1650,7 @@ The calls with product or KPI impact. Each is explained in its section below.
   until its next write; a finalised one until it is reopened. Nothing is deployed yet, so only
   local data is affected (Contract).
 - **Editing the settings is still not built:** the brief describes the screen (§5.6) but puts it
-  in no phase.
+  in no phase. (Built since: see Settings lists and deviation categories.)
 
 ### Contract (shared)
 
@@ -1658,9 +1682,10 @@ The calls with product or KPI impact. Each is explained in its section below.
   (`functions/insights.ts`), admins only, with the filters in the query string. A bad filter is
   a 400 with the zod issues in `details`.
 - **The table is queried with the filters** (model as PartitionKey, date range, `finalised eq
-true` unless in-progress is included) and only the 17 columns. A row that fails the schema is
-  skipped with a warning, so one hand-edited row can't take the dashboard down. The inspection
-  list is the same blob listing `GET /api/inspections` uses.
+true` unless in-progress is included) and only the table's columns (17 then, 18 since the
+  category). A row that fails the schema is skipped with a warning, so one hand-edited row can't
+  take the dashboard down. The inspection list is the same blob listing `GET /api/inspections`
+  uses.
 - **Published revisions are cached in memory** for the life of the Functions instance: they never
   change, so after the first request the dashboard reads only the template listing for them. A
   missing revision is not cached (and logged), so it is looked for again next time.
@@ -1730,4 +1755,495 @@ true` unless in-progress is included) and only the 17 columns. A row that fails 
   pre-login page that finds a record younger than a minute for a sign-in with a role stays on
   the no-access page and shows "The server refused a request" with the request, the status, the
   time, the roles and the account ID, plus Try again (which clears the record). Without a record,
-  or for a sign-in without a role, nothing changes.
+  or for a sign-in without a role, nothing changes. (Users and names keeps the record but has the
+  pages ask `/api/me` instead of reading the roles, see there.)
+
+## Settings lists and deviation categories
+
+### Worth reviewing first
+
+- Saving the settings sends every field at once, needs `If-Match` and answers 412 on a conflict;
+  leaving the page never saves on its own, it asks (Settings page).
+- A saved model's code can't be changed in the UI, only removed and added again (Settings page).
+- Responsible is now a select of the settings' list instead of free text with suggestions; the
+  suggestions endpoint is gone. Values stored before it was a list are kept and offered
+  (Deviations).
+- Leaving NOK drops the category along with the severity (Deviations).
+- The blank Deviation Summary gets a Category column; Description shrinks from 85.5 to 61.5 mm
+  (Print and Word).
+
+### Contract and API
+
+- **`SettingsInputSchema` (shared/src/settings.ts) checks both sides with the form's own
+  messages.** It trims every field, checks model codes as `ModelCodeSchema` does (the pattern is
+  now exported as `MODEL_CODE_PATTERN`), and limits sizes: 100 models, 50 entries per list, names
+  and entries up to 100 characters, location and company up to 200. Fifty entries is about what a
+  select stays usable with. The list editor refuses a 51st entry at once, not only at Save.
+- **Model codes, model names and list entries are unique ignoring case and surrounding spaces,
+  and the later duplicate is flagged.** Two "Mechanical" entries, or RMMG next to rmmg, could not
+  be told apart in a picker. Codes are matched ignoring case too (stricter than the task asked),
+  because they are table PartitionKeys and filter values; the first one stays as it was.
+- **`PUT /api/settings` takes the whole editable part: machine models, default location, company
+  name, `logoImageId?`, responsibles and deviation categories.** The server sets `updatedAt` and
+  `updatedBy`. Check order follows the template save: If-Match (400), body (400 with the zod
+  issues), not seeded yet (404), stale ETag (412), then the conditional write. GET and PUT share
+  one registration, so the new method costs none; the old Resp autocomplete's registration is
+  removed, 14 in all.
+- **The logo id is not checked against storage,** as with a template's `coverImageId`.
+
+### Settings page
+
+- **One card, one Save, not autosave.** Settings change rarely and affect every inspection, so a
+  half-edited list should never be live. Problems show after the first Save attempt and then
+  follow the fields, and the first one gets the focus, as on the new-inspection form. A 412 shows
+  the usual conflict message with Reload, which asks before it discards changes (`useReload`).
+- **Leaving with unsaved changes asks first and never saves.** `useLeaveGuard` gets a flush that
+  resolves `false`; closing the tab gets the browser's own warning.
+- **The card is a `<div>`, not a `<form>`.** Its confirmation dialogs are forms of their own
+  (nesting is invalid HTML), and Enter in a list's "New …" field adds the entry instead of saving
+  everything.
+- **A new model's code is suggested from its name until the code is edited** (emptying the code
+  turns the suggestion back on): the capitals and digits of each word, or a word's first letter;
+  the whole name in capitals when that gives fewer than two characters; accents dropped; a taken
+  code gets a number (RMMG2). The New template and Import JSON dialogs use the same
+  `suggestModelCode` (shared/src/settings.ts), so a model gets the same code wherever it is added.
+- **A saved model's code is fixed in the UI.** Templates, inspections and deviation rows carry it,
+  so a rename would really be removing one model and adding another; that stays possible (remove,
+  add), and the server accepts any valid list. A saved code can still carry a problem (two saved
+  codes that differ only in case): it shows under the code, and Save moves the focus there.
+- **Removing a saved model asks first**: new templates can't be made for it; templates and
+  inspections keep the code and show it where the name was (`modelName` already falls back to the
+  code). Removing a model that was never saved doesn't ask.
+- **List entries are moved with up and down buttons, not drag and drop.** The buttons are
+  keyboard operable. At either end a button stays focusable but inert (`aria-disabled`), so the
+  focus stays on the button that was used; removing hands the focus to the next entry, or to the
+  field for a new one. Changes are read out in a polite live region.
+- **The company logo is included.** `PhotoField` already does upload, replace and remove; Save
+  waits while an upload runs. Without a logo, reports keep the Modig logo.
+- **After a save the form takes the server's trimmed values and keeps its React keys,** so fields
+  and focus stay put. Edits made while the save ran are kept, still unsaved. The `['settings']`
+  query is updated at once, so other pages get the new lists without a reload.
+
+### Deviations
+
+- **Responsible is a select of `settings.responsibles`, empty allowed.** A stored value that isn't
+  on the list (a free-text name from before, or one removed since) is matched exactly. It is
+  offered as "`<value>` (not in the list)", and stays on offer while the page is open, even after
+  another value is picked, so a slip can be undone. Data is never lost: the value is stored as
+  text, as before.
+- **"Responsible" on screen, "Resp" on paper and in Word.** The printed checklist's column (not
+  this package's file) and the cards keep the workbook's short label; the template editor's column
+  label (templates package) also still says Resp. (Superseded by UI pass, review fixes: the cards say Responsible; the
+  checklist's narrow column and the blank summary keep Resp.)
+- **On a wide sheet an empty Responsible select looks like an empty text field.** Its
+  "Responsible" text is hidden like the inputs' placeholders, because the column label already
+  says it; it shows again when the keyboard reaches the select. Options set their own colour, so
+  the open list never inherits the hidden text.
+- **A NOK row's Category select goes on the line below, under the comment, before the severity.**
+  Tab order is comment → responsible → category → severity → next row: reading order, left to
+  right. The severity stays last, and the common NOK flow (2, C, comment, Tab, responsible, Enter)
+  never passes either select.
+- **Enter in the Responsible select still moves to the next row, as it did for the text field.**
+  Chrome's open list takes the Enter that picks an option. Category and severity keep Enter.
+  Letters and arrows in a select pick entries and are never shortcuts: the row only handles keys
+  aimed at itself.
+- **A category is optional and only on a NOK row or an extra deviation.** Leaving NOK drops it, as
+  it drops the severity. `deriveDeviations` and `validateForFinalise` are unchanged; finalising
+  never asks for one.
+- **The Resp autocomplete is removed: its endpoint, its table query, the client hook and their
+  tests.** With a list there is nothing left to suggest.
+
+### Print and Word
+
+- **Each card has a "Category" line above "Resp", "—" when none,** so every card has the same
+  shape. The extra line is measured like the rest of the card. The Word card's height estimate
+  grows by one line.
+- **The blank Deviation Summary has a 24 mm Category column, taken from Description, which keeps
+  61.5 mm** for handwriting. The rows stay 9.5 mm and never split; Word mirrors the widths [13,
+  12.5, 61.5, 17, 24, 30, 28] mm. The printed checklist table is unchanged.
+
+### Insights
+
+- **The deviation rows, and so the CSV, gain a `category` column after `severity`:** 18 columns,
+  the brief's 17 plus this one.
+- **"By category" is grouped like "By resp"**: trimmed, ignoring case, in the spelling most rows
+  use, none last ("No category"). The panel is renamed "By responsible", with "Not assigned" for
+  none. The four ranked panels form a 2×2 grid.
+
+### Tests and tooling
+
+- **`e2e/settings-lists.spec.ts` changes nothing other tests rely on.** It adds a model and list
+  entries named with a fresh tag, and removes everything tagged afterwards (in a `finally`,
+  through the API, re-reading on a 412). The conflict test re-saves the settings unchanged. The
+  default location and company name are never edited, because other specs read them. Its tests
+  run in order (describe mode `default`), because each settings save changes the shared ETag.
+- **Other specs that read the pick lists, the inspection tests among them, use only the first two
+  entries of each, read from `/api/settings`.** The settings test only adds at the end, so those
+  two never move.
+
+## Users and names
+
+The people list in Settings → Users & access, and names instead of emails.
+
+- **The app manages people itself in `config/people.json`; Static Web Apps role invitations still
+  count.** Managed functions can't call the Azure management API without a stored
+  service-principal secret, so the app keeps its own list (email, name, role, added by/when). A
+  caller's role is their role on the list, matched on the lowercased `userDetails`; otherwise it
+  is their invitation's roles, so nobody lost access when the list started empty (the first admin
+  was invited). A role on the list replaces the invited one, also downwards.
+- **Authorization now trusts the sign-in's email (`userDetails`) from Static Web Apps' Microsoft
+  sign-in.** Microsoft sets it from the account: the UPN for work and school accounts, which must
+  be on a domain the tenant has verified, and the account's email for personal Microsoft
+  accounts, which Microsoft verifies when the account is created. Only `aad` sign-ins are matched
+  against the list. The other providers are switched off by route rules, and a GitHub-style
+  `userDetails` would be a user name anyone could choose.
+- **The route gate is `authenticated`; the API is the gate.** People on the list have no SWA role,
+  so `/*` (the app and `/api/*`) only needs a sign-in, and `endpoint()` checks the role on every
+  request, as it always did. This supersedes "never on `authenticated`" (Phase 1, Auth). The app
+  bundle and its source maps (no data, no secrets) can now be loaded by any signed-in Microsoft
+  account.
+- **`getUser` reads the list through a 5-second cache per Functions instance.** One small blob
+  read per request would be cheap, but the cache makes most requests free. A save clears that
+  instance's cache after the write. On other instances a change, including a removal, takes
+  effect within 5 seconds. A failed read is not cached. If storage is down, requests fail with
+  500, as every data request would anyway.
+- **A sign-in without any role gets 403 `forbidden` with "You don't have access to Final
+  Inspection yet. Ask an admin to add your email in Settings."** The code stays `forbidden`. The
+  app treats the API's 403 for `/api/me` (the minimum role) as "no access" and goes to the
+  no-access page. An inspector asking for an admin endpoint still gets "You do not have access to
+  this." and stays in the app.
+- **The API is the one source of truth for the pre-login pages too.** `auth.js` uses `/.auth/me`
+  only for the email and account ID and asks `/api/me`, which can answer in, no access, signed out
+  or failed. It sends someone to `/` only when the API lets them in and no refusal was recorded in
+  the last minute. The app records one before every trip to those pages, including the no-access
+  one, so a brief disagreement between instances (just added or removed) can't bounce between the
+  app and the page. "Check again" on the no-access page asks `/api/me` in place rather than
+  reloading the app. The refused-request view stays for "the API lets you in, but the app was
+  refused" and for API failures.
+- **The app shell replaces the app with the account error only when `/api/me` has never loaded.**
+  Settings refetches `/api/me` after each change to the people list, and a failed refetch keeps
+  the user already loaded.
+- **`PUT /api/users` saves the whole list with ETag concurrency.** It needs `If-Match` with the
+  version read, or `If-None-Match: *` when there was no list (`GET` answers `{ people: [] }`
+  without an ETag). Sending both, or neither, is a 400. A first list that loses the race to
+  another admin's (a 409 from storage) is answered as 412 like any other conflict. On a 412 the
+  client reloads the list and says so, and saving again applies the same change on top. apiFetch
+  gained an `ifNoneMatch` option for this.
+- **Lockout rules on the server, mirrored in the UI:** a save may not take away the caller's own
+  admin access, judged by their entry on the new list or, when the list leaves them off, their
+  invitation. And a list with people on it needs at least one admin, otherwise only invited admins
+  could ever change it again. An invited admin may take themselves off the list (the invitation
+  still counts) or empty it. The UI locks your own role to admin and has no Remove on your own
+  row. An admin who has access only through an invitation sees "You're not on the list yet → Add
+  yourself", and the first save needs an admin on the list.
+- **`addedAt`/`addedBy` are the server's.** They are kept for people already on the list and set
+  for new ones. Someone removed and added back counts as new.
+- **No email is sent by the app.** After adding someone, the dialog shows a ready-to-send
+  invitation (the app's address, the role, and "sign in with your Microsoft account" with their
+  email) with Copy (falling back to selecting the text) and a `mailto:` link.
+- **Names are looked up at display time, not stored.** Documents keep emails (`updatedBy`,
+  `finalisedBy`, `publishedBy`, `addedBy`) and the app shows the name from `GET /api/people` (open
+  to inspectors, since they see who finalised and published). Someone not on the list is shown by
+  the stored value: their email, or "seed". This means a person removed from the list later shows
+  by email again on old reports. That is simpler than copying names into every document, and more
+  honest than guessing a name. The print page waits for the directory before building the model
+  (an autoprint must not print emails), but prints emails if it fails. The Word export uses the
+  same model.
+- **Participants are suggested from the directory with a `<datalist>`.** Picking a suggestion adds
+  the chip at once (the browser sends a replacement rather than typed text); free text still
+  works.
+- **Search appears from six people on**; below that the whole list fits on screen. The query
+  filters only while the box is shown: otherwise a removal that hides the box could leave a filter
+  no one can clear. People are sorted by name, the Swedish way.
+- **E2E: the people list is one shared document,** so the Settings test uses emails unique to its
+  run and removes them in `finally` (`e2e/support/people.ts`, deleting the blob when it becomes
+  empty). Other tests, signed in by invitation roles, are unaffected.
+
+## Templates: delete, spare lines, cards, JSON files, new models
+
+- **Deleting a template deletes the draft first (only if it is still the `If-Match` version), then
+  every blob under `templates/{id}/`, listed again after the draft is gone.** The template
+  disappears for everyone at once, since a folder without a draft is never listed. Listing again
+  catches a revision published meanwhile. A revision that fails to delete is logged and the delete
+  still answers 204: the template is already gone, and a retry would only get 404. The list and
+  the detail treat a revision that vanished mid-read, with its draft gone too, as a deleted
+  template, not a 500.
+- **Deleting keeps the images, the inspections and the deviation rows.** Inspections share the
+  cover and guide images through their snapshots. Insights counts the deviations as before; with
+  the template's revisions gone, a checkpoint shows as it was last inspected and is marked
+  `removed`.
+- **The editor saves what is unsaved before deleting, then sends the draft's current ETag.** An
+  autosave in flight would otherwise make the delete fail on the editor's own save. A failed save
+  leaves the ETag of the last successful one, so another admin's newer save still blocks the
+  delete (412). A 404 counts as deleted.
+- **Locally, deleting the seeded RigiMill MG template brings it back at the next `npm run dev`.**
+  The seed imports it whenever no template for RMMG exists. Production seeds once, by hand.
+- **Spare lines: a section gets its own `spareRows` the first time one of its spare lines is added
+  or deleted. The template's number stays the default for the other sections, and nothing
+  normalises a section's count back to it.** Deleting a spare line removes the last one: the lines
+  are all alike, so the letters never jump. Undo puts back the previous own count, or none.
+- **"Unpublished changes" compares the spare lines each section prints, not how they are
+  stored.** A section's own 3 next to a default of 3 is the same paper.
+- **Import keeps the file's section and row ids only when no draft or revision anywhere uses any
+  of them; otherwise every section and row gets a new id.** Re-importing an exported template (a
+  backup, a move between installations) keeps its checkpoints' KPI history. Copying one next to
+  its original can't create duplicate ids. Two admins importing the same file at the same moment
+  could both keep the ids; accepted, like one-template-per-model.
+- **Import drops each image id whose blob is missing and counts the dropped ids.** That covers the
+  cover photo, a guide image (when its photo is missing), a marked-up copy, and a guide left with
+  nothing in it. The model check (and adding a new model) runs last, so a refused import changes
+  nothing.
+- **The import file is checked in the browser first (format, version, schema, at most 5 MB), with
+  plain reasons; the API validates the whole request again.**
+- **Import JSON preselects the file's model when a free settings model has the same code, in any
+  case.** It offers it as a new model only when the settings have no model with that code in any
+  case (with a suggested code when a template already uses the file's).
+- **A new machine model is added in the same conditional settings write (`updateSettings`) that
+  checks its code and name are free; 409 otherwise.** A check before a separate write would let
+  two admins adding the same model at the same moment end up with two templates for one model.
+  What is taken is the same in the dialogs and in `POST /api/templates` and `/import`: a code that
+  any settings model or any template uses, whatever the case; a name only if a settings model has
+  it (a template's name is never a model's name). A code a template already uses without the
+  settings having it is a 409 too, checked before the settings change. If writing the draft fails
+  after that, the model stays in the settings, offered as a model without a template.
+- **The suggested code is the Settings one (`suggestModelCode`, see Settings lists): the capitals
+  and digits of each word, accents dropped, e.g. RigiMill MG → RMMG, with 2, 3, … added while
+  taken (by the settings or by a template's code).** It is editable, and stops following the name
+  once edited. Create stays disabled until the model fields are valid; taken and malformed values
+  show at the field at once.
+- **The New template dialog always shows the form.** With every model taken it starts on "New
+  machine model…" instead of the old "Every machine model has a template" message.
+- **The list/cards choice lives in localStorage, per browser, wrapped in try/catch; the list is
+  the default.** It is a viewer's convenience, not shared state.
+- **Cards show the draft's cover photo, to inspectors too,** like the list shows the draft's name
+  and row count. Images are decorative there (`alt=""`): the card's name is the link.
+- **Export JSON writes the editor's draft as shown, unsaved changes included,** named
+  `<template name>.json` with characters Windows and macOS refuse replaced.
+- **Import is a registration of its own (`templates/import`); DELETE shares `templates/{id}`'s.**
+  17 registrations in all, with the two from Users and names.
+- **The e2e tests that take the first machine model without a template (New template, Import
+  JSON) run serially in their own describe.** In parallel both could pick the same model. The
+  new-machine-model e2e test stops before Create, so local settings never collect test models.
+
+## Theme and quick preview
+
+### Theme
+
+- **System, Light and Dark; System is the default.** A choice is kept per browser in localStorage
+  (`theme`). System stores nothing (choosing it removes the key), so the device's own setting
+  applies. Workshop tablets are often set to dark; desks rarely are.
+- **The dark theme is the same tokens with dark values, designed rather than inverted.** The
+  canvas (#0f1216) is darker than the cards (#171b21), as in light. The ink ramp is mirrored
+  (ink-900 is near-white, ink-200 a quiet border at 1.4:1), and text stays at ink-500 or lighter
+  (≥ 4.57:1 on the canvas, cards, quiet fills and tints; ink-500 is 6.75:1 on the cards and 4.77:1
+  on ink-200). Brand 700/800 become light cyans for text (≥ 6:1; brand 700 is 8.28:1 on the
+  cards). Brand 600 stays #0b7db3: it carries white text (4.57:1) and, as the focus ring, is
+  3.78:1 on the cards, 4.11:1 on the canvas and ≥ 3.2:1 on ink-50 and ink-100. Status colours are
+  dark tints with light text (OK 7.18:1, NOK 6.50:1, N/A 6.76:1). Every pair in use was computed;
+  none fails.
+- **Severity runs the other way in the dark theme**, from a dark red (minor #8c3a31) to a light one
+  (critical, the NOK red #f68174). Severity is a sequential ramp, so the most severe must contrast
+  most with the background, and on a dark card that is the lightest. Steps fall in visible
+  lightness steps (relative luminance 0.09 → 0.17 → 0.37). Each fill has its own label token
+  (`on-severity-*`): white on minor (7.60:1) and major (4.73:1), ink on critical (6.85:1). In
+  light, the major label is now near-black (4.62:1): white on #dc5a4b was 3.75:1, below AA.
+- **Fills under white text have their own tokens, `primary`, `primary-hover` and `nok-solid`.** In
+  the dark theme brand 700 and nok-fg are light text colours, so a button hovering to brand 700,
+  or a critical badge on nok-fg, would have lost its white label. White on `primary` (#0b7db3) is
+  4.57:1 in both themes; `primary-hover` and `nok-solid` stay at least 5:1 with white (the dark
+  `nok-solid` 5.32:1).
+- **Some colours don't follow the theme: `paper`, `scrim`, `stage`, `on-stage`.** Paper is white
+  (photo mattes, printed sheets). The scrim darkens what is behind a dialog and the controls on a
+  photo. Photos are viewed and marked up on a dark stage. These were ink-900/950, which become
+  near-white in the dark theme. Annotation colours and everything drawn into an image are
+  unchanged.
+- **The theme is applied before the first paint by `public/theme.js`**, a blocking classic script
+  in the `<head>` of the app and both pre-login pages. The CSP allows no inline script, and the
+  app bundle comes too late (a flash of the wrong theme). It has its own anonymous route, like
+  every pre-login file. Without JavaScript or storage, the system's setting still applies through
+  `prefers-color-scheme`.
+- **`dark:` is redefined (`@custom-variant dark`)** to mean "the dark theme is showing":
+  `data-theme="dark"`, or the system's dark setting when no Light is stored. It applies on screen
+  only, so printing any page uses the light tokens.
+- **Paper is light in both themes.** The sheets keep their own greys, white and
+  `color-scheme: light` (set on `.paper`); only the grey desk around them, and the toolbar, follow
+  the theme. The e2e test checks white sheets and black text while the app is dark, and light
+  tokens in print.
+- **The control is a three-way segmented radio group in the sidebar's user panel**, so the tablet
+  drawer (the same Sidebar) has it too. Native radios give one Tab stop and arrow keys. System's
+  tooltip says which theme it gives right now. Both copies share one store and stay in step.
+- **A white-wordmark logo for the dark theme (`modig-logo-dark.png`)**, made from the official PNG
+  by turning only its black palette entries white; the blues and the transparency are untouched.
+  The black wordmark disappears on a dark surface. CSS filters would also have changed the blues.
+  Replace it with Modig's official negative logo if there is one. The pre-login pages could only
+  change in their `<head>`, so they show it as the background of their one `<img>` and move the
+  black image out of its box: one image, and the alt text stays.
+
+### Quick preview
+
+- **Preview opens the printout in a full-screen native `<dialog>` on the inspection page.** It
+  does not open a new tab, save first, or open the print dialog. It is built from what is on
+  screen (`inspectionOnScreen`: the draft and the server's state), so unsaved edits show. It
+  reuses PrintDocument, usePrintImages and the card measuring (`usePrintDocument`, shared with the
+  print route), so it waits for fonts and images and packs the cards as on paper.
+- **It opens on the report** (what an inspector wants to check), with a switch to the blank
+  checklist. Deviation cards are 2 to a page and there is no appendix, as the Print / Save PDF
+  menu opens them. (Superseded by UI pass, review fixes: 4 to a page when no deviation has a photo, as the print route.) The print route keeps the other layout switches.
+- **Sheets are scaled with a transform, not `zoom`**: the browser lays the pages out exactly as
+  for print and only draws them smaller, so lines break where they will on paper. The scale fits
+  the desk's width, never above 100 % and never below 37.5 %. Card measuring (`useCardPages`)
+  divides the measured rectangles by the scale (rect height ÷ computed height), so packing is the
+  same at any size.
+- **Its Print / Save PDF closes the dialog, then does what the page's does**: the page's
+  `openPrint(mode)` saves pending changes and opens the print route in a new tab, which prints
+  once loaded. Ctrl+P / Cmd+P in the dialog does the same, instead of printing the page behind it.
+  Closing first hands the focus back to Preview, and a failed save shows on the page.
+- **Close has the focus on open**; Escape or Close returns it to Preview, natively and also
+  explicitly, because Safari doesn't focus clicked buttons.
+- **In the dark theme the pages region's focus ring is brand 500,** because brand 600 is 2.67:1
+  on the dark desk.
+- **A template needs no new preview:** the template print page never prints by itself (only
+  `autoprint=1` prints), so the editor's "Print preview" link already serves as its quick preview,
+  and an e2e test checks it.
+
+## UI pass
+
+A review of every page in both themes, at phone (390 px), tablet (820 px) and desktop (1366 px)
+widths, against local demo data. No page scrolls sideways at 320 to 1366 px any more.
+
+### Shell and shared components
+
+- **Below md (768 px) the inspections list has one Inspection column** (number, machine,
+  "S/N … · date") beside State and NOK; from md the seven columns, 12 px apart so they fit a
+  portrait tablet and a landscape one beside the sidebar. Each layout's cells are `display: none`
+  in the other, so a test at desktop width still sees seven cells and one link per row.
+- **On touch screens** nav links are 44 px, menu items 40 px, Sign out 36 px and a participant
+  chip's remove button has a 28 px hit area. Buttons and inputs stay 36 px everywhere: many pages
+  set their own heights, and a global touch height would change their layouts.
+- **Below lg the page has `scroll-padding-top: 4.5rem`** for the sticky top bar, so a field
+  reached by Shift+Tab or a link to an id is never scrolled under it.
+- **In the dark theme modal backdrops are scrim at 70 %** (30 % in light): 30 % of near-black over
+  a near-black page dimmed almost nothing. The drawer and the skip link have a border there.
+- **`Button` has a `danger` variant** (nok-solid with white text in both themes), used by every
+  delete and remove confirmation.
+- **The loading skeleton matches the sidebar's user panel** row by row (shared sizes in
+  `components/layout.ts`), so nothing jumps when the account arrives. `PageLoading` draws no fake
+  header under a page's real one (`header={false}`).
+
+### Inspection page
+
+- **Read-only (finalised) has its own, tighter grid** (`READ_GRID`): ref | checkpoint | Status
+  (7rem) | Responsible (10rem) from 34rem, with the comment and a NOK row's category and severity
+  under the checkpoint. With nothing left to fill in, an empty Comment column only made 90 rows of
+  "✓ OK" twice as tall. Rows stay focusable from script for jump links.
+- **The header is laid out by its own width** (a container): from 52rem the actions sit beside
+  the title and the details run under both, so the save status changing never re-wraps them;
+  narrower, the actions go under the details. **It sticks only from 40rem wide and 40rem tall;**
+  on a phone it would take a third of the screen. On a phone the menu reads "Print" (its
+  accessible name stays "Print / Save PDF").
+- **The keyboard shortcut bar is hidden on touch-only devices,** where it took four lines.
+
+### Templates, Settings, Insights
+
+- **Every header's actions wrap** instead of pushing the page wider (template editor, Templates,
+  page headers in general).
+- **Template cards name the last editor** as the list does, not by email.
+- **The people table and the list editors fit a phone;** the invitation text grows with its
+  content instead of a fixed six rows.
+
+### Report
+
+- **Refs and card heads use proportional figures:** Inter's tabular ones spaced "D-01" out.
+- **A card's Category and Responsible values line up** in an 18 mm label column (Word: a 20 mm
+  tab stop and hanging indent).
+- **The print toolbar has two parts:** the way back, the subject and Export / Print, then the
+  layout choices with the PDF hint on the right. It is sticky from 640 px up only.
+- **The Preview names the finaliser as the print route does.**
+
+### Review fixes
+
+Two reviewers then went over the screenshots of the pass (41 findings); these came out of fixing
+them.
+
+- **Two new tokens: `raised` and `overlay`.** `raised` is the chosen segment of a segmented
+  control on its ink-100 track; `overlay` is a menu, popover or dialog. Both are white in light; in
+  dark they are lighter than the surface (#353c46, #232931), because there elevation is lightness
+  and a shadow doesn't show. Inside an overlay a hover is ink-200 in dark (ink-100 is the overlay
+  colour), the ghost button's hover included.
+- **One segmented control look:** a ringed ink-100 track, rounded-md segments, the chosen one
+  raised, a raised/60 hover. The sidebar theme toggle keeps its own size (three columns of the
+  215 px panel, h-7, text-xs), the checklist status keeps its status colours and the row height
+  (28 px with a mouse, 40 px on touch), the guide verdict picker keeps text-xs.
+- **Minor severity is a neutral grey,** in Insights and its badge alike; major and critical stay
+  red, critical the strongest. The critical badge uses the severity token, so it matches Insights.
+- **Overlays share one frame** (`DIALOG_FRAME` in components/Dialog.tsx): bg-overlay, an ink-300
+  border in dark, a scrim backdrop at 30 % (light) and 70 % (dark). The guide, annotation and photo
+  dialogs, which are not built on Dialog, use the same classes. **A dialog's closing row of buttons
+  sticks to its bottom** above a divider (components/dialog.css, found by position, as every
+  dialog ends with it), so a long dialog on a phone keeps Save in view.
+- **Secondary buttons in dark are a faint white wash** (5 %, hover 10 %): on a dialog a surface
+  fill sank in and read as a text field. **Disabled primary and danger buttons turn ink-200 with
+  ink-500 text;** half-faded white on pale cyan read as loading. Settings' Save, which is
+  aria-disabled to keep the focus, looks the same, but still fades while saving.
+- **Dark field outlines are ink-400** (3.7:1 on the surface). Tailwind emits `dark:hover` after
+  `focus-visible` and `aria-invalid`, so the focus and error borders are restated for dark.
+- **Empty and error states share `StateCard`** (a size-11 rounded-xl tile, title, hint, action),
+  so a retry that turns an error into an empty list keeps its height. The template editor's "No
+  sections yet" matches it.
+- **One card header:** a small semibold title, an xs description, an ink-200 divider and an
+  optional aside, no icon tiles, on Settings, Insights, the front page card, the revision history
+  and the New inspection Checklist card (whose h2 sits in the fieldset's legend, so the radio
+  group keeps its name). The five differ in alignment and phone padding, so they stay inline
+  rather than one component.
+- **A focused, checked template card shows one 2 px frame**, the outline drawn over its border.
+- **Link-styled buttons with a touch-sized box** ("Continue at 3.b", a card's "1.d ↳") keep the
+  focus ring and hover underline around the text (`linkText.ts`), so the focus on load reads as a
+  focused link.
+- **Labels in rows are grey** (Category, Severity, Responsible, the finalised notes). Red is kept
+  for the NOK bar and chip, the Major and Critical badges and real errors.
+- **Inspection header on a tablet:** from 42rem the actions sit beside the title, and below 52rem
+  the save status moves to the end of the details line, at its text's height (`SaveStatus`'s
+  `height`). The sticky header drops from 162 to 122 px and never changes height while typing.
+- **Phone checklist:** below 34rem the fields span the ref column, inset to line up with the row
+  letter and clear the NOK bar, on a sheet with 12 px sides; controls are 294 px wide at 360 px
+  (250 before). Status and Responsible stay on separate lines: side by side the status segments
+  would be too narrow to tap. A chosen Responsible gets a grey label on a phone; tablets get the
+  column labels on a second line of the section header.
+- **The template editor's header follows the inspection's rules:** sticky only from sm and 40rem
+  tall, scroll padding measured from the header (`lib/useScrollPaddingBelow.ts`, shared), a long
+  name wraps to two lines.
+- **Template cards show the list's badges;** "Unpublished changes" only when the draft differs.
+- **Insights:** with one or two months the chart draws 24 px columns with their count on top (a
+  line needs three points to show a trend), and from three months the line. The count axis has
+  whole, round ticks with at least 15 % headroom; ticks read "Oct 2026". The panels share one
+  two-column grid, "By severity" takes its own height, and on a phone the KPI tiles are two to a
+  row (a subgrid keeps their values level) and the Top 10 table moves its numbers under the
+  checkpoint ("2 failed · 100% of 2 inspections"), staying a real table.
+- **Report, Chrome PDFs:** every sheet's content keeps the 0.5 mm inset off the right margin, so no
+  box's right border is clipped to a hairline.
+- **Report on a phone or tablet:** the print route fits its sheets to the screen with the
+  Preview's `FittedPages` (a transform, 37.5–100 %, screen only), so paper stays 1:1.
+- **A report without a machine photo leaves its space blank;** a "No machine photo" frame read
+  like a missing image in the customer's copy. Blank and template forms keep a "Machine photo"
+  frame to stick one in. Word does the same.
+- **4 deviations per page when none has a photo** (`defaultDeviationsPerPage`): with 2, three
+  quarters of each card page were empty sketch frames. 2 stays the default with photos, and a
+  choice in the address always wins.
+- **The summary counts statuses for the customer:** "90 checkpoints: 82 OK · 5 NOK · 3 N/A ·
+  7 deviations", plus "N not checked" on a draft report.
+- **A row with a very long comment (over 600 characters, about a third of a page) is free of the
+  keep-with-next rules.** In a short section, first-keeps-with-next and last-keeps-with-previous
+  chained every row into one block; three such rows were taller than a page, and Chrome then split
+  a row (and left the checklist's first page with only its heading) rather than break between
+  rows.
+- **Lower report rows:** a 3.4 mm status symbol over 6 pt type and tighter cell padding take a
+  90-row checklist from 5 pages to 4. The OK/NOK/N/A columns stay, as on the paper form.
+- **The blank Deviation Summary has 24 lines,** as many as its page holds (the brief says about 15),
+  instead of half a page left empty.
+- **Revision wording:** running text (checklist heading, footer, toolbar) says "Rev 2" or "Draft –
+  Rev 3". The front-page corner keeps the workbook's form field "Rev: n" for a published revision.
+- **The print toolbar truncates only the subject's name,** never "Draft – Rev 3", and the PDF hint
+  wraps between whole settings.
+- **The search placeholder is "Number, machine or S/N",** which fits a 320 px phone.
+- **A participant chip's 36 px remove area is for coarse pointers only,** so a mouse click near the
+  end of a name doesn't remove it.

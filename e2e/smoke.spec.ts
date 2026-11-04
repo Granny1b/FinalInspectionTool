@@ -83,7 +83,9 @@ test('create from the seeded template → mark rows → finalise → print the r
     await expect(report.locator('html')).toHaveAttribute('data-printed', '1');
     // The front page carries the inspection's number.
     await expect(root.getByText(inspection.number, { exact: true })).toBeVisible();
-    await expect(root).toContainText(`${total} / ${total} rows filled · 1 NOK · 1 deviation`);
+    await expect(root).toContainText(
+      `${total} checkpoints: ${total - 1} OK · 1 NOK · 0 N/A · 1 deviation`,
+    );
     await expect(root.locator('[data-deviation-card="D-01"]')).toContainText(
       'Torque mark missing on one screw',
     );

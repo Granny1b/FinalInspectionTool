@@ -1,4 +1,4 @@
-import { odata, type TransactionAction } from '@azure/data-tables';
+import { odata } from '@azure/data-tables';
 import {
   DeviationRowSchema,
   newId,
@@ -8,7 +8,7 @@ import {
 } from '@modig/shared';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { draftTemplate, resetStorage, sampleInspection, useTestStorage } from '../../test/storage';
-import { loadRespSuggestions, syncDeviations } from './deviations';
+import { syncDeviations } from './deviations';
 import { deviationsTable } from './storage';
 
 beforeAll(useTestStorage);
@@ -17,7 +17,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** The brief's 17 columns (§4), in its order. */
+/** The brief's 17 columns (§4), in its order, plus `category` after `severity`. */
 const COLUMNS = [
   'inspectionId',
   'inspectionNumber',
@@ -33,6 +33,7 @@ const COLUMNS = [
   'comment',
   'resp',
   'severity',
+  'category',
   'inspectionDate',
   'finalised',
   'createdAt',
@@ -68,7 +69,7 @@ function withResults(inspection: Inspection, results: Record<string, RowResult>)
 }
 
 describe('syncDeviations', () => {
-  it('writes one row per NOK row and extra deviation, with exactly the 17 columns', async () => {
+  it('writes one row per NOK row and extra deviation, with exactly the 18 columns', async () => {
     const base = sampleInspection();
     const [a, b, c] = itemIds(base);
     const extraId = newId();
@@ -119,6 +120,7 @@ describe('syncDeviations', () => {
       comment: 'Blue mark missing',
       resp: 'Mechanics',
       severity: 'major',
+      category: '',
     });
     expect(await rowOf(inspection, c!)).toMatchObject({
       itemId: c,
@@ -138,6 +140,7 @@ describe('syncDeviations', () => {
       comment: '',
       resp: 'Paint shop',
       severity: 'minor',
+      category: '',
     });
   });
 
@@ -271,65 +274,5 @@ describe('syncDeviations', () => {
     await syncDeviations(withResults(mt, { [a!]: { status: 'NOK' } }));
     expect(await rows('RMMG')).toEqual([]);
     expect(await rows('RMMT')).toEqual([expect.objectContaining({ modelCode: 'RMMT', itemId: a })]);
-  });
-});
-
-describe('loadRespSuggestions', () => {
-  async function storeResps(values: (string | undefined)[]): Promise<void> {
-    for (const [index, resp] of values.entries()) {
-      await deviationsTable().createEntity({
-        partitionKey: index % 2 ? 'RMMG' : 'IM',
-        rowKey: `Insp${index}_row`,
-        ...(resp === undefined ? {} : { resp }),
-      });
-    }
-  }
-
-  it('returns each name once, trimmed, in Swedish order', async () => {
-    await storeResps([
-      'MECHANICS',
-      'Örjan',
-      ' Mechanics ',
-      'Åsa',
-      'el-team',
-      'Erik',
-      '',
-      '   ',
-      undefined,
-      'mechanics',
-      'Ärla',
-      'Mechanics',
-      'Zeta',
-    ]);
-    // "Mechanics" is the spelling most rows use.
-    expect(await loadRespSuggestions()).toEqual([
-      'el-team',
-      'Erik',
-      'Mechanics',
-      'Zeta',
-      'Åsa',
-      'Ärla',
-      'Örjan',
-    ]);
-  });
-
-  it('is empty without deviations', async () => {
-    expect(await loadRespSuggestions()).toEqual([]);
-  });
-
-  it('returns at most 500', async () => {
-    const actions = Array.from({ length: 510 }, (_, i) => ({
-      partitionKey: 'RMMG',
-      rowKey: `Insp_${String(i).padStart(3, '0')}`,
-      resp: `Person ${String(i).padStart(3, '0')}`,
-    }));
-    for (let start = 0; start < actions.length; start += 100) {
-      await deviationsTable().submitTransaction(
-        actions.slice(start, start + 100).map((entity): TransactionAction => ['create', entity]),
-      );
-    }
-    const suggestions = await loadRespSuggestions();
-    expect(suggestions).toHaveLength(500);
-    expect(suggestions.at(-1)).toBe('Person 499');
   });
 });

@@ -1,6 +1,6 @@
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { rowRef, sectionNumber, type Section } from '@modig/shared';
+import { rowRef, sectionNumber, sectionSpareRows, type Section } from '@modig/shared';
 import clsx from 'clsx';
 import { GripVertical, ListChecks, Plus, Undo2, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
@@ -19,6 +19,7 @@ import { useDocumentDnd, type DragState } from './useDocumentDnd';
 type Props = {
   sections: Section[];
   onChange: (sections: Section[]) => void;
+  /** The template's default, for sections without a number of their own. */
   spareRowsPerSection: number;
   issues: IssueIndex;
   onEditorDirtyChange?: (dirty: boolean) => void;
@@ -39,6 +40,7 @@ export function EditableDocument({
   const actions = useDocumentActions({
     sections,
     onChange,
+    spareRowsPerSection,
     rootRef,
     confirmDelete: setConfirmingDelete,
     onDeleted: setDeleted,
@@ -57,15 +59,15 @@ export function EditableDocument({
     <div ref={rootRef}>
       {shown.length === 0 ? (
         <div className="py-12 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-            <ListChecks size={22} strokeWidth={1.75} aria-hidden="true" />
+          <div className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+            <ListChecks size={20} strokeWidth={1.75} aria-hidden="true" />
           </div>
-          <h2 className="mt-5 text-base font-semibold text-ink-900">No sections yet</h2>
+          <h2 className="mt-4 text-base font-semibold text-ink-900">No sections yet</h2>
           <p className="mx-auto mt-1.5 max-w-sm text-sm text-balance text-ink-500">
             Sections group the checkpoints, like “Loading area” or “Electrical cabinets”. Add the
             first one to start the checklist.
           </p>
-          <Button data-add-section="" onClick={actions.addSection} className="mt-7">
+          <Button data-add-section="" onClick={actions.addSection} className="mt-6">
             <Plus size={16} aria-hidden="true" />
             Add section
           </Button>
@@ -80,7 +82,7 @@ export function EditableDocument({
                   section={section}
                   index={index}
                   sectionCount={shown.length}
-                  spareRows={spareRowsPerSection}
+                  spareRows={sectionSpareRows(section, { spareRowsPerSection })}
                   issues={issues.sections.get(section.id)}
                   itemIssues={issues.items}
                   collapsed={drag?.kind === 'section' && drag.sectionId === section.id}
@@ -161,8 +163,8 @@ type UndoBarProps = {
 };
 
 /**
- * "Row 1.c deleted · Undo" at the bottom of the window until the next change to the structure;
- * not timed. The live region stays mounted so screen readers announce the message when it appears.
+ * "Row 1.c deleted · Undo" (or a section, or a spare line) at the bottom of the window until the
+ * next change to the structure; not timed. The live region stays mounted so screen readers announce the message when it appears.
  */
 function UndoBar({ deleted, onUndo, onDismiss }: UndoBarProps) {
   return createPortal(
@@ -171,12 +173,14 @@ function UndoBar({ deleted, onUndo, onDismiss }: UndoBarProps) {
       className="pointer-events-none fixed inset-x-0 bottom-6 z-30 flex justify-center px-4"
     >
       {deleted && (
-        <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-ink-200 bg-surface py-1.5 pr-1.5 pl-4 text-sm text-ink-900 shadow-lg">
+        // An overlay, like a menu: lifted off the cards it floats over, which in the dark theme
+        // takes a lighter fill and border (a shadow doesn't show on near-black).
+        <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-ink-200 bg-overlay py-1.5 pr-1.5 pl-4 text-sm text-ink-900 shadow-lg dark:border-ink-300">
           <span className="mr-2">{deleted.label} deleted.</span>
           <button
             type="button"
             onClick={() => onUndo(deleted)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 font-medium text-brand-700 transition-colors hover:bg-brand-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 font-medium text-brand-700 transition-colors hover:bg-brand-50 dark:hover:bg-brand-100"
           >
             <Undo2 size={15} aria-hidden="true" />
             Undo
@@ -185,7 +189,8 @@ function UndoBar({ deleted, onUndo, onDismiss }: UndoBarProps) {
             type="button"
             onClick={onDismiss}
             aria-label="Dismiss"
-            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+            // The overlay is ink-100 in the dark theme: one step up for the hover.
+            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:hover:bg-ink-200"
           >
             <X size={15} aria-hidden="true" />
           </button>
