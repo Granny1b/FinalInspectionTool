@@ -32,6 +32,7 @@ import { useReload } from '../../lib/autosave/useReload';
 import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { formatDateTime } from '../../lib/format';
 import { useCurrentUser } from '../../lib/useMe';
+import { usePersonName } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
 import { inspectionPrintHref } from '../print/links';
 import type { PrintMode } from '../print/model';
@@ -103,6 +104,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const queryClient = useQueryClient();
   const isAdmin = hasRole(useCurrentUser().roles, 'admin');
   const settings = useSettings();
+  const personName = usePersonName();
   const respHistory = useRespHistory();
   const idPrefix = useId();
   // Back to the list as it was left (search and filters); one element for the page's lifetime.
@@ -446,7 +448,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
               {finalised && server.finalisedAt && (
                 <span>
                   Finalised {formatDateTime(server.finalisedAt)}
-                  {server.finalisedBy && ` by ${server.finalisedBy}`}
+                  {server.finalisedBy && ` by ${personName(server.finalisedBy)}`}
                 </span>
               )}
             </div>

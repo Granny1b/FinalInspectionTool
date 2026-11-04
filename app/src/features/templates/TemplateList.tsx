@@ -1,6 +1,7 @@
 import type { MachineModel, TemplateSummary } from '@modig/shared';
 import { Link } from 'react-router';
 import { formatDate } from '../../lib/format';
+import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
 import { Badge, PublishedBadge } from './Badge';
 
@@ -15,6 +16,7 @@ const HEAD = 'px-4 py-2.5 font-medium whitespace-nowrap';
 
 /** One row per template; the whole row opens it. */
 export function TemplateList({ templates, models, showDrafts }: Props) {
+  const personName = usePersonName();
   return (
     <div className="overflow-x-auto rounded-lg border border-ink-200 bg-surface">
       <table className="w-full text-left text-sm">
@@ -71,7 +73,7 @@ export function TemplateList({ templates, models, showDrafts }: Props) {
                   {formatDate(template.updatedAt)}
                 </div>
                 <div className="truncate text-xs text-ink-500" title={template.updatedBy}>
-                  {template.updatedBy}
+                  {personName(template.updatedBy)}
                 </div>
               </td>
             </tr>

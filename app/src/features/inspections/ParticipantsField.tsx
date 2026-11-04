@@ -1,6 +1,15 @@
 import { X } from 'lucide-react';
-import { useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react';
+import {
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import type { ControlProps } from '../../components/Field';
+import { nameSuggestions, usePeopleDirectory } from '../../lib/usePeople';
 import { addNames, MAX_NAME_LENGTH, splitNames } from './participants';
 
 /** For a page that autosaves: a name typed but not yet added is unsaved work. */
@@ -20,11 +29,18 @@ type Props = {
 
 /**
  * Participants as removable chips. `Enter` (or a comma) adds what was typed; a pasted list is
- * split into names; leaving the field adds a name that was typed but not yet added.
+ * split into names; leaving the field adds a name that was typed but not yet added. The names of
+ * the people in Settings are suggested; any other name can be typed too.
  */
 export function ParticipantsField({ control, value, onChange, pending }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
+  const listId = useId();
+  const directory = usePeopleDirectory();
+  const suggestions = useMemo(
+    () => nameSuggestions(directory.data, value),
+    [directory.data, value],
+  );
 
   function add(names: string[]) {
     const next = addNames(value, names);
@@ -79,8 +95,21 @@ export function ParticipantsField({ control, value, onChange, pending }: Props) 
         enterKeyHint="done"
         maxLength={MAX_NAME_LENGTH * 10}
         placeholder={value.length > 0 ? 'Add another' : 'Type a name and press Enter'}
+        list={suggestions.length > 0 ? listId : undefined}
         value={text}
         onChange={(event) => {
+          // A picked suggestion replaces the text in one go rather than being typed (browsers send
+          // a plain Event or an InputEvent without a typing inputType for it): add it at once.
+          const input = event.nativeEvent;
+          const picked =
+            !(input instanceof InputEvent) ||
+            input.inputType === '' ||
+            input.inputType === 'insertReplacementText';
+          if (picked && suggestions.includes(event.target.value)) {
+            add([event.target.value]);
+            setText('');
+            return;
+          }
           // A comma, semicolon or line break (typed or pasted) ends a name.
           const parts = event.target.value.split(/[,;\r\n]/);
           const rest = parts.pop() ?? '';
@@ -97,6 +126,13 @@ export function ParticipantsField({ control, value, onChange, pending }: Props) 
         onBlur={commit}
         className="h-7 min-w-40 flex-1 bg-transparent px-1 text-sm text-ink-900 placeholder:text-ink-500 focus-visible:outline-none"
       />
+      {suggestions.length > 0 && (
+        <datalist id={listId}>
+          {suggestions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
+      )}
     </div>
   );
 }

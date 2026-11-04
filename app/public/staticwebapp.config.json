@@ -13,7 +13,7 @@
     { "route": "/login-assets/auth.css", "allowedRoles": ["anonymous"] },
     { "route": "/modig-logo.png", "allowedRoles": ["anonymous"] },
     { "route": "/favicon.png", "allowedRoles": ["anonymous"] },
-    { "route": "/*", "allowedRoles": ["inspector", "admin"] }
+    { "route": "/*", "allowedRoles": ["authenticated"] }
   ],
   "navigationFallback": {
     "rewrite": "/index.html",

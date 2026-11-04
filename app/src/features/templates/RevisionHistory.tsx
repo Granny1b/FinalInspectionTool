@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { memo, useId } from 'react';
 import { Link } from 'react-router';
 import { formatDateTime } from '../../lib/format';
+import { usePersonName } from '../../lib/usePeople';
 import { Badge } from './Badge';
 
 type Props = {
@@ -17,6 +18,7 @@ type Props = {
  */
 export const RevisionHistory = memo(function RevisionHistory({ templateId, revisions }: Props) {
   const titleId = useId();
+  const personName = usePersonName();
   return (
     <section
       aria-labelledby={titleId}
@@ -50,7 +52,7 @@ export const RevisionHistory = memo(function RevisionHistory({ templateId, revis
                 </span>
               </div>
               <p className="mt-0.5 truncate text-xs text-ink-500" title={revision.publishedBy}>
-                {formatDateTime(revision.publishedAt)} · {revision.publishedBy}
+                {formatDateTime(revision.publishedAt)} · {personName(revision.publishedBy)}
               </p>
               {revision.changeNote && (
                 <p className="mt-1.5 line-clamp-3 text-sm whitespace-pre-line text-ink-700">

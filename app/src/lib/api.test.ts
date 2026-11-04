@@ -72,6 +72,17 @@ describe('apiFetch', () => {
     expect(init.body).toBe('{"name":"RigiMill MG"}');
     expect(headers.get('Content-Type')).toBe('application/json');
     expect(headers.get('If-Match')).toBe('"0x8D1"');
+    expect(headers.has('If-None-Match')).toBe(false);
+  });
+
+  it('sends If-None-Match: * to create the first version of a document', async () => {
+    fetchMock.mockResolvedValue(json(200, {}));
+
+    await apiFetch('/api/users', { method: 'PUT', body: { people: [] }, ifNoneMatch: '*' });
+
+    const headers = new Headers(fetchMock.mock.calls[0]![1]!.headers);
+    expect(headers.get('If-None-Match')).toBe('*');
+    expect(headers.has('If-Match')).toBe(false);
   });
 
   it('sends a read with an expired session (SWA redirect) to the login page, never settling', async () => {

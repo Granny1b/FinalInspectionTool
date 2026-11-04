@@ -3,6 +3,7 @@ import { useId, type ReactNode } from 'react';
 import { Logo } from '../../components/Logo';
 import { PhotoFrame } from '../../components/PhotoField';
 import { formatDateTime } from '../../lib/format';
+import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
 
 type FrameProps = {
@@ -43,6 +44,7 @@ export function PublishedFrontPage({
   template: Template;
   models: MachineModel[] | undefined;
 }) {
+  const personName = usePersonName();
   return (
     <FrontPageFrame revisionLabel={`Rev: ${template.revision}`}>
       <PhotoFrame imageId={template.coverImageId} noun="cover photo" />
@@ -55,7 +57,7 @@ export function PublishedFrontPage({
         <Detail label="Published">
           {formatDateTime(template.updatedAt)}
           <span className="block truncate text-ink-500" title={template.updatedBy}>
-            {template.updatedBy}
+            {personName(template.updatedBy)}
           </span>
         </Detail>
         {template.changeNote && (
