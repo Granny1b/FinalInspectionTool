@@ -20,16 +20,19 @@ export function FrontPageFrame({ revisionLabel, children }: FrameProps) {
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} className="rounded-lg border border-ink-200 bg-surface">
-      <div className="flex items-center justify-between gap-4 border-b border-ink-100 px-5 py-3.5">
+      {/* The app's card header, with the logo as its aside, centred on the title. At h-8 the
+          logo's "Machine Tool Sweden" line is still legible (smaller, it blurs into a smudge on
+          the dark card); the negative margin keeps the header as tall as the other cards'. */}
+      <div className="flex items-center justify-between gap-4 border-b border-ink-200 px-5 py-3.5">
         <h2 id={titleId} className="text-sm font-semibold text-ink-900">
           Front page
         </h2>
-        <Logo className="h-6" />
+        <Logo className="-my-1.5 h-8" />
       </div>
       <div className="grid grid-cols-1 gap-x-6 gap-y-5 p-5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
         {children}
       </div>
-      <p className="border-t border-ink-100 px-5 py-2.5 text-right text-xs text-ink-500 tabular-nums">
+      <p className="border-t border-ink-200 px-5 py-2.5 text-right text-xs text-ink-500 tabular-nums">
         {revisionLabel}
       </p>
     </section>

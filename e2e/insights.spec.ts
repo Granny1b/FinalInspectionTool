@@ -140,23 +140,27 @@ test('an admin reads the KPIs of finalised inspections and exports their deviati
 
   const top = panel(page, 'Top 10 recurring checkpoints').getByRole('row');
   await expect(top).toHaveCount(3); // header and two checkpoints
-  // Rank, checkpoint (ref and text, then its section), failed, share of the inspections.
-  await expect(top.nth(1).getByRole('cell')).toHaveText([
-    '1',
-    /^1\.a Lifting columns - Marked screws, blue\/red\/yellow\s*Loading area$/,
-    '2',
-    /^100%\s*of 2$/,
-  ]);
-  await expect(top.nth(2).getByRole('cell')).toHaveText([
-    '2',
-    /^2\.a Tool magazine - All pockets clean\s*Tool arena$/,
-    '1',
-    /^50%\s*of 2$/,
-  ]);
+  // Rank, checkpoint (ref and text, then its section), failed, share of the inspections. As shown
+  // (inner text): the checkpoint cell also holds the numbers' line a phone shows instead.
+  await expect(top.nth(1).getByRole('cell')).toHaveText(
+    [
+      '1',
+      /^1\.a Lifting columns - Marked screws, blue\/red\/yellow\s*Loading area$/,
+      '2',
+      /^100%\s*of 2$/,
+    ],
+    { useInnerText: true },
+  );
+  await expect(top.nth(2).getByRole('cell')).toHaveText(
+    ['2', /^2\.a Tool magazine - All pockets clean\s*Tool arena$/, '1', /^50%\s*of 2$/],
+    { useInnerText: true },
+  );
 
-  // One month of data: the line is a single dot.
+  // One month of data: no line to draw, but a single column with its count on the cap.
   const perMonth = panel(page, 'Deviations per month');
-  await expect(perMonth.locator('.recharts-line-dot')).toHaveCount(1);
+  await expect(perMonth.locator('.recharts-bar-rectangle')).toHaveCount(1);
+  await expect(perMonth.locator('.recharts-line-dot')).toHaveCount(0);
+  await expect(perMonth.locator('.recharts-label-list .recharts-label')).toHaveText(['3']);
   await expect(perMonth.getByRole('table')).toContainText('October 202632');
   const severity = panel(page, 'By severity');
   await expect(severity.getByRole('img')).toHaveAccessibleName(

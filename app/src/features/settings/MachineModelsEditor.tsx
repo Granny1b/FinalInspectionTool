@@ -95,7 +95,8 @@ export function MachineModelsEditor({ models, errors, onChange }: Props) {
         <div className="mt-3 rounded-md border border-ink-200">
           <div
             aria-hidden="true"
-            className="hidden grid-cols-[minmax(0,1fr)_10rem_2.25rem] gap-2 border-b border-ink-100 bg-ink-50 px-3 py-1.5 text-[0.6875rem] font-medium tracking-wide text-ink-500 uppercase sm:grid"
+            // The column headings of the app's tables (People, Inspections, Templates).
+            className="hidden grid-cols-[minmax(0,1fr)_10rem_2.25rem] gap-2 border-b border-ink-200 bg-ink-50 px-3 py-2 text-xs font-medium text-ink-500 sm:grid"
           >
             <span>Name</span>
             <span>Code</span>

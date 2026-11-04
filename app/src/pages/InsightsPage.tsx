@@ -165,9 +165,10 @@ function Dashboard({ insights, models, singleModel }: DashboardProps) {
         />
       </Panel>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* One two-column grid for every panel under the table, so the gutters line up with each
+          other and with the middle of the tiles above. */}
+      <div className="grid gap-6 md:grid-cols-2">
         <Panel
-          className="lg:col-span-2"
           title="Deviations per month"
           description="By the date on the inspection’s front page."
         >
@@ -175,16 +176,18 @@ function Dashboard({ insights, models, singleModel }: DashboardProps) {
             <MonthlyChart months={insights.perMonth} />
           </Suspense>
         </Panel>
-        <Panel title="By severity" aside={plural(severityTotal, 'deviation')}>
+        {/* As tall as its bar and legend: stretched to the chart beside it, it was mostly empty. */}
+        <Panel
+          className="md:self-start"
+          title="By severity"
+          aside={plural(severityTotal, 'deviation')}
+        >
           {severityTotal > 0 ? (
             <SeverityBar bySeverity={insights.bySeverity} />
           ) : (
             <p className="py-6 text-center text-sm text-ink-500">No deviations.</p>
           )}
         </Panel>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
         <Panel
           title="Per section"
           description={

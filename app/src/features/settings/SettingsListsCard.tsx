@@ -1,4 +1,4 @@
-import { ListChecks, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '../../components/Button';
 import { Callout } from '../../components/Callout';
@@ -25,7 +25,6 @@ export function SettingsListsCard() {
 
   return (
     <SettingsCard
-      icon={ListChecks}
       title="Models, lists & reports"
       description="The machine models, the choices on a deviation, and what new inspections and printed reports start from."
     >

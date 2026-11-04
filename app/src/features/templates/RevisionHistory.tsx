@@ -24,12 +24,12 @@ export const RevisionHistory = memo(function RevisionHistory({ templateId, revis
       aria-labelledby={titleId}
       className="flex flex-col rounded-lg border border-ink-200 bg-surface"
     >
-      <h2
-        id={titleId}
-        className="border-b border-ink-100 px-5 py-3.5 text-sm font-semibold text-ink-900"
-      >
-        Revision history
-      </h2>
+      {/* The app's card header, as on the front page beside it. */}
+      <div className="flex items-start justify-between gap-4 border-b border-ink-200 px-5 py-3.5">
+        <h2 id={titleId} className="text-sm font-semibold text-ink-900">
+          Revision history
+        </h2>
+      </div>
       {revisions.length === 0 ? (
         <p className="px-5 py-5 text-sm text-ink-500">
           Not published yet. Publishing creates revision 1, which new inspections then use.

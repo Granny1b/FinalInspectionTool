@@ -173,12 +173,14 @@ function UndoBar({ deleted, onUndo, onDismiss }: UndoBarProps) {
       className="pointer-events-none fixed inset-x-0 bottom-6 z-30 flex justify-center px-4"
     >
       {deleted && (
-        <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-ink-200 bg-surface py-1.5 pr-1.5 pl-4 text-sm text-ink-900 shadow-lg">
+        // An overlay, like a menu: lifted off the cards it floats over, which in the dark theme
+        // takes a lighter fill and border (a shadow doesn't show on near-black).
+        <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-ink-200 bg-overlay py-1.5 pr-1.5 pl-4 text-sm text-ink-900 shadow-lg dark:border-ink-300">
           <span className="mr-2">{deleted.label} deleted.</span>
           <button
             type="button"
             onClick={() => onUndo(deleted)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 font-medium text-brand-700 transition-colors hover:bg-brand-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 font-medium text-brand-700 transition-colors hover:bg-brand-50 dark:hover:bg-brand-100"
           >
             <Undo2 size={15} aria-hidden="true" />
             Undo
@@ -187,7 +189,8 @@ function UndoBar({ deleted, onUndo, onDismiss }: UndoBarProps) {
             type="button"
             onClick={onDismiss}
             aria-label="Dismiss"
-            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+            // The overlay is ink-100 in the dark theme: one step up for the hover.
+            className="flex size-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:hover:bg-ink-200"
           >
             <X size={15} aria-hidden="true" />
           </button>
