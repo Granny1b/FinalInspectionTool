@@ -54,13 +54,15 @@ export function initialChoice(
   preferred?: { code: string; name?: string | undefined },
 ): ModelChoice {
   const blank = { name: '', code: '', codeEdited: false };
-  if (preferred && context.free.some((model) => model.code === preferred.code)) {
-    return { ...blank, selected: preferred.code };
-  }
-  if (preferred && !context.models.some((model) => model.code === preferred.code)) {
+  // Codes compare without regard to case, as everywhere ("rmmg" is RMMG to people).
+  const isPreferred = (model: MachineModel) =>
+    model.code.toLowerCase() === preferred?.code.toLowerCase();
+  const free = context.free.find(isPreferred);
+  if (free) return { ...blank, selected: free.code };
+  if (preferred && !context.models.some(isPreferred)) {
     const name = preferred.name ?? '';
     const taken = takenModels(context);
-    return taken.some((model) => model.code.toLowerCase() === preferred.code.toLowerCase())
+    return taken.some(isPreferred)
       ? { selected: NEW_MODEL, name, code: suggestModelCode(name, taken), codeEdited: false }
       : { selected: NEW_MODEL, name, code: preferred.code, codeEdited: true };
   }

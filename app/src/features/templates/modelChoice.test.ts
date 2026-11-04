@@ -41,6 +41,8 @@ describe('initialChoice', () => {
 
   it("takes an imported file's model when it is free", () => {
     expect(initialChoice(context, { code: 'IM', name: 'IM8' }).selected).toBe('IM');
+    // Whatever the case of its code.
+    expect(initialChoice(context, { code: 'im' }).selected).toBe('IM');
   });
 
   it("offers a model the settings don't have as a new one, with the file's code", () => {
@@ -55,6 +57,8 @@ describe('initialChoice', () => {
 
   it('falls back to the first free model when the file’s model has a template here', () => {
     expect(initialChoice(context, { code: 'RMMG' }).selected).toBe('RMMT');
+    // Not offered as a new model either: the settings have it.
+    expect(initialChoice(context, { code: 'rmmg', name: 'RigiMill MG' }).selected).toBe('RMMT');
     expect(initialChoice(none, { code: 'RMMG' })).toEqual(newModel('', ''));
   });
 });

@@ -51,6 +51,7 @@ import {
   deleteTemplate as deleteStoredTemplate,
   duplicateIds,
   findTemplateForModel,
+  loadAllTemplates,
   loadDetail,
   loadLatestPublished,
   loadSummaries,
@@ -208,10 +209,15 @@ async function prepareModel(
   by: string,
 ): Promise<void> {
   if (!newModel) return checkModel(modelCode);
-  // A template may already use the code without the settings having it (a model removed since).
-  const other = await findTemplateForModel(modelCode);
+  // A template may already use the code without the settings having it (a model removed since);
+  // in any case, as for the settings' codes.
+  const other = (await loadAllTemplates()).find(
+    (template) => template.draft.modelCode.toLowerCase() === modelCode.toLowerCase(),
+  );
   if (other) {
-    throw new ConflictError(`"${other.draft.name}" already uses the model code ${modelCode}.`);
+    throw new ConflictError(
+      `"${other.draft.name}" already uses the model code ${other.draft.modelCode}.`,
+    );
   }
   // Checked inside the conditional write, so an admin adding the same model meanwhile is a 409
   // here rather than a second template for their model.

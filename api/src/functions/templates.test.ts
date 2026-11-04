@@ -349,6 +349,11 @@ describe('POST /api/templates', () => {
       const response = await create({ name: 'X', modelCode: 'HMC800', newModel });
       expect(response.status).toBe(409);
       expect(errorOf(response).message).toBe('"Old HMC" already uses the model code HMC800.');
+      // Whatever the case: "hmc800" would be a second HMC800 to people.
+      const lower = { code: 'hmc800', name: 'HMC 800' };
+      const other = await create({ name: 'X', modelCode: 'hmc800', newModel: lower });
+      expect(other.status).toBe(409);
+      expect(errorOf(other).message).toBe('"Old HMC" already uses the model code HMC800.');
       expect((await loadSettings())?.machineModels).toEqual(MODELS);
     });
 
