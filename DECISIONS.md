@@ -1716,3 +1716,18 @@ true` unless in-progress is included) and only the 17 columns. A row that fails 
   name). The test request helper takes a query string.
 - **`e2e/insights.spec.ts`:** each test publishes a template with a model code of its own
   (`createTemplate` takes one), so other tests' inspections never mix into its numbers.
+
+## After the first deploy
+
+- **The no-access page shows the sign-in's account ID.** A Static Web Apps role belongs to the one
+  Microsoft sign-in that accepted the invitation, not to the email, so the ID is what an admin
+  compares with `az staticwebapp users list` (README, Invite users).
+- **A refused request no longer bounces between the app and the no-access page.** The app sends
+  a read that Static Web Apps refuses (401/403 without the API's JSON) to the sign-in or
+  no-access page, and those pages send anyone whose sign-in has a role straight back into the
+  app. When the two disagree they bounced back and forth, which is what the first admin saw. Now
+  the app records the refused request (path, status, time) in `sessionStorage` first, and a
+  pre-login page that finds a record younger than a minute for a sign-in with a role stays on
+  the no-access page and shows "The server refused a request" with the request, the status, the
+  time, the roles and the account ID, plus Try again (which clears the record). Without a record,
+  or for a sign-in without a role, nothing changes.

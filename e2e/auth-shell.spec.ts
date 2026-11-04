@@ -105,10 +105,46 @@ test.describe('signed in', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: "You don't have access yet" })).toBeVisible();
-    await expect(page.getByText('visitor@example.com')).toBeVisible();
+    await expect(page.getByText('visitor@example.com', { exact: true })).toBeVisible();
+    // The sign-in's id, which an admin compares with Role management.
+    await expect(page.getByText(/^Account ID /).filter({ visible: true })).toHaveText(
+      'Account ID e2e-visitor@example.com',
+    );
     await expect(
       page.getByRole('link', { name: 'Sign out and use another account' }),
     ).toBeVisible();
+  });
+
+  test('an admin whose request is refused sees what was refused, instead of bouncing', async ({
+    page,
+    context,
+  }) => {
+    await signIn(context, 'asa.oberg@modig.se', ['admin']);
+    // Refused the way Azure's front door refuses: 403 with an HTML page, not the API's JSON.
+    await page.route('**/api/me', (route) =>
+      route.fulfill({ status: 403, contentType: 'text/html', body: '<!doctype html><p>No</p>' }),
+    );
+    await page.goto('/');
+
+    await expect(page).toHaveURL(/\/forbidden\.html$/);
+    await expect(page.getByRole('heading', { name: 'The server refused a request' })).toBeVisible();
+    const message = page.locator('p.lead').filter({ visible: true });
+    await expect(message).toContainText(
+      "You're signed in as asa.oberg@modig.se with the role admin, but the app's request " +
+        'GET /api/me was refused with HTTP 403 at',
+    );
+    await expect(message).toHaveText(/at \d\d:\d\d:\d\d\.\s*$/);
+    await expect(page.getByText(/^Account ID /).filter({ visible: true })).toHaveText(
+      'Account ID e2e-asa.oberg@modig.se',
+    );
+    // The page stays (its sign-in check is done once the network is idle): no bouncing.
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/forbidden\.html$/);
+
+    // Once the API answers again, Try again goes back into the app.
+    await page.unroute('**/api/me');
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Inspections' })).toBeVisible();
   });
 
   test('signing out from the sidebar ends on the sign-in page', async ({ page, context }) => {

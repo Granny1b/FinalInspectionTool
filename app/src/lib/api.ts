@@ -63,7 +63,7 @@ export async function apiFetch<T = unknown>(
     signal,
   });
 
-  if (res.type === 'opaqueredirect') return sessionEnded(method, 401);
+  if (res.type === 'opaqueredirect') return sessionEnded(method, 401, path);
 
   const payload = await readJson(res);
   const apiError = ApiErrorSchema.safeParse(payload);
@@ -73,7 +73,7 @@ export async function apiFetch<T = unknown>(
   // the page to show. The pre-login pages send role holders straight back to '/', so navigating
   // on the API's own 401 would loop whenever the SWA gate and the API's checks disagree.
   if (!apiError.success && (res.status === 401 || res.status === 403)) {
-    return sessionEnded(method, res.status);
+    return sessionEnded(method, res.status, path);
   }
 
   if (!res.ok) {
@@ -115,11 +115,11 @@ export async function apiDownload(
   { signal }: { signal?: AbortSignal } = {},
 ): Promise<{ blob: Blob; fileName: string | null }> {
   const res = await fetch(path, { credentials: 'same-origin', redirect: 'manual', signal });
-  if (res.type === 'opaqueredirect') return sessionEnded('GET', 401);
+  if (res.type === 'opaqueredirect') return sessionEnded('GET', 401, path);
   if (!res.ok) {
     const apiError = ApiErrorSchema.safeParse(await readJson(res));
     if (!apiError.success && (res.status === 401 || res.status === 403)) {
-      return sessionEnded('GET', res.status);
+      return sessionEnded('GET', res.status, path);
     }
     throw new ApiRequestError(
       res.status,
@@ -184,12 +184,30 @@ const NO_ACCESS_MESSAGE = 'Your account no longer has access to this app.';
  * instead: the page may hold unsaved work, whose leave warning can keep the page open, and a
  * request that never settled would then leave the save hanging for good.
  */
-function sessionEnded(method: string, status: 401 | 403): Promise<never> {
+function sessionEnded(method: string, status: 401 | 403, path: string): Promise<never> {
   if (method !== 'GET') {
     throw status === 401
       ? new ApiRequestError(401, { error: 'unauthorized', message: SIGNED_OUT_MESSAGE })
       : new ApiRequestError(403, { error: 'forbidden', message: NO_ACCESS_MESSAGE });
   }
+  recordRefusal({ path, status, at: new Date().toISOString() });
   window.location.assign(status === 401 ? LOGIN_PAGE : FORBIDDEN_PAGE);
   return new Promise<never>(() => {});
+}
+
+/**
+ * Read by the pre-login pages (public/login-assets/auth.js), which send anyone whose sign-in has
+ * a role straight back into the app. If the app was refused although the sign-in has a role, the
+ * two would bounce between each other forever; with this record the page stays and says which
+ * request was refused, so the cause can be seen instead of guessed.
+ */
+export const REFUSAL_KEY = 'auth.refused';
+export type Refusal = { path: string; status: number; at: string };
+
+function recordRefusal(refusal: Refusal): void {
+  try {
+    sessionStorage.setItem(REFUSAL_KEY, JSON.stringify(refusal));
+  } catch {
+    // Storage blocked: the pre-login page then behaves as before.
+  }
 }

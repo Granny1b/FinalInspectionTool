@@ -62,6 +62,13 @@ export function SettingsPage() {
             <li>At most 25 people can be invited to the app.</li>
             <li>A changed role applies the next time that person signs in.</li>
             <li>
+              Accepted, but still “You don't have access yet”? A role belongs to the Microsoft
+              account that accepted, not to the email: they may have signed in with another account
+              on the same email. Their page shows an <Path>Account ID</Path>; if it isn't in{' '}
+              <Path>Role management</Path>, invite them again and have them accept with that
+              account.
+            </li>
+            <li>
               To change a role or remove someone, use <Path>Role management</Path> in the portal.
             </li>
           </ul>
