@@ -34,8 +34,15 @@ describe('updateExtra', () => {
     expect(next[1]).toBe(b);
   });
 
-  it('removes a comment or resp that was emptied instead of storing ""', () => {
-    const [next] = updateExtra([b], b.id, { comment: '', resp: '' });
+  it('removes a comment, resp or category that was emptied instead of storing ""', () => {
+    expect(updateExtra([b], b.id, { category: 'Documentation' })[0]?.category).toBe(
+      'Documentation',
+    );
+    const [next] = updateExtra([{ ...b, category: 'Documentation' }], b.id, {
+      comment: '',
+      resp: '',
+      category: '',
+    });
     expect(next).toEqual({ id: b.id, description: 'Manual missing', severity: 'major' });
     expect(next).not.toHaveProperty('comment');
     expect(next).not.toHaveProperty('resp');

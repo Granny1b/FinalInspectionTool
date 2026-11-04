@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import { useId, type KeyboardEvent, type ReactNode } from 'react';
 import { INPUT } from '../../components/Field';
 import { singleLine } from '../templates/document/ops';
+import { ChoiceOptions } from './ChoiceOptions';
 import type { ExtraDeviationPatch } from './extras';
 import { extraDescriptionId } from './issues';
 
@@ -15,22 +16,33 @@ type Props = {
   deviation: InspectionDeviation;
   /** Finalise problem ("needs a description"). */
   issue: string | undefined;
-  respListId: string;
+  /** The settings' Responsible list. */
+  responsibles: readonly string[];
+  /** The settings' deviation categories. */
+  categories: readonly string[];
   onUpdate: (id: string, patch: ExtraDeviationPatch) => void;
 };
 
 /**
- * An extra deviation's fields, edited in its card: description, comment, then severity and resp.
- * That is also the Tab order, as in the paper's columns.
+ * An extra deviation's fields, edited in its card: description, comment, then severity,
+ * responsible and category. That is also the Tab order.
  */
-export function ExtraDeviationFields({ deviation, issue, respListId, onUpdate }: Props) {
+export function ExtraDeviationFields({
+  deviation,
+  issue,
+  responsibles,
+  categories,
+  onUpdate,
+}: Props) {
   const issueId = useId();
   const commentId = useId();
   const severityId = useId();
   const respId = useId();
+  const categoryId = useId();
   const { key: id, number } = deviation;
   return (
-    <div className="grid gap-3">
+    // Its own container: the three selects share a line once the text column is wide enough.
+    <div className="@container grid gap-3">
       <Labelled htmlFor={extraDescriptionId(id)} label="Description">
         <GrowingText
           id={extraDescriptionId(id)}
@@ -58,7 +70,7 @@ export function ExtraDeviationFields({ deviation, issue, respListId, onUpdate }:
           onChange={(comment) => onUpdate(id, { comment })}
         />
       </Labelled>
-      <div className="grid gap-3 @min-[26rem]:grid-cols-[9rem_minmax(0,1fr)]">
+      <div className="grid gap-3 @min-[30rem]:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)]">
         <Labelled htmlFor={severityId} label="Severity">
           <select
             id={severityId}
@@ -74,19 +86,27 @@ export function ExtraDeviationFields({ deviation, issue, respListId, onUpdate }:
             ))}
           </select>
         </Labelled>
-        <Labelled htmlFor={respId} label="Resp">
-          <input
+        <Labelled htmlFor={respId} label="Responsible">
+          <select
             id={respId}
-            aria-label={`Resp, ${number}`}
-            list={respListId}
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={200}
-            placeholder="Person or department"
+            aria-label={`Responsible, ${number}`}
             value={deviation.resp}
             onChange={(event) => onUpdate(id, { resp: event.target.value })}
             className={clsx(INPUT, 'h-9')}
-          />
+          >
+            <ChoiceOptions list={responsibles} value={deviation.resp} empty="—" />
+          </select>
+        </Labelled>
+        <Labelled htmlFor={categoryId} label="Category">
+          <select
+            id={categoryId}
+            aria-label={`Category, ${number}`}
+            value={deviation.category}
+            onChange={(event) => onUpdate(id, { category: event.target.value })}
+            className={clsx(INPUT, 'h-9')}
+          >
+            <ChoiceOptions list={categories} value={deviation.category} empty="—" />
+          </select>
         </Labelled>
       </div>
     </div>

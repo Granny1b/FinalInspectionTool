@@ -63,11 +63,9 @@ import {
   inspectionKeys,
   isUnavailable,
   saveInspection,
-  useRespHistory,
   type LoadedInspection,
   type StateChange,
 } from './queries';
-import { respSuggestions } from './resp';
 import { StateBadge } from './StateBadge';
 import { StateChangeDialog, type StateOutcome } from './StateChangeDialog';
 import { useScrollPaddingBelow } from './useScrollPaddingBelow';
@@ -85,6 +83,8 @@ type ServerState = Pick<Inspection, 'state' | 'finalisedAt' | 'finalisedBy'>;
 type DialogState = { change: 'finalise'; issues: FinaliseIssue[] } | { change: 'reopen' };
 
 const NO_ISSUES: FinaliseIssue[] = [];
+/** Until the settings have loaded: one array, so the memoised rows don't re-render for it. */
+const NO_CHOICES: readonly string[] = [];
 /** What the header says while a participant's name is typed but not yet added. */
 const TYPING: AutosaveState = { status: 'pending' };
 // One element for the page's lifetime: React skips it when the page re-renders per key.
@@ -103,7 +103,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const queryClient = useQueryClient();
   const isAdmin = hasRole(useCurrentUser().roles, 'admin');
   const settings = useSettings();
-  const respHistory = useRespHistory();
+  const responsibles = settings.data?.responsibles ?? NO_CHOICES;
+  const categories = settings.data?.deviationCategories ?? NO_CHOICES;
   const idPrefix = useId();
   // Back to the list as it was left (search and filters); one element for the page's lifetime.
   const [backLink] = useState(() => <BackLink to={inspectionsListHref()} label="Inspections" />);
@@ -226,17 +227,6 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     () => (nextItemId && nextRef ? { itemId: nextItemId, ref: nextRef } : null),
     [nextItemId, nextRef],
   );
-  // History plus this inspection's own names, taken when a Resp field is left: the text being
-  // typed must not be offered to its own field (it would come first, as a prefix of the name it
-  // was going to complete). Same list → same array (stable datalists).
-  const [respNames, setRespNames] = useState(draft);
-  const commitRespNames = useCallback(() => setRespNames(draftRef.current), []);
-  const respKey = useMemo(
-    () => JSON.stringify(respSuggestions(respHistory.data, respNames)),
-    [respHistory.data, respNames],
-  );
-  const suggestions = useMemo(() => JSON.parse(respKey) as string[], [respKey]);
-
   // Tabs keep their own scroll position, so going back to the checklist returns to the row.
   const [tab, setTab] = useState<InspectionTab>('checklist');
   // The Deviations tab is rendered when first shown, then kept: opening an inspection doesn't
@@ -297,11 +287,9 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     field?.scrollIntoView({ block: 'nearest' });
   }, [update]);
   const removeExtraDeviation = useCallback(
-    (extraId: string) => {
-      update({ extraDeviations: removeExtra(draftRef.current.extraDeviations, extraId) });
-      commitRespNames();
-    },
-    [update, commitRespNames],
+    (extraId: string) =>
+      update({ extraDeviations: removeExtra(draftRef.current.extraDeviations, extraId) }),
+    [update],
   );
 
   const headerRef = useRef<HTMLElement>(null);
@@ -408,14 +396,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const machine = draft.front.machineName.trim();
 
   return (
-    // A Resp field that is left adds its name to the suggestions (React's onBlur bubbles).
-    <div
-      onBlur={(event) => {
-        if (event.target instanceof HTMLInputElement && event.target.hasAttribute('list')) {
-          commitRespNames();
-        }
-      }}
-    >
+    <div>
       <title>{`${number}${machine ? ` · ${machine}` : ''} · ${APP_NAME}`}</title>
       {backLink}
 
@@ -595,7 +576,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             sections={sections}
             results={draft.results}
             onChange={finalised ? undefined : updateResults}
-            respSuggestions={suggestions}
+            responsibles={responsibles}
+            categories={categories}
             issues={issues}
             onShowPhotos={goToPhotos}
           />
@@ -613,7 +595,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             deviations={deviations}
             readOnly={finalised}
             issues={extraErrors}
-            respSuggestions={suggestions}
+            responsibles={responsibles}
+            categories={categories}
             onGoToRow={goToRow}
             onAdd={addExtraDeviation}
             onUpdate={updateExtraDeviation}

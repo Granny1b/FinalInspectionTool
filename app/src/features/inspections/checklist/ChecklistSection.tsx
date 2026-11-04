@@ -14,7 +14,8 @@ type Props = {
   /** All results; the section only re-renders when one of its own rows changed. */
   results: Results;
   rowIssues: ReadonlyMap<string, string>;
-  respListId: string;
+  responsibles: readonly string[];
+  categories: readonly string[];
   actions: ChecklistActions;
 };
 
@@ -23,7 +24,8 @@ export const ChecklistSection = memo(function ChecklistSection({
   index,
   results,
   rowIssues,
-  respListId,
+  responsibles,
+  categories,
   actions,
 }: Props) {
   const number = sectionNumber(index);
@@ -69,7 +71,8 @@ export const ChecklistSection = memo(function ChecklistSection({
           rowIndex={rowIndex}
           result={results[item.id]}
           issue={rowIssues.get(item.id)}
-          respListId={respListId}
+          responsibles={responsibles}
+          categories={categories}
           actions={actions}
         />
       ))}
@@ -82,7 +85,8 @@ function sameSection(previous: Props, next: Props): boolean {
   return (
     previous.section === next.section &&
     previous.index === next.index &&
-    previous.respListId === next.respListId &&
+    previous.responsibles === next.responsibles &&
+    previous.categories === next.categories &&
     previous.actions === next.actions &&
     next.section.items.every(
       (item) =>

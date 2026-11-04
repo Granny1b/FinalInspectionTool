@@ -75,6 +75,7 @@ const INSPECTION: Inspection = {
       severity: 'major',
       comment: 'Two screws have no torque mark.',
       resp: 'Montage',
+      category: 'Missing parts',
       photos: [
         {
           imageId: id('Orig', 1),
@@ -208,6 +209,11 @@ describe('the Word export of a report', () => {
     expect(all).toContain('D-02 · Minor');
     expect(all).toContain('Not on the checklist');
     expect(all).toContain('Operator manual missing');
+    expect(all).toContain('Category  Missing parts');
+    expect(all).toContain('Resp  Montage');
+    // The extra deviation has neither: a dash, as on paper.
+    expect(all).toContain('Category  —');
+    expect(all).toContain('Resp  —');
     expect(all).toContain('Sketch / photo');
     expect(count(all, /Closed {2}Sign/g)).toBe(2);
   });
@@ -417,7 +423,11 @@ describe('the Word export of awkward text', () => {
     expect(text(document)).toContain('10.am');
     // 12.5 mm in twips, the first column of every section's table.
     const grids = document.match(/<w:tblGrid>(?:(?!<\/w:tblGrid>)[\s\S])*<\/w:tblGrid>/g) ?? [];
-    const sectionGrids = grids.filter((grid) => grid.match(/<w:gridCol /g)?.length === 7);
+    // Seven columns, as the blank Deviation Summary has (its first is 13 mm, 737 twips).
+    const summary = '<w:tblGrid><w:gridCol w:w="737"/>';
+    const sevenColumns = grids.filter((grid) => grid.match(/<w:gridCol /g)?.length === 7);
+    expect(sevenColumns.filter((grid) => grid.startsWith(summary))).toHaveLength(1);
+    const sectionGrids = sevenColumns.filter((grid) => !grid.startsWith(summary));
     expect(sectionGrids).toHaveLength(10);
     for (const grid of sectionGrids) expect(grid).toMatch(/^<w:tblGrid><w:gridCol w:w="709"\/>/);
   });
@@ -433,7 +443,7 @@ describe('the Word export of a blank checklist', () => {
     expect(count(all, /☐/g)).toBe((3 + 2 * 3) * 3);
     expect(all).toContain('1.e');
     expect(all).not.toContain('Two screws have no torque mark.');
-    expect(all).toContain('No.RefDescriptionSeverityRespClosed (sign/date)');
+    expect(all).toContain('No.RefDescriptionSeverityCategoryRespClosed (sign/date)');
     for (let n = 1; n <= 15; n += 1) expect(all).toContain(`D-${String(n).padStart(2, '0')}`);
     // Two header rows per section and the summary's own.
     expect(count(document, /<w:tblHeader\/>/g)).toBe(5);

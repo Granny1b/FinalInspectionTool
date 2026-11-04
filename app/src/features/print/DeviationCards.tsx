@@ -139,6 +139,10 @@ function DeviationCard({
         <p className="paper-card-text">{card.text}</p>
         {card.comment && <p className="paper-card-comment">{card.comment}</p>}
         <p className="paper-card-resp">
+          <span className="paper-card-label">Category</span>
+          {card.category || '—'}
+        </p>
+        <p className="paper-card-resp">
           <span className="paper-card-label">Resp</span>
           {card.resp || '—'}
         </p>

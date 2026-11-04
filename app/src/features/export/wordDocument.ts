@@ -104,8 +104,8 @@ const STATUS_SYMBOLS: Record<Status, string> = { OK: '✓', NOK: '✗', NA: '–
  */
 const CHECKLIST_COLUMNS = [12.5, 68, 47, 9.5, 9.5, 9.5, 30];
 const REF_WIDTH = CHECKLIST_COLUMNS[0]!;
-/** No. | Ref | Description | Severity | Resp | Closed (sign/date) */
-const SUMMARY_COLUMNS = [13, REF_WIDTH, 85.5, 17, 30, 28];
+/** No. | Ref | Description | Severity | Category | Resp | Closed (sign/date) */
+const SUMMARY_COLUMNS = [13, REF_WIDTH, 61.5, 17, 24, 30, 28];
 /** Inside a deviation card's padding. */
 const CARD_PADDING = 3;
 const CARD_WIDTH = CONTENT_WIDTH - 2 * CARD_PADDING;
@@ -670,7 +670,15 @@ function statusMark(row: PrintRow, status: Status, keepNext: boolean): Paragraph
 
 /** The blank Deviation Summary: numbered lines to fill in by hand on the walk-round. */
 function summaryTable(numbers: string[]): Table {
-  const labels = ['No.', 'Ref', 'Description', 'Severity', 'Resp', 'Closed (sign/date)'];
+  const labels = [
+    'No.',
+    'Ref',
+    'Description',
+    'Severity',
+    'Category',
+    'Resp',
+    'Closed (sign/date)',
+  ];
   return table(
     [
       new TableRow({
@@ -703,7 +711,7 @@ function summaryTable(numbers: string[]): Table {
 
 /**
  * A report's deviation as a framed card: "D-03 · 4.c · Major", the section, checkpoint or
- * description, comment, Resp, up to two photos as marked up, and a line to sign it off. One table
+ * description, comment, category, Resp, up to two photos as marked up, and a line to sign it off. One table
  * row that can't split, so a card is never split across pages; only a card whose text makes it
  * taller than a page may (its photos still don't).
  */
@@ -730,8 +738,11 @@ function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImag
     ),
     paragraph([run(card.text, { bold: true, size: pt(9.5) })], { spacing: { before: twips(0.6) } }),
     ...(card.comment ? [paragraph([run(card.comment)], { spacing: { before: twips(1) } })] : []),
+    paragraph([label('Category'), run(card.category || '—')], {
+      spacing: { before: twips(1.5) },
+    }),
     paragraph([label('Resp'), run(card.resp || '—')], {
-      spacing: { before: twips(1.5), after: twips(2.5) },
+      spacing: { before: twips(0.6), after: twips(2.5) },
     }),
     cardPhotos(card, photos),
     paragraph(
@@ -758,8 +769,9 @@ function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImag
   const height =
     LINE_HEIGHT * (lines(card.text, CARD_WIDTH) + lines(card.comment, CARD_WIDTH)) +
     (card.photos.length === 0 ? 40 : card.photos.length === 1 ? 80 : 64) +
-    // The head, section, Resp and Closed lines, captions and spacing.
-    30;
+    // The head, section, category, Resp and Closed lines, captions and spacing.
+    30 +
+    LINE_HEIGHT;
   return table(
     [new TableRow({ cantSplit: height < TALL, children: [cell(content)] })],
     [CONTENT_WIDTH],

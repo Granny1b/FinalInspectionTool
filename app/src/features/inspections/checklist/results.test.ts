@@ -4,6 +4,7 @@ import {
   rowsWithoutStatus,
   withPhotos,
   withRemainingOk,
+  withCategory,
   withSeverity,
   withStatus,
   withText,
@@ -47,8 +48,10 @@ describe('withStatus', () => {
     });
   });
 
-  it('drops the severity when a row leaves NOK', () => {
-    const results: Results = { a1: { status: 'NOK', severity: 'major', comment: 'Loose' } };
+  it('drops the severity and category when a row leaves NOK', () => {
+    const results: Results = {
+      a1: { status: 'NOK', severity: 'major', category: 'Leakage', comment: 'Loose' },
+    };
     expect(withStatus(results, 'a1', 'OK')).toEqual({ a1: { status: 'OK', comment: 'Loose' } });
     expect(withStatus(results, 'a1', null)).toEqual({ a1: { comment: 'Loose' } });
   });
@@ -56,6 +59,9 @@ describe('withStatus', () => {
   it('keeps a severity a row already had when it becomes NOK', () => {
     expect(withStatus({ a1: { severity: 'critical' } }, 'a1', 'NOK')).toEqual({
       a1: { status: 'NOK', severity: 'critical' },
+    });
+    expect(withStatus({ a1: { category: 'Leakage' } }, 'a1', 'NOK')).toEqual({
+      a1: { status: 'NOK', category: 'Leakage' },
     });
   });
 
@@ -177,5 +183,21 @@ describe('rowsWithoutStatus', () => {
   it('counts the rows still to fill in', () => {
     expect(rowsWithoutStatus(section, {})).toBe(4);
     expect(rowsWithoutStatus(section, { a1: { status: 'OK' }, a2: { comment: 'x' } })).toBe(3);
+  });
+});
+
+describe('withCategory', () => {
+  it('sets, changes and removes the category, leaving the rest of the row', () => {
+    const results: Results = { a1: { status: 'NOK', comment: 'Leaks' } };
+    const set = withCategory(results, 'a1', 'Leakage');
+    expect(set).toEqual({ a1: { status: 'NOK', comment: 'Leaks', category: 'Leakage' } });
+    expect(withCategory(set, 'a1', 'Cleanliness').a1?.category).toBe('Cleanliness');
+    expect(withCategory(set, 'a1', '')).toEqual(results);
+  });
+
+  it('returns the results themselves when nothing changes', () => {
+    const results: Results = { a1: { status: 'NOK', category: 'Leakage' } };
+    expect(withCategory(results, 'a1', 'Leakage')).toBe(results);
+    expect(withCategory({}, 'a1', '')).toEqual({});
   });
 });

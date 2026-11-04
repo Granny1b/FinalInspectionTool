@@ -1,15 +1,16 @@
 /**
  * Geometry of the fill-in sheet, shared by section headers, editable rows and read-only rows so
- * everything lines up like the printed table: ref | checkpoint | Comment | Status | Resp.
+ * everything lines up like the printed table: ref | checkpoint | Comment | Status | Responsible.
  *
  * The sheet adapts to its own width (container queries), not the viewport's:
  * - wide (≥ 56rem, a desktop): one line per row, in the print's column order;
  * - narrow (≥ 34rem, a tablet): the checkpoint on its own line, Comment | Status | Resp below;
  * - below that everything stacks.
- * A NOK row's severity goes on the next line, under the status it qualifies, and its photo count
- * next to it, under Resp. Every cell is placed explicitly, so the DOM order (which is the Tab
- * order) can stay comment → resp → severity.
- * Resp is 10rem wide, so a department such as "El-avdelningen" fits its input unclipped.
+ * A NOK row's severity goes on the next line, under the status it qualifies, with its category
+ * before it (under the comment, where a long category has room) and its photo count after it,
+ * under Responsible. Every cell is placed explicitly, so the DOM order (which is the Tab order)
+ * can stay comment → responsible → category → severity, left to right, top to bottom.
+ * Responsible is 10rem wide, so a department such as "El-avdelningen" fits unclipped.
  */
 export const GRID =
   'grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2 gap-y-1.5 @min-[34rem]:grid-cols-[2.25rem_minmax(0,1fr)_12rem_10rem] @min-[56rem]:grid-cols-[2.25rem_minmax(0,3fr)_minmax(0,2fr)_12rem_10rem]';
@@ -21,6 +22,8 @@ export const CELL = {
   status:
     'col-start-2 @min-[34rem]:col-start-3 @min-[34rem]:row-start-2 @min-[56rem]:col-start-4 @min-[56rem]:row-start-1',
   resp: 'col-start-2 @min-[34rem]:col-start-4 @min-[34rem]:row-start-2 @min-[56rem]:col-start-5 @min-[56rem]:row-start-1',
+  category:
+    'col-start-2 @min-[34rem]:row-start-3 @min-[56rem]:col-start-3 @min-[56rem]:row-start-2',
   severity:
     'col-start-2 @min-[34rem]:col-start-3 @min-[34rem]:row-start-3 @min-[56rem]:col-start-4 @min-[56rem]:row-start-2',
   photos:
@@ -49,6 +52,13 @@ export const ROW_LINE = 'border-b border-ink-200 py-1.5';
 /** Text fields in a row. The border is ink-500 at 80 % (3.4:1), as WCAG 1.4.11 asks of a control. */
 export const FIELD =
   'w-full min-w-0 rounded-t-sm border border-transparent border-b-ink-500/80 bg-transparent px-2 text-sm text-ink-900 transition-colors placeholder:text-ink-500 hover:border-b-ink-700 @min-[56rem]:placeholder:text-transparent hover:bg-ink-100/60 focus-visible:rounded-sm focus-visible:border-brand-600 focus-visible:bg-surface focus-visible:outline-1 focus-visible:outline-offset-0';
+
+/**
+ * A row's Responsible select while it is empty: its "Responsible" reads like the placeholder of a
+ * text field, and on wide sheets, where the column label says it, it is hidden as they are. Its
+ * options set their own colour, so the open list never inherits the hidden text.
+ */
+export const EMPTY_SELECT = 'data-empty:text-ink-500 @min-[56rem]:data-empty:text-transparent';
 
 /** "Row 3.c has no status." (brief §5.3 Finalise): red outline and tint, as in the template editor. */
 export const ISSUE_OUTLINE = 'bg-nok-bg outline-1 -outline-offset-1 outline-nok-fg';

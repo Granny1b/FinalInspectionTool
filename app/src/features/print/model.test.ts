@@ -215,7 +215,13 @@ describe('lettering', () => {
 describe('a report', () => {
   const results: Inspection['results'] = {
     [row1a!.id]: { status: 'OK', comment: '  Checked twice ' },
-    [row1b!.id]: { status: 'NOK', comment: 'Screw loose', resp: 'Assembly', severity: 'major' },
+    [row1b!.id]: {
+      status: 'NOK',
+      comment: 'Screw loose',
+      resp: 'Assembly',
+      severity: 'major',
+      category: ' Loose or wrong torque ',
+    },
     [row2a!.id]: { status: 'NA' },
     [row2b!.id]: { status: 'NOK', comment: 'Label missing' },
     [row2c!.id]: { status: 'OK' },
@@ -229,6 +235,7 @@ describe('a report', () => {
         comment: 'Left side',
         resp: 'Paint shop',
         severity: 'critical',
+        category: 'Damage & scratches',
       },
     ],
     state: 'finalised',
@@ -269,6 +276,7 @@ describe('a report', () => {
         comment: 'Screw loose',
         severity: 'major',
         resp: 'Assembly',
+        category: 'Loose or wrong torque',
         photos: [],
       },
       {
@@ -279,6 +287,7 @@ describe('a report', () => {
         comment: 'Label missing',
         severity: 'minor',
         resp: '',
+        category: '',
         photos: [],
       },
       {
@@ -289,6 +298,7 @@ describe('a report', () => {
         comment: 'Left side',
         severity: 'critical',
         resp: 'Paint shop',
+        category: 'Damage & scratches',
         photos: [],
       },
     ]);

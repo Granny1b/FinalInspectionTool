@@ -41,7 +41,7 @@ export function SectionHeader({ number, title, children }: Props) {
         </span>
       )}
       <span aria-hidden="true" className={clsx(LABEL, 'col-start-5')}>
-        Resp
+        Responsible
       </span>
     </div>
   );

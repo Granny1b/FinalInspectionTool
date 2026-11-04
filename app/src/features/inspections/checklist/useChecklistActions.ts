@@ -9,7 +9,14 @@ import {
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import type { Move, RowCommand } from './keys';
 import { advancesAfter, rowOrder, targetRow } from './navigation';
-import { withRemainingOk, withSeverity, withStatus, withText, type Results } from './results';
+import {
+  withCategory,
+  withRemainingOk,
+  withSeverity,
+  withStatus,
+  withText,
+  type Results,
+} from './results';
 
 /** Everything rows and section headers can ask the sheet to do. The object is stable. */
 export type ChecklistActions = {
@@ -19,6 +26,8 @@ export type ChecklistActions = {
   pick: (itemId: string, status: Status) => void;
   setText: (itemId: string, field: 'comment' | 'resp', value: string) => void;
   setSeverity: (itemId: string, severity: Severity) => void;
+  /** A NOK row's category; '' for none. */
+  setCategory: (itemId: string, category: string) => void;
   setRemainingOk: (sectionId: string) => void;
   /** Escape in a field. */
   focusRow: (itemId: string) => void;
@@ -122,6 +131,8 @@ export function useChecklistActions(options: Options): ChecklistActions {
         commit(withText(latest.current.results, itemId, field, value)),
       setSeverity: (itemId, severity) =>
         commit(withSeverity(latest.current.results, itemId, severity)),
+      setCategory: (itemId, category) =>
+        commit(withCategory(latest.current.results, itemId, category)),
       setRemainingOk,
       focusRow: (itemId) => focusRow(rootRef.current, itemId),
       finishRow: (itemId) => {

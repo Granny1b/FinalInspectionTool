@@ -23,8 +23,8 @@ type Props = {
 };
 
 /**
- * The same sheet without inputs (a finalised inspection): statuses as symbol and text, comment
- * and resp as text. Rows can take the focus from script (`tabIndex={-1}`), so the page's jump
+ * The same sheet without inputs (a finalised inspection): statuses as symbol and text, comment,
+ * responsible and a NOK row's category as text. Rows can take the focus from script (`tabIndex={-1}`), so the page's jump
  * links still work.
  */
 export function ReadOnlyChecklist({
@@ -80,7 +80,17 @@ export function ReadOnlyChecklist({
                   <StatusMark status={result?.status} />
                 </div>
                 <ReadOnlyText className={CELL.comment} label="Comment" value={result?.comment} />
-                <ReadOnlyText className={CELL.resp} label="Resp" value={result?.resp} />
+                <ReadOnlyText className={CELL.resp} label="Responsible" value={result?.resp} />
+                {result?.status === 'NOK' && result.category && (
+                  <p
+                    className={clsx(
+                      CELL.category,
+                      'self-center text-xs leading-6 font-medium text-nok-fg @min-[34rem]:text-right',
+                    )}
+                  >
+                    Category: <span className="text-ink-800">{result.category}</span>
+                  </p>
+                )}
                 {result?.status === 'NOK' && (
                   <p
                     className={clsx(
@@ -107,7 +117,10 @@ export function ReadOnlyChecklist({
   ));
 }
 
-/** Comment or resp as text; on narrow sheets, where there are no column labels, with its label. */
+/**
+ * Comment or responsible as text; on narrow sheets, where there are no column labels, with its
+ * label.
+ */
 function ReadOnlyText({
   className,
   label,

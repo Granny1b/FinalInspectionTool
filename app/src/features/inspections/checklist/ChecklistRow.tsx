@@ -14,11 +14,13 @@ import clsx from 'clsx';
 import { memo, useId, type KeyboardEvent } from 'react';
 import { singleLine } from '../../templates/document/ops';
 import { IssueNote } from '../../templates/document/parts';
+import { ChoiceOptions } from '../ChoiceOptions';
 import { photoCountText } from '../deviations';
 import { fieldCommand, rowCommand, type RowField } from './keys';
 import {
   CELL,
   CONTROL_HEIGHT,
+  EMPTY_SELECT,
   FIELD,
   GRID,
   ISSUE_OUTLINE,
@@ -36,15 +38,18 @@ type Props = {
   result: RowResult | undefined;
   /** Finalise problem on this row ("Row 3.c has no status."). */
   issue: string | undefined;
-  /** The one `<datalist>` of resp suggestions the sheet renders. */
-  respListId: string;
+  /** The settings' Responsible list. */
+  responsibles: readonly string[];
+  /** The settings' deviation categories. */
+  categories: readonly string[];
   actions: ChecklistActions;
 };
 
 /**
  * One checkpoint, filled in. The row itself is focusable: status keys work on it, and Tab goes on
- * into its comment, resp and (NOK) severity, then the next row. Memoised: a change re-renders
- * only the row it touches.
+ * into its comment, responsible and (NOK) category and severity, then the next row. Keys pressed
+ * in those fields are theirs (a select picks by its letters), never shortcuts. Memoised: a change
+ * re-renders only the row it touches.
  */
 export const ChecklistRow = memo(function ChecklistRow({
   item,
@@ -52,11 +57,14 @@ export const ChecklistRow = memo(function ChecklistRow({
   rowIndex,
   result,
   issue,
-  respListId,
+  responsibles,
+  categories,
   actions,
 }: Props) {
   const ref = rowRef(sectionIndex, rowIndex);
   const status = result?.status;
+  const resp = result?.resp ?? '';
+  const category = result?.category ?? '';
   // Photos belong to the row's deviation, so they count only while it is NOK.
   const photos = status === 'NOK' ? (result?.photos?.length ?? 0) : 0;
   const statusId = useId();
@@ -149,21 +157,41 @@ export const ChecklistRow = memo(function ChecklistRow({
           />
         </div>
         <div className={CELL.resp}>
-          <input
+          <select
             data-resp={item.id}
-            aria-label={`Resp, row ${ref}`}
-            list={respListId}
-            autoComplete="off"
-            spellCheck={false}
-            enterKeyHint="next"
-            maxLength={200}
-            placeholder="Resp"
-            value={result?.resp ?? ''}
+            aria-label={`Responsible, row ${ref}`}
+            value={resp}
+            // Shown like a placeholder while empty (see EMPTY_SELECT).
+            data-empty={resp ? undefined : ''}
             onChange={(event) => actions.setText(item.id, 'resp', event.target.value)}
             onKeyDown={onFieldKeyDown('resp')}
-            className={clsx(FIELD, CONTROL_HEIGHT)}
-          />
+            className={clsx(FIELD, CONTROL_HEIGHT, EMPTY_SELECT)}
+          >
+            <ChoiceOptions
+              list={responsibles}
+              value={resp}
+              empty="Responsible"
+              optionClassName="text-ink-900"
+            />
+          </select>
         </div>
+        {status === 'NOK' && (
+          <label
+            className={clsx(CELL.category, 'flex items-center gap-2 @min-[34rem]:justify-end')}
+          >
+            <span className="text-xs font-medium text-nok-fg">Category</span>
+            <select
+              data-category={item.id}
+              aria-label={`Category, row ${ref}`}
+              value={category}
+              onChange={(event) => actions.setCategory(item.id, event.target.value)}
+              onKeyDown={onFieldKeyDown('category')}
+              className={clsx(FIELD, CONTROL_HEIGHT, 'flex-1 @min-[34rem]:max-w-64')}
+            >
+              <ChoiceOptions list={categories} value={category} empty="—" />
+            </select>
+          </label>
+        )}
         {status === 'NOK' && (
           <label className={clsx(CELL.severity, 'flex items-center gap-2')}>
             <span className="text-xs font-medium text-nok-fg">Severity</span>

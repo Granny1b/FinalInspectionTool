@@ -184,7 +184,7 @@ function Dashboard({ insights, models, singleModel }: DashboardProps) {
         </Panel>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Panel
           title="Per section"
           description={
@@ -196,8 +196,11 @@ function Dashboard({ insights, models, singleModel }: DashboardProps) {
         <Panel title="Per model" description="Deviations, with the inspections they come from.">
           <BarList items={modelBars(insights, models)} limit={10} />
         </Panel>
-        <Panel title="By resp" description="Who is responsible for fixing them.">
+        <Panel title="By responsible" description="Who is responsible for fixing them.">
           <BarList items={respBars(insights)} limit={10} />
+        </Panel>
+        <Panel title="By category" description="What kind of deviations they are.">
+          <BarList items={categoryBars(insights)} limit={10} />
         </Panel>
       </div>
     </>
@@ -225,7 +228,15 @@ function modelBars(insights: Insights, models: MachineModel[] | undefined): BarI
 function respBars(insights: Insights): BarItem[] {
   return insights.byResp.map(({ resp, deviations }) => ({
     key: resp || '\u0000none',
-    label: resp || 'No resp given',
+    label: resp || 'Not assigned',
+    value: deviations,
+  }));
+}
+
+function categoryBars(insights: Insights): BarItem[] {
+  return insights.byCategory.map(({ category, deviations }) => ({
+    key: category || '\u0000none',
+    label: category || 'No category',
     value: deviations,
   }));
 }

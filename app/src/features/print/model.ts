@@ -82,6 +82,8 @@ export type DeviationCard = {
   comment: string;
   severity: Severity;
   resp: string;
+  /** One of the settings' deviation categories; empty when none was chosen. */
+  category: string;
   photos: DeviationPhoto[];
 };
 
@@ -344,6 +346,7 @@ function deviationCard(deviation: InspectionDeviation): DeviationCard {
     comment: deviation.comment.trim(),
     severity: deviation.severity,
     resp: deviation.resp.trim(),
+    category: deviation.category.trim(),
     photos: deviation.photos.map(printedPhoto),
   };
 }
