@@ -11,12 +11,15 @@ Storage and Table Storage: no database, about 1 SEK a month.
 
 Working now:
 
-- **Sign-in and access control.** Microsoft Entra ID sign-in through Static Web Apps. Only invited
-  users with the role `inspector` or `admin` get past `/login.html`; signed-in users without a
-  role see a "You don't have access yet" page. Pages and `/api/*` are locked alike.
+- **Sign-in and access control.** Microsoft Entra ID sign-in through Static Web Apps. Admins
+  manage who may use the app in Settings → Users & access (name, email, role); people invited
+  earlier through Static Web Apps roles keep their access. A signed-in user who is neither on the
+  list nor invited sees a "You don't have access yet" page. The API checks the role on every
+  request.
 - **App shell.** Sidebar with Inspections and Templates, plus Insights and Settings for admins; a
-  drawer on tablets. Settings explains how to invite users; editing the settings is not built yet
-  (the brief schedules it in no phase).
+  drawer on tablets. Settings manages users and access, and admins edit the machine models, the
+  Responsible and deviation category lists, the default location and the company name and logo
+  there (see [Settings](#settings)).
 - **Templates (phase 2).** The template list; a new template for a machine model that has none;
   the template editor, which looks like the printed checklist and is edited in place (sections and
   rows, drag and drop, automatic 1.a numbering, cover photo, spare rows); autosave of the draft
@@ -44,8 +47,8 @@ Working now:
 - **Reference images and Word (phase 5).** Printouts can add an appendix with every guide's
   images, two to a row, and every printout can be exported as an editable Word file. See
   [Reference images](#reference-images-appendix) and [Word export](#word-export).
-- **API.** `/api/me`, the template and inspection endpoints, settings, "Resp" suggestions and
-  photo upload/download URLs (see [API](#api)), with role checks, JSON errors and ETag
+- **API.** `/api/me`, the template and inspection endpoints, settings (read and save), the people
+  list and photo upload/download URLs (see [API](#api)), with role checks, JSON errors and ETag
   concurrency on every save.
 - **Seed.** The RigiMill MG checklist (6 sections, 90 checkpoints) and the six machine models are
   imported from `seed/Final_Inspection_rev_2.xlsm` into storage.
@@ -54,13 +57,25 @@ Working now:
 
 - **Insights (phase 6).** The admins' KPI dashboard: inspections, deviations, deviations per
   machine and the first-pass rate; the top 10 recurring checkpoints; deviations per month, by
-  severity, per section, per model and by resp; filtered by period, model and in-progress, and
-  exported as CSV for Excel or Power BI. See [Insights](#insights).
+  severity, per section, per model, by responsible and by category; filtered by period, model and
+  in-progress, and exported as CSV for Excel or Power BI. See [Insights](#insights).
 
-Not yet: editing the settings (machine models, default location, company name and logo). They
-come from the seed; the brief puts the screen in §5.6 but in no phase.
+Added after the six phases:
 
-Next: deploy to Azure (see [Deploy to Azure](#deploy-to-azure)).
+- **Editable settings and pick lists.** Admins edit the machine models, the Responsible and
+  deviation category lists, the default location and the company name and logo. Every deviation
+  picks its Responsible and an optional category from those lists. See [Settings](#settings).
+- **Users and names.** Admins add, change and remove the people who may use the app in Settings,
+  and the app shows them by name. See [Auth model and roles](#auth-model-and-roles).
+- **Templates.** Delete a template, export and import it as JSON, see the list as cards, add and
+  delete spare lines per section, and add a new machine model together with its template. See
+  [Editing templates](#editing-templates).
+- **Dark and light theme**, following the device's setting unless you pick one. See
+  [Light and dark theme](#light-and-dark-theme).
+- **Quick report preview.** **Preview** on an inspection shows the printout at once, unsaved
+  edits included. See [Printing](#printing).
+
+Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
 ## Prerequisites
 
@@ -79,12 +94,14 @@ npm run dev
 Open <http://localhost:4280> and choose **Sign in with Microsoft**. Locally, the Static Web Apps
 CLI shows its own mock sign-in form instead of Microsoft's:
 
-- **Username**: any email address, e.g. `anna.andersson@modig.se`. The app derives the display
-  name from it.
+- **Username**: any email address, e.g. `anna.andersson@modig.se`. Unless that email is on the
+  people list in Settings, the app derives the display name from it.
 - **User's roles**: add `admin` or `inspector` on a line of its own, below the existing roles.
 - Leave the other fields as they are and choose **Login**.
 
-Sign in without either role to see the no-access page. Stop everything with Ctrl+C.
+Sign in without either role to see the no-access page. An admin can then add that email in
+Settings → Users & access, and "Check again" lets them in, no role needed in the emulator. Stop
+everything with Ctrl+C.
 
 The mock form loads jQuery and Bootstrap from a CDN (`ajax.aspnetcdn.com`). If it does nothing
 (offline, or the CDN is blocked), sign in from the browser console on <http://localhost:4280>
@@ -149,7 +166,13 @@ the GitHub workflow file. The warning is harmless.
 ## Editing templates
 
 Templates are for admins; inspectors see the latest published revision of each, read-only. There
-is one template per machine model: **New template** offers the models that don't have one yet.
+is one template per machine model: **New template** offers the models that don't have one yet,
+and **New machine model…** for a model launched since. Type its name; the code is suggested from
+it as in [Settings](#settings) (the capitals and digits of each word, e.g. RigiMill MG → RMMG,
+with a number added when that code is taken) and can be changed. The model is added to the
+machine models in Settings along with the template. A code that a model or a template already
+uses (in any case), or a name another model has, is refused. **List** / **Cards** above the list
+switches the view (cards show the cover photos); each browser remembers its own choice.
 
 - **Draft and revisions.** Every template has one draft, which admins edit, and numbered
   revisions, which never change once published. New inspections use the latest
@@ -172,9 +195,23 @@ is one template per machine model: **New template** offers the models that don't
   red.
 - **Revision history.** Next to the front page: each revision with its date, who published it and
   the note. **View** opens that revision read-only.
-- **Front page.** Name, machine model, spare rows per section (the empty lettered lines printed
-  after each section for handwritten findings, previewed in the checklist) and a cover photo. The
-  photo is scaled down in the browser to 1600 px on the long edge before it is uploaded.
+- **Export and import (JSON).** The editor's **⋯** menu has **Export JSON**: the draft as shown,
+  unsaved changes included, saved as `<template name>.json`. On the Templates page, **Import
+  JSON** reads such a file and checks it first (a file that isn't one is explained). You then
+  pick a machine model without a template (or a new model) and the name, and the file becomes a
+  new, unpublished draft. If no template here uses its rows' ids, it keeps them, so re-importing
+  an exported template keeps its checkpoints' history in Insights; otherwise every section and
+  row gets a new id. Images (cover, guide images) come along only if they are stored in this
+  installation; the import says how many were left out.
+- **Delete (admins).** **⋯ → Delete template** asks first, then deletes the draft and every
+  published revision for good and goes back to the list. Inspections made from it are kept with
+  their own copy of the checklist, their reports and their deviations. Insights still counts
+  their deviations, showing each checkpoint as it was last inspected. Images stay in storage.
+  Locally, deleting the seeded RigiMill MG template brings it back at the next `npm run dev`,
+  because the seed imports it whenever none exists.
+- **Front page.** Name, machine model, spare lines per section (the default: the empty lettered
+  lines printed after each section for handwritten findings) and a cover photo. The photo is
+  scaled down in the browser to 1600 px on the long edge before it is uploaded.
 
 In the checklist:
 
@@ -183,12 +220,17 @@ In the checklist:
 | Add a row below                             | `Enter` in a row; **+ Add row** at the end of a section           |
 | Start a new section's rows                  | `Enter` in its title                                              |
 | Delete an empty row                         | `Backspace` in it (holding it down only empties a row)            |
-| Undo deleting a row or section              | **Undo** at the bottom of the window, until the next such change  |
+| Add a spare line to a section               | **+ Add spare line** at the end of the section                    |
+| Delete a spare line                         | Its bin icon, shown on hover or focus (always on a tablet)        |
+| Undo deleting a row, section or spare line  | **Undo** at the bottom of the window, until the next such change  |
 | Move between rows                           | `↑` / `↓` from the first or last line of a row                    |
 | Duplicate or delete a row                   | The icons that appear on hover or focus; on a tablet, its **⋯**   |
 | Rename, duplicate, move or delete a section | Its **⋯** menu (deleting a section with rows asks first)          |
 | Move a row or section                       | Drag its handle (⠿, left of it), also between sections            |
 | Move it with the keyboard                   | `Tab` to the handle, `Space`, arrow keys, `Space` (`Esc` cancels) |
+
+A section whose spare lines you added or deleted keeps its own number; the others follow the
+front page's default.
 
 Numbers (section 3, row 3.c) follow the position and change as rows move; each row keeps its
 identity, which is what later phases key results and statistics on.
@@ -212,7 +254,8 @@ Inspectors and admins create and fill in inspections; only admins reopen a final
   progress) and the number of NOK rows, newest first. Search by number, machine or serial number,
   and filter by model and state; the filters are kept in the address, so they survive opening an
   inspection and coming back (with the browser's Back or the page's _← Inspections_).
-- **The page.** A sticky header with the number, machine, state, revision, save status, **Print /
+- **The page.** A sticky header with the number, machine, state, revision, save status,
+  **Preview** (the printout at once, unsaved edits included, see [Printing](#printing)), **Print /
   Save PDF** (see [Printing](#printing)), **Finalise** (or **Reopen**), the tabs _Checklist_ and
   _Deviations (n)_, and the
   progress, e.g. `87 / 104 rows filled · 6 NOK`. _Continue at 3.b_ jumps to the first row without
@@ -222,28 +265,32 @@ Inspectors and admins create and fill in inspections; only admins reopen a final
 
 ### Filling in the checklist
 
-The checklist looks like the printed one. Each row has OK / NOK / N/A, a comment and _Resp_
-(responsible person or department, suggested from earlier deviations). A NOK row gets a red bar and
-a severity (minor unless you pick another). Click a row, or use _Continue at_, then:
+The checklist looks like the printed one. Each row has OK / NOK / N/A, a comment and a
+_Responsible_ department, picked from the list in [Settings](#settings). A NOK row gets a red bar,
+a _Category_ (optional, from the list in Settings) and a severity (minor unless you pick another).
+A value stored before it left the list stays, shown as "Mekanik (not in the list)". Click a row,
+or use _Continue at_, then:
 
-| Key                          | Does                                                              |
-| ---------------------------- | ----------------------------------------------------------------- |
-| `1` or `O`                   | OK, then on to the next row                                       |
-| `2` or `N`                   | NOK; stays on the row for its comment                             |
-| `3` or `A`                   | N/A, then on to the next row                                      |
-| `0`, `Backspace` or `Delete` | Clears the status (so does clicking the selected one again)       |
-| `R`                          | The rest of the row's section OK (as **Set remaining to OK**)     |
-| `↓` / `J`, `↑` / `K`         | Next / previous row, across sections (`Home`, `End`: first, last) |
-| `C`                          | Into the comment                                                  |
-| `G`                          | The row's guide, if it has one (`Esc` closes it)                  |
-| `Tab`                        | Row → comment → resp → severity (NOK rows) → next row             |
-| `Enter` in comment or resp   | On to the next row                                                |
-| `Esc` in a field             | Back to the row                                                   |
+| Key                               | Does                                                                      |
+| --------------------------------- | ------------------------------------------------------------------------- |
+| `1` or `O`                        | OK, then on to the next row                                               |
+| `2` or `N`                        | NOK; stays on the row for its comment                                     |
+| `3` or `A`                        | N/A, then on to the next row                                              |
+| `0`, `Backspace` or `Delete`      | Clears the status (so does clicking the selected one again)               |
+| `R`                               | The rest of the row's section OK (as **Set remaining to OK**)             |
+| `↓` / `J`, `↑` / `K`              | Next / previous row, across sections (`Home`, `End`: first, last)         |
+| `C`                               | Into the comment                                                          |
+| `G`                               | The row's guide, if it has one (`Esc` closes it)                          |
+| `Tab`                             | Row → comment → responsible → category and severity (NOK rows) → next row |
+| `Enter` in comment or responsible | On to the next row                                                        |
+| `Esc` in a field                  | Back to the row                                                           |
+
+In the Responsible and Category selects, letters and arrows pick an entry; they are never
+shortcuts.
 
 Keys typed in a field are text, never shortcuts; `Tab` carries on from a section's last row into
 the next section. **Set remaining to OK** on a section header (or `R` on one of its rows) marks
-every row of that section that has no status yet as OK: mark the exceptions, then fill the rest.
-Resp suggests the names of earlier deviations and the ones already entered in this inspection. A
+every row of that section that has no status yet as OK: mark the exceptions, then fill the rest. A
 row with a guide shows its icon (a camera when it has images); the icon or `G` opens the guide
 (see [Guides](#guides)).
 
@@ -251,13 +298,14 @@ row with a guide shows its icon (a camera when it has images); the icon or `G` o
 
 - **Deviation Summary.** The _Deviations_ tab has a card for every NOK row, in checklist order,
   then for each extra deviation: D-01, the row's ref (a link back to the row), its section, the
-  checkpoint, comment, Resp and severity, and the deviation's photos (see
-  [Deviation photos](#deviation-photos)). A row's comment, Resp and severity are edited in its
-  checklist row. **Add extra deviation** adds a finding that isn't tied to a row; it is edited on
-  its card (Description, Comment, Severity, Resp) and removed with its bin icon, which asks first
-  if anything was typed or a photo added. A NOK row in the checklist shows _Add photo_ or _2
-  photos_ under Resp; a click opens its card's photos (it is not a Tab stop, so transcribing is
-  unchanged). Once finalised, the cards are read-only and a photo opens in a viewer.
+  checkpoint, comment, responsible, category and severity, and the deviation's photos (see
+  [Deviation photos](#deviation-photos)). A row's comment, responsible, category and severity are
+  edited in its checklist row. **Add extra deviation** adds a finding that isn't tied to a row; it
+  is edited on its card (Description, Comment, Severity, Responsible, Category) and removed with
+  its bin icon, which asks first if anything was typed or a photo added. A NOK row in the
+  checklist shows _Add photo_ or _2 photos_ under Responsible; a click opens its card's photos
+  (it is not a Tab stop, so transcribing is unchanged). Once finalised, the cards are read-only
+  and a photo opens in a viewer.
 - **Autosave and conflicts.** As in the template editor: saved about a second after you stop,
   _Saved_ in the header, failed saves retried, a warning before leaving with unsaved changes. If
   someone else saved the inspection in between, nothing is overwritten: the page shows "Someone
@@ -276,10 +324,10 @@ row with a guide shows its icon (a camera when it has images); the icon or `G` o
 Every inspection's deviations are copied into the table `deviations`, the source of the KPIs
 (brief §4): one row per deviation, PartitionKey = model code, RowKey =
 `{inspectionId}_{itemId or extraId}`, with the inspection's number, machine, serial number,
-template revision, the row's section, ref and text, comment, resp, severity, date, `finalised`
-and `createdAt` (when the deviation was first recorded). Each write brings the table in line with
-the inspection: new and changed rows are written, rows of deviations that are gone (a NOK set
-back to OK, a removed extra deviation) are deleted, unchanged rows are left alone.
+template revision, the row's section, ref and text, comment, resp, severity, category, date,
+`finalised` and `createdAt` (when the deviation was first recorded). Each write brings the table
+in line with the inspection: new and changed rows are written, rows of deviations that are gone
+(a NOK set back to OK, a removed extra deviation) are deleted, unchanged rows are left alone.
 
 - A **save** writes the inspection first, then the table. If the table update fails, the save
   still succeeds and the next save repairs the table. After updating the table, every write
@@ -392,6 +440,12 @@ machine name longer than 60 characters is shortened in the footer.
 
 **What to print.**
 
+- **A quick look first**: **Preview** on an inspection shows the printed pages straight away in a
+  full-screen window. Nothing is saved first and no print dialog opens. It shows what is on
+  screen, including changes that are not saved yet, laid out as on paper and scaled to fit a
+  tablet. It opens on the report; _Blank checklist_ switches to the blank checklist. Its **Print /
+  Save PDF** does what the page's does. Escape or **Close** go back to the inspection. A
+  template's **Print preview** never prints by itself, so it is the preview there.
 - **From an inspection**: **Print / Save PDF** → _Blank checklist_ or _Report_. It saves pending
   changes, opens the preview in a new tab and the print dialog once everything (photos, fonts) has
   loaded. The preview's toolbar switches between the two.
@@ -418,11 +472,13 @@ machine name longer than 60 characters is shortened in the footer.
   the status as a symbol and a word (✓ OK, ✗ NOK, – N/A), a NOK row's severity above its comment
   ("Severity: Major"), and Resp.
 - **Deviations**, starting on a new page. _Blank_: the Deviation Summary to fill in by hand, lines
-  D-01 to D-15 (No. | Ref | Description | Severity | Resp | Closed). _Report_: a card per
-  deviation: "D-03 · 4.c · MAJOR" (an extra deviation says "Not on the checklist"), the section,
-  the checkpoint or description, comment, Resp, its photos as marked up (with captions), and a
-  "Closed · Sign · Date" line to sign off. A deviation without photos gets an empty frame to sketch
-  in. "No deviations recorded." when there are none.
+  D-01 to D-15 (No. | Ref | Description | Severity | Category | Resp | Closed). _Report_: a card
+  per deviation: "D-03 · 4.c · MAJOR" (an extra deviation says "Not on the checklist"), the
+  section, the checkpoint or description, comment, Category and Resp ("—" when none), its photos
+  as marked up (with captions), and a "Closed · Sign · Date" line to sign off. A deviation without
+  photos gets an empty frame to sketch in. "No deviations recorded." when there are none.
+
+The printed checklist and cards keep the paper's short "Resp" label; the screens say Responsible.
 
 **2 or 4 deviations per page.** The report's toolbar has _Deviations: 2 per page | 4 per page_
 (kept in the address). With 2, a card has the full width and half a page: one photo prints at
@@ -464,6 +520,14 @@ off), but Word lays out its own pages, so they break differently from the PDF. T
 `– Draft report`, a template's `… – Checklist preview`); a very long name is shortened before
 that last part. The Word library is loaded only on the first export.
 
+## Light and dark theme
+
+**System**, **Light** or **Dark**, at the bottom of the sidebar (and in the tablet menu). System
+follows the device's own light or dark setting and is the default. A choice is kept in this
+browser (localStorage) and also applies to the sign-in and no-access pages. Printouts, the print
+preview and the quick Preview always show white paper, whatever the theme. In the dark theme the
+logo has a white wordmark (`app/public/modig-logo-dark.png`).
+
 ## Insights
 
 Admins only (Insights in the sidebar). The numbers come from the inspection list and the
@@ -485,46 +549,78 @@ Admins only (Insights in the sidebar). The numbers come from the inspection list
   the row was added says nothing about it. A row removed since shows its last ref and text, marked
   "No longer in the checklist".
 - **Charts:** deviations per month (a line; every month of the period, empty ones included),
-  by severity (one bar split into minor, major and critical), and per section, per model and by
-  resp (ranked bars). Sections and resps are grouped ignoring case and surrounding spaces, in the
-  spelling most rows use; extra deviations and deviations without a resp come last.
+  by severity (one bar split into minor, major and critical), and per section, per model, by
+  responsible and by category (ranked bars). Sections, responsibles and categories are grouped
+  ignoring case and surrounding spaces, in the spelling most rows use; extra deviations and
+  deviations without a responsible or category come last ("Not assigned", "No category").
 - **Export CSV** saves the deviation rows behind the page, under the same filters: the table's
-  17 columns in the brief's order, oldest inspection first, rows in checklist order. It is UTF-8
-  with a byte order mark and semicolons, which is what Excel with Swedish regional settings opens
-  directly; Power BI reads it too. A cell that starts with `=`, `+`, `-` or `@` gets a leading `'`
-  so that Excel never runs it as a formula. The file is named after the filters, e.g.
+  18 columns in the brief's order, with `category` after `severity`, oldest inspection first, rows
+  in checklist order. It is UTF-8 with a byte order mark and semicolons, which is what Excel with
+  Swedish regional settings opens directly; Power BI reads it too. A cell that starts with `=`,
+  `+`, `-` or `@` gets a leading `'` so that Excel never runs it as a formula. The file is named
+  after the filters, e.g.
   `Deviations 2025-12-01 to 2026-11-03, RMMG.csv`.
 
 The chart library (Recharts) loads only when Insights opens.
 
+## Settings
+
+Admins only. The Settings page has two cards: _Users & access_, the people who may use the app
+(see [Auth model and roles](#auth-model-and-roles) and [Invite users](#5-invite-users)), and
+_Models, lists & reports_, described here. Everything in _Models, lists & reports_ is saved
+together with one **Save**. Problems (an empty name, a code with other characters, a name that is
+already on its list, ignoring case) are listed after the first try, and the first one gets the
+focus. Leaving the page with unsaved changes asks first. If someone else saved the settings in
+between, nothing is overwritten: the card says so and offers **Reload**.
+
+- **Machine models.** A name and a short code each. A new model's code is suggested from its name
+  ("RigiMill MG" → RMMG, with a number added when that code is taken) and can be changed until it
+  is saved: letters and digits only. After that the code stays, because templates, inspections
+  and the deviation records carry it. Removing a model asks first. Templates and inspections that
+  use it keep its code and show the code where its name was. New templates can't be made for it.
+- **Responsible** (who fixes a deviation) and **Deviation categories** (what kind it is). These
+  are the choices offered on every deviation, in this order. Add an entry (type it and press
+  Enter), rename it in place, move it up or down, or remove it. Each list starts from the
+  defaults: Mechanical, Electrical, Media, Quality, Design, Software, Purchasing; and Markings &
+  labels, Wrong assembly, Missing parts, Damage & scratches, Loose or wrong torque, Leakage,
+  Cleanliness, Cabling & routing, Function & adjustment, Software & parameters, Documentation,
+  Safety. Removing or renaming an entry doesn't change deviations that already use it.
+- **Default location** for new inspections, and the **company name and logo** on printed reports
+  and Word exports. Without a logo of its own, the Modig logo is used.
+
 ## API
 
 Managed Functions under `/api`, all JSON. Every function checks the role itself; errors are
-`{ error, message, details? }`. Saves, publishing, finalising and reopening need the document's
-`ETag` in `If-Match` and get `412` if someone else changed it. A `503` with `unavailable` means
-nothing was changed and the same request can be sent again.
+`{ error, message, details? }`. Saves (settings too), publishing, finalising, reopening and
+deleting a template need the document's `ETag` in `If-Match` and get `412` if someone else changed
+it. A `503` with `unavailable` means nothing was changed and the same request can be sent again.
 
-| Method and route                        | Role      | What                                                             |
-| --------------------------------------- | --------- | ---------------------------------------------------------------- |
-| `GET /api/me`                           | inspector | Name, email and roles of the signed-in user                      |
-| `GET /api/settings`                     | inspector | Machine models, default location, company name                   |
-| `GET /api/templates`                    | inspector | All templates: latest published revision, unpublished changes    |
-| `POST /api/templates`                   | admin     | New template for a machine model without one                     |
-| `GET /api/templates/{id}`               | admin     | The draft, its revision history and its `ETag`                   |
-| `PUT /api/templates/{id}`               | admin     | Save the draft (`If-Match`)                                      |
-| `POST /api/templates/{id}/publish`      | admin     | Publish the draft as the next revision (`If-Match`, change note) |
-| `GET /api/templates/{id}/revisions/{n}` | inspector | A published revision (cached by the browser: it never changes)   |
-| `GET /api/inspections`                  | inspector | All inspections as list rows, newest number first                |
-| `POST /api/inspections`                 | inspector | New inspection from a template's latest published revision       |
-| `GET /api/inspections/{id}`             | inspector | One inspection and its `ETag`                                    |
-| `PUT /api/inspections/{id}`             | inspector | Save front page, results and extra deviations (`If-Match`)       |
-| `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                 |
-| `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                       |
-| `GET /api/resp-suggestions`             | inspector | "Resp" values used in earlier deviations, for autocomplete       |
-| `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)       |
-| `GET /api/insights/export.csv`          | admin     | The deviation rows under the same filters, as a CSV file         |
-| `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                   |
-| `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                |
+| Method and route                        | Role      | What                                                                    |
+| --------------------------------------- | --------- | ----------------------------------------------------------------------- |
+| `GET /api/me`                           | inspector | Name, email and roles of the signed-in user                             |
+| `GET /api/settings`                     | inspector | Machine models, location, company name and logo, the pick lists, `ETag` |
+| `PUT /api/settings`                     | admin     | Save every editable setting (`If-Match`)                                |
+| `GET /api/users`                        | admin     | The people list (name, email, role, added by/when) and its `ETag`       |
+| `PUT /api/users`                        | admin     | Save the people list (`If-Match`, or `If-None-Match: *` for the first)  |
+| `GET /api/people`                       | inspector | Everyone's name by email, to show people by name                        |
+| `GET /api/templates`                    | inspector | All templates: latest published revision, unpublished changes           |
+| `POST /api/templates`                   | admin     | New template for a machine model without one, or for a new model        |
+| `GET /api/templates/{id}`               | admin     | The draft, its revision history and its `ETag`                          |
+| `PUT /api/templates/{id}`               | admin     | Save the draft (`If-Match`)                                             |
+| `DELETE /api/templates/{id}`            | admin     | Delete the draft and every revision (`If-Match`); inspections stay      |
+| `POST /api/templates/import`            | admin     | New draft from a template file (model, name, optional new model)        |
+| `POST /api/templates/{id}/publish`      | admin     | Publish the draft as the next revision (`If-Match`, change note)        |
+| `GET /api/templates/{id}/revisions/{n}` | inspector | A published revision (cached by the browser: it never changes)          |
+| `GET /api/inspections`                  | inspector | All inspections as list rows, newest number first                       |
+| `POST /api/inspections`                 | inspector | New inspection from a template's latest published revision              |
+| `GET /api/inspections/{id}`             | inspector | One inspection and its `ETag`                                           |
+| `PUT /api/inspections/{id}`             | inspector | Save front page, results and extra deviations (`If-Match`)              |
+| `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                        |
+| `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                              |
+| `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)              |
+| `GET /api/insights/export.csv`          | admin     | The deviation rows under the same filters, as a CSV file                |
+| `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                          |
+| `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                       |
 
 ## Seed data
 
@@ -571,17 +667,33 @@ because it usually means the command that produced it failed.
   stops it afterwards; locally it reuses a stack you already started. The tests cover the sign-in
   redirect for pages and the API, the anonymous pre-login files (and that an encoded `../` cannot
   reach the app through them), the sign-in link, the inspector and admin navigation, the no-access
-  page, a deep link, signing out and the seed. For templates: the list, autosave across a reload,
-  `Enter` and `Backspace` (also held down), undoing a delete, a long word at tablet width,
-  dragging a row into another section, the section menu, saving before leaving and the tab-close
-  warning, publishing with a change note, two admins in conflict, a lost save answer, a save after
-  signing out, a cover photo upload (also leaving while it uploads), a new template whose empty
-  row blocks publishing, and the inspector's read-only view (the API refuses their saves with
-  403). For inspections: creating one from the front page form and finding it in the list; a
-  whole checklist filled in from the keyboard (status keys, moving between rows, the comment,
-  the Tab order, Escape, Enter, clearing, Set remaining to OK, the progress) and still there
-  after a reload; the Deviation Summary's order
-  and an extra deviation; the deviation table, read straight from Azurite (every column, the
+  page (and Check again), an admin adding themselves and a colleague in Settings (the invitation,
+  then the colleague signing in by name without any Static Web Apps role, an edit and a removal
+  counting at once), a deep link, signing out and the seed. For the themes: System following the
+  browser's setting, Light and Dark kept over a reload and set before the first paint, the tablet
+  drawer's control in step with the sidebar's, light paper when printing in the dark theme, the
+  anonymous theme script and dark logo, and the sign-in page in the stored or the system theme.
+  For the quick Preview: the report with unsaved edits on white sheets while the app is dark, the
+  switch to the blank checklist, Escape closing it with the focus back on Preview and nothing
+  saved, Close, its Print / Save PDF saving first and printing in a new tab, sheets scaled to a
+  tablet's width with the cards packed as on paper, and a template's print preview never printing
+  by itself. For the settings (`e2e/settings-lists.spec.ts`, run in order because every save
+  changes the settings' one ETag): an admin adding a model and list entries, which inspections
+  then offer, and removing them again; Save after someone else saved refused with Reload, and
+  leaving with changes asking first; and an inspector's save refused with 403. For templates: the
+  list, autosave across a reload, `Enter` and `Backspace` (also held down), undoing a delete, a
+  long word at tablet width, dragging a row into another section, the section menu, saving before
+  leaving and the tab-close warning, publishing with a change note, two admins in conflict, a lost
+  save answer, a save after signing out, a cover photo upload (also leaving while it uploads), a
+  new template whose empty row blocks publishing; spare lines deleted, put back with Undo, added
+  and printed per section; the list shown as cards and remembered; deleting a template (asks
+  first, its inspection kept, its revisions gone); the new machine model fields (suggested code, a
+  taken code refused); Export JSON, a wrong file explained, and Import JSON making a new draft
+  with new ids; and the inspector's read-only view (the API refuses their saves, deletes and
+  imports with 403). For inspections: creating one from the front page form and finding it in the
+  list; a whole checklist filled in from the keyboard (status keys, moving between rows, the
+  comment, the Tab order, Escape, Enter, clearing, Set remaining to OK, the progress) and still
+  there after a reload; the Deviation Summary's order and an extra deviation; the deviation table, read straight from Azurite (every column, the
   `finalised` flag, a row deleted when NOK becomes OK); Finalise blocked by a missing row, its
   jump link, the locked page and the API's 409; Reopen refused to an inspector (403) and done by
   an admin; an inspection unchanged after its template publishes a new revision; and two
@@ -604,10 +716,10 @@ because it usually means the command that produced it failed.
   from the seeded RigiMill MG in the UI, marked from the keyboard, finalised, and its report
   printed from the Print menu. For insights (`e2e/insights.spec.ts`, each test with a model code
   of its own, so other tests' inspections never mix in): the headline numbers, the top
-  checkpoints with their shares, the month, severity, section and resp figures, in-progress
-  inspections joining in, the CSV download (name, header, rows) and no console errors under the
-  Content-Security-Policy; a custom range that ends before it starts; and inspectors refused the
-  page and both endpoints.
+  checkpoints with their shares, the month, severity, section, responsible and category figures,
+  in-progress inspections joining in, the CSV download (name, header, rows) and no console errors
+  under the Content-Security-Policy; a custom range that ends before it starts; and inspectors
+  refused the page and both endpoints.
 - **Print tests** (`e2e/print.spec.ts`) print real PDFs with Chromium's `page.pdf` (A4, the
   page's own `@page` rule, background graphics on) and measure them with `pdfjs-dist`: a blank
   checklist of the 90-row RigiMill MG, a finalised report in both deviation layouts (long
@@ -636,8 +748,10 @@ because it usually means the command that produced it failed.
 The end-to-end tests sign in by setting the SWA CLI's `StaticWebAppsAuthCookie` directly. Each
 test writes its own throwaway templates into the local Azurite (the print tests a copy of the
 seeded checklist) and deletes them afterwards with their inspections, deviation rows and photos,
-so local edits to the seeded RigiMill MG never break them. The New template test needs one
-machine model that has no template yet; the smoke test uses the seeded template as it is.
+so local edits to the seeded RigiMill MG never break them. The New template and Import JSON tests
+need one machine model that has no template yet, and run one after the other; the smoke test uses
+the seeded template as it is. The settings and the people list are one shared document each, so
+those tests add entries named for their own run and remove them afterwards.
 
 CI (`.github/workflows/azure-static-web-apps.yml`) runs `typecheck`, `lint`, `format:check`, a
 Bicep lint, `test` and `build` on every pull request and push to `main`. The end-to-end tests run
@@ -647,7 +761,8 @@ in a separate job that does not block deployment yet.
 
 ```text
 app/      Frontend: Vite, React, TypeScript, Tailwind CSS, React Router, TanStack Query
-  public/   staticwebapp.config.json (routes, roles, headers), login.html, forbidden.html, logo
+  public/   staticwebapp.config.json (routes, roles, headers), login.html, forbidden.html,
+            theme.js, logos
   src/      app shell, pages, apiFetch (lib/api.ts); theme tokens in src/index.css
 api/      Azure Functions (Node v4 model), bundled by esbuild into api/deploy
 shared/   zod schemas and types, numbering (3.c, D-01), roles, storage names: used by all others
@@ -658,10 +773,13 @@ scripts/  swa-start.mjs: the SWA CLI for npm run dev; local-swa-config.mjs: the 
           checking the built app locally
 ```
 
-Branding lives in the colour, spacing, font and radius tokens in `app/src/index.css`. The
-pre-login pages (`app/public/login-assets/auth.css`) mirror a few of them by hand, so change both.
+Branding lives in the colour, spacing, font and radius tokens in `app/src/index.css`. Each colour
+has a light value in `@theme` and a dark one in the dark-theme block below it. The pre-login pages
+(`app/public/login-assets/auth.css`) mirror a few of both by hand, so change all of them.
 `app/public/modig-logo.png` is the official Modig logo and `app/public/favicon.png` is the blue
 swoosh cut from it. To change the logo, replace the PNG and keep the file name.
+`modig-logo-dark.png` is the same logo with the black wordmark made white, for the dark theme;
+replace it together with the logo.
 
 ## Storage layout
 
@@ -674,7 +792,9 @@ templates/{templateId}/draft.json        draft being edited
 templates/{templateId}/rev-{n}.json      published revisions, never changed
 inspections/{inspectionId}.json          with its list row in the blob's metadata
 images/{imageId}.jpg                     photos, and flattened copies of marked-up photos
-config/settings.json                     machine models, default location, company name
+config/settings.json                     machine models, default location, company name and
+                                         logo, Responsible and category lists
+config/people.json                       who may use the app: email, name, role, added by/when
 config/inspection-counter.json           counter for FI-YYYY-NNNN numbers
 table deviations                         one row per deviation, the source for KPIs
 ```
@@ -693,21 +813,38 @@ comes from the Bicep file.
 
 ## Auth model and roles
 
-- Static Web Apps built-in authentication with Microsoft Entra ID (`/.auth/login/aad`). There is
-  no user table and there are no passwords. Other providers (GitHub, X) are switched off.
-- Two roles, assigned with Static Web Apps invitations and always written in lowercase:
-  **`inspector`** creates and fills in inspections; **`admin`** can also edit templates, see
-  insights and change settings. On the Free plan any Microsoft account can sign in, so access
-  depends only on these roles, never on "authenticated". At most 25 invited users.
-- `app/public/staticwebapp.config.json` locks everything, including `/api/*`, to the two roles.
-  The only anonymous paths are `/login.html`, `/forbidden.html`, `/login-assets/auth.js`,
-  `/login-assets/auth.css`, the logo and the favicon, each with its own exact route: an anonymous
-  wildcard such as `/login-assets/*` can be escaped with an encoded `../`. Without a session you
-  are redirected to `/login.html`; with a session but no role you get the no-access page.
-- Every function checks the role again (`endpoint({ role })` in `api/src/lib/http.ts`). Users are
-  identified by their lowercased email, and the display name is derived from it, because Static
-  Web Apps passes no name claim to managed functions.
-- After an invitation or a role change, the person must sign out and in again.
+- Static Web Apps built-in authentication with Microsoft Entra ID (`/.auth/login/aad`). There are
+  no passwords. Other providers (GitHub, X) are switched off.
+- Two roles: **`inspector`** creates and fills in inspections; **`admin`** can also edit
+  templates, see insights and change settings.
+- **Who has which role is decided by the API.** A person's role and the name shown for them come
+  from the people list (`config/people.json`), which admins manage in Settings → Users & access.
+  The list is matched on the sign-in's email (lowercased). Someone not on the list keeps the role
+  of their Static Web Apps role invitation, if they have one (written in lowercase), so access
+  granted the old way keeps working. Their name is then made from their email. A role on the list
+  replaces the invited one.
+- `app/public/staticwebapp.config.json` only asks for a signed-in user (`authenticated`) for the
+  app and `/api/*`: people on the list have no Static Web Apps role. Every function checks the
+  role itself (`endpoint({ role })` in `api/src/lib/http.ts`), and a sign-in without any role gets
+  `403` with "You don't have access to Final Inspection yet…". The app bundle (no data) can be
+  loaded by any signed-in Microsoft account. The only anonymous paths are `/login.html`,
+  `/forbidden.html`, `/login-assets/auth.js`, `/login-assets/auth.css`, `/theme.js`, the two
+  logos and the favicon, each with its own exact route: an anonymous wildcard such as
+  `/login-assets/*` can be escaped with an encoded `../`. Without a session you are redirected to
+  `/login.html`.
+- The pre-login pages and the app ask `/api/me`. With a role you go into the app; without one you
+  get the no-access page, with your email, your account ID and "Check again".
+- A change in Settings counts straight away, with no new sign-in. On a Functions instance other
+  than the one that saved it, it can take up to 5 seconds (each instance caches the list that
+  long). A changed invitation role still applies only from the next sign-in. The app itself reads
+  the person's role once per visit, so its menus follow at their next page load.
+- **What is trusted:** the sign-in's email (`userDetails`) from Static Web Apps' Microsoft
+  sign-in. Microsoft sets it from the account: the UPN for work and school accounts (on a domain
+  the tenant has verified), and the account's email for personal Microsoft accounts (verified when
+  the account is created). Only Microsoft (`aad`) sign-ins are matched against the list.
+- Users are identified by their lowercased email. Documents store emails (`updatedBy`,
+  `finalisedBy`, …) and the app shows names from `GET /api/people`. Someone removed from the list
+  is shown by email again.
 
 ## Deploy to Azure
 
@@ -831,50 +968,48 @@ Add `-- --dry-run` to parse and validate the workbook without writing anything.
 
 ### 5. Invite users
 
-Anyone with a Microsoft account can _sign in_, but only users holding the role `inspector` or
-`admin` get past the login page (`admin` includes everything an inspector can do). Roles are
-assigned with Static Web Apps invitations:
+Anyone with a Microsoft account can _sign in_, but only people the API gives a role get into the
+app (`admin` includes everything an inspector can do).
 
-- **Portal**: Static Web App → _Settings_ → _Role management_ → _Invite_. Provider _Microsoft
-  Entra ID_, the person's email, domain = the site's hostname, role `inspector` or `admin`,
-  expiry in hours. Write the role in lowercase. Send them the generated link; they open it and
-  sign in with that account.
-- **CLI**:
+**The first admin** needs a Static Web Apps role invitation once, because the people list starts
+empty:
 
-  ```bash
-  : "${RG:?run step 1 first}" "${SWA:?run step 1 first}" "${SWA_URL:?run step 1 first}" &&
-  SWA_HOST=${SWA_URL#https://} &&
-  az staticwebapp users invite --name "$SWA" --resource-group "$RG" \
-    --authentication-provider AAD --user-details anna.andersson@example.com \
-    --roles inspector --domain "$SWA_HOST" --invitation-expiration-in-hours 168 \
-    --query invitationUrl --output tsv
+```bash
+: "${RG:?run step 1 first}" "${SWA:?run step 1 first}" "${SWA_URL:?run step 1 first}" &&
+SWA_HOST=${SWA_URL#https://} &&
+az staticwebapp users invite --name "$SWA" --resource-group "$RG" \
+  --authentication-provider AAD --user-details anna.andersson@example.com \
+  --roles admin --domain "$SWA_HOST" --invitation-expiration-in-hours 168 \
+  --query invitationUrl --output tsv
+```
 
-  # Change a role, list users
-  az staticwebapp users update --name "$SWA" --resource-group "$RG" \
-    --authentication-provider AAD --user-details anna.andersson@example.com --roles admin
-  az staticwebapp users list --name "$SWA" --resource-group "$RG" --output table
-  ```
+(or in the portal: Static Web App → _Settings_ → _Role management_ → _Invite_, provider
+_Microsoft Entra ID_, role `admin` in lowercase). They open the link and sign in with that
+account. The link expires after at most 168 hours (7 days); send a new one if it lapses.
 
-Limits: at most **25 users** with a custom role (on every plan), and an invitation link expires
-after at most **168 hours (7 days)**; send a new one if it lapses. Remove someone's access in the
-portal under _Role management_. A user who gets a new role should sign out and in again.
+**Everyone else** is added in the app. In Settings → Users & access, the first admin selects
+**Add yourself** (the list always needs an admin), then **Add person** for each colleague: name,
+the email of their Microsoft account (usually their work email), and a role. The app sends no
+email. It shows an invitation with the app's address and "sign in with your Microsoft account"
+followed by their email, with **Copy invitation** and **Open in email**. Names and roles can be
+changed and people removed in the same place. Changes count straight away, with no new sign-in.
+There is no 25-user cap: that limit applies only to Static Web Apps invitations.
 
-**Invited, but still "You don't have access yet"?** Static Web Apps gives the role to the one
-Microsoft sign-in that accepted the invitation (its account ID), not to the email address. Someone
-with two Microsoft accounts on the same email (a personal account and a work or school account,
-which also happens when a personal address was used to sign up for Azure) can accept with one and
-come back with the other: same email, different account, no role. The no-access page shows the
-**Account ID** of the current sign-in. Compare it with the `UserId` column of
-`az staticwebapp users list`:
+**Invited earlier through Role management?** Those people keep their access with the invited
+role. Add them in Settings to set their name; their role there then counts instead. Removing
+someone in Settings does not remove their invitation: remove that in _Role management_ (or
+`az staticwebapp users update … --roles ""`) to take that access away too.
 
-- **Not in the list:** that sign-in never accepted an invitation. Create a new invitation for the
-  same email and have them open it while signed in with _this_ account (same browser, not a
-  private window). Both sign-ins then have the role, and either one works.
-- **In the list, with the role:** sign out and in again; a role applies from the next sign-in.
+**Still "You don't have access yet"?** The page shows the email they are signed in with. Check
+that this exact email is on the list in Settings, then have them select **Check again**. If
+Microsoft signed them in with a different account (a personal account instead of the work one,
+say), they sign out and use the account that was added. For someone relying on an old
+invitation, the page also shows the **Account ID**, to compare with the `UserId` column of
+`az staticwebapp users list`.
 
-If the app itself is refused while the sign-in has a role, the page says **The server refused a
-request** instead, with the request, its status, the time and the account ID: send that screen
-to whoever maintains the app.
+If the app itself is refused while the API lets the sign-in in, the page says **The server
+refused a request** instead, with the request, its status, the time and the account ID. Send that
+screen to whoever maintains the app.
 
 ### 6. Check the lock after each deploy
 
@@ -905,8 +1040,8 @@ Azure serves its navigation fallback there; only a 302 to github.com means the p
 broken. `/login-assets/..%2findex.html` may also be refused with 400 or 404; only a 200 means the
 app can be reached without signing in.
 
-Then sign in through the site with an invited account and with a non-invited one (the latter must
-land on the "You don't have access yet" page).
+Then sign in through the site with an account that is on the people list (or invited) and with
+one that is neither. The latter must land on the "You don't have access yet" page.
 
 ### Rotating secrets
 
