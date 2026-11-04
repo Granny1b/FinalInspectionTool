@@ -2,7 +2,7 @@ import { CONFLICT_MESSAGE, settingsInput, type SettingsInput } from '@modig/shar
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { LoaderCircle, RefreshCw } from 'lucide-react';
-import { useCallback, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Callout } from '../../components/Callout';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -84,8 +84,7 @@ export function SettingsForm({ loaded, onReload }: Props) {
     upload.then(done, done);
   }, []);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function submit() {
     if (saving || uploads > 0 || !changed || save.status === 'conflict') return;
     setAttempted(true);
     const found = formErrors(form);
@@ -115,7 +114,9 @@ export function SettingsForm({ loaded, onReload }: Props) {
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} noValidate>
+    // Not a <form>: its confirmation dialogs are forms of their own, and Enter in a list's field
+    // is for that list (the field to add an entry takes it), not for saving everything.
+    <div>
       <MachineModelsEditor
         models={form.models}
         errors={errors}
@@ -253,7 +254,7 @@ export function SettingsForm({ loaded, onReload }: Props) {
           </p>
           {/* aria-disabled, not disabled: a disabled button would drop the keyboard focus. */}
           <Button
-            type="submit"
+            onClick={() => void submit()}
             aria-disabled={
               saving || uploads > 0 || !changed || save.status === 'conflict' || undefined
             }
@@ -275,6 +276,6 @@ export function SettingsForm({ loaded, onReload }: Props) {
           onCancel={leaveGuard.stay}
         />
       )}
-    </form>
+    </div>
   );
 }

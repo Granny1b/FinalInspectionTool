@@ -2,6 +2,7 @@ import {
   CONFLICT_MESSAGE,
   InspectionSchema,
   newId,
+  SettingsSchema,
   TemplateDetailSchema,
   type Inspection,
   type InspectionDraftInput,
@@ -99,6 +100,21 @@ function save(
   });
 }
 
+/**
+ * The settings' Responsible and category lists, which the selects offer. Tests pick from their
+ * first two entries: another test may add entries at the end meanwhile, never before them.
+ */
+async function pickLists(
+  request: APIRequestContext,
+): Promise<{ responsibles: string[]; categories: string[] }> {
+  const response = await request.get('/api/settings');
+  expect(response.status()).toBe(200);
+  const { responsibles, deviationCategories } = SettingsSchema.parse(await response.json());
+  expect(responsibles.length).toBeGreaterThanOrEqual(2);
+  expect(deviationCategories.length).toBeGreaterThanOrEqual(2);
+  return { responsibles, categories: deviationCategories };
+}
+
 /** Row ids by section: [[1.a, 1.b, 1.c], [2.a, 2.b, 2.c]]. */
 const rowIds = (template: Template) =>
   template.sections.map((section) => section.items.map((item) => item.id));
@@ -108,8 +124,12 @@ const pressed = (page: Page, itemId: string) => row(page, itemId).locator('[aria
 const segment = (page: Page, itemId: string, label: 'OK' | 'NOK' | 'N/A') =>
   row(page, itemId).getByRole('button', { name: label, exact: true });
 const comment = (page: Page, itemId: string) => page.locator(`[data-comment="${itemId}"]`);
+/** The row's Responsible select. */
 const resp = (page: Page, itemId: string) => page.locator(`[data-resp="${itemId}"]`);
-const severity = (page: Page, itemId: string) => row(page, itemId).locator('select');
+/** A NOK row's Category select. */
+const category = (page: Page, itemId: string) => page.locator(`[data-category="${itemId}"]`);
+const severity = (page: Page, itemId: string) =>
+  row(page, itemId).getByRole('combobox', { name: /^Severity, row / });
 /** "Saved", "Unsaved changes", "Saving…", "Not saved — Reload" or "Couldn’t save — Retry". */
 const saveStatus = (page: Page) => page.locator('main header [role="status"]');
 /** "4 / 6 rows filled · 2 NOK" in the sticky header. */
@@ -118,7 +138,10 @@ const deviationsTab = (page: Page) => page.getByRole('tab', { name: /^Deviations
 const summaryCards = (page: Page) =>
   page.getByRole('region', { name: 'Deviation Summary' }).locator('article[data-deviation]');
 
-/** A row deviation's card: number, ref (a link to the row), checkpoint, severity, comment, resp. */
+/**
+ * A row deviation's card: number, ref (a link to the row), checkpoint, severity, and its details:
+ * comment, responsible and category.
+ */
 async function expectRowCard(
   card: Locator,
   expected: { number: string; ref: string; text: string; severity: string; details: string[] },
@@ -246,6 +269,7 @@ test.describe('an inspector', () => {
     inspections,
   }) => {
     const [[a1, b1, c1], [a2, b2, c2]] = rowIds(published) as [string[], string[]];
+    const { responsibles } = await pickLists(page.request);
     const loaded = await inspections.create(page.request, published, `Keyboard – ${published.id}`);
     await openInspection(page, loaded);
     await expect(page.getByRole('list', { name: 'Keyboard shortcuts' })).toBeVisible();
@@ -260,7 +284,8 @@ test.describe('an inspector', () => {
     await expect(pressed(page, a1!)).toHaveText('OK');
     await expect(row(page, b1!)).toBeFocused();
 
-    // 2 = NOK stays on the row, which asks for a severity. Tab: comment, resp, severity, next row.
+    // 2 = NOK stays on the row, which asks for a category and a severity. Tab: comment,
+    // responsible, category, severity, next row.
     await page.keyboard.press('2');
     await expect(pressed(page, b1!)).toHaveText('NOK');
     await expect(row(page, b1!)).toBeFocused();
@@ -270,7 +295,13 @@ test.describe('an inspector', () => {
     await page.keyboard.type('Oil leak at the pump, check again');
     await page.keyboard.press('Tab');
     await expect(resp(page, b1!)).toBeFocused();
-    await page.keyboard.type('Mekanik');
+    // Responsible is a select of the settings' list: ↓ picks the first, and is no shortcut.
+    await page.keyboard.press('ArrowDown');
+    await expect(resp(page, b1!)).toHaveValue(responsibles[0]!);
+    await expect(row(page, b1!)).not.toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(category(page, b1!)).toBeFocused();
+    await expect(category(page, b1!)).toHaveValue('');
     await page.keyboard.press('Tab');
     await expect(severity(page, b1!)).toBeFocused();
     await expect(severity(page, b1!)).toHaveValue('minor');
@@ -350,7 +381,7 @@ test.describe('an inspector', () => {
       [b1!]: {
         status: 'NOK',
         comment: 'Oil leak at the pump, check again',
-        resp: 'Mekanik',
+        resp: responsibles[0],
         severity: 'major',
       },
       [c1!]: { status: 'NA' },
@@ -368,7 +399,7 @@ test.describe('an inspector', () => {
     await expect(progress(page)).toHaveText('6 / 6 rows filled · 2 NOK');
     await expect(pressed(page, b1!)).toHaveText('NOK');
     await expect(comment(page, b1!)).toHaveValue('Oil leak at the pump, check again');
-    await expect(resp(page, b1!)).toHaveValue('Mekanik');
+    await expect(resp(page, b1!)).toHaveValue(responsibles[0]!);
     await expect(severity(page, b1!)).toHaveValue('major');
     await expect(pressed(page, c1!)).toHaveText('N/A');
 
@@ -389,6 +420,7 @@ test.describe('an inspector', () => {
   }) => {
     const [[, , c1], [, b2]] = rowIds(published) as [string[], string[]];
     const [one, two] = published.sections;
+    const { responsibles, categories } = await pickLists(page.request);
     const loaded = await inspections.create(
       page.request,
       published,
@@ -404,10 +436,11 @@ test.describe('an inspector', () => {
     await expect(row(page, b2!)).toBeFocused();
     await expect(row(page, b2!)).toHaveCSS('outline-style', 'solid');
     await comment(page, b2!).fill('Coolant nozzle bent');
-    await resp(page, b2!).fill('Mekanik');
+    await resp(page, b2!).selectOption(responsibles[0]!);
     await segment(page, c1!, 'NOK').click();
     await comment(page, c1!).fill('Gap of 12 mm under the fence');
-    await resp(page, c1!).fill('El-avdelningen');
+    await resp(page, c1!).selectOption(responsibles[1]!);
+    await category(page, c1!).selectOption(categories[0]!);
     await expect(deviationsTab(page)).toHaveText(/^Deviations\s*2$/);
 
     await deviationsTab(page).click();
@@ -417,14 +450,14 @@ test.describe('an inspector', () => {
       ref: '1.c',
       text: one!.items[2]!.text,
       severity: 'Minor',
-      details: ['Gap of 12 mm under the fence', 'El-avdelningen'],
+      details: ['Gap of 12 mm under the fence', responsibles[1]!, categories[0]!],
     });
     await expectRowCard(summaryCards(page).nth(1), {
       number: 'D-02',
       ref: '2.b',
       text: two!.items[1]!.text,
       severity: 'Minor',
-      details: ['Coolant nozzle bent', 'Mekanik'],
+      details: ['Coolant nozzle bent', responsibles[0]!, '—'],
     });
 
     // An extra deviation, not tied to a row, filled in from the keyboard.
@@ -436,8 +469,17 @@ test.describe('an inspector', () => {
     await page.keyboard.press('Tab');
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Tab');
-    await page.keyboard.type('Dokumentation');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('combobox', { name: 'Severity, D-03' })).toHaveValue('major');
+    await expect(page.getByRole('combobox', { name: 'Responsible, D-03' })).toHaveValue(
+      responsibles[0]!,
+    );
+    await expect(page.getByRole('combobox', { name: 'Category, D-03' })).toHaveValue(
+      categories[1]!,
+    );
     await expect(deviationsTab(page)).toHaveText(/^Deviations\s*3$/);
 
     // Saved, and mirrored row by row in the deviations table (brief §4), KPI columns included.
@@ -446,9 +488,9 @@ test.describe('an inspector', () => {
       .poll(async () => {
         const saved = (await stored(page.request, inspection.id)).inspection;
         extraId = saved.extraDeviations[0]?.id ?? '';
-        return saved.extraDeviations[0]?.resp;
+        return saved.extraDeviations[0]?.category;
       })
-      .toBe('Dokumentation');
+      .toBe(categories[1]);
     const common = {
       partitionKey: 'E2E',
       inspectionId: inspection.id,
@@ -471,8 +513,9 @@ test.describe('an inspector', () => {
         displayRef: '1.c',
         checkpointText: one!.items[2]!.text,
         comment: 'Gap of 12 mm under the fence',
-        resp: 'El-avdelningen',
+        resp: responsibles[1],
         severity: 'minor',
+        category: categories[0],
       },
       {
         ...common,
@@ -482,8 +525,9 @@ test.describe('an inspector', () => {
         displayRef: '2.b',
         checkpointText: two!.items[1]!.text,
         comment: 'Coolant nozzle bent',
-        resp: 'Mekanik',
+        resp: responsibles[0],
         severity: 'minor',
+        category: '',
       },
       {
         ...common,
@@ -493,8 +537,9 @@ test.describe('an inspector', () => {
         displayRef: '—',
         checkpointText: 'Operator manual missing',
         comment: 'Ordered from documentation',
-        resp: 'Dokumentation',
+        resp: responsibles[0],
         severity: 'major',
+        category: categories[1],
       },
     ].sort((a, b) => a.rowKey.localeCompare(b.rowKey));
     await expect.poll(() => deviationRows(inspection.id)).toEqual(expectedRows);
@@ -533,34 +578,45 @@ test.describe('an inspector', () => {
     ).toBeVisible();
   });
 
-  test('Resp suggests names typed in this inspection once their field is left', async ({
+  test('Responsible offers the settings’ list and keeps a value that is not on it', async ({
     page,
     published,
     inspections,
   }) => {
     const [[a1, b1]] = rowIds(published) as [string[]];
-    const loaded = await inspections.create(page.request, published, `Resp – ${published.id}`);
-    await openInspection(page, loaded);
-    const name = `Svets ${published.id}`;
-    const listId = await resp(page, a1!).getAttribute('list');
-    const suggested = () =>
-      page
-        .locator(`datalist[id="${listId}"] option`)
-        .evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
+    const { responsibles } = await pickLists(page.request);
+    const created = await inspections.create(
+      page.request,
+      published,
+      `Responsible – ${published.id}`,
+    );
+    // Typed before Responsible was a list (or removed from it since): kept as it is.
+    const offList = `Svets ${published.id}`;
+    expect((await save(page.request, created, { [a1!]: { resp: offList } })).status()).toBe(200);
+    await openInspection(page, created);
 
-    // The text being typed is never offered to its own field (it would come first).
-    await resp(page, a1!).pressSequentially(name.slice(0, 3));
-    await expect(resp(page, a1!)).toHaveValue(name.slice(0, 3));
-    expect(await suggested()).not.toContain(name.slice(0, 3));
-    await resp(page, a1!).fill(name);
-    expect(await suggested()).not.toContain(name);
+    const options = (itemId: string) => resp(page, itemId).locator('option').allTextContents();
+    await expect.poll(() => options(b1!)).toEqual(expect.arrayContaining(responsibles));
+    expect((await options(b1!))[0]).toBe('Responsible');
+    await expect(resp(page, a1!)).toHaveValue(offList);
+    expect((await options(a1!)).slice(0, 3)).toEqual([
+      'Responsible',
+      `${offList} (not in the list)`,
+      responsibles[0],
+    ]);
 
-    // Once the field is left, the name is offered to the others.
-    await page.keyboard.press('Tab');
-    await expect.poll(suggested).toContain(name);
-    await resp(page, b1!).pressSequentially('Sv');
-    expect(await suggested()).not.toContain('Sv');
-    expect(await suggested()).toContain(name);
+    // Picking another can be undone while the page is open; none is a choice too.
+    await resp(page, a1!).selectOption(responsibles[1]!);
+    expect(await options(a1!)).toContain(`${offList} (not in the list)`);
+    await resp(page, b1!).selectOption(responsibles[1]!);
+    await expect
+      .poll(async () => (await stored(page.request, created.inspection.id)).inspection.results)
+      .toEqual({ [a1!]: { resp: responsibles[1] }, [b1!]: { resp: responsibles[1] } });
+    await resp(page, a1!).selectOption(offList);
+    await resp(page, b1!).selectOption('');
+    await expect
+      .poll(async () => (await stored(page.request, created.inspection.id)).inspection.results)
+      .toEqual({ [a1!]: { resp: offList } });
   });
 
   test('a participant typed but not yet added counts as unsaved', async ({

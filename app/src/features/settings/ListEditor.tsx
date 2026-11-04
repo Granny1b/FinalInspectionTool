@@ -2,7 +2,6 @@ import clsx from 'clsx';
 import { ArrowDown, ArrowUp, Plus, Trash2, type LucideIcon } from 'lucide-react';
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '../../components/Button';
-import { buttonClasses } from '../../components/buttonClasses';
 import { INPUT } from '../../components/Field';
 import {
   addEntry,
@@ -197,7 +196,7 @@ export function ListEditor({
             setAddError(null);
           }}
           onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
-            // Enter adds the name instead of saving the whole form.
+            // Enter adds the name, as the Add button does.
             if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
             event.preventDefault();
             add();
@@ -242,12 +241,11 @@ function IconButton({ icon: Icon, label, action, inert, danger, onClick }: IconB
       onClick={() => {
         if (!inert) onClick();
       }}
-      className={buttonClasses(
-        'ghost',
-        clsx(
-          'size-9 shrink-0 px-0 aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ink-600 pointer-coarse:size-11',
-          danger && 'hover:bg-nok-bg hover:text-nok-fg',
-        ),
+      className={clsx(
+        'flex size-9 shrink-0 items-center justify-center rounded-md text-ink-500 transition-colors pointer-coarse:size-11',
+        'aria-disabled:cursor-default aria-disabled:opacity-40',
+        !inert &&
+          (danger ? 'hover:bg-nok-bg hover:text-nok-fg' : 'hover:bg-ink-100 hover:text-ink-900'),
       )}
     >
       <Icon size={16} aria-hidden="true" />

@@ -5,7 +5,7 @@ import {
   type Severity,
 } from '@modig/shared';
 import clsx from 'clsx';
-import { useId, type KeyboardEvent, type ReactNode } from 'react';
+import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { INPUT } from '../../components/Field';
 import { singleLine } from '../templates/document/ops';
 import { ChoiceOptions } from './ChoiceOptions';
@@ -39,6 +39,8 @@ export function ExtraDeviationFields({
   const severityId = useId();
   const respId = useId();
   const categoryId = useId();
+  // As stored when the card opened: a value off the list stays on offer after another is picked.
+  const [opened] = useState(deviation);
   const { key: id, number } = deviation;
   return (
     // Its own container: the three selects share a line once the text column is wide enough.
@@ -94,7 +96,12 @@ export function ExtraDeviationFields({
             onChange={(event) => onUpdate(id, { resp: event.target.value })}
             className={clsx(INPUT, 'h-9')}
           >
-            <ChoiceOptions list={responsibles} value={deviation.resp} empty="—" />
+            <ChoiceOptions
+              list={responsibles}
+              value={deviation.resp}
+              initial={opened.resp}
+              empty="—"
+            />
           </select>
         </Labelled>
         <Labelled htmlFor={categoryId} label="Category">
@@ -105,7 +112,12 @@ export function ExtraDeviationFields({
             onChange={(event) => onUpdate(id, { category: event.target.value })}
             className={clsx(INPUT, 'h-9')}
           >
-            <ChoiceOptions list={categories} value={deviation.category} empty="—" />
+            <ChoiceOptions
+              list={categories}
+              value={deviation.category}
+              initial={opened.category}
+              empty="—"
+            />
           </select>
         </Labelled>
       </div>

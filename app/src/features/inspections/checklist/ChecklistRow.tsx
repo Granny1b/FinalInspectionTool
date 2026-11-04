@@ -11,7 +11,7 @@ import {
   type Severity,
 } from '@modig/shared';
 import clsx from 'clsx';
-import { memo, useId, type KeyboardEvent } from 'react';
+import { memo, useId, useState, type KeyboardEvent } from 'react';
 import { singleLine } from '../../templates/document/ops';
 import { IssueNote } from '../../templates/document/parts';
 import { ChoiceOptions } from '../ChoiceOptions';
@@ -65,6 +65,8 @@ export const ChecklistRow = memo(function ChecklistRow({
   const status = result?.status;
   const resp = result?.resp ?? '';
   const category = result?.category ?? '';
+  // As stored when the page opened: a value off the list stays on offer after another is picked.
+  const [opened] = useState(result);
   // Photos belong to the row's deviation, so they count only while it is NOK.
   const photos = status === 'NOK' ? (result?.photos?.length ?? 0) : 0;
   const statusId = useId();
@@ -170,6 +172,7 @@ export const ChecklistRow = memo(function ChecklistRow({
             <ChoiceOptions
               list={responsibles}
               value={resp}
+              initial={opened?.resp}
               empty="Responsible"
               optionClassName="text-ink-900"
             />
@@ -188,7 +191,12 @@ export const ChecklistRow = memo(function ChecklistRow({
               onKeyDown={onFieldKeyDown('category')}
               className={clsx(FIELD, CONTROL_HEIGHT, 'flex-1 @min-[34rem]:max-w-64')}
             >
-              <ChoiceOptions list={categories} value={category} empty="—" />
+              <ChoiceOptions
+                list={categories}
+                value={category}
+                initial={opened?.category}
+                empty="—"
+              />
             </select>
           </label>
         )}

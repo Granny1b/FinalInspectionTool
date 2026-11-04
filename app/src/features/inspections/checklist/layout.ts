@@ -55,10 +55,12 @@ export const FIELD =
 
 /**
  * A row's Responsible select while it is empty: its "Responsible" reads like the placeholder of a
- * text field, and on wide sheets, where the column label says it, it is hidden as they are. Its
- * options set their own colour, so the open list never inherits the hidden text.
+ * text field, and on wide sheets, where the column label says it, it is hidden as they are
+ * until the keyboard reaches it (then it shows it is a list). Its options set their own colour,
+ * so the open list never inherits the hidden text.
  */
-export const EMPTY_SELECT = 'data-empty:text-ink-500 @min-[56rem]:data-empty:text-transparent';
+export const EMPTY_SELECT =
+  'data-empty:text-ink-500 @min-[56rem]:data-empty:not-focus-visible:text-transparent';
 
 /** "Row 3.c has no status." (brief §5.3 Finalise): red outline and tint, as in the template editor. */
 export const ISSUE_OUTLINE = 'bg-nok-bg outline-1 -outline-offset-1 outline-nok-fg';

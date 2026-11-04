@@ -60,8 +60,8 @@ export function formFromInput(input: SettingsInput): SettingsForm {
 
 /**
  * The form after a save of `sent`, which the server stored as `stored` (trimmed). Rows keep
- * their keys, so the field that had the focus (Enter saves) keeps it. Changes made while the save
- * ran are kept, still unsaved; either way every model that was saved now has a fixed code.
+ * their keys, so their fields (and the focus in one) stay. Changes made while the save ran are
+ * kept, still unsaved; either way every model that was saved now has a fixed code.
  */
 export function savedForm(
   form: SettingsForm,

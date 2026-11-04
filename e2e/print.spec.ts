@@ -251,6 +251,9 @@ function smallestRowPitch(pages: PdfPage[]): number {
 function expectBlankDeviationTable(pages: PdfPage[]): void {
   const summary = pages.filter(isDeviationPage);
   expect(summary.map((page) => page.number)).toEqual([pages.length]);
+  expect(pageText(summary[0]!)).toContain(
+    compact('No.RefDescriptionSeverityCategoryRespClosed (sign/date)'),
+  );
   const lines = summary[0]!.texts.filter((text) => /^D-\d{2}$/.test(text.text));
   expect(lines.map((text) => text.text)).toEqual(
     Array.from({ length: 15 }, (_, index) => deviationNumber(index)),
@@ -258,7 +261,14 @@ function expectBlankDeviationTable(pages: PdfPage[]): void {
   expect(refsOn(summary[0]!)).toEqual([]);
 }
 
-type ExpectedCard = { number: string; text: string; comment: string; photos: number };
+type ExpectedCard = {
+  number: string;
+  text: string;
+  comment: string;
+  /** The category and Resp lines, "—" for none. */
+  details: string;
+  photos: number;
+};
 
 /** Card numbers in pages of `perPage`: the layout when every card fits its share. */
 const pagesOf = (cards: ExpectedCard[], perPage: number) =>
@@ -269,7 +279,8 @@ const pagesOf = (cards: ExpectedCard[], perPage: number) =>
 /**
  * The report's deviation pages, after the checklist, hold the cards as `layout` says (card
  * numbers per page). Each page is headed with the inspection and its range of cards; each card is
- * whole on its page (number, text, comment and its Closed line) with its photos painted there.
+ * whole on its page (number, text, comment, category, Resp and its Closed line) with its photos
+ * painted there.
  */
 function expectCards(
   pages: PdfPage[],
@@ -300,7 +311,7 @@ function expectCards(
     ).toHaveLength(onPage.length);
     for (const card of onPage) {
       expect(pageText(page), `${card.number} whole on ${where}`).toContain(
-        compact(card.text + card.comment),
+        compact(card.text + card.comment + card.details),
       );
     }
     expect(page.images, `photos on ${where}`).toBe(
@@ -373,6 +384,7 @@ function expectedCards(
     number: deviationNumber(index),
     text: card.text,
     comment: card.comment ?? '',
+    details: `Category${card.category || '—'}Resp${card.resp || '—'}`,
     photos: card.photos?.length ?? 0,
   }));
 }
@@ -421,6 +433,7 @@ async function createReport(
         comment: LONG_COMMENTS[0],
         resp: 'Montage',
         severity: 'major',
+        category: 'Loose or wrong torque',
         photos: [photo(0, 'Left lifting column, upper screws'), photo(1, 'The same screws', false)],
       },
     },
@@ -460,6 +473,7 @@ async function createReport(
       comment: 'Touch up before shipping.',
       resp: 'Lackering',
       severity: 'minor',
+      category: 'Damage & scratches',
       photos: [photo(4, 'Right-hand door')],
     },
     {
@@ -1169,6 +1183,7 @@ test('reference images print in an appendix, two to a row, captioned with ref an
   const nok = {
     text: inspection.templateSnapshot.sections[0]!.items[1]!.text,
     comment: NOK_COMMENT,
+    details: 'Category—Resp—',
   };
   expectCards(pages, [{ number: 'D-01', ...nok, photos: 0 }], [['D-01']], inspection.number);
   expectAppendix(appendixPages, rows);

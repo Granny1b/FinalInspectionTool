@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { offListLabel, offListValue } from './choices';
+import { offListLabel, offListValues } from './choices';
 
 const LIST = ['Mechanical', 'Electrical'];
 
-describe('offListValue', () => {
-  it('is null for no value and for a value on the list', () => {
-    expect(offListValue(LIST, undefined)).toBeNull();
-    expect(offListValue(LIST, '')).toBeNull();
-    expect(offListValue(LIST, 'Electrical')).toBeNull();
+describe('offListValues', () => {
+  it('is empty for no value and for values on the list', () => {
+    expect(offListValues(LIST, [undefined, ''])).toEqual([]);
+    expect(offListValues(LIST, ['Electrical', 'Mechanical'])).toEqual([]);
   });
 
   it('keeps a value that is not on the list exactly as stored', () => {
-    expect(offListValue(LIST, 'Mekanik')).toBe('Mekanik');
+    expect(offListValues(LIST, ['Mekanik'])).toEqual(['Mekanik']);
     // Matched exactly: another spelling is another value, and stays as it was stored.
-    expect(offListValue(LIST, 'mechanical')).toBe('mechanical');
-    expect(offListValue([], 'Mechanical')).toBe('Mechanical');
+    expect(offListValues(LIST, ['mechanical'])).toEqual(['mechanical']);
+    expect(offListValues([], ['Mechanical'])).toEqual(['Mechanical']);
+  });
+
+  it('keeps the value the page opened with after another was picked, each value once', () => {
+    expect(offListValues(LIST, ['Electrical', 'Mekanik'])).toEqual(['Mekanik']);
+    expect(offListValues(LIST, ['Mekanik', 'Mekanik'])).toEqual(['Mekanik']);
+    expect(offListValues(LIST, ['Svets', 'Mekanik'])).toEqual(['Svets', 'Mekanik']);
   });
 
   it('labels it as not in the list', () => {
