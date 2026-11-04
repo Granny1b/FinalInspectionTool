@@ -39,9 +39,13 @@
   --color-ink-900: #161b21;
   --color-ink-950: #0b0e12;
 
-  /* Layout surfaces: white cards on a very light grey app background. */
+  /* Layout surfaces: white cards on a very light grey app background. `raised` is the chosen
+     segment of a segmented control, on its ink-100 track; `overlay` is a menu, popover or dialog
+     above the cards. Both are white here; the dark theme lifts them off the surface. */
   --color-canvas: #f6f7f9;
   --color-surface: #ffffff;
+  --color-raised: #ffffff;
+  --color-overlay: #ffffff;
 
   /* Nearly the same in both themes: paper is white (photo mattes, printed sheets), a scrim
      darkens what is behind a dialog or under a control on a photo, and photos are viewed and
@@ -71,9 +75,10 @@
   --color-na-fg: #58616c;
   --color-na-border: #d6dbe0;
 
-  /* Deviation severity in Insights: one red ramp, minor → critical (critical is NOK red). Checked
-     as an ordinal ramp: lightness falls in visible steps, and minor still shows on white (2.2:1). */
-  --color-severity-minor: #f19a90;
+  /* Deviation severity, in Insights and on the critical badge of a deviation card: minor is a
+     neutral grey (as its badge), major and critical are red, critical the strongest (NOK red).
+     Minor still shows on white (1.9:1) beside a labelled legend. */
+  --color-severity-minor: #b4bcc6;
   --color-severity-major: #dc5a4b;
   --color-severity-critical: #b42318;
   /* A label on each fill, at 4.5:1 or more. */
@@ -157,6 +162,10 @@
 
       --color-canvas: #0f1216;
       --color-surface: #171b21;
+      /* Lighter than the track and the surface: in the dark, elevation is lightness (a shadow
+         doesn't show on near-black). */
+      --color-raised: #353c46;
+      --color-overlay: #232931;
 
       --color-scrim: #05070a;
       --color-stage: #0b0e12;
@@ -175,7 +184,7 @@
       --color-na-fg: #a7b0ba;
       --color-na-border: #3c444e;
 
-      --color-severity-minor: #8c3a31;
+      --color-severity-minor: #6c7682;
       --color-severity-major: #c8483a;
       --color-severity-critical: #f68174;
       --color-on-severity-minor: #ffffff;
