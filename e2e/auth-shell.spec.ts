@@ -189,8 +189,10 @@ test.describe('signed in', () => {
       await invitation.getByRole('button', { name: 'Done' }).click();
       await expect(invitation).toBeHidden();
       const personRow = card.getByRole('row').filter({ hasText: personEmail });
+      // Person, role, added, actions.
+      const roleCell = personRow.getByRole('cell').nth(1);
       await expect(personRow).toContainText('Petra Persson');
-      await expect(personRow).toContainText('Inspector');
+      await expect(roleCell).toHaveText('Inspector');
       await expect(personRow).toContainText('by Ada Admin');
 
       // Petra signs in with no Static Web Apps role at all.
@@ -207,6 +209,28 @@ test.describe('signed in', () => {
         // The sign-in page, asked by someone the API lets in, goes straight into the app.
         await petraPage.goto('/login.html');
         await expect(petraPage).toHaveURL(/\/inspections$/);
+
+        // An edit counts at once, without signing in again.
+        await personRow.getByRole('button', { name: 'Edit Petra Persson' }).click();
+        const edit = page.getByRole('dialog', { name: 'Edit Petra Persson' });
+        await edit.getByLabel('Name', { exact: true }).fill('Petra Pettersson');
+        await edit.getByRole('radio', { name: /^Admin/ }).check();
+        await edit.getByRole('button', { name: 'Save', exact: true }).click();
+        await expect(edit).toBeHidden();
+        await expect(personRow).toContainText('Petra Pettersson');
+        await expect(roleCell).toHaveText('Admin');
+        expect(await (await petraPage.request.get('/api/me')).json()).toMatchObject({
+          name: 'Petra Pettersson',
+          roles: ['admin'],
+        });
+
+        // So does removing her, after a confirmation.
+        await personRow.getByRole('button', { name: 'Remove Petra Pettersson' }).click();
+        const confirm = page.getByRole('dialog', { name: 'Remove Petra Pettersson?' });
+        await confirm.getByRole('button', { name: 'Remove', exact: true }).click();
+        await expect(personRow).toHaveCount(0);
+        await expect(card.getByText('Petra Pettersson was removed.')).toBeVisible();
+        expect((await petraPage.request.get('/api/me')).status()).toBe(403);
       } finally {
         await petra.close();
       }

@@ -1,7 +1,7 @@
 import type { Person } from '@modig/shared';
 import clsx from 'clsx';
 import { ChevronRight, RefreshCw, Search, UserRoundPlus, UsersRound } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Callout } from '../../components/Callout';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -71,6 +71,8 @@ function PeopleEditor({ users }: { users: LoadedUsers }) {
   const [dialog, setDialog] = useState<PersonDialogMode | null>(null);
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeIssue, setRemoveIssue] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<string | null>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
 
   const sorted = useMemo(() => sortPeople(users.people), [users.people]);
   const visible = useMemo(() => filterPeople(sorted, query), [sorted, query]);
@@ -80,10 +82,21 @@ function PeopleEditor({ users }: { users: LoadedUsers }) {
 
   function confirmRemove(person: Person) {
     setRemoving(null);
+    setRemoved(null);
     const next = removePerson(users.people, person.email);
     const problem = listIssue(next);
     setRemoveIssue(problem);
-    if (!problem) remove.mutate({ people: next, from: users });
+    if (problem) return;
+    remove.mutate(
+      { people: next, from: users },
+      {
+        onSuccess: () => {
+          setRemoved(`${person.name} was removed.`);
+          // Their row, and the button that had the focus, are gone.
+          addRef.current?.focus();
+        },
+      },
+    );
   }
 
   const removeFailure =
@@ -147,9 +160,11 @@ function PeopleEditor({ users }: { users: LoadedUsers }) {
         )}
         <p className="text-sm text-ink-500">
           {count(users.people.length, 'person', 'people')} · {count(admins, 'admin', 'admins')}
-          {remove.isPending && <span role="status"> · Saving…</span>}
+          <span role="status">
+            {remove.isPending ? ' · Saving…' : removed ? ` · ${removed}` : ''}
+          </span>
         </p>
-        <Button className="ml-auto" onClick={() => setDialog({ kind: 'add' })}>
+        <Button ref={addRef} className="ml-auto" onClick={() => setDialog({ kind: 'add' })}>
           <UserRoundPlus size={16} aria-hidden="true" />
           Add person
         </Button>
