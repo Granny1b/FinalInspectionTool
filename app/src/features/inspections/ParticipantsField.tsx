@@ -80,7 +80,8 @@ export function ParticipantsField({ control, value, onChange, pending }: Props) 
                   onChange(value.filter((other) => other !== name));
                   inputRef.current?.focus();
                 }}
-                className="flex size-5 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-200 hover:text-ink-900"
+                // The hit area reaches 4 px past the 20 px circle, short of the next row's chips.
+                className="relative flex size-5 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors after:absolute after:-inset-1 hover:bg-ink-200 hover:text-ink-900"
               >
                 <X size={12} aria-hidden="true" />
               </button>

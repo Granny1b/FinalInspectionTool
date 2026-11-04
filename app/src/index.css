@@ -195,6 +195,15 @@
     outline-offset: 2px;
   }
 
+  /* Below `lg` the top bar (layout.ts, MOBILE_BAR: 3.5rem) sticks to the top: whatever is scrolled
+     into view, by the focus moving backwards or a link to an id, stops below it rather than
+     under it. Pages with a sticky header of their own set a larger value. */
+  @media (width < 64rem) {
+    html {
+      scroll-padding-top: 4.5rem;
+    }
+  }
+
   /* A modal <dialog> (the navigation drawer) makes the page inert but would let it scroll. */
   html:has(dialog:modal) {
     overflow: hidden;

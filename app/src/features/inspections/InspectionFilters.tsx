@@ -32,8 +32,9 @@ export function InspectionFilters({ filter, models, onChange }: Props) {
           className={clsx(INPUT, 'h-9 pl-9')}
         />
       </div>
-      {/* Sized by a wrapper: INPUT is full width. */}
-      <div className="w-full sm:w-44">
+      {/* Sized by a wrapper: INPUT is full width. Just wide enough for the longest choices, so the
+          search box keeps room for its placeholder beside the sidebar (1024 px). */}
+      <div className="w-full sm:w-40">
         <select
           aria-label="Machine model"
           value={filter.model}
@@ -48,7 +49,7 @@ export function InspectionFilters({ filter, models, onChange }: Props) {
           ))}
         </select>
       </div>
-      <div className="w-full sm:w-40">
+      <div className="w-full sm:w-36">
         <select
           aria-label="State"
           value={filter.state}

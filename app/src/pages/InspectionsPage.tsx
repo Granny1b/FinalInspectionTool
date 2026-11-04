@@ -66,7 +66,7 @@ export function InspectionsPage() {
         actions={all?.length ? newInspection : undefined}
       />
       {inspections.isPending ? (
-        <PageLoading label="Loading inspections…" />
+        <PageLoading label="Loading inspections…" header={false} />
       ) : inspections.isError ? (
         <LoadError
           title="We couldn't load the inspections"

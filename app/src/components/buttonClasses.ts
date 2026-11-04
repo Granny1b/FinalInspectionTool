@@ -1,12 +1,15 @@
 import clsx from 'clsx';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-white shadow-xs hover:bg-primary-hover',
   secondary:
     'border border-ink-200 bg-surface text-ink-800 shadow-xs hover:border-ink-300 hover:bg-ink-50',
   ghost: 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
+  // The confirming button of a delete or remove: nok-solid carries white text in both themes,
+  // where nok-fg is a light red in the dark one.
+  danger: 'bg-nok-solid text-white shadow-xs hover:bg-nok-solid/90',
 };
 
 /** The button look: `Button`, `ButtonLink` and other elements that act as buttons (a menu's trigger). */
