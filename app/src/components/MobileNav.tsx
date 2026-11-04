@@ -69,7 +69,7 @@ export function MobileNav({ me }: { me: Me }) {
         onClick={(event) => {
           if (event.target === event.currentTarget) close();
         }}
-        className="m-0 h-dvh max-h-none w-72 max-w-[85vw] overscroll-contain border-r border-ink-200 bg-surface p-0 shadow-xl transition-transform duration-200 ease-out backdrop:bg-scrim/30 motion-reduce:transition-none lg:hidden dark:backdrop:bg-scrim/60 starting:open:-translate-x-full"
+        className="m-0 h-dvh max-h-none w-72 max-w-[85vw] overscroll-contain border-r border-ink-200 bg-surface p-0 shadow-xl transition-transform duration-200 ease-out backdrop:bg-scrim/30 motion-reduce:transition-none lg:hidden dark:backdrop:bg-scrim/70 starting:open:-translate-x-full"
       >
         <Sidebar me={me} onNavigate={close} onClose={close} />
       </dialog>

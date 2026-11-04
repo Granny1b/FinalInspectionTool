@@ -12,7 +12,8 @@ export function ErrorScreen({ title, message, actions }: Props) {
       <title>{`${title} · ${APP_NAME}`}</title>
       <div className="w-full max-w-sm rounded-xl border border-ink-200 bg-surface p-8 text-center shadow-xs">
         <Logo className="mx-auto h-10" />
-        <div className="mx-auto mt-8 flex size-11 items-center justify-center rounded-full bg-nok-bg text-nok-fg ring-1 ring-nok-border">
+        {/* The icon tile of StateCard, the in-shell error. */}
+        <div className="mx-auto mt-8 flex size-11 items-center justify-center rounded-xl bg-nok-bg text-nok-fg ring-1 ring-nok-border">
           <TriangleAlert size={20} strokeWidth={1.75} />
         </div>
         <h1 className="mt-4 text-base font-semibold text-ink-900">{title}</h1>
