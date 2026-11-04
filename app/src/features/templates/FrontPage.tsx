@@ -51,7 +51,9 @@ export function PublishedFrontPage({
           {template.name}
         </Detail>
         <Detail label="Machine model">{modelName(models, template.modelCode)}</Detail>
-        <Detail label="Spare rows per section">{template.printSettings.spareRowsPerSection}</Detail>
+        <Detail label="Spare lines per section (default)">
+          {template.printSettings.spareRowsPerSection}
+        </Detail>
         <Detail label="Published">
           {formatDateTime(template.updatedAt)}
           <span className="block truncate text-ink-500" title={template.updatedBy}>

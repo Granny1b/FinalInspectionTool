@@ -11,9 +11,11 @@ import {
   inspectionProgress,
   rowRef,
   sectionNumber,
+  sectionSpareRows,
   type AnnotatedImage,
   type Inspection,
   type InspectionDeviation,
+  type PrintSettings,
   type RowResult,
   type Section,
   type Severity,
@@ -186,7 +188,7 @@ export function inspectionPrint(
     checklistTitle: `${templateSnapshot.name}${SEPARATOR}Rev ${templateRevision}`,
     sections: printSections(
       templateSnapshot.sections,
-      report ? { results: inspection.results } : { spareRows: spareRows(templateSnapshot) },
+      report ? { results: inspection.results } : { printSettings: templateSnapshot.printSettings },
     ),
     deviations: report
       ? { kind: 'cards', cards: deviations.map(deviationCard) }
@@ -237,7 +239,7 @@ export function templatePrint(
       report: null,
     },
     checklistTitle: `${name}${SEPARATOR}${revision}`,
-    sections: printSections(template.sections, { spareRows: spareRows(template) }),
+    sections: printSections(template.sections, { printSettings: template.printSettings }),
     deviations: blankDeviationLines(),
     appendix: appendixEntries(template.sections),
     footer: [companyName, name, `Rev ${template.revision}${draft ? ' (draft)' : ''}`].join(
@@ -284,18 +286,15 @@ function reportState(inspection: Inspection, deviationCount: number): ReportStat
   return { finalised: true, text: `Finalised${when}${who}`, summary };
 }
 
-function spareRows({ printSettings }: Pick<Template, 'printSettings'>): number {
-  return printSettings.spareRowsPerSection;
-}
-
 /**
- * Blank: every checkpoint plus `spareRows` empty lines that carry on the lettering (the paper's
- * room for handwritten findings). Report: every checkpoint with what was recorded, and no spare
- * lines: findings that belong to no row are extra deviations by then.
+ * Blank: every checkpoint plus the section's spare lines (its own number, else the template's),
+ * empty lines that carry on the lettering (the paper's room for handwritten findings). Report:
+ * every checkpoint with what was recorded, and no spare lines: findings that belong to no row
+ * are extra deviations by then.
  */
 function printSections(
   sections: readonly Section[],
-  fill: { results: Record<string, RowResult> } | { spareRows: number },
+  fill: { results: Record<string, RowResult> } | { printSettings: PrintSettings },
 ): PrintSection[] {
   return sections.map((section, sectionIndex) => {
     const ref = (rowIndex: number) => rowRef(sectionIndex, rowIndex);
@@ -312,7 +311,7 @@ function printSections(
         resp: result?.resp?.trim() ?? '',
       };
     });
-    const spare = 'spareRows' in fill ? fill.spareRows : 0;
+    const spare = 'printSettings' in fill ? sectionSpareRows(section, fill.printSettings) : 0;
     for (let index = 0; index < spare; index += 1) {
       rows.push({
         ref: ref(section.items.length + index),

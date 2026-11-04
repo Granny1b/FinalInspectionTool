@@ -1,9 +1,9 @@
-import { rowLetter, type Guide } from '@modig/shared';
+import { rowLetter, rowRef, type Guide } from '@modig/shared';
 import clsx from 'clsx';
-import { Camera, CircleAlert, GripVertical, Info, type LucideIcon } from 'lucide-react';
+import { Camera, CircleAlert, GripVertical, Info, Trash2, type LucideIcon } from 'lucide-react';
 import type { ButtonHTMLAttributes, Ref } from 'react';
 import { imageCountText } from '../../guides/guide';
-import { GRID, REF_CELL, ROW_LINE } from './layout';
+import { GRID, REF_CELL, ROW_CONTROLS, ROW_LINE } from './layout';
 
 /** The paper-only columns, each pinned to its grid column (see layout.ts). */
 const PAPER_COLUMNS = [
@@ -45,10 +45,20 @@ type SpareRowsProps = {
   /** Index of the first spare row: lettering continues after the real rows. */
   start: number;
   count: number;
+  /** In the editor: each line gets a delete button ("Delete spare line 1.f"). */
+  edit?: {
+    sectionId: string;
+    sectionIndex: number;
+    onDelete: (offset: number) => void;
+  };
 };
 
+/** Shown on hover and keyboard focus, like a row's actions; always on touch screens. */
+const REVEAL =
+  'opacity-0 group-focus-within/spare:opacity-100 group-hover/spare:opacity-100 pointer-coarse:opacity-100';
+
 /** Lettered blank lines printed after each section for handwritten findings (brief §6). */
-export function SpareRows({ start, count }: SpareRowsProps) {
+export function SpareRows({ start, count, edit }: SpareRowsProps) {
   if (count <= 0) return null;
   return (
     <div title="Spare lines for handwritten findings on the printed checklist">
@@ -57,11 +67,27 @@ export function SpareRows({ start, count }: SpareRowsProps) {
         printed.
       </p>
       {Array.from({ length: count }, (_, offset) => (
-        <div key={offset} aria-hidden="true" className={clsx(GRID, ROW_LINE, 'border-ink-100')}>
-          <span className={clsx(REF_CELL, 'leading-10 text-ink-400')}>
+        <div
+          key={offset}
+          aria-hidden={edit ? undefined : true}
+          className={clsx('group/spare', GRID, ROW_LINE, 'border-ink-100')}
+        >
+          <span aria-hidden="true" className={clsx(REF_CELL, 'leading-10 text-ink-400')}>
             {rowLetter(start + offset)}
           </span>
           <PaperCells />
+          {edit && (
+            // Opaque, so it covers the paper cells' borders it floats over.
+            <div className={clsx(ROW_CONTROLS, 'bg-surface pt-1.5 pr-1', REVEAL)}>
+              <IconButton
+                icon={Trash2}
+                label={`Delete spare line ${rowRef(edit.sectionIndex, start + offset)}`}
+                data-spare-delete={`${edit.sectionId}:${offset}`}
+                onClick={() => edit.onDelete(offset)}
+                className="hover:bg-nok-bg hover:text-nok-fg"
+              />
+            </div>
+          )}
         </div>
       ))}
     </div>
