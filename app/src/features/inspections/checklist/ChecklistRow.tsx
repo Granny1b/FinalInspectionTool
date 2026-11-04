@@ -31,6 +31,9 @@ import {
 import { GuideButton, PhotoCount, StatusControl } from './parts';
 import type { ChecklistActions } from './useChecklistActions';
 
+/** "Category" and "Severity" before a NOK row's selects. */
+const NOK_LABEL = 'shrink-0 text-xs font-medium text-nok-fg @max-[34rem]:w-14';
+
 type Props = {
   item: Item;
   sectionIndex: number;
@@ -182,7 +185,8 @@ export const ChecklistRow = memo(function ChecklistRow({
           <label
             className={clsx(CELL.category, 'flex items-center gap-2 @min-[34rem]:justify-end')}
           >
-            <span className="text-xs font-medium text-nok-fg">Category</span>
+            {/* Stacked (a phone), both labels are as wide, so the two selects line up. */}
+            <span className={NOK_LABEL}>Category</span>
             <select
               data-category={item.id}
               aria-label={`Category, row ${ref}`}
@@ -202,7 +206,7 @@ export const ChecklistRow = memo(function ChecklistRow({
         )}
         {status === 'NOK' && (
           <label className={clsx(CELL.severity, 'flex items-center gap-2')}>
-            <span className="text-xs font-medium text-nok-fg">Severity</span>
+            <span className={NOK_LABEL}>Severity</span>
             <select
               aria-label={`Severity, row ${ref}`}
               value={result?.severity ?? DEFAULT_SEVERITY}

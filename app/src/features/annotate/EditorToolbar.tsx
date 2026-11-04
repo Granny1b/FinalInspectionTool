@@ -125,8 +125,9 @@ export function EditorToolbar({
   );
 }
 
+/** Not on a phone: there the groups wrap onto lines of their own and it would dangle at an end. */
 function Divider() {
-  return <div aria-hidden="true" className="mx-0.5 h-6 w-px bg-ink-200" />;
+  return <div aria-hidden="true" className="mx-0.5 h-6 w-px bg-ink-200 max-sm:hidden" />;
 }
 
 /**
