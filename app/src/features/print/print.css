@@ -383,9 +383,10 @@
   height: var(--paper-report-row);
 }
 
+/* Proportional figures, as in the headings and the footer: Inter's tabular ones widen the hyphen
+   too, which spaced "D-01" out to "D - 01". Refs are left-aligned, so nothing lines up on them. */
 .paper-ref {
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -503,7 +504,6 @@
   gap: 2.5mm;
   font-size: 11pt;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 .paper-card-ref {
@@ -549,7 +549,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Label and value on one baseline, the values of Category and Resp lined up one above the other
+   (the labels' column fits "Category"); a long value wraps under its own first line. */
 .paper-card-resp {
+  display: grid;
+  grid-template-columns: 12.5mm minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 2mm;
   margin-top: 1.5mm;
   overflow-wrap: anywhere;
 }
@@ -564,6 +570,10 @@
   font-size: 7.5pt;
   font-weight: 600;
   color: var(--paper-muted);
+}
+
+.paper-card-resp .paper-card-label {
+  margin-right: 0;
 }
 
 /* One photo takes the whole width, two share it. The photos fill what the text leaves; their

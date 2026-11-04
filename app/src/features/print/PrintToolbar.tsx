@@ -29,7 +29,11 @@ type Props = {
   children?: ReactNode;
 };
 
-/** Above the preview, never printed: the way back, the layout, and Print with the settings to use. */
+/**
+ * Above the preview, never printed. First the way back, what is printed and the ways out (Word,
+ * Print); under them the layout's choices, with the settings Print needs on the right. Each part
+ * wraps within itself, so a choice never lands among the buttons.
+ */
 export function PrintToolbar({
   subject,
   back,
@@ -41,44 +45,46 @@ export function PrintToolbar({
 }: Props) {
   const hintId = useId();
   return (
-    <header className="sticky top-0 z-10 border-b border-ink-200 bg-surface print:hidden">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 pt-3 sm:px-6">
-        <BackLink to={back.to} label={back.label} />
-        <div className="min-w-0 flex-1 basis-48">
-          <h1 className="text-base font-semibold text-ink-900">Print preview</h1>
-          <p className="truncate text-xs text-ink-500">{subject}</p>
+    // Sticky from 640 px up; on a phone its wrapped rows would cover half the screen.
+    <header className="border-b border-ink-200 bg-surface sm:sticky sm:top-0 sm:z-10 print:hidden">
+      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <BackLink to={back.to} label={back.label} />
+          <div className="min-w-0 flex-1 basis-48">
+            <h1 className="text-base font-semibold text-ink-900">Print preview</h1>
+            <p className="truncate text-xs text-ink-500">{subject}</p>
+          </div>
+          {/* Right-aligned, also when they wrap onto a line of their own. */}
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {children}
+            <Button onClick={() => window.print()} disabled={!ready} aria-describedby={hintId}>
+              <Printer size={16} aria-hidden="true" />
+              {ready ? 'Print / Save PDF' : 'Preparing…'}
+            </Button>
+          </div>
         </div>
-        {mode && (
-          <Segmented
-            label="What to print"
-            options={PRINT_MODES.map((value) => ({ value, label: PRINT_MODE_LABELS[value] }))}
-            {...mode}
-          />
-        )}
-        {deviationsPerPage && (
-          <Segmented
-            label="Deviations"
-            showLabel
-            options={DEVIATIONS_PER_PAGE.map((value) => ({ value, label: `${value} per page` }))}
-            {...deviationsPerPage}
-          />
-        )}
-        <AppendixToggle {...appendix} />
-        {/* Right-aligned, also when they wrap onto a line of their own. */}
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {children}
-          <Button onClick={() => window.print()} disabled={!ready} aria-describedby={hintId}>
-            <Printer size={16} aria-hidden="true" />
-            {ready ? 'Print / Save PDF' : 'Preparing…'}
-          </Button>
+        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+          {mode && (
+            <Segmented
+              label="What to print"
+              options={PRINT_MODES.map((value) => ({ value, label: PRINT_MODE_LABELS[value] }))}
+              {...mode}
+            />
+          )}
+          {deviationsPerPage && (
+            <Segmented
+              label="Deviations"
+              showLabel
+              options={DEVIATIONS_PER_PAGE.map((value) => ({ value, label: `${value} per page` }))}
+              {...deviationsPerPage}
+            />
+          )}
+          <AppendixToggle {...appendix} />
+          <p id={hintId} className="ml-auto text-right text-xs text-ink-500">
+            Chrome/Edge → Save as PDF · Margins: Default · Scale: 100 % · Headers and footers: off
+          </p>
         </div>
       </div>
-      <p
-        id={hintId}
-        className="mx-auto max-w-7xl px-4 pt-1.5 pb-2.5 text-right text-xs text-ink-500 sm:px-6"
-      >
-        Chrome/Edge → Save as PDF · Margins: Default · Scale: 100 % · Headers and footers: off
-      </p>
     </header>
   );
 }
@@ -118,8 +124,9 @@ export function Segmented<T extends string | number>({
             type="button"
             aria-pressed={option.value === value}
             onClick={() => onChange(option.value)}
+            // Taller under a finger: the tablet in the workshop.
             className={clsx(
-              'h-8 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors',
+              'h-8 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors pointer-coarse:h-10',
               option.value === value
                 ? 'bg-surface text-ink-900 shadow-xs ring-1 ring-ink-200'
                 : 'text-ink-600 hover:text-ink-900',
@@ -137,10 +144,12 @@ export function Segmented<T extends string | number>({
 function AppendixToggle({ value, onChange, available }: Choice<boolean> & { available: boolean }) {
   const noteId = useId();
   return (
-    <div className="flex items-center gap-2">
+    // The note under the label, lined up with its text, as a field's hint: the row of choices
+    // stays one line on a desktop.
+    <div>
       <label
         className={clsx(
-          'flex items-center gap-2 text-sm whitespace-nowrap',
+          'flex items-center gap-2 text-sm whitespace-nowrap pointer-coarse:min-h-10',
           available ? 'text-ink-800' : 'text-ink-500',
         )}
       >
@@ -155,9 +164,9 @@ function AppendixToggle({ value, onChange, available }: Choice<boolean> & { avai
         Include reference images
       </label>
       {!available && (
-        <span id={noteId} className="text-xs text-ink-500">
+        <p id={noteId} className="pl-6 text-xs text-ink-500">
           No reference images in this checklist
-        </span>
+        </p>
       )}
     </div>
   );

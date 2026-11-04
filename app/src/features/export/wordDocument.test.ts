@@ -140,6 +140,18 @@ async function build(
 const tableRows = (xml: string) => xml.match(/<w:tr[ >](?:(?!<w:tbl>)[\s\S])*?<\/w:tr>/g) ?? [];
 
 const count = (xml: string, pattern: RegExp) => xml.match(pattern)?.length ?? 0;
+/**
+ * A card's Category and Resp paragraphs as text, the tab between label and value as "\t": the
+ * tab stop lines the values up.
+ */
+const detailLines = (xml: string) =>
+  (xml.match(/<w:p>(?:(?!<\/w:p>)[\s\S])*<\/w:p>/g) ?? [])
+    .map((paragraph) =>
+      [...paragraph.matchAll(/<w:tab\/>|<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)]
+        .map((match) => match[1] ?? '\t')
+        .join(''),
+    )
+    .filter((line) => /^(Category|Resp)\t/.test(line));
 /** The text of the document in order, without the XML. */
 const text = (xml: string) =>
   [...xml.matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)].map((match) => match[1]).join('');
@@ -209,11 +221,13 @@ describe('the Word export of a report', () => {
     expect(all).toContain('D-02 · Minor');
     expect(all).toContain('Not on the checklist');
     expect(all).toContain('Operator manual missing');
-    expect(all).toContain('Category  Missing parts');
-    expect(all).toContain('Resp  Montage');
-    // The extra deviation has neither: a dash, as on paper.
-    expect(all).toContain('Category  —');
-    expect(all).toContain('Resp  —');
+    expect(detailLines(document)).toEqual([
+      'Category\tMissing parts',
+      'Resp\tMontage',
+      // The extra deviation has neither: a dash, as on paper.
+      'Category\t—',
+      'Resp\t—',
+    ]);
     expect(all).toContain('Sketch / photo');
     expect(count(all, /Closed {2}Sign/g)).toBe(2);
   });

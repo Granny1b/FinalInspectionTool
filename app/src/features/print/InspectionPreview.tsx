@@ -1,8 +1,12 @@
-import type { Inspection } from '@modig/shared';
+import type { Inspection, PeopleDirectory } from '@modig/shared';
 import { useMemo, useState } from 'react';
+import { personName, usePeopleDirectory } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
 import { inspectionPrint, type PrintMode } from './model';
 import { PrintPreviewDialog } from './PrintPreviewDialog';
+
+/** One empty directory, so the model isn't rebuilt on every render after a failed load. */
+const NO_PEOPLE: PeopleDirectory = [];
 
 type Props = {
   /** As the page shows it, unsaved edits included (inspectionOnScreen). */
@@ -20,15 +24,20 @@ type Props = {
 export function InspectionPreview({ inspection, onPrint, onClose }: Props) {
   const settings = useSettings();
   const [mode, setMode] = useState<PrintMode>('report');
+  // "Finalised … by" names the person, as the print route does: waited for, so the cards aren't
+  // laid out twice, but not needed (a failed load shows the email).
+  const people = usePeopleDirectory();
+  const directory = people.isPending ? null : (people.data ?? NO_PEOPLE);
   const model = useMemo(
     () =>
-      settings.data
+      settings.data && directory
         ? inspectionPrint(inspection, mode, {
             companyName: settings.data.companyName,
             modelLabel: modelName(settings.data.machineModels, inspection.front.modelCode),
+            personName: (email) => personName(directory, email),
           })
         : null,
-    [inspection, settings.data, mode],
+    [inspection, settings.data, mode, directory],
   );
   const machine = inspection.front.machineName.trim();
 
