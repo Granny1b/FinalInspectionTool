@@ -18,7 +18,7 @@ export function InspectionNewPage() {
 
   let body;
   if (templates.isPending || settings.isPending) {
-    body = <PageLoading label="Loading the checklists…" />;
+    body = <PageLoading label="Loading the checklists…" header={false} />;
   } else if (templates.isError) {
     body = (
       <LoadError

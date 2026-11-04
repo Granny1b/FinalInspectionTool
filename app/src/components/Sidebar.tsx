@@ -12,6 +12,7 @@ import {
 import { useId } from 'react';
 import { NavLink } from 'react-router';
 import { signOutUrl } from '../lib/auth';
+import { NAV_ITEM_HEIGHT, USER_PANEL, USER_PANEL_ROW } from './layout';
 import { Logo } from './Logo';
 import { RoleBadge } from './RoleBadge';
 import { ThemeToggle } from './ThemeToggle';
@@ -92,7 +93,8 @@ function NavList({ items, onNavigate, labelledBy }: NavListProps) {
             onClick={onNavigate}
             className={({ isActive }) =>
               clsx(
-                'group flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
+                'group flex items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
+                NAV_ITEM_HEIGHT,
                 isActive
                   ? 'bg-brand-50 text-brand-800'
                   : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
@@ -122,7 +124,8 @@ function UserPanel({ me }: { me: Me }) {
   // The API may only know the email (SWA passes no name claim); don't show it twice.
   const displayName = me.name || me.email;
   return (
-    <div className="border-t border-ink-200 p-3">
+    // Laid out like its skeleton in LoadingShell: change both.
+    <div className={USER_PANEL}>
       <div className="flex items-center gap-3 px-2 py-1.5">
         <span
           aria-hidden="true"
@@ -145,7 +148,10 @@ function UserPanel({ me }: { me: Me }) {
         <RoleBadge roles={me.roles} />
         <a
           href={signOutUrl()}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+          className={clsx(
+            'inline-flex items-center gap-1.5 rounded-md px-2 text-xs font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900',
+            USER_PANEL_ROW,
+          )}
         >
           <LogOut size={14} />
           Sign out

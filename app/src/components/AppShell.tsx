@@ -22,10 +22,11 @@ export function AppShell() {
 
   return (
     <>
-      {/* Parked above the viewport until focused; sr-only/not-sr-only would reset its padding. */}
+      {/* Parked above the viewport until focused; sr-only/not-sr-only would reset its padding.
+          The border keeps it apart from the sidebar it covers, which is the same surface. */}
       <a
         href="#main"
-        className="fixed top-3 left-3 z-50 -translate-y-16 rounded-md bg-surface px-4 py-2 text-sm font-medium text-ink-900 shadow-md transition-transform focus:translate-y-0 motion-reduce:transition-none"
+        className="fixed top-3 left-3 z-50 -translate-y-16 rounded-md border border-ink-200 bg-surface px-4 py-2 text-sm font-medium text-ink-900 shadow-md transition-transform focus:translate-y-0 motion-reduce:transition-none"
       >
         Skip to content
       </a>

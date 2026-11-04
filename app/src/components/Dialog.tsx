@@ -50,7 +50,7 @@ export function Dialog({
         if (busy) event.preventDefault();
       }}
       className={clsx(
-        'm-auto max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl backdrop:bg-scrim/30',
+        'm-auto max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-ink-200 bg-surface p-0 text-ink-900 shadow-xl backdrop:bg-scrim/30 dark:backdrop:bg-scrim/60',
         className,
       )}
     >

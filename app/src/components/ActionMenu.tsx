@@ -149,8 +149,9 @@ export function ActionMenu({ label, items, triggerData, trigger }: Props) {
                 menuRef.current?.hidePopover();
                 item.onSelect();
               }}
+              // Taller on a touch screen, where items 32 px apart are easy to miss with a finger.
               className={clsx(
-                'flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left whitespace-nowrap transition-colors focus-visible:-outline-offset-2 disabled:pointer-events-none disabled:text-ink-400',
+                'flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left whitespace-nowrap transition-colors focus-visible:-outline-offset-2 disabled:pointer-events-none disabled:text-ink-400 pointer-coarse:h-10',
                 item.danger
                   ? 'text-nok-fg hover:bg-nok-bg focus-visible:bg-nok-bg'
                   : 'hover:bg-ink-100 focus-visible:bg-ink-100',

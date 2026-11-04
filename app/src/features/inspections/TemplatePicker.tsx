@@ -32,7 +32,8 @@ export function TemplatePicker({ templates, models, value, error, onChange }: Pr
         {templates.map((template, index) => (
           <label
             key={template.id}
-            className="flex cursor-pointer items-start gap-3 rounded-lg border border-ink-200 px-4 py-3 transition-colors hover:border-ink-300 hover:bg-ink-50 has-checked:border-brand-600 has-checked:bg-brand-50"
+            // The focus ring goes round the whole card rather than as a square round the radio.
+            className="flex cursor-pointer items-start gap-3 rounded-lg border border-ink-200 px-4 py-3 transition-colors hover:border-ink-300 hover:bg-ink-50 has-checked:border-brand-600 has-checked:bg-brand-50 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-600"
           >
             <input
               type="radio"
@@ -43,7 +44,7 @@ export function TemplatePicker({ templates, models, value, error, onChange }: Pr
               // The form starts here: the selected template, or the first one.
               autoFocus={value ? value === template.id : index === 0}
               aria-invalid={error ? true : undefined}
-              className="mt-0.5 size-4 shrink-0 accent-brand-600"
+              className="mt-0.5 size-4 shrink-0 accent-brand-600 focus-visible:outline-none"
             />
             <span className="min-w-0">
               {/* The published revision's model and name: an unpublished change doesn't count. */}
