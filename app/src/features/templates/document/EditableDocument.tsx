@@ -163,8 +163,8 @@ type UndoBarProps = {
 };
 
 /**
- * "Row 1.c deleted · Undo" (or a section, or a spare line) at the bottom of the window until the next change to the structure;
- * not timed. The live region stays mounted so screen readers announce the message when it appears.
+ * "Row 1.c deleted · Undo" (or a section, or a spare line) at the bottom of the window until the
+ * next change to the structure; not timed. The live region stays mounted so screen readers announce the message when it appears.
  */
 function UndoBar({ deleted, onUndo, onDismiss }: UndoBarProps) {
   return createPortal(

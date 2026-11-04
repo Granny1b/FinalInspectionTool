@@ -84,6 +84,8 @@ describe('a new model', () => {
     expect(modelProblems(newModel('Rig', 'E2E'), context, { required: false })).toEqual({
       code: '“Throwaway” already uses the code E2E.',
     });
+    // A template's name is not a model's name: only the settings' names are taken.
+    expect(modelProblems(newModel('Throwaway', 'THR'), context, { required: false })).toEqual({});
     expect(modelProblems(newModel('Rig', 'RM-1'), context, { required: false })).toEqual({
       code: 'Only letters and digits.',
     });

@@ -109,17 +109,17 @@ export function modelProblems(
         ? `At most ${ModelCodeSchema.maxLength ?? 32} characters.`
         : 'Only letters and digits.';
   }
-  const conflict = newModelConflict(takenModels(context), { code, name });
-  if (conflict?.field === 'code' && code) {
-    const template = context.templates.find(
-      (candidate) => candidate.modelCode.toLowerCase() === code.toLowerCase(),
-    );
-    problems.code =
-      template && !context.models.some((model) => model.code === template.modelCode)
-        ? `“${template.name}” already uses the code ${template.modelCode}.`
-        : conflict.message;
+  // Names are checked against the settings only, as the API does: a template's name is not a
+  // model's name. Codes also against the templates whose model the settings no longer have.
+  const conflict = newModelConflict(context.models, { code, name });
+  const template = context.templates.find(
+    (candidate) => candidate.modelCode.toLowerCase() === code.toLowerCase(),
+  );
+  if (code && conflict?.field === 'code') problems.code = conflict.message;
+  else if (code && template) {
+    problems.code = `“${template.name}” already uses the code ${template.modelCode}.`;
   }
-  if (conflict?.field === 'name' && name) problems.name = conflict.message;
+  if (name && conflict?.field === 'name') problems.name = conflict.message;
   return problems;
 }
 

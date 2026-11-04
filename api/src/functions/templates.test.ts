@@ -627,6 +627,28 @@ describe('DELETE /api/templates/{id}', () => {
     ]);
   });
 
+  it('frees its ids: its exported file imports again with the same sections and rows', async () => {
+    const template = draftTemplate({ revision: 2 });
+    const etag = await storeTemplate(template, [1]);
+    const file = templateExport(template, 'RigiMill MG', '2026-11-04T08:00:00.000Z');
+    expect((await remove(template.id, etag)).status).toBe(204);
+
+    // Its model is free again, too.
+    const response = await importTemplate(
+      request({
+        principal: admin,
+        method: 'POST',
+        body: JSON.stringify({ name: template.name, modelCode: 'RMMG', file }),
+      }),
+      context(),
+    );
+    expect(response.status).toBe(201);
+    const { draft } = ImportTemplateResponseSchema.parse(response.jsonBody);
+    expect(draft.id).not.toBe(template.id);
+    // KPIs follow a row by its id, so the re-imported rows carry on their history.
+    expect(checklistIds(draft.sections)).toEqual(checklistIds(template.sections));
+  });
+
   it('400 without If-Match, and with "*"', async () => {
     const template = draftTemplate();
     await storeTemplate(template);
