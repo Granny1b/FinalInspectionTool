@@ -264,7 +264,8 @@ test('a single month or a range of months narrows the numbers, and the URL keeps
 }) => {
   await signIn(context, ADMIN, ['admin']);
   const [a1] = rowIds(published) as [string];
-  // One in October with a deviation, one in September without.
+  // One in October with a deviation, one in September without (which also puts September in the
+  // month menus, as they start at the first inspection's month).
   await inspect(page.request, allOk(published, { [a1]: { status: 'NOK' } }), true);
   await inspect(page.request, allOk(published), true, '2026-09-15');
   await page.goto(`/insights?period=all&model=${model}`);
@@ -310,9 +311,11 @@ test('a month range that ends before it starts says so instead of loading', asyn
   inspect,
 }) => {
   await signIn(context, ADMIN, ['admin']);
+  // The menus start at the first inspection's month, so September is there whatever else exists.
   await inspect(page.request, allOk(published), true);
+  await inspect(page.request, allOk(published), true, '2026-09-15');
   await page.goto(`/insights?period=months&fromMonth=2026-09&toMonth=2026-10&model=${model}`);
-  await expect(value(page, 'Inspections finalised')).toHaveText('1');
+  await expect(value(page, 'Inspections finalised')).toHaveText('2');
 
   const from = page.getByRole('combobox', { name: 'From month' });
   const to = page.getByRole('combobox', { name: 'To month' });
