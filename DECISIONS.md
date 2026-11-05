@@ -2358,3 +2358,61 @@ them.
   are invalidated.
 - **The e2e tests are a file of their own** (`e2e/delete-inspection.spec.ts`), with their own
   throwaway template, so they merge cleanly with the inspection tests.
+
+### Insights month filters and page pass
+
+- **Two new periods, Single month and Month range,** next to the relative ones and custom dates.
+  "Custom range" is now "Custom dates", so it isn't mistaken for a range of months. The URL
+  carries them as `month`, `fromMonth` and `toMonth` ("2026-10", in 2000–2099; anything else is
+  ignored), and they reach the API as the first and last day of their months, so the API's
+  filters are unchanged.
+- **Months are chosen from menus, not `<input type="month">`,** which Firefox and Safari on a
+  desktop show as a plain text field. The menus list every month from the earliest inspection's
+  to the current one, newest first. A month a shared link names outside that stretch widens it,
+  so the menu can show it. An inspection dated in the future doesn't lengthen the list.
+- **The answer gains `firstInspectionDate`:** the earliest front-page date of any inspection,
+  in any state and whatever the filters (like `modelCodes`), or null without inspections. It
+  defaults to null in `InsightsSchema`, so an answer without it still parses.
+- **A month range's open ends** (a link without `fromMonth` or `toMonth`) are the first
+  inspection's month and the current month, which is what the menus show; a single month without
+  `month` is the current one. The page always writes both ends into the URL.
+- **Switching the kind of period starts from the dates on screen.** From Last 12 months a month
+  range starts at 2025-12 to 2026-11, from Last year at 2025-01 to 2025-12; a single month takes
+  the stretch's last month, never one after the current month; custom dates start at the
+  stretch's dates unless dates were already typed. Picking the kind of period and then narrowing
+  it is two steps, and the numbers shouldn't change at the first.
+- **A month range that ends before it starts** says "The start month is after the end month."
+  under the menus, marks both invalid and asks for nothing, as custom dates do.
+- **The relative periods show the dates they cover today** next to the menu
+  ("2025-12-01 – 2026-11-05"); the menu points to them with `aria-describedby`.
+- **Merge safety for the filters module:** no existing export changed its name or signature. The
+  month fields of `InsightsFilter` are optional and `filterFromParams` leaves them out when the
+  URL has none, so code that builds or compares a filter without months still works. `Period`
+  has two more values. New exports: `withPeriod`, `monthOptions`, `describePeriod`.
+- **Month labels on the chart are chosen for its width,** measured from its container: every
+  month when they fit, otherwise every 2nd, 3rd (quarters), 6th or 12th month, always the same
+  months of the year (quarters start in January, April, July and October), at least 56 px apart.
+  Recharts' own thinning left uneven gaps (2025-03, 2025-07, 2025-10, 2026-01, 2026-04, then
+  2026-10). The plot keeps 26 px on its right, so the last month's label isn't cut off.
+- **Loading draws the dashboard's shape** (the filter row, four tiles and the top 10 card)
+  instead of one grey block. While other filters load, the previous numbers stay, dimmed, as
+  before, and "Updating…" with a spinner shows at the end of the filter row: a status message,
+  so a screen reader hears it too. On a phone it is for screen readers only, as it would add a
+  line under the filters.
+- **An empty selection says which:** "There are no finalised RigiMill MG inspections in
+  2025-08. Inspections in progress count only when you include them.", with **Show all time**
+  unless the period already is.
+- **Ranked panels without rows say "No deviations."** (inspections that had none); the card
+  body was blank.
+- **A severity block shows its percentage only when it has room for it.** Each block is a CSS
+  container; a fixed minimum share (8 %) still overflowed in a narrow card.
+- **On a phone every filter has a line of its own,** the two ends of a range side by side.
+- **The panel layout stays two columns.** A month chart across two thirds read better, but its
+  gutter no longer lined up with the tiles', and the six panels then left one alone in a row;
+  quarters fit the half-width chart.
+- **Month labels and menus use proportional figures:** tabular ones spread "2026-10" out.
+- **Tests:** `filters.test.ts` (URL round trips, month ranges, the month list, switching periods,
+  the period in words, the month range error), `axis.test.ts` (month ticks: calendar steps, never
+  closer than a label), `shared/src/insights.test.ts` (`firstInspectionDate`). In
+  `e2e/insights.spec.ts` the `inspect` fixture takes a date; three tests cover a single month and
+  a range narrowing the numbers with the URL keeping them, a backwards range, and an empty month.

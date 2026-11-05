@@ -22,7 +22,13 @@ type Results = InspectionDraftInput['results'];
 const test = base.extend<{
   model: string;
   published: Template;
-  inspect: (request: APIRequestContext, results: Results, finalise: boolean) => Promise<Inspection>;
+  /** An inspection of `published`, dated 2026-10-07 unless another date is given. */
+  inspect: (
+    request: APIRequestContext,
+    results: Results,
+    finalise: boolean,
+    date?: string,
+  ) => Promise<Inspection>;
 }>({
   // eslint-disable-next-line no-empty-pattern -- Playwright fixtures take an object pattern first
   model: async ({}, use) => {
@@ -43,7 +49,7 @@ const test = base.extend<{
   },
   inspect: async ({ published }, use) => {
     const ids: string[] = [];
-    await use(async (request, results, finalise) => {
+    await use(async (request, results, finalise, date = '2026-10-07') => {
       const created = await request.post('/api/inspections', {
         data: {
           templateId: published.id,
@@ -52,7 +58,7 @@ const test = base.extend<{
             serialNumber: `SN-${ids.length + 1}`,
             participants: [],
             location: 'Kalmar, Sweden',
-            date: '2026-10-07',
+            date,
           },
         },
       });
@@ -90,6 +96,8 @@ const tile = (page: Page, label: string) =>
     .locator('dl > div')
     .filter({ has: page.getByRole('term').getByText(label, { exact: true }) });
 const panel = (page: Page, title: string) => page.getByRole('region', { name: title });
+/** A tile's number alone (its first definition; the second is the line under it). */
+const value = (page: Page, label: string) => tile(page, label).getByRole('definition').first();
 
 test('an admin reads the KPIs of finalised inspections and exports their deviations', async ({
   page,
@@ -245,4 +253,104 @@ test('a custom range that ends before it starts says so instead of loading', asy
     page.getByRole('heading', { name: 'No inspections in this selection' }),
   ).toBeVisible();
   await expect(from).not.toHaveAttribute('aria-invalid');
+});
+
+test('a single month or a range of months narrows the numbers, and the URL keeps them', async ({
+  page,
+  context,
+  model,
+  published,
+  inspect,
+}) => {
+  await signIn(context, ADMIN, ['admin']);
+  const [a1] = rowIds(published) as [string];
+  // One in October with a deviation, one in September without (which also puts September in the
+  // month menus, as they start at the first inspection's month).
+  await inspect(page.request, allOk(published, { [a1]: { status: 'NOK' } }), true);
+  await inspect(page.request, allOk(published), true, '2026-09-15');
+  await page.goto(`/insights?period=all&model=${model}`);
+  await expect(value(page, 'Inspections finalised')).toHaveText('2');
+
+  const period = page.getByRole('combobox', { name: 'Period' });
+  await period.selectOption({ label: 'Single month' });
+  const month = page.getByRole('combobox', { name: 'Month', exact: true });
+  await month.selectOption('2026-10');
+  await expect(page).toHaveURL(/[?&]period=month&month=2026-10&/);
+  await expect(value(page, 'Inspections finalised')).toHaveText('1');
+  await expect(value(page, 'Deviations')).toHaveText('1');
+  await month.selectOption('2026-09');
+  await expect(value(page, 'Deviations')).toHaveText('0');
+  await expect(value(page, 'Inspections finalised')).toHaveText('1');
+
+  // A range starts as the month on screen; widened, both inspections count again.
+  await period.selectOption({ label: 'Month range' });
+  const from = page.getByRole('combobox', { name: 'From month' });
+  const to = page.getByRole('combobox', { name: 'To month' });
+  await expect(from).toHaveValue('2026-09');
+  await expect(to).toHaveValue('2026-09');
+  await to.selectOption('2026-10');
+  await expect(page).toHaveURL(/[?&]period=months&fromMonth=2026-09&toMonth=2026-10&/);
+  await expect(value(page, 'Inspections finalised')).toHaveText('2');
+  await expect(value(page, 'Deviations')).toHaveText('1');
+  // Header row and the range's two months, in the table behind the chart.
+  await expect(panel(page, 'Deviations per month').getByRole('row')).toHaveCount(3);
+
+  // A shared link opens the same view.
+  await page.reload();
+  await expect(period).toHaveValue('months');
+  await expect(from).toHaveValue('2026-09');
+  await expect(to).toHaveValue('2026-10');
+  await expect(value(page, 'Inspections finalised')).toHaveText('2');
+});
+
+test('a month range that ends before it starts says so instead of loading', async ({
+  page,
+  context,
+  model,
+  published,
+  inspect,
+}) => {
+  await signIn(context, ADMIN, ['admin']);
+  // The menus start at the first inspection's month, so September is there whatever else exists.
+  await inspect(page.request, allOk(published), true);
+  await inspect(page.request, allOk(published), true, '2026-09-15');
+  await page.goto(`/insights?period=months&fromMonth=2026-09&toMonth=2026-10&model=${model}`);
+  await expect(value(page, 'Inspections finalised')).toHaveText('2');
+
+  const from = page.getByRole('combobox', { name: 'From month' });
+  const to = page.getByRole('combobox', { name: 'To month' });
+  await from.selectOption('2026-10');
+  await expect(value(page, 'Inspections finalised')).toHaveText('1');
+  await to.selectOption('2026-09');
+  await expect(page.getByText('The start month is after the end month.')).toBeVisible();
+  await expect(from).toHaveAttribute('aria-invalid', 'true');
+  await expect(to).toHaveAttribute('aria-invalid', 'true');
+  await expect(page).toHaveURL(/toMonth=2026-09/);
+  // Nothing is asked for meanwhile: the numbers are gone until the range makes sense again.
+  await expect(tile(page, 'Inspections finalised')).toHaveCount(0);
+  await to.selectOption('2026-10');
+  await expect(value(page, 'Inspections finalised')).toHaveText('1');
+  await expect(from).not.toHaveAttribute('aria-invalid');
+});
+
+test('a month without inspections says which, and offers all time', async ({
+  page,
+  context,
+  model,
+  published,
+  inspect,
+}) => {
+  await signIn(context, ADMIN, ['admin']);
+  await inspect(page.request, allOk(published), true);
+  await page.goto(`/insights?period=month&month=2026-08&model=${model}`);
+  await expect(page.getByRole('combobox', { name: 'Month', exact: true })).toHaveValue('2026-08');
+  await expect(
+    page.getByRole('heading', { name: 'No inspections in this selection' }),
+  ).toBeVisible();
+  await expect(page.getByText(/There are no finalised .+ inspections in 2026-08\./)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Show all time' }).click();
+  await expect(page.getByRole('combobox', { name: 'Period' })).toHaveValue('all');
+  await expect(page).toHaveURL(/[?&]period=all&/);
+  await expect(value(page, 'Inspections finalised')).toHaveText('1');
 });

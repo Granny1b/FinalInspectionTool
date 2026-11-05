@@ -92,6 +92,12 @@ export const TOP_CHECKPOINTS = 10;
 export const InsightsSchema = z.object({
   /** Model codes of every inspection, whatever the filters: the model filter's choices. */
   modelCodes: z.array(z.string()),
+  /**
+   * The earliest front-page date of any inspection, whatever the filters ("YYYY-MM-DD"); null
+   * without inspections. The month filter offers the months from this one to the current one.
+   * Defaulted, so an answer from an API without it still parses.
+   */
+  firstInspectionDate: z.string().nullable().default(null),
   /** Inspections in scope. `inProgress` is 0 unless in-progress ones are included. */
   inspections: z.object({ finalised: Count, inProgress: Count }),
   /** Deviations of those inspections: NOK rows plus extra deviations. */
@@ -228,6 +234,11 @@ export function aggregateInsights({
 
   return {
     modelCodes: [...new Set(inspections.map((inspection) => inspection.modelCode))].sort(),
+    // Every inspection, in scope or not, like the model codes above.
+    firstInspectionDate: inspections.reduce<string | null>(
+      (first, { date }) => (date && (first === null || date < first) ? date : first),
+      null,
+    ),
     inspections: {
       finalised: scope.filter((inspection) => inspection.state === 'finalised').length,
       inProgress: scope.filter((inspection) => inspection.state === 'in_progress').length,

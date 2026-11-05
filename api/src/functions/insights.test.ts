@@ -139,6 +139,7 @@ describe('GET /api/insights', () => {
   it('is all zeros without inspections', async () => {
     expect(parsed(await insights())).toEqual({
       modelCodes: [],
+      firstInspectionDate: null,
       inspections: { finalised: 0, inProgress: 0 },
       deviations: 0,
       rows: { ok: 0, nok: 0, na: 0 },
@@ -258,6 +259,7 @@ describe('GET /api/insights', () => {
     expect(otherModel.inspections.finalised).toBe(0);
     expect(otherModel.deviations).toBe(0);
     expect(otherModel.modelCodes).toEqual(['RMMG']);
+    expect(otherModel.firstInspectionDate).toBe('2026-01-31');
   });
 
   it('shows where a checkpoint is now, and counts only inspections whose checklist had it', async () => {
