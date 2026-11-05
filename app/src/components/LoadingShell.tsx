@@ -22,6 +22,8 @@ export function LoadingShell() {
           <Logo className="h-10" />
         </div>
         <div className="flex-1 space-y-2 px-3 py-5">
+          {/* The "Final inspection" label over its two links. */}
+          <Bone className="mx-3 mb-3 h-2.5 w-28" />
           <Bone className={NAV_ITEM_HEIGHT} />
           <Bone className={clsx(NAV_ITEM_HEIGHT, 'w-4/5')} />
         </div>
