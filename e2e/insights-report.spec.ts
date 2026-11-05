@@ -225,11 +225,14 @@ test('an admin previews the report from Insights, adds the deviation list and pr
   await expect(list.getByRole('heading', { name: 'Deviation list' })).toBeVisible();
   await expect(root).toHaveAttribute('data-print-ready', 'true');
   await expect(list).toContainText('3 deviations in 2 inspections');
-  const groups = list.locator('tbody');
+  // A table to an inspection, its line in the head (repeated on a page its rows carry on to); the
+  // column labels head the first one only.
+  const groups = list.locator('table[data-inspection]');
   await expect(groups).toHaveCount(2);
   await expect(groups.nth(0)).toHaveAttribute('data-inspection', first.number);
   await expect(groups.nth(1)).toHaveAttribute('data-inspection', second.number);
   await expect(groups.nth(0).getByRole('row')).toHaveText([
+    /^Ref\s*Checkpoint and comment\s*Severity\s*Category\s*Responsible$/,
     new RegExp(`^${first.number} · 2026-10-07 · ${model}\\s*Volvo Cars Skövde, line 2 · S/N SN-1$`),
     /^1\.a\s*Lifting columns - Marked screws, blue\/red\/yellow\s*Blue mark missing\s*Major\s*Markings & labels\s*Mechanics$/,
   ]);
@@ -296,7 +299,7 @@ test('the report prints as A4 pages with its footer, the list on pages of its ow
   await expect(page.getByRole('checkbox', { name: 'Include deviation list' })).toBeChecked();
   await expect(root.locator('.report-facts dd').nth(2)).toHaveText('Finalised and in progress');
   // The inspection in progress is in the list, and says so.
-  const groups = root.locator('[data-report-list] tbody');
+  const groups = root.locator('[data-report-list] table[data-inspection]');
   await expect(groups).toHaveCount(3);
   await expect(groups.nth(2)).toContainText('In progress');
 

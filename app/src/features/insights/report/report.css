@@ -440,15 +440,29 @@
   font-size: 8.5pt;
 }
 
+/* In the table's head, so it comes again on a page that carries on with the rows: not styled
+   as the column labels there. */
 .report-list .report-group th {
   padding: 1.6mm 2mm;
   border-top: 0.3mm solid var(--paper-ink);
+  border-bottom: 0;
   background: var(--paper-fill-light);
+  font-size: inherit;
   font-weight: 400;
+  letter-spacing: normal;
+  color: inherit;
+  white-space: normal;
+  vertical-align: baseline;
 }
 
-.report-list tbody:first-of-type .report-group th {
+/* Under the column labels, their rule is its own. */
+.report-list thead tr + .report-group th {
   border-top: 0;
+}
+
+/* The tables follow on as one list: the next inspection's line is the rule between them. */
+.report-list:not(:last-of-type) {
+  border-bottom: 0;
 }
 
 .report-group {

@@ -70,9 +70,13 @@ export type ChartLayout = {
 };
 
 export function monthChart(months: readonly Month[]): ChartLayout {
+  const axisLabels = months.length > MONTHS_PER_ROW;
   const plot = {
     left: CHART_GUTTER_MM * MM,
-    right: WIDTH_MM * MM,
+    // The latest month's label is centred on the last point: with labels of its own the chart
+    // keeps half a label's room on the right, or the label crosses the content edge (where
+    // Chrome cuts it) as soon as a month's slot is narrower than a label.
+    right: WIDTH_MM * MM - (axisLabels ? LABEL_ROOM / 2 : 0),
     top: PLOT_TOP,
     bottom: PLOT_TOP + PLOT_HEIGHT,
   };
@@ -83,7 +87,6 @@ export function monthChart(months: readonly Month[]): ChartLayout {
   // Every month's label when they fit; else every second, third… counted back from the latest
   // month, which is always labelled.
   const every = Math.ceil(LABEL_ROOM / slot);
-  const axisLabels = months.length > MONTHS_PER_ROW;
   return {
     width: WIDTH_MM * MM,
     height: plot.bottom + (axisLabels ? AXIS_BAND : NO_AXIS_BAND),

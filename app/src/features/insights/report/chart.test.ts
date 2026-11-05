@@ -46,6 +46,16 @@ describe('monthChart', () => {
     expect(long.height).toBeGreaterThan(monthChart(months(12)).height);
   });
 
+  it('keeps the latest month label inside the content width', () => {
+    // Half a 7 pt "2026-11" is about 5.4 mm; the label is centred on the last point.
+    for (const count of [13, 18, 23, 36, 60]) {
+      const chart = monthChart(months(count));
+      expect(chart.points.at(-1)!.x + 5.6 * MM).toBeLessThanOrEqual(chart.width);
+    }
+    // With a year or less the month table names them, its columns under the chart's.
+    expect(monthChart(months(12)).plot.right).toBeCloseTo(185 * MM);
+  });
+
   it('keeps dots up to three years and columns no wider than 8 mm', () => {
     expect(monthChart(months(36)).dots).toBe(true);
     expect(monthChart(months(37)).dots).toBe(false);

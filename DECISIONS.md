@@ -2496,3 +2496,19 @@ them.
   the new tab's autoprint and its address), a real PDF (A4, footer and page numbers on every page,
   nothing past the right margin, the parts in order, no page ending on a heading, the list on a
   page of its own), a single month, an empty selection and unusable filters, and admins only.
+
+### Review fixes (feature batch)
+
+- **A menu never opens past the screen's left edge.** `ActionMenu` right-aligns its menu under its
+  button; on a 360–375 px phone the inspection page's ⋯ button wraps to the far left, and the menu
+  ran 136 px off screen. Once the menu has a width, its left edge is kept 8 px inside the viewport.
+- **The report chart keeps room for the latest month's label.** With more than a year the chart
+  writes its own month labels, the last one centred on the last point; past about 17 months half a
+  month's slot is narrower than half a label, and Chrome cut "2026-11" to "2026-1" at the content
+  edge. The plot now ends half a label short of the edge when it writes labels. With a year or less
+  it still spans the full width, so the month table's columns stay under its points.
+- **The deviation list is a table to an inspection, with the inspection's line in its head**, so a
+  page that carries on with an inspection's rows starts with that line again. The column labels
+  head the first table only: in every table they would come round again for each inspection of a
+  row or two. Browsers without margin boxes get the fallback footer from the last table only, for
+  the same reason.

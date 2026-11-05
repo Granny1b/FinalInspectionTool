@@ -22,6 +22,10 @@ function machine({ machine, model, serialNumber }: ListGroup): string {
  * "Include deviation list": the rows behind the numbers, on pages of their own after the report.
  * Each inspection's deviations under a line naming it (number, date, model, machine), in the
  * order of the CSV export: oldest inspection first, checklist order, extra deviations last.
+ *
+ * A table to an inspection, its line in the table's head, so a page that carries on with its
+ * rows starts with that line again. The column labels head the first table only: with them in
+ * every one, the labels would come round again for each inspection of a row or two.
  */
 export function DeviationList({ list, footer }: Props) {
   const titleId = useId();
@@ -38,32 +42,29 @@ export function DeviationList({ list, footer }: Props) {
       {list.count === 0 ? (
         <p className="report-none">No deviations in this selection.</p>
       ) : (
-        <table className="report-table report-list">
-          <colgroup>
-            <col className="report-col-ref" />
-            <col />
-            <col className="report-col-severity" />
-            <col className="report-col-category" />
-            <col className="report-col-resp" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th scope="col">Ref</th>
-              <th scope="col">Checkpoint and comment</th>
-              <th scope="col">Severity</th>
-              <th scope="col">Category</th>
-              <th scope="col">Responsible</th>
-            </tr>
-          </thead>
-          {fallbackFooter && (
-            <tfoot className="paper-fallback-footer">
-              <tr>
-                <td colSpan={COLUMNS}>{fallbackFooter}</td>
-              </tr>
-            </tfoot>
-          )}
-          {list.groups.map((group) => (
-            <tbody key={group.key} data-inspection={group.number}>
+        list.groups.map((group, index) => (
+          <table
+            key={group.key}
+            className="report-table report-list"
+            data-inspection={group.number}
+          >
+            <colgroup>
+              <col className="report-col-ref" />
+              <col />
+              <col className="report-col-severity" />
+              <col className="report-col-category" />
+              <col className="report-col-resp" />
+            </colgroup>
+            <thead>
+              {index === 0 && (
+                <tr>
+                  <th scope="col">Ref</th>
+                  <th scope="col">Checkpoint and comment</th>
+                  <th scope="col">Severity</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Responsible</th>
+                </tr>
+              )}
               <tr className="report-group">
                 <th colSpan={COLUMNS} scope="colgroup">
                   <div className="report-group-line">
@@ -76,6 +77,16 @@ export function DeviationList({ list, footer }: Props) {
                   </div>
                 </th>
               </tr>
+            </thead>
+            {/* One footer for the list: in every table it would print under each inspection. */}
+            {fallbackFooter && index === list.groups.length - 1 && (
+              <tfoot className="paper-fallback-footer">
+                <tr>
+                  <td colSpan={COLUMNS}>{fallbackFooter}</td>
+                </tr>
+              </tfoot>
+            )}
+            <tbody>
               {group.rows.map((row) => (
                 <tr key={row.key}>
                   <td className="report-ref">{row.ref}</td>
@@ -92,8 +103,8 @@ export function DeviationList({ list, footer }: Props) {
                 </tr>
               ))}
             </tbody>
-          ))}
-        </table>
+          </table>
+        ))
       )}
     </section>
   );

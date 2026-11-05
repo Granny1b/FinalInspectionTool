@@ -172,13 +172,19 @@ export function ActionMenu({ label, items, triggerData, trigger }: Props) {
   );
 }
 
-/** Right-aligned under its button; flipped above it when there is no room below. */
+/**
+ * Right-aligned under its button, but never past the left edge (a button at the far left of a
+ * phone); flipped above it when there is no room below.
+ */
 function placeMenu(menu: HTMLElement, trigger: HTMLElement) {
   const anchor = trigger.getBoundingClientRect();
   const viewportWidth = document.documentElement.clientWidth;
-  menu.style.right = `${Math.max(8, viewportWidth - anchor.right)}px`;
+  // Before it opens the menu has no width yet; onToggle places it again once it has.
+  const width = menu.offsetWidth;
+  const right = viewportWidth - anchor.right;
+  const leftmost = width > 0 ? viewportWidth - 8 - width : right;
+  menu.style.right = `${Math.max(8, Math.min(right, leftmost))}px`;
   menu.style.top = `${anchor.bottom + 4}px`;
-  // Before it opens the menu has no height yet; onToggle places it again once it has.
   const height = menu.offsetHeight;
   if (height > 0 && anchor.bottom + 4 + height > window.innerHeight - 8) {
     menu.style.top = `${Math.max(8, anchor.top - 4 - height)}px`;
