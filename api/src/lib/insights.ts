@@ -124,7 +124,7 @@ async function loadDeviationRows(
  * existed, such as `category`, would otherwise fail the schema and be dropped, where the
  * schema's default is meant to fill it in. A required column that is missing still fails.
  */
-export function withoutNulls(entity: Record<string, unknown>): Record<string, unknown> {
+function withoutNulls(entity: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(entity).filter(([, value]) => value !== null));
 }
 
