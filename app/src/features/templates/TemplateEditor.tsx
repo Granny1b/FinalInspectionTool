@@ -388,7 +388,6 @@ export function TemplateEditor({ loaded, onReload }: Props) {
         <TemplateSettingsCard
           name={draft.name}
           modelCode={draft.modelCode}
-          spareRows={draft.printSettings.spareRowsPerSection}
           coverImageId={draft.coverImageId}
           revision={server.revision}
           models={settings.data?.machineModels}
@@ -405,7 +404,6 @@ export function TemplateEditor({ loaded, onReload }: Props) {
         <TemplateDocument
           sections={draft.sections}
           onChange={updateSections}
-          spareRowsPerSection={draft.printSettings.spareRowsPerSection}
           issues={issues}
           onEditorDirtyChange={setEditorDirty}
         />
@@ -446,14 +444,8 @@ export function TemplateEditor({ loaded, onReload }: Props) {
 }
 
 /** The fields a client may send (brief §8 PUT body); the rest of the draft belongs to the server. */
-function draftInput({
-  name,
-  modelCode,
-  coverImageId,
-  printSettings,
-  sections,
-}: Template): TemplateDraftInput {
-  return { name, modelCode, coverImageId, printSettings, sections };
+function draftInput({ name, modelCode, coverImageId, sections }: Template): TemplateDraftInput {
+  return { name, modelCode, coverImageId, sections };
 }
 
 function serverState(detail: TemplateDetail): ServerState {

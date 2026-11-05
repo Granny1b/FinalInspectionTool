@@ -17,7 +17,6 @@ import {
   checklistIds,
   CONTAINERS,
   CreateTemplateRequestSchema,
-  DEFAULT_SPARE_ROWS_PER_SECTION,
   hasUnpublishedChanges,
   ImportTemplateRequestSchema,
   newId,
@@ -72,7 +71,6 @@ export const createTemplate = endpoint({ role: 'admin' }, async (req, _context, 
   const { draft, etag } = await writeNewDraft({
     name,
     modelCode,
-    printSettings: { spareRowsPerSection: DEFAULT_SPARE_ROWS_PER_SECTION },
     // The editor starts from an empty state with "+ Add section".
     sections: [],
     updatedBy: user.email,
@@ -89,7 +87,7 @@ export const createTemplate = endpoint({ role: 'admin' }, async (req, _context, 
  */
 export const importTemplate = endpoint({ role: 'admin' }, async (req, _context, user) => {
   const { name, modelCode, newModel, file } = await readJsonBody(req, ImportTemplateRequestSchema);
-  const { coverImageId, printSettings, sections } = file.template;
+  const { coverImageId, sections } = file.template;
   checkIds(sections);
 
   const [used, stored] = await Promise.all([
@@ -108,7 +106,6 @@ export const importTemplate = endpoint({ role: 'admin' }, async (req, _context, 
     name,
     modelCode,
     ...(checklist.coverImageId && { coverImageId: checklist.coverImageId }),
-    printSettings,
     sections: checklist.sections,
     updatedBy: user.email,
   });

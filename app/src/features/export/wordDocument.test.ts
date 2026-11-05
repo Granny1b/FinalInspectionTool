@@ -60,11 +60,7 @@ const INSPECTION: Inspection = {
   number: 'FI-2026-0042',
   templateId: id('Tmpl', 1),
   templateRevision: 2,
-  templateSnapshot: {
-    name: 'Final inspection – RigiMill MG',
-    sections: SECTIONS,
-    printSettings: { spareRowsPerSection: 3 },
-  },
+  templateSnapshot: { name: 'Final inspection – RigiMill MG', sections: SECTIONS },
   front: {
     machineName: 'RigiMill MG – Volvo Skövde',
     modelCode: 'RMMG',
@@ -211,11 +207,10 @@ describe('the Word export of a report', () => {
     expect(all).toContain(
       '1.aLifting columns - Marked screws, blue/red/yellowSeverity: MajorTwo screws have no torque mark.',
     );
-    // Statuses as symbol and word; no spare rows in a report.
+    // Statuses as symbol and word.
     expect(all).toContain('✗NOK');
     expect(all).toContain('✓OK');
     expect(all).toContain('–N/A');
-    expect(all).not.toContain('1.c');
     expect(all).not.toContain('☐');
   });
 
@@ -440,7 +435,6 @@ describe('the Word export of awkward text', () => {
           modelCode: 'RMMG',
           revision: 1,
           status: 'draft',
-          printSettings: { spareRowsPerSection: 0 },
           sections,
           updatedAt: '2026-10-07T08:00:00.000Z',
           updatedBy: 'anna@modig.se',
@@ -464,12 +458,13 @@ describe('the Word export of awkward text', () => {
 describe('the Word export of a blank checklist', () => {
   const model = inspectionPrint(INSPECTION, 'blank', CONTEXT);
 
-  it('has boxes to tick, the spare rows and the numbered Deviation Summary lines', async () => {
+  it('has boxes to tick and the numbered Deviation Summary lines', async () => {
     const { document } = await build(model);
     const all = text(document);
-    // Three rows plus three spare rows per section, three boxes each.
-    expect(count(all, /☐/g)).toBe((3 + 2 * 3) * 3);
-    expect(all).toContain('1.e');
+    // The three checkpoints, three boxes each, and no blank lines after them.
+    expect(count(all, /☐/g)).toBe(3 * 3);
+    expect(all).toContain('1.bPallet');
+    expect(all).not.toContain('1.c');
     expect(all).not.toContain('Two screws have no torque mark.');
     expect(all).toContain('No.RefDescriptionSeverityCategoryRespClosed (sign/date)');
     for (let n = 1; n <= BLANK_DEVIATION_LINES; n += 1) {
@@ -483,7 +478,7 @@ describe('the Word export of a blank checklist', () => {
     const { document } = await build(model);
     // 9.5 mm in twips, "at least".
     expect(count(document, /<w:trHeight w:val="539" w:hRule="atLeast"\/>/g)).toBe(
-      9 + BLANK_DEVIATION_LINES,
+      3 + BLANK_DEVIATION_LINES,
     );
   });
 });
@@ -495,7 +490,6 @@ describe('the Word export of a template preview', () => {
     modelCode: 'RMMG',
     revision: 3,
     status: 'draft',
-    printSettings: { spareRowsPerSection: 0 },
     sections: SECTIONS,
     updatedAt: '2026-10-07T08:00:00.000Z',
     updatedBy: 'anna@modig.se',
@@ -522,7 +516,6 @@ describe('the Word export of a section without checkpoints', () => {
     modelCode: 'RMMG',
     revision: 3,
     status: 'published',
-    printSettings: { spareRowsPerSection: 2 },
     sections,
     updatedAt: '2026-10-07T08:00:00.000Z',
     updatedBy: 'anna@modig.se',
@@ -531,28 +524,32 @@ describe('the Word export of a section without checkpoints', () => {
   const sectionText = (all: string, title: string, next: string) =>
     all.slice(all.indexOf(title), all.indexOf(next, all.indexOf(title)));
 
-  it('prints its heading and its spare lines, lettered from a, on a blank checklist', async () => {
-    const all = text((await build(templatePrint(template, { ...CONTEXT, draft: false }))).document);
-    const table = sectionText(all, '2Electrical cabinet', '3Tool arena');
-    expect(table).toBe('2Electrical cabinetNo.CheckpointCommentOKNOKN/AResp2.a☐☐☐2.b☐☐☐');
-    expect(all).toContain('3.aTool magazine - All pockets clean');
-  });
+  const withEmpty = {
+    ...INSPECTION,
+    templateSnapshot: { ...INSPECTION.templateSnapshot, sections },
+  };
 
-  it('says it has no checkpoints in a report, on one line that keeps with the heading', async () => {
-    const report = inspectionPrint(
-      { ...INSPECTION, templateSnapshot: { ...INSPECTION.templateSnapshot, sections } },
-      'report',
-      CONTEXT,
-    );
-    const { document } = await build(report);
-    const table = sectionText(text(document), '2Electrical cabinet', '3Tool arena');
-    expect(table).toBe(
-      '2Electrical cabinetNo.CheckpointCommentOKNOKN/ARespNo checkpoints in this section.',
-    );
-    const line = tableRows(document).find((row) => row.includes('No checkpoints in this section.'));
-    expect(line).toContain('<w:cantSplit/>');
-    expect(line).toContain('<w:i/>');
-  });
+  it.each([
+    ['a template preview', templatePrint(template, { ...CONTEXT, draft: false })],
+    ['a blank checklist', inspectionPrint(withEmpty, 'blank', CONTEXT)],
+    ['a report', inspectionPrint(withEmpty, 'report', CONTEXT)],
+  ])(
+    'says it has no checkpoints in %s, on one line that keeps with the heading',
+    async (_, model) => {
+      const { document } = await build(model);
+      const all = text(document);
+      const table = sectionText(all, '2Electrical cabinet', '3Tool arena');
+      expect(table).toBe(
+        '2Electrical cabinetNo.CheckpointCommentOKNOKN/ARespNo checkpoints in this section.',
+      );
+      expect(all).toContain('3.aTool magazine - All pockets clean');
+      const line = tableRows(document).find((row) =>
+        row.includes('No checkpoints in this section.'),
+      );
+      expect(line).toContain('<w:cantSplit/>');
+      expect(line).toContain('<w:i/>');
+    },
+  );
 
   it('keeps a first row with the next and the one before last with the last, never a lone row', () => {
     const keeps = (count: number) =>

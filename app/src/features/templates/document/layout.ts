@@ -1,6 +1,6 @@
 /**
- * Column geometry shared by section headers, rows and spare rows, so everything lines up like the
- * printed table: ref | checkpoint | Comment | Status | Resp.
+ * Column geometry shared by section headers and rows, so everything lines up like the printed
+ * table: ref | checkpoint | Comment | Status | Resp.
  *
  * The paper-only columns (Comment, Status, Resp) just hint at the print layout. They appear when
  * the sheet itself is wide enough (a container query, `@min-[52rem]`), so not on tablets; there

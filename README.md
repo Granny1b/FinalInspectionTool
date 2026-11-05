@@ -22,9 +22,9 @@ Working now:
   there (see [Settings](#settings)).
 - **Templates (phase 2).** The template list; a new template for a machine model that has none;
   the template editor, which looks like the printed checklist and is edited in place (sections and
-  rows, drag and drop, automatic 1.a numbering, cover photo, spare rows); autosave of the draft
-  with conflict detection; publishing immutable revisions with a change note; the revision
-  history; and read-only views of any published revision. Inspectors see the latest published
+  rows, drag and drop, automatic 1.a numbering, cover photo); autosave of the draft with conflict
+  detection; publishing immutable revisions with a change note; the revision history; and
+  read-only views of any published revision. Inspectors see the latest published
   revision of each template, read-only. See [Editing templates](#editing-templates).
 - **Inspections (phase 3).** The inspection list with search and filters; a new inspection from a
   model's latest published checklist, which it keeps as a frozen copy; the front page; the
@@ -67,9 +67,8 @@ Added after the six phases:
   picks its Responsible and an optional category from those lists. See [Settings](#settings).
 - **Users and names.** Admins add, change and remove the people who may use the app in Settings,
   and the app shows them by name. See [Auth model and roles](#auth-model-and-roles).
-- **Templates.** Delete a template, export and import it as JSON, see the list as cards, add and
-  delete spare lines per section, and add a new machine model together with its template. See
-  [Editing templates](#editing-templates).
+- **Templates.** Delete a template, export and import it as JSON, see the list as cards, and add
+  a new machine model together with its template. See [Editing templates](#editing-templates).
 - **Dark and light theme**, following the device's setting unless you pick one. See
   [Light and dark theme](#light-and-dark-theme).
 - **Quick report preview.** **Preview** on an inspection shows the printout at once, unsaved
@@ -199,8 +198,8 @@ has an empty frame of the same size.
 - **Sections without rows.** A section may be published before it has rows: a heading for
   checkpoints still to be written. In the editor it says "No rows yet" with its **+ Add row**,
   and rows can be dragged into it. It keeps its number (4 stays 4), inspections show its heading
-  with "No checkpoints in this section yet.", and it prints its heading with its spare lines (see
-  [Printing](#printing)).
+  with "No checkpoints in this section yet.", and it prints its heading over "No checkpoints in
+  this section.", on a blank checklist and a report alike (see [Printing](#printing)).
 - **Revision history.** Next to the front page: each revision with its date, who published it and
   the note. **View** opens that revision read-only.
 - **Export and import (JSON).** The editor's **⋯** menu has **Export JSON**: the draft as shown,
@@ -210,16 +209,16 @@ has an empty frame of the same size.
   new, unpublished draft. If no template here uses its rows' ids, it keeps them, so re-importing
   an exported template keeps its checkpoints' history in Insights; otherwise every section and
   row gets a new id. Images (cover, guide images) come along only if they are stored in this
-  installation; the import says how many were left out.
+  installation; the import says how many were left out. Files exported while templates had spare
+  lines still import; their spare lines are left out.
 - **Delete (admins).** **⋯ → Delete template** asks first, then deletes the draft and every
   published revision for good and goes back to the list. Inspections made from it are kept with
   their own copy of the checklist, their reports and their deviations. Insights still counts
   their deviations, showing each checkpoint as it was last inspected. Images stay in storage.
   Locally, deleting the seeded RigiMill MG template brings it back at the next `npm run dev`,
   because the seed imports it whenever none exists.
-- **Front page.** Name, machine model, spare lines per section (the default: the empty lettered
-  lines printed after each section for handwritten findings) and a cover photo. The photo is
-  scaled down in the browser to 1600 px on the long edge before it is uploaded.
+- **Front page.** Name, machine model and a cover photo. The photo is scaled down in the browser
+  to 1600 px on the long edge before it is uploaded.
 
 In the checklist:
 
@@ -228,17 +227,12 @@ In the checklist:
 | Add a row below                             | `Enter` in a row; **+ Add row** at the end of a section           |
 | Start a new section's rows                  | `Enter` in its title                                              |
 | Delete an empty row                         | `Backspace` in it (holding it down only empties a row)            |
-| Add a spare line to a section               | **+ Add spare line** at the end of the section                    |
-| Delete a spare line                         | Its bin icon, shown on hover or focus (always on a tablet)        |
-| Undo deleting a row, section or spare line  | **Undo** at the bottom of the window, until the next such change  |
+| Undo deleting a row or section              | **Undo** at the bottom of the window, until the next such change  |
 | Move between rows                           | `↑` / `↓` from the first or last line of a row                    |
 | Duplicate or delete a row                   | The icons that appear on hover or focus; on a tablet, its **⋯**   |
 | Rename, duplicate, move or delete a section | Its **⋯** menu (deleting a section with rows asks first)          |
 | Move a row or section                       | Drag its handle (⠿, left of it), also between sections            |
 | Move it with the keyboard                   | `Tab` to the handle, `Space`, arrow keys, `Space` (`Esc` cancels) |
-
-A section whose spare lines you added or deleted keeps its own number; the others follow the
-front page's default.
 
 Numbers (section 3, row 3.c) follow the position and change as rows move; each row keeps its
 identity, which is what later phases key results and statistics on.
@@ -491,13 +485,12 @@ machine name longer than 60 characters is shortened in the footer.
   names near their 200 characters) move the signatures and revision to a second page.
 - **Checklist.** One table per section: No. | Checkpoint | Comment | OK | NOK | N/A | Resp. Its
   title and column labels repeat on every page the section runs onto; a row is never split, and a
-  section title never stands alone at the foot of a page. _Blank_: tick boxes, rows at least
-  9 mm high for handwriting, and the template's spare lines after each section, lettered on. _Report_:
+  section title never stands alone at the foot of a page. _Blank_: tick boxes and rows at least
+  9 mm high for handwriting; findings that belong to no row go on the Deviation Summary. _Report_:
   the status as a symbol and a word (✓ OK, ✗ NOK, – N/A), a NOK row's severity above its comment
   ("Severity: Major"), and Resp. A section without checkpoints prints its title and column
-  labels, then on a blank checklist its spare lines lettered from a (2.a, 2.b…) and in a report
-  one line, "No checkpoints in this section."; it keeps with its title but never holds the next
-  section on its page. Word does the same.
+  labels, then one line, "No checkpoints in this section.", blank or report; it keeps with its
+  title but never holds the next section on its page. Word does the same.
 - **Deviations**, starting on a new page. _Blank_: the Deviation Summary to fill in by hand, lines
   D-01 to D-24, filling the page (No. | Ref | Description | Severity | Category | Resp | Closed).
   _Report_: a card per deviation: "D-03 · 4.c · MAJOR" (an extra deviation says "Not on the
@@ -625,7 +618,8 @@ deviation report: the same numbers, for exactly the filters chosen on the page.
   the numbers on pages of their own (greyed out when there are none).
 - Address: `/insights/report?<the Insights page's filters>[&deviations=1]`, for admins only.
 
-**What it says**, A4 portrait, in black and white:
+**What it says**, A4 portrait, in black and white, each part in a light card (the short ones two to
+a row):
 
 - **The header:** logo, "Deviation report", the company name, then what the report covers:
   _Period_ ("2026-10" for a whole month, "2026-01 – 2026-10" for whole months, otherwise the
@@ -636,9 +630,10 @@ deviation report: the same numbers, for exactly the filters chosen on the page.
 - **Headline numbers:** the four tiles' figures, each with what it counts.
 - **Deviations per month:** columns for one or two months, a line from three on, and under it
   each month's deviations and inspections, a year to a row.
-- **By severity, Per section, Per model, By responsible, By category:** tables with every entry
-  (no "Show all"), its count, its share of all the deviations and a bar as long as the count
-  against the largest; per model also its inspections and deviations per machine.
+- **By severity and Per model** side by side, then the top 10, **Per section**, and **By
+  responsible and By category** side by side: tables with every entry (no "Show all"), its count,
+  its share of all the deviations and a bar as long as the count against the largest; per model
+  its inspections, deviations, deviations per machine and share.
 - **Top 10 recurring checkpoints:** rank, ref, checkpoint ("No longer in the checklist" under a
   removed one), section, the model when there are several, how many inspections it failed in and
   that as a share of the inspections whose checklist had it ("50% of 4").
@@ -781,15 +776,14 @@ because it usually means the command that produced it failed.
   leaving and the tab-close warning, publishing with a change note, two admins in conflict, a lost
   save answer, a save after signing out, a cover photo upload (also leaving while it uploads), a
   new template whose empty row blocks publishing; a section without rows published, shown in an
-  inspection and printed; spare lines deleted, put back with Undo, added
-  and printed per section; the list shown as cards and remembered; deleting a template (asks
-  first, its inspection kept, its revisions gone); the new machine model fields (suggested code, a
-  taken code refused); Export JSON, a wrong file explained, and Import JSON making a new draft
-  with new ids; and the inspector's read-only view (the API refuses their saves, deletes and
-  imports with 403). For inspections: creating one from the front page form and finding it in the
-  list; a whole checklist filled in from the keyboard (status keys, moving between rows, the
-  comment, the Tab order, Escape, Enter, clearing, Set remaining to OK, the progress) and still
-  there after a reload; the Deviation Summary's order and an extra deviation; the deviation table, read straight from Azurite (every column, the
+  inspection and printed (blank and report); the list shown as cards and remembered; deleting a
+  template (asks first, its inspection kept, its revisions gone); the new machine model fields
+  (suggested code, a taken code refused); Export JSON, a wrong file explained, and Import JSON
+  making a new draft with new ids; and the inspector's read-only view (the API refuses their
+  saves, deletes and imports with 403). For inspections: creating one from the front page form and
+  finding it in the list; a whole checklist filled in from the keyboard (status keys, moving between
+  rows, the comment, the Tab order, Escape, Enter, clearing, Set remaining to OK, the progress) and
+  still there after a reload; the Deviation Summary's order and an extra deviation; the deviation table, read straight from Azurite (every column, the
   `finalised` flag, a row deleted when NOK becomes OK); Finalise blocked by a missing row, its
   jump link, the locked page and the API's 409; Reopen refused to an inspector (403) and done by
   an admin; an inspection unchanged after its template publishes a new revision; and two
@@ -828,17 +822,17 @@ because it usually means the command that produced it failed.
   checklist of the 90-row RigiMill MG, a finalised report in both deviation layouts (long
   comments, N/A rows, extra deviations, photos with and without a marked-up copy), a report whose
   long texts leave fewer cards on a page, one whose deviation is too tall to share a page of four
-  (it gets a page of its own, full width, and no empty page follows), a template preview with
-  spare lines lettered past z, a report with its reference images (also as Firefox and Safari
-  print it, with the footer on every appendix page), a front page with very long values (the
+  (it gets a page of its own, full width, and no empty page follows), a template preview of the
+  90-row checklist, a report with its reference images (also as Firefox and Safari print it, with
+  the footer on every appendix page), a front page with very long values (the
   signatures and revision move on together) and refs up to 10.an inside their column, 2 per
-  page with long texts (no photo under 50 mm), and a section without checkpoints (spare lines
-  blank, one line in a report).
+  page with long texts (no photo under 50 mm), and a section without checkpoints (its heading and
+  one line saying so, blank and report).
   They check that every page is A4, the page count is in a range derived from the layout, page 1
   is the front page, every page has the footer and "Page X of Y" with the right total and nothing
   else in the bottom margin, every row is whole on the one page that has its ref, no section
   title is left without a row after it, no text crosses the right margin, blank rows are at least
-  9 mm apart, spare lines carry on the lettering, the blank Deviation Summary is the last page
+  9 mm apart, the blank Deviation Summary is the last page
   with D-01 to D-24, and the report's cards are 2 or 4 to a page, each whole on one page with its
   photos painted there. The reference images: turned on in the toolbar, the page is not ready to
   print until their images are in; the appendix follows the deviations, the images two to a row
@@ -904,6 +898,9 @@ table deviations                         one row per deviation, the source for K
 ```
 
 IDs are 16-character alphanumeric nanoids. Names are defined in `shared/src/storage.ts`.
+Documents are read through the shared zod schemas, which drop fields they no longer know: the
+`printSettings` and sections' `spareRows` that templates and inspections stored before spare lines
+were removed still carry are ignored, and gone after the next save.
 
 Photos never pass through the API. The browser asks `/api/images/upload-url` for a new image id
 and a URL that can only write that one blob, valid for 10 minutes, and uploads the scaled-down

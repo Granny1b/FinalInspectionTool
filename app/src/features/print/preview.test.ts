@@ -17,7 +17,6 @@ const stored: Inspection = {
         items: [{ id: 'Item000000000001', text: 'Door seals intact' }],
       },
     ],
-    printSettings: { spareRowsPerSection: 3 },
   },
   front: {
     machineName: 'RigiMill MG',

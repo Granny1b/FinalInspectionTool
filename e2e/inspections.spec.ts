@@ -912,7 +912,6 @@ test('an inspection keeps its checklist when the template gets a new revision', 
     data: {
       name: draft.name,
       modelCode: draft.modelCode,
-      printSettings: draft.printSettings,
       sections,
     },
   });

@@ -20,7 +20,6 @@ const sections: Section[] = [
   {
     id: 's1',
     title: 'Loading area',
-    spareRows: 1,
     items: [
       { id: 'i1', text: 'Lifting columns', guide: { images: [image('p1', 'r1'), image('p2')] } },
       { id: 'i2', text: 'Pallet mover', guide: { description: 'Slack', images: [image('p3')] } },
@@ -33,7 +32,6 @@ const template = {
   name: 'Final inspection – RigiMill MG',
   modelCode: 'RMMG',
   coverImageId: 'cover',
-  printSettings: { spareRowsPerSection: 3 },
   sections,
 };
 
@@ -54,7 +52,47 @@ describe('templateExport', () => {
       undefined,
       '2026-11-04T08:00:00.000Z',
     );
-    expect(Object.keys(file.template)).toEqual(['name', 'modelCode', 'printSettings', 'sections']);
+    expect(Object.keys(file.template)).toEqual(['name', 'modelCode', 'sections']);
+  });
+});
+
+describe('TemplateExportSchema', () => {
+  it('reads a file exported before spare lines were removed, without them, still as version 1', () => {
+    // As an earlier version wrote it: print settings, and a section with its own spare lines.
+    const old = {
+      format: 'modig-final-inspection/template',
+      version: 1,
+      exportedAt: '2026-10-20T08:00:00.000Z',
+      template: {
+        name: 'Final inspection – RigiMill MG',
+        modelCode: 'RMMG',
+        modelName: 'RigiMill MG',
+        coverImageId: 'cover',
+        printSettings: { spareRowsPerSection: 3 },
+        sections: [
+          { id: 's1', title: 'Loading area', spareRows: 5, items: [{ id: 'i1', text: 'Lifting' }] },
+          { id: 's2', title: 'Tool arena', spareRows: 0, items: [] },
+        ],
+      },
+    };
+    const parsed = TemplateExportSchema.parse(old);
+    expect(parsed).toEqual({
+      format: 'modig-final-inspection/template',
+      version: 1,
+      exportedAt: '2026-10-20T08:00:00.000Z',
+      template: {
+        name: 'Final inspection – RigiMill MG',
+        modelCode: 'RMMG',
+        modelName: 'RigiMill MG',
+        coverImageId: 'cover',
+        sections: [
+          { id: 's1', title: 'Loading area', items: [{ id: 'i1', text: 'Lifting' }] },
+          { id: 's2', title: 'Tool arena', items: [] },
+        ],
+      },
+    });
+    expect('printSettings' in parsed.template).toBe(false);
+    expect(parsed.template.sections.some((section) => 'spareRows' in section)).toBe(false);
   });
 });
 
@@ -78,7 +116,6 @@ describe('images', () => {
     // The description stays when its only image goes; a guide left empty goes.
     expect(second!.guide).toEqual({ description: 'Slack', images: [] });
     expect(third).toEqual({ id: 'i3', text: 'Light curtains' });
-    expect(kept.sections[0]!.spareRows).toBe(1);
     expect(kept.sections[1]).toEqual(sections[1]);
     // The input is left as it was.
     expect(templateImageIds(template)).toHaveLength(6);
@@ -94,7 +131,7 @@ describe('ids', () => {
     let n = 0;
     const renewed = withNewIds(sections, () => `new${++n}`);
     expect(checklistIds(renewed)).toEqual(['new1', 'new2', 'new3', 'new4', 'new5', 'new6']);
-    expect(renewed[0]).toMatchObject({ title: 'Loading area', spareRows: 1 });
+    expect(renewed[0]).toMatchObject({ title: 'Loading area' });
     expect(renewed[0]!.items[0]!.guide).toEqual(sections[0]!.items[0]!.guide);
     expect(checklistIds(sections)[0]).toBe('s1');
   });

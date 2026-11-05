@@ -40,11 +40,7 @@ function inspection(patch: Partial<Inspection> = {}): Inspection {
     number: 'FI-2026-0042',
     templateId: 'Tmpl000000000001',
     templateRevision: 2,
-    templateSnapshot: {
-      name: 'Final inspection – RigiMill MG',
-      sections: SECTIONS,
-      printSettings: { spareRowsPerSection: 3 },
-    },
+    templateSnapshot: { name: 'Final inspection – RigiMill MG', sections: SECTIONS },
     front: {
       machineName: 'RigiMill MG – Volvo Skövde',
       modelCode: 'RMMG',
@@ -73,7 +69,6 @@ function template(patch: Partial<Template> = {}): Template {
     revision: 3,
     status: 'draft',
     coverImageId: 'Covr000000000001',
-    printSettings: { spareRowsPerSection: 2 },
     sections: SECTIONS,
     updatedAt: '2026-10-07T08:00:00.000Z',
     updatedBy: 'anna@modig.se',
@@ -110,30 +105,21 @@ describe('a blank checklist', () => {
     expect(model.front.report).toBeNull();
   });
 
-  it('numbers sections and rows, then adds the frozen spare rows with the lettering continued', () => {
+  it('numbers sections and rows: the checkpoints and nothing else, no blank lines', () => {
     expect(model.sections.map((s) => [s.number, s.title])).toEqual([
       [1, 'Loading area'],
       [2, 'Tool arena'],
     ]);
-    expect(refs(model.sections[0]!.rows)).toEqual(['1.a', '1.b', '1.c', '1.d', '1.e']);
-    expect(refs(model.sections[1]!.rows)).toEqual(['2.a', '2.b', '2.c', '2.d', '2.e', '2.f']);
-    expect(model.sections[0]!.rows.map((row) => row.spare)).toEqual([
-      false,
-      false,
-      true,
-      true,
-      true,
-    ]);
+    expect(refs(model.sections[0]!.rows)).toEqual(['1.a', '1.b']);
+    expect(refs(model.sections[1]!.rows)).toEqual(['2.a', '2.b', '2.c']);
     expect(model.sections[0]!.rows[0]).toEqual({
       ref: '1.a',
       text: 'Checkpoint 1.0',
-      spare: false,
       status: null,
       severity: null,
       comment: '',
       resp: '',
     });
-    expect(model.sections[0]!.rows[2]).toMatchObject({ text: '', status: null, comment: '' });
   });
 
   it('ignores recorded results: the paper is for filling in by hand', () => {
@@ -197,24 +183,17 @@ describe('a blank checklist', () => {
 });
 
 describe('lettering', () => {
-  it('runs past z (aa, ab…) and the spare rows continue after it', () => {
-    const long = { ...section(1, 'Long', 27) };
+  it('runs past z (aa, ab…)', () => {
+    const long = section(1, 'Long', 30);
     const model = inspectionPrint(
-      inspection({
-        templateSnapshot: {
-          name: 'Long',
-          sections: [long],
-          printSettings: { spareRowsPerSection: 3 },
-        },
-      }),
+      inspection({ templateSnapshot: { name: 'Long', sections: [long] } }),
       'blank',
       CONTEXT,
     );
     const rows = model.sections[0]!.rows;
     expect(rows).toHaveLength(30);
     expect(refs(rows.slice(24))).toEqual(['1.y', '1.z', '1.aa', '1.ab', '1.ac', '1.ad']);
-    expect(rows.slice(27).every((row) => row.spare)).toBe(true);
-    expect(rows[26]!.spare).toBe(false);
+    expect(rows[29]!.text).toBe('Checkpoint 1.29');
   });
 });
 
@@ -267,8 +246,8 @@ describe('a report', () => {
     ]);
   });
 
-  it('has no spare rows', () => {
-    expect(model.sections.flatMap((s) => s.rows).some((row) => row.spare)).toBe(false);
+  it('has a row per checkpoint, as the blank checklist', () => {
+    expect(refs(model.sections[0]!.rows)).toEqual(['1.a', '1.b']);
     expect(refs(model.sections[1]!.rows)).toEqual(['2.a', '2.b', '2.c']);
   });
 
@@ -412,11 +391,7 @@ describe('an inspection with a section without checkpoints', () => {
   // Published as a heading for checkpoints still to be written: section 2 of 3.
   const sections = [SECTIONS[0]!, section(3, 'Electrical cabinet', 0), SECTIONS[1]!];
   const withEmpty = inspection({
-    templateSnapshot: {
-      name: 'Final inspection – RigiMill MG',
-      sections,
-      printSettings: { spareRowsPerSection: 2 },
-    },
+    templateSnapshot: { name: 'Final inspection – RigiMill MG', sections },
     results: { [row2b!.id]: { status: 'NOK', comment: 'Label missing' } },
   });
 
@@ -431,13 +406,13 @@ describe('an inspection with a section without checkpoints', () => {
     }
   });
 
-  it('prints its spare lines on the blank checklist, lettered from a', () => {
+  it('has no rows on the blank checklist (it prints "No checkpoints in this section.")', () => {
     const model = inspectionPrint(withEmpty, 'blank', CONTEXT);
-    expect(refs(model.sections[1]!.rows)).toEqual(['2.a', '2.b']);
-    expect(model.sections[1]!.rows.every((row) => row.spare && row.text === '')).toBe(true);
+    expect(model.sections[1]!.rows).toEqual([]);
+    expect(refs(model.sections[2]!.rows)).toEqual(['3.a', '3.b', '3.c']);
   });
 
-  it('has no rows in the report (it prints "No checkpoints in this section.")', () => {
+  it('has no rows in the report either', () => {
     const model = inspectionPrint(withEmpty, 'report', CONTEXT);
     expect(model.sections[1]!.rows).toEqual([]);
     expect(refs(model.sections[2]!.rows)).toEqual(['3.a', '3.b', '3.c']);
@@ -452,7 +427,7 @@ describe('an inspection with a section without checkpoints', () => {
 });
 
 describe('a template preview', () => {
-  it('prints the draft blank, marked as a draft, with its own spare rows', () => {
+  it('prints the draft blank, marked as a draft', () => {
     const model = templatePrint(template(), { ...CONTEXT, draft: true });
     expect(model.mode).toBe('blank');
     expect(model.front.number).toBeNull();
@@ -466,7 +441,8 @@ describe('a template preview', () => {
     ]);
     expect(model.front.photoId).toBe('Covr000000000001');
     expect(model.front.revision).toBe('Draft – Rev 3');
-    expect(refs(model.sections[0]!.rows)).toEqual(['1.a', '1.b', '1.c', '1.d']);
+    expect(refs(model.sections[0]!.rows)).toEqual(['1.a', '1.b']);
+    expect(model.sections[0]!.rows.every((row) => row.status === null)).toBe(true);
     expect(model.deviations).toEqual({ kind: 'lines', numbers: blankNumbers });
     expect(printedImageIds(model, { appendix: false })).toEqual(['Covr000000000001']);
     expect(model.footer).toBe(
@@ -491,39 +467,15 @@ describe('a template preview', () => {
     expect(model.footer).toBe('Modig Machine Tool · Final inspection – RigiMill MG · Rev 2');
   });
 
-  it('keeps an empty section: only its spare rows, or no rows at all', () => {
+  it('keeps an empty section, without rows', () => {
     const sections = [section(1, 'Empty', 0), section(2, 'Full', 1)];
-    const withSpare = templatePrint(template({ sections }), { ...CONTEXT, draft: true });
-    expect(refs(withSpare.sections[0]!.rows)).toEqual(['1.a', '1.b']);
-    expect(withSpare.sections[0]!.rows.every((row) => row.spare)).toBe(true);
-
-    const without = templatePrint(
-      template({ sections, printSettings: { spareRowsPerSection: 0 } }),
-      { ...CONTEXT, draft: true },
-    );
-    expect(without.sections[0]!.rows).toEqual([]);
-    expect(refs(without.sections[1]!.rows)).toEqual(['2.a']);
-  });
-
-  it("gives a section with its own spare lines that number, the others the template's", () => {
-    const sections = [{ ...section(1, 'Own', 1), spareRows: 0 }, section(2, 'Default', 1)];
     const model = templatePrint(template({ sections }), { ...CONTEXT, draft: true });
-    expect(refs(model.sections[0]!.rows)).toEqual(['1.a']);
-    expect(refs(model.sections[1]!.rows)).toEqual(['2.a', '2.b', '2.c']);
-
-    // An inspection prints its snapshot's spare lines the same way.
-    const blank = inspectionPrint(
-      inspection({
-        templateSnapshot: {
-          name: 'Final inspection – RigiMill MG',
-          sections: [{ ...section(1, 'Own', 1), spareRows: 4 }],
-          printSettings: { spareRowsPerSection: 1 },
-        },
-      }),
-      'blank',
-      CONTEXT,
-    );
-    expect(refs(blank.sections[0]!.rows)).toEqual(['1.a', '1.b', '1.c', '1.d', '1.e']);
+    expect(model.sections.map((s) => [s.number, s.title])).toEqual([
+      [1, 'Empty'],
+      [2, 'Full'],
+    ]);
+    expect(model.sections[0]!.rows).toEqual([]);
+    expect(refs(model.sections[1]!.rows)).toEqual(['2.a']);
   });
 
   it('names an untitled template', () => {

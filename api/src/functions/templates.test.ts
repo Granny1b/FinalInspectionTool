@@ -28,6 +28,7 @@ import {
   sampleInspection,
   storeTemplate,
   useTestStorage,
+  withSpareLines,
   writeSettings,
 } from '../../test/storage';
 import { syncDeviations } from '../lib/deviations';
@@ -67,6 +68,12 @@ async function storedDraft(id: string) {
   return readJson(CONTAINERS.templates, blobNames.templateDraft(id), TemplateSchema);
 }
 
+/** The stored draft's JSON as it is in the blob, unparsed. */
+async function rawDraft(id: string): Promise<Record<string, unknown>> {
+  const blob = containerClient(CONTAINERS.templates).getBlobClient(blobNames.templateDraft(id));
+  return JSON.parse((await blob.downloadToBuffer()).toString('utf8')) as Record<string, unknown>;
+}
+
 function create(body: unknown, who = admin) {
   return createTemplate(
     request({ principal: who, method: 'POST', body: JSON.stringify(body) }),
@@ -91,8 +98,8 @@ function put(id: string, body: unknown, ifMatch?: string | null, who = admin) {
 }
 
 /** What the editor sends: the editable fields (the server ignores anything else). */
-function editable({ name, modelCode, coverImageId, printSettings, sections }: Template) {
-  return { name, modelCode, coverImageId, printSettings, sections };
+function editable({ name, modelCode, coverImageId, sections }: Template) {
+  return { name, modelCode, coverImageId, sections };
 }
 
 describe('registration', () => {
@@ -257,7 +264,6 @@ describe('POST /api/templates', () => {
       modelCode: 'IM',
       revision: 1,
       status: 'draft',
-      printSettings: { spareRowsPerSection: 3 },
       sections: [],
       updatedAt: expect.any(String),
       updatedBy: 'boss@modig.se',
@@ -398,14 +404,13 @@ describe('POST /api/templates/import', () => {
     verdict: 'good',
   });
 
-  /** An exported template from somewhere else: ids nobody here uses, one section with own spare lines. */
+  /** An exported template from somewhere else: ids nobody here uses. */
   function exported(overrides: Partial<Template> = {}) {
-    const source = draftTemplate({ printSettings: { spareRowsPerSection: 2 }, ...overrides });
-    source.sections[0] = { ...source.sections[0]!, spareRows: 5 };
+    const source = draftTemplate(overrides);
     return { source, file: templateExport(source, 'RigiMill MG', EXPORTED_AT) };
   }
 
-  it('creates an unpublished draft with the file’s checklist, ids and print settings', async () => {
+  it('creates an unpublished draft with the file’s checklist and ids', async () => {
     const { source, file } = exported();
     const response = await importFile({ name: ' Imported ', modelCode: 'IM', file });
     expect(response.status).toBe(201);
@@ -417,7 +422,6 @@ describe('POST /api/templates/import', () => {
         modelCode: 'IM',
         revision: 1,
         status: 'draft',
-        printSettings: { spareRowsPerSection: 2 },
         sections: source.sections,
         updatedAt: expect.any(String),
         updatedBy: 'boss@modig.se',
@@ -431,6 +435,19 @@ describe('POST /api/templates/import', () => {
       data: imported.draft,
       etag: etagOf(response),
     });
+  });
+
+  it('imports a file exported before spare lines were removed, without them', async () => {
+    const { source, file } = exported();
+    const old = { ...file, template: withSpareLines(file.template) };
+    expect(old.template.sections[0]).toHaveProperty('spareRows');
+    const response = await importFile({ name: 'Old file', modelCode: 'IM', file: old });
+    expect(response.status).toBe(201);
+    const { draft } = ImportTemplateResponseSchema.parse(response.jsonBody);
+    expect(draft.sections).toEqual(source.sections);
+    const raw = await rawDraft(draft.id);
+    expect(raw).not.toHaveProperty('printSettings');
+    expect(raw.sections).toEqual(source.sections);
   });
 
   it('gives every section and row a new id when any of them is in use, in a draft or a revision', async () => {
@@ -715,6 +732,15 @@ describe('GET /api/templates/{id}', () => {
     expect(detail.hasUnpublishedChanges).toBe(false);
   });
 
+  it('reads a template stored before spare lines were removed, without them', async () => {
+    const template = draftTemplate({ revision: 3 });
+    // Its draft and both revisions as an earlier version stored them.
+    await storeTemplate(withSpareLines(template), [1, 2]);
+    const detail = TemplateDetailSchema.parse((await get(template.id)).jsonBody);
+    expect(detail.draft).toEqual(template);
+    expect(detail.hasUnpublishedChanges).toBe(false);
+  });
+
   it('normalises a stale draft revision to latest published + 1', async () => {
     const template = draftTemplate({ revision: 7, status: 'published' });
     await storeTemplate(template, [1, 2]);
@@ -787,6 +813,20 @@ describe('PUT /api/templates/{id}', () => {
     expect(SaveTemplateResponseSchema.parse(reverted.jsonBody).hasUnpublishedChanges).toBe(false);
   });
 
+  it('saves a template stored with spare lines without them, and that is no unpublished change', async () => {
+    const template = draftTemplate({ revision: 3 });
+    // The draft and the revisions were stored before spare lines were removed; the draft's
+    // sections had their own numbers of them, the revisions too.
+    const etag = await storeTemplate(withSpareLines(template), [1, 2]);
+    const response = await put(template.id, editable(template), etag);
+    expect(response.status).toBe(200);
+    const saved = SaveTemplateResponseSchema.parse(response.jsonBody);
+    expect(saved.hasUnpublishedChanges).toBe(false);
+    const raw = await rawDraft(template.id);
+    expect(raw).not.toHaveProperty('printSettings');
+    expect(raw.sections).toEqual(template.sections);
+  });
+
   it('writes the normalised revision over a stale stored one', async () => {
     const template = draftTemplate({ revision: 11 });
     const etag = await storeTemplate(template, [4]);
@@ -825,14 +865,15 @@ describe('PUT /api/templates/{id}', () => {
 
   it('400 with the zod issues for an invalid body', async () => {
     const { template, etag } = await seeded();
+    const [first, ...rest] = template.sections;
     const response = await put(
       template.id,
-      { ...editable(template), printSettings: { spareRowsPerSection: -1 } },
+      { ...editable(template), sections: [{ ...first!, title: 'x'.repeat(201) }, ...rest] },
       etag,
     );
     expect(response.status).toBe(400);
     expect(errorOf(response).details).toEqual([
-      expect.objectContaining({ path: ['printSettings', 'spareRowsPerSection'] }),
+      expect.objectContaining({ path: ['sections', 0, 'title'] }),
     ]);
   });
 

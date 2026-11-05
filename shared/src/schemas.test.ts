@@ -34,7 +34,6 @@ describe('TemplateSchema', () => {
     modelCode: 'RMMG',
     revision: 2,
     status: 'published',
-    printSettings: { spareRowsPerSection: 3 },
     sections: [
       {
         id: newId(),
@@ -65,6 +64,18 @@ describe('TemplateSchema', () => {
 
   it('rejects model codes that cannot be a Table Storage PartitionKey', () => {
     expect(TemplateSchema.safeParse({ ...template, modelCode: 'RM/MG' }).success).toBe(false);
+  });
+
+  it('reads a template stored before spare lines were removed, without them', () => {
+    const stored = {
+      ...template,
+      printSettings: { spareRowsPerSection: 3 },
+      sections: template.sections.map((section) => ({ ...section, spareRows: 5 })),
+    };
+    const parsed = TemplateSchema.parse(stored);
+    expect(parsed).toEqual(template);
+    expect('printSettings' in parsed).toBe(false);
+    expect('spareRows' in parsed.sections[0]!).toBe(false);
   });
 });
 
@@ -115,7 +126,6 @@ describe('InspectionSchema', () => {
         sections: [
           { id: newId(), title: 'Gantry', items: [{ id: itemId, text: 'Motors - Safety decals' }] },
         ],
-        printSettings: { spareRowsPerSection: 3 },
       },
       front: {
         machineName: 'RigiMill MG #7',
@@ -137,6 +147,46 @@ describe('InspectionSchema', () => {
     expect(InspectionSchema.safeParse({ ...inspection, number: 'X-1' }).success).toBe(false);
     const badModel = { ...inspection, front: { ...inspection.front, modelCode: 'RM/MG' } };
     expect(InspectionSchema.safeParse(badModel).success).toBe(false);
+  });
+
+  it('reads an inspection stored before spare lines were removed: its snapshot without them', () => {
+    const itemId = newId();
+    const snapshot = {
+      name: 'Final inspection – RigiMill MG',
+      sections: [{ id: newId(), title: 'Gantry', items: [{ id: itemId, text: 'Motors' }] }],
+    };
+    const stored = {
+      id: newId(),
+      number: 'FI-2026-0007',
+      templateId: newId(),
+      templateRevision: 1,
+      // As an earlier version froze it: the print settings and a section's own spare lines.
+      templateSnapshot: {
+        ...snapshot,
+        sections: snapshot.sections.map((section) => ({ ...section, spareRows: 2 })),
+        printSettings: { spareRowsPerSection: 3 },
+      },
+      front: {
+        machineName: 'RigiMill MG #3',
+        modelCode: 'RMMG',
+        serialNumber: '123',
+        participants: [],
+        location: 'Kalmar, Sweden',
+        date: '2026-09-30',
+      },
+      results: { [itemId]: { status: 'OK' } },
+      extraDeviations: [],
+      state: 'finalised',
+      finalisedAt: '2026-09-30T15:00:00.000Z',
+      finalisedBy: 'sam@modig.se',
+      createdAt: '2026-09-30T09:00:00.000Z',
+      createdBy: 'sam@modig.se',
+      updatedAt: '2026-09-30T15:00:00.000Z',
+      updatedBy: 'sam@modig.se',
+    };
+    const parsed = InspectionSchema.parse(stored);
+    expect(parsed.templateSnapshot).toEqual(snapshot);
+    expect(parsed).toEqual({ ...stored, templateSnapshot: snapshot });
   });
 });
 

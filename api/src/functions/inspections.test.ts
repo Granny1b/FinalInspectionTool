@@ -26,6 +26,7 @@ import {
   sampleInspection,
   storeTemplate,
   useTestStorage,
+  withSpareLines,
   writeSettings,
 } from '../../test/storage';
 import { syncDeviations } from '../lib/deviations';
@@ -127,6 +128,12 @@ const inspectionOf = (response: HttpResponseInit) => InspectionSchema.parse(resp
 
 async function stored(id: string) {
   return readJson(CONTAINERS.inspections, blobNames.inspection(id), InspectionSchema);
+}
+
+/** The stored inspection's JSON as it is in the blob, unparsed. */
+async function raw(id: string): Promise<Inspection> {
+  const blob = containerClient(CONTAINERS.inspections).getBlobClient(blobNames.inspection(id));
+  return JSON.parse((await blob.downloadToBuffer()).toString('utf8')) as Inspection;
 }
 
 /** RigiMill MG published as revisions 1 and 2 (the draft equals revision 2), with a cover. */
@@ -268,11 +275,7 @@ describe('POST /api/inspections', () => {
       number: `FI-${year}-0001`,
       templateId: template.id,
       templateRevision: 2,
-      templateSnapshot: {
-        name: template.name,
-        sections: template.sections,
-        printSettings: template.printSettings,
-      },
+      templateSnapshot: { name: template.name, sections: template.sections },
       front: {
         machineName: 'RigiMill MG #7',
         modelCode: 'RMMG',
@@ -330,6 +333,15 @@ describe('POST /api/inspections', () => {
     const { inspection } = await created(template);
     expect(inspection.front.modelCode).toBe('RMMG');
     expect(inspection.templateSnapshot.name).toBe(template.name);
+  });
+
+  it('freezes a revision stored before spare lines were removed without them', async () => {
+    const template = draftTemplate({ revision: 3 });
+    await storeTemplate(withSpareLines(template), [1, 2]);
+    const { inspection } = await created(template);
+    const snapshot = { name: template.name, sections: template.sections };
+    expect(inspection.templateSnapshot).toEqual(snapshot);
+    expect((await raw(inspection.id)).templateSnapshot).toEqual(snapshot);
   });
 
   it('uses the latest published revision, not the draft', async () => {
@@ -462,6 +474,21 @@ describe('GET /api/inspections/{id}', () => {
     expect(etagOf(response)).toBe(etag);
   });
 
+  it('reads and saves an inspection stored before spare lines were removed, without them', async () => {
+    const inspection = sampleInspection();
+    const old = { ...inspection, templateSnapshot: withSpareLines(inspection.templateSnapshot) };
+    const etag = await writeInspection(old, {});
+    expect((await raw(inspection.id)).templateSnapshot).toHaveProperty('printSettings');
+
+    const response = await get(inspection.id);
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toEqual(inspection);
+
+    const saved = await put(inspection.id, draftOf(inspection), etag);
+    expect(saved.status).toBe(200);
+    expect((await raw(inspection.id)).templateSnapshot).toEqual(inspection.templateSnapshot);
+  });
+
   it('400 for a malformed id, 404 for an unknown one', async () => {
     expect((await get('../config/settings')).status).toBe(400);
     const unknown = await get(newId());
@@ -529,7 +556,7 @@ describe('PUT /api/inspections/{id}', () => {
       id: newId(),
       number: 'FI-1999-0001',
       templateRevision: 99,
-      templateSnapshot: { name: 'x', sections: [], printSettings: { spareRowsPerSection: 0 } },
+      templateSnapshot: { name: 'x', sections: [] },
       state: 'finalised',
       createdBy: 'someone@else.se',
       updatedBy: 'someone@else.se',

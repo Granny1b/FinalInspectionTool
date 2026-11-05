@@ -9,11 +9,6 @@ export type TemplateDocumentProps = {
   sections: Section[];
   /** Omit for read-only rendering (inspectors, published revisions). */
   onChange?: (sections: Section[]) => void;
-  /**
-   * Print setting: how many empty lettered spare lines end a section that has no number of its
-   * own (`Section.spareRows`). Previewed after each section's rows.
-   */
-  spareRowsPerSection: number;
   /** Publish problems to highlight (red outline + message) on the matching section/row. */
   issues?: PublishIssue[];
   /**
@@ -34,7 +29,6 @@ export type TemplateDocumentProps = {
 export function TemplateDocument({
   sections,
   onChange,
-  spareRowsPerSection,
   issues,
   onEditorDirtyChange,
 }: TemplateDocumentProps): JSX.Element {
@@ -47,16 +41,11 @@ export function TemplateDocument({
           <EditableDocument
             sections={sections}
             onChange={onChange}
-            spareRowsPerSection={spareRowsPerSection}
             issues={issueIndex}
             onEditorDirtyChange={onEditorDirtyChange}
           />
         ) : (
-          <ReadOnlyDocument
-            sections={sections}
-            spareRowsPerSection={spareRowsPerSection}
-            issues={issueIndex}
-          />
+          <ReadOnlyDocument sections={sections} issues={issueIndex} />
         )}
       </div>
     </div>

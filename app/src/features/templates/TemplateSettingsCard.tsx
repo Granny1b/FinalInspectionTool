@@ -1,6 +1,6 @@
-import { PrintSettingsSchema, type MachineModel, type TemplateDraftInput } from '@modig/shared';
+import type { MachineModel, TemplateDraftInput } from '@modig/shared';
 import clsx from 'clsx';
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import { Field, INPUT } from '../../components/Field';
 import { PhotoField } from '../../components/PhotoField';
 import { FrontPageFrame } from './FrontPage';
@@ -8,15 +8,9 @@ import { FrontPageFrame } from './FrontPage';
 /** The name input; publish problems about the name jump here. */
 export const TEMPLATE_NAME_ID = 'template-name';
 
-/** The range PrintSettingsSchema accepts (0–30), so the field and the API agree. */
-const SPARE_ROWS = PrintSettingsSchema.shape.spareRowsPerSection;
-const MIN_SPARE = SPARE_ROWS.minValue ?? 0;
-const MAX_SPARE = SPARE_ROWS.maxValue ?? 30;
-
 type Props = {
   name: string;
   modelCode: string;
-  spareRows: number;
   coverImageId: string | undefined;
   /** The revision the draft will be published as. */
   revision: number;
@@ -31,13 +25,12 @@ type Props = {
 };
 
 /**
- * Name, model, spare lines and cover photo, laid out like the printed front page. Memoised: the
+ * Name, model and cover photo, laid out like the printed front page. Memoised: the
  * editor re-renders on every keystroke in the checklist.
  */
 export const TemplateSettingsCard = memo(function TemplateSettingsCard({
   name,
   modelCode,
-  spareRows,
   coverImageId,
   revision,
   models,
@@ -73,73 +66,27 @@ export const TemplateSettingsCard = memo(function TemplateSettingsCard({
             />
           )}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <Field label="Machine model">
-            {(control) => (
-              <select
-                {...control}
-                value={modelCode}
-                onChange={(event) => onChange({ modelCode: event.target.value })}
-                className={clsx(INPUT, 'h-9')}
-              >
-                {options.map((model) => {
-                  const taken = model.code !== modelCode && takenModels.has(model.code);
-                  return (
-                    <option key={model.code} value={model.code} disabled={taken}>
-                      {model.name}
-                      {taken ? ' – has its own template' : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            )}
-          </Field>
-          <SpareRowsField
-            value={spareRows}
-            onChange={(spareRowsPerSection) => onChange({ printSettings: { spareRowsPerSection } })}
-          />
-        </div>
-        <p className="text-xs text-ink-500">
-          Spare lines are blank lettered lines after each section of the printed checklist, for
-          findings written by hand. Add or delete them per section in the checklist below; a section
-          you haven’t changed there gets this number.
-        </p>
+        <Field label="Machine model">
+          {(control) => (
+            <select
+              {...control}
+              value={modelCode}
+              onChange={(event) => onChange({ modelCode: event.target.value })}
+              className={clsx(INPUT, 'h-9')}
+            >
+              {options.map((model) => {
+                const taken = model.code !== modelCode && takenModels.has(model.code);
+                return (
+                  <option key={model.code} value={model.code} disabled={taken}>
+                    {model.name}
+                    {taken ? ' – has its own template' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          )}
+        </Field>
       </div>
     </FrontPageFrame>
   );
 });
-
-/** A number field that only reports whole numbers in range; anything else waits for blur. */
-function SpareRowsField({ value, onChange }: { value: number; onChange: (n: number) => void }) {
-  const [text, setText] = useState<string | null>(null);
-  return (
-    <Field label="Spare lines per section (default)">
-      {(control) => (
-        <input
-          {...control}
-          type="number"
-          inputMode="numeric"
-          min={MIN_SPARE}
-          max={MAX_SPARE}
-          step={1}
-          value={text ?? String(value)}
-          onChange={(event) => {
-            setText(event.target.value);
-            const n = Number(event.target.value);
-            if (
-              event.target.value !== '' &&
-              Number.isInteger(n) &&
-              n >= MIN_SPARE &&
-              n <= MAX_SPARE
-            ) {
-              onChange(n);
-            }
-          }}
-          // Back to the last valid number.
-          onBlur={() => setText(null)}
-          className={clsx(INPUT, 'h-9 w-full tabular-nums sm:w-28')}
-        />
-      )}
-    </Field>
-  );
-}

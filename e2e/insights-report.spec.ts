@@ -343,9 +343,9 @@ test('the report prints as A4 pages with its footer, the list on pages of its ow
     'Headline numbers',
     'Deviations per month',
     'By severity',
+    'Per model',
     'Top 10 recurring checkpoints',
     'Per section',
-    'Per model',
     'By responsible',
     'By category',
   ].map(compact);

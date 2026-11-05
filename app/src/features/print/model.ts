@@ -1,7 +1,7 @@
 /**
  * What gets printed (brief §6), worked out from the data alone: the front page, one table per
- * section with spare rows, the deviation pages and the page footer. Pure, so the rules are
- * unit-tested; the components only lay it out.
+ * section, the deviation pages and the page footer. Pure, so the rules are unit-tested; the
+ * components only lay it out.
  */
 import {
   DEFAULT_COMPANY_NAME,
@@ -11,12 +11,10 @@ import {
   inspectionProgress,
   rowRef,
   sectionNumber,
-  sectionSpareRows,
   STATUS_LABELS,
   type AnnotatedImage,
   type Inspection,
   type InspectionDeviation,
-  type PrintSettings,
   type RowResult,
   type Section,
   type Severity,
@@ -57,13 +55,11 @@ export const DEFAULT_DEVIATIONS_PER_PAGE: DeviationsPerPage = 2;
 export const NOT_FINALISED_MARKER = 'NOT FINALISED – DRAFT REPORT';
 
 export type PrintRow = {
-  /** "3.c"; spare rows continue the lettering. */
+  /** "3.c" */
   ref: string;
-  /** The checkpoint; empty on a spare row. */
+  /** The checkpoint. */
   text: string;
-  /** An empty lettered line for a handwritten finding. */
-  spare: boolean;
-  /** Report mode: the recorded status. Null prints empty boxes (blank, spare or not yet filled). */
+  /** Report mode: the recorded status. Null prints empty boxes (blank, or not yet filled). */
   status: Status | null;
   /** NOK rows only. */
   severity: Severity | null;
@@ -75,7 +71,10 @@ export type PrintSection = {
   /** Section number, 1-based. */
   number: number;
   title: string;
-  /** May be empty (a draft's section without rows and no spare rows). */
+  /**
+   * May be empty: a section without rows yet prints its heading over "No checkpoints in this
+   * section.", blank or report.
+   */
   rows: PrintRow[];
 };
 
@@ -211,10 +210,7 @@ export function inspectionPrint(
     checklistTitle: `${templateSnapshot.name}${SEPARATOR}${revisionLabel}`,
     checklistName: templateSnapshot.name,
     revisionLabel,
-    sections: printSections(
-      templateSnapshot.sections,
-      report ? { results: inspection.results } : { printSettings: templateSnapshot.printSettings },
-    ),
+    sections: printSections(templateSnapshot.sections, report ? inspection.results : {}),
     deviations: report
       ? { kind: 'cards', cards: deviations.map(deviationCard) }
       : blankDeviationLines(),
@@ -266,7 +262,7 @@ export function templatePrint(
     checklistTitle: `${name}${SEPARATOR}${revision}`,
     checklistName: name,
     revisionLabel: revision,
-    sections: printSections(template.sections, { printSettings: template.printSettings }),
+    sections: printSections(template.sections, {}),
     deviations: blankDeviationLines(),
     appendix: appendixEntries(template.sections),
     // The revision as the front page and the checklist's heading name it, so a page never calls
@@ -322,44 +318,30 @@ function reportState(
 }
 
 /**
- * Blank: every checkpoint plus the section's spare lines (its own number, else the template's),
- * empty lines that carry on the lettering (the paper's room for handwritten findings). Report:
- * every checkpoint with what was recorded, and no spare lines: findings that belong to no row
- * are extra deviations by then.
+ * Every checkpoint of every section; a report's with what was recorded (`results`), a blank
+ * checklist's with nothing (no results). Findings that belong to no row are written on the
+ * Deviation Summary's lines, or are extra deviations in a report.
  */
 function printSections(
   sections: readonly Section[],
-  fill: { results: Record<string, RowResult> } | { printSettings: PrintSettings },
+  results: Record<string, RowResult>,
 ): PrintSection[] {
-  return sections.map((section, sectionIndex) => {
-    const ref = (rowIndex: number) => rowRef(sectionIndex, rowIndex);
-    const rows: PrintRow[] = section.items.map((item, rowIndex) => {
-      const result = 'results' in fill ? fill.results[item.id] : undefined;
+  return sections.map((section, sectionIndex) => ({
+    number: sectionNumber(sectionIndex),
+    title: section.title.trim(),
+    rows: section.items.map((item, rowIndex) => {
+      const result = results[item.id];
       const status = result?.status ?? null;
       return {
-        ref: ref(rowIndex),
+        ref: rowRef(sectionIndex, rowIndex),
         text: item.text,
-        spare: false,
         status,
         severity: status === 'NOK' ? (result?.severity ?? DEFAULT_SEVERITY) : null,
         comment: result?.comment?.trim() ?? '',
         resp: result?.resp?.trim() ?? '',
       };
-    });
-    const spare = 'printSettings' in fill ? sectionSpareRows(section, fill.printSettings) : 0;
-    for (let index = 0; index < spare; index += 1) {
-      rows.push({
-        ref: ref(section.items.length + index),
-        text: '',
-        spare: true,
-        status: null,
-        severity: null,
-        comment: '',
-        resp: '',
-      });
-    }
-    return { number: sectionNumber(sectionIndex), title: section.title.trim(), rows };
-  });
+    }),
+  }));
 }
 
 function plural(count: number, noun: string): string {

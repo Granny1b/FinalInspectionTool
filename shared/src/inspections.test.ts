@@ -17,7 +17,6 @@ const template: Template = {
   modelCode: 'RMMG',
   revision: 2,
   status: 'published',
-  printSettings: { spareRowsPerSection: 3 },
   sections: [
     {
       id: 's1',
@@ -74,13 +73,9 @@ describe('formatInspectionNumber', () => {
 });
 
 describe('snapshotTemplate', () => {
-  it('freezes name, sections and print settings', () => {
+  it('freezes name and sections', () => {
     const snap = snapshotTemplate(template);
-    expect(snap).toEqual({
-      name: template.name,
-      sections: template.sections,
-      printSettings: template.printSettings,
-    });
+    expect(snap).toEqual({ name: template.name, sections: template.sections });
   });
 
   it('is a deep copy: later template edits never reach the inspection', () => {
@@ -88,12 +83,10 @@ describe('snapshotTemplate', () => {
     const snap = snapshotTemplate(live);
     live.sections[0]!.items[0]!.text = 'Reworded';
     live.sections[0]!.items.push({ id: 'i9', text: 'New row' });
-    live.printSettings.spareRowsPerSection = 9;
     expect(snap.sections[0]!.items.map((i) => i.text)).toEqual([
       'Light curtains - Correct height',
       'Pallet mover - Chains slack',
     ]);
-    expect(snap.printSettings.spareRowsPerSection).toBe(3);
   });
 });
 

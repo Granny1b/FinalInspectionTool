@@ -11,14 +11,18 @@
   /* Bars and columns: a dark grey that prints solid on a laser printer and leaves black for text
      and the line. */
   --report-bar: #5c5c5c;
-  /* Rules between table rows: lighter than the cell rules of the checklist, as rows here are
-     read across, not filled in. */
-  --report-rule: #c4c4c4;
+  /* The bar's track, so a short bar still reads as a share of a whole. */
+  --report-track: #ececec;
+  /* A card's outline: light, so the cards group the figures without boxing them in. */
+  --report-card-line: #d2d2d2;
+  /* Under column labels, and between rows: rows here are read across, not filled in. */
+  --report-head-rule: #b8b8b8;
+  --report-rule: #e3e3e3;
 }
 
 /* ------------------------------------------------------------------------------------------ */
-/* Header: the logo and the period over a black rule, the title, the company, then what the    */
-/* report covers, line by line as on the inspection's front page.                             */
+/* Header: the logo and the period over a black rule, the title and the company, then what the */
+/* report covers as four labelled facts in a light card.                                      */
 /* ------------------------------------------------------------------------------------------ */
 
 .report-head {
@@ -44,29 +48,25 @@
 }
 
 .report-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3mm 8mm;
   margin: 6mm 0 0;
-  border-top: 0.25mm solid var(--paper-rule);
-}
-
-.report-facts > div {
-  display: flex;
-  align-items: baseline;
-  gap: 4mm;
-  padding: 2.4mm 0 1.2mm;
-  border-bottom: 0.25mm solid var(--paper-rule);
+  padding: 3.5mm 4.5mm;
+  border-radius: 2mm;
+  background: var(--paper-fill-light);
 }
 
 .report-facts dt {
-  flex: none;
-  width: 26mm;
-  font-size: 8pt;
+  font-size: 7pt;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--paper-muted);
 }
 
 .report-facts dd {
   min-width: 0;
-  margin: 0;
+  margin: 0.6mm 0 0;
   font-size: 10pt;
   overflow-wrap: anywhere;
 }
@@ -74,17 +74,18 @@
 /* Deviation records the API couldn't read: framed, so it isn't missed. */
 .report-note {
   margin-top: 5mm;
-  padding: 2.5mm 3mm;
+  padding: 2.5mm 3.5mm;
   border: 0.4mm solid var(--paper-ink);
+  border-radius: 2mm;
   font-weight: 600;
 }
 
-/* No inspection matches: one framed statement instead of empty tables. */
+/* No inspection matches: one framed statement instead of empty cards. */
 .report-empty {
   margin-top: 12mm;
   padding: 14mm 10mm;
   border: 0.3mm dashed var(--paper-rule);
-  border-radius: 1mm;
+  border-radius: 2mm;
   text-align: center;
 }
 
@@ -100,14 +101,23 @@
 }
 
 /* ------------------------------------------------------------------------------------------ */
-/* Sections: a heading, what it counts, the figure. A section never parts from its heading and */
-/* is never split, unless it is taller than a page (a long table): then its rows run on under  */
-/* its repeated column labels.                                                                */
+/* Parts: each a light card with its heading, what it counts and the figure. A card never      */
+/* parts from its heading and is never split, unless it is taller than a page (a long table):  */
+/* then its rows run on under its repeated column labels. Short parts go two to a row.         */
 /* ------------------------------------------------------------------------------------------ */
 
 .report-section {
-  margin-top: 8mm;
+  margin-top: 6mm;
   break-inside: avoid;
+}
+
+.report-card {
+  padding: 4mm 4.5mm 3.5mm;
+  border: 0.25mm solid var(--report-card-line);
+  border-radius: 2mm;
+  /* A card that runs onto the next page is closed and opened again there. */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 /* Deviations per month over more than a year: the chart and its first year stay with the heading,
@@ -115,6 +125,23 @@
    them and left the first page half empty. */
 .report-section[data-breakable] {
   break-inside: auto;
+}
+
+/* Two cards side by side, as tall as each other. */
+.report-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5mm;
+  margin-top: 6mm;
+  break-inside: avoid;
+}
+
+.report-pair[data-wide-end] {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+}
+
+.report-pair > .report-section {
+  margin-top: 0;
 }
 
 .report-section-head {
@@ -127,34 +154,32 @@
 }
 
 .report-section h3 {
-  font-size: 11pt;
+  font-size: 10.5pt;
   font-weight: 600;
 }
 
 .report-section-description {
   margin-top: 0.6mm;
-  font-size: 8pt;
+  font-size: 7.5pt;
   color: var(--paper-muted);
 }
 
 .report-section-aside {
   flex: none;
-  font-size: 8pt;
+  font-size: 7.5pt;
   color: var(--paper-muted);
 }
 
 .report-none {
-  padding: 3mm 0;
-  border-top: 0.3mm solid var(--paper-ink);
-  border-bottom: 0.3mm solid var(--paper-ink);
+  padding: 2mm 0 1mm;
   color: var(--paper-muted);
 }
 
-/* The headline numbers: four framed figures in a row, each with what it counts under it. */
+/* The headline numbers: four cards in a row, each with what it counts under it. */
 .report-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 3mm;
+  gap: 4mm;
   margin: 0;
 }
 
@@ -163,9 +188,9 @@
   grid-row: span 3;
   grid-template-rows: subgrid;
   row-gap: 0;
-  padding: 3mm 3.5mm;
-  border: 0.3mm solid var(--paper-rule);
-  border-radius: 1mm;
+  padding: 3.5mm 4mm;
+  border: 0.25mm solid var(--report-card-line);
+  border-radius: 2mm;
 }
 
 .report-kpis dt {
@@ -181,7 +206,7 @@
 /* Proportional figures, as on the screen's tiles: a big standalone number looks loose with
    tabular ones. */
 .report-kpi-value {
-  margin-top: 1.5mm;
+  margin-top: 2mm;
   font-size: 20pt;
   font-weight: 600;
   line-height: 1.05;
@@ -195,8 +220,8 @@
 }
 
 /* ------------------------------------------------------------------------------------------ */
-/* Tables: a black rule over the column labels, a thinner one under them, light rules between  */
-/* rows and a black one at the foot. Labels repeat on every page a table runs onto; a row is   */
+/* Tables: the column labels small and grey over a grey rule, hairlines between rows, nothing  */
+/* at the foot (the card closes it). Labels repeat on every page a table runs onto; a row is   */
 /* never split. Counts are right-aligned in tabular figures, so their digits line up.         */
 /* ------------------------------------------------------------------------------------------ */
 
@@ -204,7 +229,6 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  border-bottom: 0.3mm solid var(--paper-ink);
 }
 
 .report-table thead {
@@ -217,7 +241,7 @@
 
 .report-table th,
 .report-table td {
-  padding: 1.1mm 1.5mm;
+  padding: 1.3mm 1.5mm;
   text-align: left;
   vertical-align: top;
   overflow-wrap: anywhere;
@@ -234,9 +258,8 @@
 }
 
 .report-table thead th {
-  padding-block: 1.2mm;
-  border-top: 0.3mm solid var(--paper-ink);
-  border-bottom: 0.25mm solid var(--paper-ink);
+  padding-block: 0 1.2mm;
+  border-bottom: 0.25mm solid var(--report-head-rule);
   font-size: 7pt;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -276,16 +299,24 @@
   color: var(--paper-muted);
 }
 
-/* A slim bar in the last column, as long as the count against the largest. */
+/* A slim bar in the last column, as long as the count against the largest, on a light track. */
 .report-table .report-bar-cell {
   padding-left: 3mm;
   vertical-align: middle;
 }
 
+.report-bar-cell {
+  background-image: linear-gradient(var(--report-track), var(--report-track));
+  background-size: calc(100% - 3mm) 1.8mm;
+  background-position: right center;
+  background-repeat: no-repeat;
+}
+
 .report-bar {
   display: block;
-  height: 2mm;
-  min-width: 0.4mm;
+  height: 1.8mm;
+  min-width: 0.6mm;
+  border-radius: 0.9mm;
   background: var(--report-bar);
 }
 
@@ -323,6 +354,21 @@
 }
 .report-col-bar {
   width: 40mm;
+}
+
+/* In a half card: narrower figures and bar, so the label keeps its room. The model table keeps
+   room for its labels ("Inspections", "Per machine"). */
+.report-pair .report-col-count {
+  width: 15mm;
+}
+.report-pair .report-col-share {
+  width: 12mm;
+}
+.report-pair .report-col-bar {
+  width: 18mm;
+}
+.report-pair .report-model .report-col-count {
+  width: 19mm;
 }
 
 /* ------------------------------------------------------------------------------------------ */
@@ -408,7 +454,7 @@
 /* The rules run under the labels and the months, not on into the cells that only pad a short
    last row to a year's width. */
 .report-months thead > tr > :not([data-pad]) {
-  border-bottom: 0.25mm solid var(--paper-ink);
+  border-bottom: 0.25mm solid var(--report-head-rule);
 }
 
 .report-months tbody tr + tr > :not([data-pad]) {
@@ -444,7 +490,7 @@
    as the column labels there. */
 .report-list .report-group th {
   padding: 1.6mm 2mm;
-  border-top: 0.3mm solid var(--paper-ink);
+  border-top: 0.25mm solid var(--report-head-rule);
   border-bottom: 0;
   background: var(--paper-fill-light);
   font-size: inherit;

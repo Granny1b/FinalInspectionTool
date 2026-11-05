@@ -102,7 +102,7 @@ describe('labels', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// Geometry: section A rows at y 100/140/180 (40 high) with its body 100–260 (rows + spare lines),
+// Geometry: section A rows at y 100/140/180 (40 high) with its body 100–260 (rows + Add row),
 // a gap with B's header, B's single row at 330 (body 330–450), then the empty C body at 520.
 // ---------------------------------------------------------------------------------------------
 
@@ -154,7 +154,7 @@ function collide(
 describe('documentCollisions (rows)', () => {
   it('picks the nearest row inside the section under the pointer', () => {
     expect(collide(row('B', 'b1'), rect(150, 40), 165)[0]?.id).toBe(rowDndId('a2'));
-    // On a spare line of A: still the nearest of A's rows.
+    // Below A's rows, by its Add row: still the nearest of A's rows.
     expect(collide(row('B', 'b1'), rect(235, 40), 250)[0]?.id).toBe(rowDndId('a3'));
   });
 

@@ -1,4 +1,4 @@
-import { rowLetter, rowRef, sectionNumber, sectionSpareRows, type Section } from '@modig/shared';
+import { rowLetter, rowRef, sectionNumber, type Section } from '@modig/shared';
 import clsx from 'clsx';
 import { useState } from 'react';
 import { guideRow } from '../../guides/guide';
@@ -13,11 +13,10 @@ import {
   SECTION_HEADER,
   TEXT_CELL,
 } from './layout';
-import { ColumnLabels, GuideMark, IssueNote, PaperCells, SpareRows } from './parts';
+import { ColumnLabels, GuideMark, IssueNote, PaperCells } from './parts';
 
 type Props = {
   sections: Section[];
-  spareRowsPerSection: number;
   issues: IssueIndex;
 };
 
@@ -25,7 +24,7 @@ type Props = {
  * The same sheet without inputs, handles or menus: for inspectors and published revisions. A
  * row's guide icon opens the guide, read-only.
  */
-export function ReadOnlyDocument({ sections, spareRowsPerSection, issues }: Props) {
+export function ReadOnlyDocument({ sections, issues }: Props) {
   // The row whose guide is open in the viewer.
   const [guideItemId, setGuideItemId] = useState<string | null>(null);
   const viewing = guideItemId === null ? null : guideRow(sections, guideItemId);
@@ -36,12 +35,7 @@ export function ReadOnlyDocument({ sections, spareRowsPerSection, issues }: Prop
   }
   return (
     <>
-      <Sections
-        sections={sections}
-        spareRowsPerSection={spareRowsPerSection}
-        issues={issues}
-        onOpenGuide={setGuideItemId}
-      />
+      <Sections sections={sections} issues={issues} onOpenGuide={setGuideItemId} />
       {viewing?.guide && (
         <GuideViewer
           rowRef={viewing.ref}
@@ -56,7 +50,6 @@ export function ReadOnlyDocument({ sections, spareRowsPerSection, issues }: Prop
 
 function Sections({
   sections,
-  spareRowsPerSection,
   issues,
   onOpenGuide,
 }: Props & { onOpenGuide: (itemId: string) => void }) {
@@ -117,10 +110,6 @@ function Sections({
             })}
           </ol>
         )}
-        <SpareRows
-          start={section.items.length}
-          count={sectionSpareRows(section, { spareRowsPerSection })}
-        />
       </div>
     );
   });

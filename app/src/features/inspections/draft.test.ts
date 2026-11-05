@@ -7,11 +7,7 @@ const inspection: Inspection = {
   number: 'FI-2026-0001',
   templateId: 'Tmpl000000000001',
   templateRevision: 2,
-  templateSnapshot: {
-    name: 'Final inspection',
-    sections: [],
-    printSettings: { spareRowsPerSection: 3 },
-  },
+  templateSnapshot: { name: 'Final inspection', sections: [] },
   front: {
     machineName: 'RigiMill MG',
     modelCode: 'RMMG',
