@@ -121,6 +121,14 @@ export function InsightsPage() {
               insights.isPlaceholderData && 'opacity-60',
             )}
           >
+            {data.unreadableRows > 0 && (
+              <Callout tone="error" role="status">
+                {data.unreadableRows === 1
+                  ? '1 deviation record could not be read and is not counted, '
+                  : `${data.unreadableRows} deviation records could not be read and are not counted, `}
+                so these numbers may be too low.
+              </Callout>
+            )}
             <Dashboard insights={data} models={models} singleModel={Boolean(filter.model)} />
           </div>
         )}

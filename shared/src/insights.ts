@@ -128,6 +128,11 @@ export const InsightsSchema = z.object({
   byResp: z.array(z.object({ resp: z.string(), deviations: Count })),
   /** As `byResp`, by the deviation category; `category` '' (none chosen) last. */
   byCategory: z.array(z.object({ category: z.string(), deviations: Count })),
+  /**
+   * Deviation rows under the filters that could not be read, so none of the numbers above count
+   * them: the page says its numbers may be short. 0 normally.
+   */
+  unreadableRows: Count.default(0),
 });
 export type Insights = z.infer<typeof InsightsSchema>;
 
@@ -180,6 +185,8 @@ type AggregateInput = {
   /** Deviation rows; those of inspections out of scope are ignored. */
   deviations: readonly DeviationRow[];
   checklists: ChecklistLookup;
+  /** Rows the table held under the filters that could not be read (passed through). */
+  unreadableRows?: number;
 };
 
 /** Whether an inspection counts under the filters (date and model of its front page). */
@@ -200,6 +207,7 @@ export function aggregateInsights({
   inspections,
   deviations,
   checklists,
+  unreadableRows = 0,
 }: AggregateInput): Insights {
   const scope = inspections.filter((inspection) => inScope(inspection, query));
   const byId = new Map(scope.map((inspection) => [inspection.id, inspection]));
@@ -241,6 +249,7 @@ export function aggregateInsights({
       category: key ?? '',
       deviations: count,
     })),
+    unreadableRows,
   };
 }
 

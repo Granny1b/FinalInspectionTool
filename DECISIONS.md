@@ -1869,6 +1869,17 @@ true` unless in-progress is included) and only the table's columns (17 then, 18 
 - **"By category" is grouped like "By resp"**: trimmed, ignoring case, in the spelling most rows
   use, none last ("No category"). The panel is renamed "By responsible", with "Not assigned" for
   none. The four ranked panels form a 2×2 grid.
+- **A null in a deviation row is read as a missing property** (after the first deploy).
+  Insights reads the table with `$select`. For a property a row lacks, Azure's Table service
+  returns null, while Azurite, which every test uses, leaves the property out. So every row
+  written before `category` existed failed the schema and was skipped: Insights showed 0
+  deviations for an inspection with NOK rows. Without its nulls, such a row gets the schema's
+  default (`''`, no category). Old rows aren't rewritten. The API test makes the table answer
+  as Azure does.
+- **Rows that can't be read are counted, not only logged.** The response carries
+  `unreadableRows`, and the page then says that number of deviation records is not counted, so
+  its numbers may be too low. A dashboard that drops rows silently looks the same as one with no
+  deviations. The log names the first problem (field and message).
 
 ### Tests and tooling
 
