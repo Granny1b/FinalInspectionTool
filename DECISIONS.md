@@ -2565,3 +2565,20 @@ them.
   lettered rows without text (Phase 1, Seed; it still does, they are simply blank lines on the
   paper form), the snapshot keeping print settings (Phase 3, Contract), spare lines printing in
   blank mode only and the page-count ranges (Phase 4, Print and Tests and tooling).
+
+## Insights report in cards (2026-11-05)
+
+- **Each part of the report is a light card**: a thin grey outline with rounded corners, its
+  heading and what it counts inside. Tables lose the black rules over and under them: grey column
+  labels over a grey rule, hairlines between rows, and the card closes the table. Bars get a light
+  track and rounded ends, so a short bar still reads as a share of a whole. Supersedes the ruled
+  tables under "Insights report"; the deviation list keeps its table per inspection, its line's
+  rule grey as the cards'.
+- **Short parts go two to a row**: By severity next to Per model (two fifths and three fifths, so
+  the model table's four figures keep room for their labels; it loses its bar, the share says it),
+  and By responsible next to By category. Per model therefore comes before the top 10 now. The
+  report of a busy year is a page shorter.
+- **What the report covers is a grey panel of four labelled facts**, two to a row, instead of ruled
+  lines, and the headline numbers are four cards like the parts.
+- A card that runs onto the next page (the month numbers over several years) is closed and opened
+  again there (`box-decoration-break: clone`).

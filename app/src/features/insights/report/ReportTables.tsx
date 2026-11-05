@@ -66,17 +66,16 @@ export function ShareTable({ label, rows, total }: ShareTableProps) {
   );
 }
 
-/** Per model: its inspections and deviations, deviations per machine, share and bar. */
+/** Per model: its inspections and deviations, deviations per machine and share (a half card). */
 export function ModelTable({ rows, total }: { rows: ModelRow[]; total: number }) {
   return (
-    <table className="report-table">
+    <table className="report-table report-model">
       <colgroup>
         <col />
         <col className="report-col-count" />
         <col className="report-col-count" />
         <col className="report-col-count" />
         <col className="report-col-share" />
-        <col className="report-col-bar" />
       </colgroup>
       <thead>
         <tr>
@@ -93,9 +92,6 @@ export function ModelTable({ rows, total }: { rows: ModelRow[]; total: number })
           <th scope="col" className="report-num">
             Share
           </th>
-          <th scope="col">
-            <span className="sr-only">Bar</span>
-          </th>
         </tr>
       </thead>
       <tbody>
@@ -108,9 +104,6 @@ export function ModelTable({ rows, total }: { rows: ModelRow[]; total: number })
               {row.perInspection === null ? '–' : formatDecimal(row.perInspection)}
             </td>
             <td className="report-num">{share(row, total)}</td>
-            <td className="report-bar-cell" aria-hidden="true">
-              <Bar length={row.bar} />
-            </td>
           </tr>
         ))}
       </tbody>

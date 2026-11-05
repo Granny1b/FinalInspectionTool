@@ -618,7 +618,8 @@ deviation report: the same numbers, for exactly the filters chosen on the page.
   the numbers on pages of their own (greyed out when there are none).
 - Address: `/insights/report?<the Insights page's filters>[&deviations=1]`, for admins only.
 
-**What it says**, A4 portrait, in black and white:
+**What it says**, A4 portrait, in black and white, each part in a light card (the short ones two to
+a row):
 
 - **The header:** logo, "Deviation report", the company name, then what the report covers:
   _Period_ ("2026-10" for a whole month, "2026-01 – 2026-10" for whole months, otherwise the
@@ -629,9 +630,10 @@ deviation report: the same numbers, for exactly the filters chosen on the page.
 - **Headline numbers:** the four tiles' figures, each with what it counts.
 - **Deviations per month:** columns for one or two months, a line from three on, and under it
   each month's deviations and inspections, a year to a row.
-- **By severity, Per section, Per model, By responsible, By category:** tables with every entry
-  (no "Show all"), its count, its share of all the deviations and a bar as long as the count
-  against the largest; per model also its inspections and deviations per machine.
+- **By severity and Per model** side by side, then the top 10, **Per section**, and **By
+  responsible and By category** side by side: tables with every entry (no "Show all"), its count,
+  its share of all the deviations and a bar as long as the count against the largest; per model
+  its inspections, deviations, deviations per machine and share.
 - **Top 10 recurring checkpoints:** rank, ref, checkpoint ("No longer in the checklist" under a
   removed one), section, the model when there are several, how many inspections it failed in and
   that as a share of the inspections whose checklist had it ("50% of 4").

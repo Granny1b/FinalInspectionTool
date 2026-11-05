@@ -78,7 +78,7 @@ function Contents({ report }: { report: Report }) {
   const counted = plural(total, 'deviation');
   return (
     <>
-      <Section title="Headline numbers">
+      <Section title="Headline numbers" plain>
         <dl className="report-kpis">
           {report.kpis.map((kpi) => (
             <div key={kpi.label}>
@@ -99,13 +99,20 @@ function Contents({ report }: { report: Report }) {
         <PaperMonthChart months={report.months} />
       </Section>
 
-      <Section title="By severity" aside={counted}>
-        {total > 0 ? (
-          <ShareTable label="Severity" rows={report.severity} total={total} />
-        ) : (
-          <None>No deviations in this selection.</None>
-        )}
-      </Section>
+      {/* Severity's three short lines leave the room to the model table's four figures. */}
+      <div className="report-pair" data-wide-end="">
+        <Section title="By severity" aside={counted}>
+          {total > 0 ? (
+            <ShareTable label="Severity" rows={report.severity} total={total} />
+          ) : (
+            <None>No deviations in this selection.</None>
+          )}
+        </Section>
+
+        <Section title="Per model" description="Deviations, with the inspections they come from.">
+          <ModelTable rows={report.models} total={total} />
+        </Section>
+      </div>
 
       <Section
         title="Top 10 recurring checkpoints"
@@ -134,33 +141,23 @@ function Contents({ report }: { report: Report }) {
         )}
       </Section>
 
-      <Section
-        title="Per model"
-        description="Deviations, with the inspections they come from."
-        aside={counted}
-      >
-        <ModelTable rows={report.models} total={total} />
-      </Section>
+      <div className="report-pair">
+        <Section title="By responsible" description="Who is responsible for fixing them.">
+          {report.resps.length > 0 ? (
+            <ShareTable label="Responsible" rows={report.resps} total={total} />
+          ) : (
+            <None>No deviations in this selection.</None>
+          )}
+        </Section>
 
-      <Section
-        title="By responsible"
-        description="Who is responsible for fixing them."
-        aside={counted}
-      >
-        {report.resps.length > 0 ? (
-          <ShareTable label="Responsible" rows={report.resps} total={total} />
-        ) : (
-          <None>No deviations in this selection.</None>
-        )}
-      </Section>
-
-      <Section title="By category" description="What kind of deviations they are." aside={counted}>
-        {report.categories.length > 0 ? (
-          <ShareTable label="Category" rows={report.categories} total={total} />
-        ) : (
-          <None>No deviations in this selection.</None>
-        )}
-      </Section>
+        <Section title="By category" description="What kind of deviations they are.">
+          {report.categories.length > 0 ? (
+            <ShareTable label="Category" rows={report.categories} total={total} />
+          ) : (
+            <None>No deviations in this selection.</None>
+          )}
+        </Section>
+      </div>
     </>
   );
 }
@@ -173,15 +170,19 @@ type SectionProps = {
   aside?: string;
   /** May run on to the next page between its parts (which keep themselves whole). */
   breakable?: boolean;
+  /** A heading over figures that are cards of their own (the headline numbers), not a card. */
+  plain?: boolean;
   children: ReactNode;
 };
 
-/** A part of the report under its heading, kept whole on a page when it fits on one. */
-function Section({ title, description, aside, breakable, children }: SectionProps) {
+/**
+ * A part of the report: a light card with its heading, kept whole on a page when it fits on one.
+ */
+function Section({ title, description, aside, breakable, plain, children }: SectionProps) {
   const titleId = useId();
   return (
     <section
-      className="report-section"
+      className={plain ? 'report-section' : 'report-section report-card'}
       aria-labelledby={titleId}
       data-breakable={breakable || undefined}
     >
