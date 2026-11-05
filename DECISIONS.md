@@ -2258,3 +2258,85 @@ them.
 - **The search placeholder is "Number, machine or S/N",** which fits a 320 px phone.
 - **A participant chip's 36 px remove area is for coarse pointers only,** so a mouse click near the
   end of a name doesn't remove it.
+
+## Feature batch 2026-11-05
+
+### Insights report
+
+- **A print route, `/insights/report`, under the print shell** (no sidebar) and for admins only,
+  like Insights. A guard (`report/AdminOnly`) shows the app's "Admins only" page in the print
+  routes' message column; the API checks the role again. The route reads the filters only through
+  `features/insights/filters.ts` (`filterFromParams`, `insightsQuery`, and `filterToParams` for the
+  links to and from it), so a period the Insights page learns is the report's too. Its own
+  parameters are `deviations=1` (the list) and `autoprint=1`.
+- **The numbers are the page's own query** (`useInsights`, same key), so a preview opened from the
+  page has them at once. The report waits for the numbers of exactly its filters, never the
+  previous filters' that the page keeps on screen meanwhile.
+- **What the paper says is worked out in one pure module** (`report/model.ts`, unit-tested): the
+  KPI tiles' words, the panels' labels ("Not assigned", "No category", "Extra deviations (not
+  tied to a row)"), shares and bars. Paper and screen say the same.
+- **The period is stated as months when it is whole months** ("2026-10", "2026-01 – 2026-10"),
+  otherwise as dates; a period that moves with the day ("last 12 months", "this year", "last
+  year") is named after its dates, which say what it meant that day. No ends: "All time"; one:
+  "From …" or "Up to …".
+- **The PDF is named like the CSV export** ("Deviation report 2026-01-01 to 2026-10-31, RMMG"):
+  months for whole months, "start" and today for open ends, the model code (ASCII) and ", incl. in
+  progress", so the two files of one selection sort together.
+- **"Generated" is when the numbers were read** (the query's time), with the signed-in user's
+  name (the email when the API knows no name), as the inspection report names people.
+- **Ruled tables instead of the screen's widgets:** severity, sections, models, responsibles and
+  categories as tables with a black rule over and under and light rules between rows, each entry
+  with its count, its share of all deviations and a slim dark-grey bar as long as the count against
+  the largest (as the page's bars). Every entry is printed; there is no "Show all" on paper.
+  Severity is a table too, not the stacked bar: three greys would not read as severities in black
+  and white, the words do.
+- **The top 10 on paper** has a Section column of its own and "50% of 4" on one line; the Model
+  column only with several models in the selection, as on the page.
+- **The month chart is an SVG the report draws itself, not Recharts:** a fixed geometry prints
+  sharp and identical at any size and in any browser, and Recharts stays in the page's own chunk.
+  It follows the page's rules: columns for one or two months, a line from three, dots up to 36
+  months, round ticks from `countTicks`. The numbers are a table under it, a year to a row. With a
+  year or less the table's columns sit under the chart's (its label column is the axis gutter), so
+  its header names the months and the chart doesn't repeat them; with more, the chart labels every
+  few months, counted back from the latest.
+- **The chart is drawn in CSS pixels and redrawn when the fit scale changes.** Chrome lays SVG text
+  out for the scale it is drawn at and doesn't redo it when only an HTML ancestor's transform
+  changes. FittedPages measures at full size and then scales down, so on a phone the axis labels
+  came out twice their size and out of place. `FittedPages` now provides its scale
+  (`print/fitScale.ts`, additive) and the chart is keyed on it. Millimetre user units (text 2.5
+  units high) were tried first and were not the cause.
+- **Page breaks:** each part keeps its heading and stays whole on a page when it fits
+  (`break-inside: avoid`), so no heading ends a page; a part taller than a page breaks between rows
+  and its column labels repeat. The month part may break between its yearly tables, the chart and
+  the first year kept together: three years kept whole left half of the first page empty.
+- **The deviation list is a new endpoint, `GET /api/insights/deviations`:** the CSV's rows as JSON
+  (`loadExportRows`: the same filters, rows and order), in `InsightsDeviationsSchema` (`{ rows }`)
+  in shared. It is fetched only when the list is included. On paper it starts a page of its own,
+  each inspection's rows under a grey line (number, date, model, the machine when it says more
+  than the model, the serial number, "In progress"), in five columns: ref, checkpoint and comment,
+  severity (critical in bold), category, responsible ("—" when empty). Refs and texts are as they
+  were inspected, not the current ones: it is the record of what was found.
+- **The list is off by default** (Print report and the preview open without it) and greyed out,
+  with no page of its own, when the selection has no deviations.
+- **Firefox and Safari** print no page numbers; the footer's text repeats under the deviation
+  list (a table footer), as under the inspection's tables. The report before it is a few pages.
+- **An empty selection** prints the header and one framed "No inspections match these filters";
+  filters that can't be used (a range that ends before it starts) show why instead of printing.
+- **The print toolbar is shared:** its "Include reference images" became optional and it gained a
+  `choices` slot, where the report puts "Include deviation list", drawn like the reference images
+  toggle. The inspection's toolbar is unchanged.
+- **The preview dialog is the report's own** (`ReportPreviewDialog`): `PrintPreviewDialog` is built
+  around the inspection's print model and its mode switch. It behaves the same: Close has the
+  focus, Escape or Close hand it back to Preview report, Ctrl+P prints, the pages region scrolls
+  from the keyboard and has a brand-500 ring in dark.
+- **Print report opens a new tab that prints once loaded**, as the inspection's Print / Save PDF;
+  there is nothing to save first.
+- **The Insights page got two secondary buttons before Export CSV** (`report/ReportActions`), shown
+  and disabled under the same conditions as Export CSV.
+- **Tests:** unit tests for the model (period, file names, facts, KPIs, shares and bars, top 10,
+  empty, unreadable records, the list's groups), the chart's geometry and the links; API tests for
+  the endpoint (registration, roles, a bad filter, filters and order). `e2e/insights-report.spec.ts`:
+  the preview and both ways of printing from the Insights page (dark theme, light paper, the list,
+  the new tab's autoprint and its address), a real PDF (A4, footer and page numbers on every page,
+  nothing past the right margin, the parts in order, no page ending on a heading, the list on a
+  page of its own), a single month, an empty selection and unusable filters, and admins only.

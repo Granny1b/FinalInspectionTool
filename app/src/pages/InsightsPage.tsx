@@ -20,6 +20,7 @@ import { InsightsFilters } from '../features/insights/InsightsFilters';
 import { KpiTiles } from '../features/insights/KpiTiles';
 import { Panel } from '../features/insights/Panel';
 import { useInsights } from '../features/insights/queries';
+import { ReportActions } from '../features/insights/report/ReportActions';
 import { SeverityBar } from '../features/insights/SeverityBar';
 import { TopCheckpoints } from '../features/insights/TopCheckpoints';
 import { errorMessage } from '../lib/api';
@@ -52,7 +53,10 @@ export function InsightsPage() {
       description="Deviation KPIs across finalised inspections, per checkpoint, section and model."
       actions={
         data?.modelCodes.length ? (
-          <ExportCsvButton query={query} onError={setExportError} />
+          <>
+            <ReportActions filter={filter} disabled={!query} />
+            <ExportCsvButton query={query} onError={setExportError} />
+          </>
         ) : undefined
       }
     />

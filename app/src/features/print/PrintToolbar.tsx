@@ -24,7 +24,9 @@ type Props = {
   /** A report's deviation cards: 2 or 4 to a page. */
   deviationsPerPage?: Choice<DeviationsPerPage>;
   /** "Include reference images"; `available` is false when no row has any. */
-  appendix: Choice<boolean> & { available: boolean };
+  appendix?: Choice<boolean> & { available: boolean };
+  /** Other documents' own layout choices, after the built-in ones (the Insights report's list). */
+  choices?: ReactNode;
   /** Until the document is complete, Print would miss a photo or the font. */
   ready: boolean;
   /** More ways out, before Print: the Word export. */
@@ -52,6 +54,7 @@ export function PrintToolbar({
   mode,
   deviationsPerPage,
   appendix,
+  choices,
   ready,
   children,
 }: Props) {
@@ -94,7 +97,8 @@ export function PrintToolbar({
               {...deviationsPerPage}
             />
           )}
-          <AppendixToggle {...appendix} />
+          {appendix && <AppendixToggle {...appendix} />}
+          {choices}
           {/* Each setting stays whole, its separator with it, so a wrapped line never starts
               with a dot or splits "Headers and footers: off". */}
           <p id={hintId} className="text-xs text-ink-500 sm:ml-auto sm:text-right">

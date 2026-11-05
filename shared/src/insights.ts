@@ -5,7 +5,13 @@
  */
 import { z } from 'zod';
 import type { InspectionSummary } from './inspections';
-import { ModelCodeSchema, SEVERITIES, type DeviationRow, type Severity } from './schemas';
+import {
+  DeviationRowSchema,
+  ModelCodeSchema,
+  SEVERITIES,
+  type DeviationRow,
+  type Severity,
+} from './schemas';
 
 // ---------------------------------------------------------------------------------------------
 // Filters: GET /api/insights?from&to&model&includeInProgress (the same for …/export.csv)
@@ -444,3 +450,16 @@ function refParts(ref: string): [section: number, letters: string] {
   const match = /^(\d+)\.([a-z]+)$/.exec(ref);
   return match ? [Number(match[1]), match[2]!] : [Number.MAX_SAFE_INTEGER, ref];
 }
+
+// ---------------------------------------------------------------------------------------------
+// The deviation list: GET /api/insights/deviations?from&to&model&includeInProgress
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The deviation rows behind the numbers, for the printed report's "Include deviation list": the
+ * rows the CSV export holds, under the same filters and in the same order (oldest inspection
+ * first, each inspection's rows in checklist order, extra deviations last). A row's ref and text
+ * are as they were inspected, as that inspection's own report prints them.
+ */
+export const InsightsDeviationsSchema = z.object({ rows: z.array(DeviationRowSchema) });
+export type InsightsDeviations = z.infer<typeof InsightsDeviationsSchema>;
