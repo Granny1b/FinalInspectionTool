@@ -11,7 +11,7 @@ import {
 import clsx from 'clsx';
 import { IssueNote } from '../../templates/document/parts';
 import { ISSUE_OUTLINE, NOK_BAR, READ_CELL, READ_GRID, ROW_FOCUS, ROW_LINE } from './layout';
-import { GuideButton, PhotoCount, StatusMark } from './parts';
+import { EmptySectionNote, GuideButton, PhotoCount, StatusMark } from './parts';
 import type { Results } from './results';
 import { SectionHeader } from './SectionHeader';
 
@@ -38,80 +38,93 @@ export function ReadOnlyChecklist({
 }: Props) {
   return sections.map((section, sectionIndex) => (
     <div key={section.id} id={`section-${section.id}`} className="mt-8 first:mt-0">
-      <SectionHeader number={sectionNumber(sectionIndex)} title={section.title} readOnly />
-      <ol>
-        {section.items.map((item, rowIndex) => {
-          const ref = rowRef(sectionIndex, rowIndex);
-          const result = results[item.id];
-          const issue = rowIssues.get(item.id);
-          const photos = result?.status === 'NOK' ? (result.photos?.length ?? 0) : 0;
-          return (
-            <li
-              key={item.id}
-              id={`row-${item.id}`}
-              tabIndex={-1}
-              aria-label={`Row ${refWithText(ref, item.text)}`}
-              className={clsx(
-                'relative scroll-mt-2',
-                ROW_FOCUS,
-                result?.status === 'NOK' && NOK_BAR,
-                issue && ISSUE_OUTLINE,
-              )}
-            >
-              <div className={clsx(READ_GRID, ROW_LINE)}>
-                <span
-                  aria-hidden="true"
-                  className={clsx(
-                    READ_CELL.ref,
-                    'pl-2 text-sm leading-8 text-ink-500 tabular-nums',
-                  )}
-                >
-                  {rowLetter(rowIndex)}
-                </span>
-                <div className={clsx(READ_CELL.text, 'flex items-start gap-1')}>
-                  <p className="min-w-0 flex-1 py-1.5 text-sm leading-5 wrap-break-word text-ink-900">
-                    {item.text}
-                  </p>
-                  {item.guide && (
-                    <GuideButton
-                      guide={item.guide}
-                      rowRef={ref}
-                      onClick={() => onShowGuide(item.id)}
-                      inTabOrder
-                    />
-                  )}
-                </div>
-                {/* Inset like the column labels above it. */}
-                <div className={clsx(READ_CELL.status, '@min-[34rem]:px-2')}>
-                  <StatusMark status={result?.status} />
-                </div>
-                {result?.resp && (
-                  <p
+      <SectionHeader
+        number={sectionNumber(sectionIndex)}
+        title={section.title}
+        readOnly
+        empty={section.items.length === 0}
+      />
+      {section.items.length === 0 ? (
+        <EmptySectionNote />
+      ) : (
+        <ol>
+          {section.items.map((item, rowIndex) => {
+            const ref = rowRef(sectionIndex, rowIndex);
+            const result = results[item.id];
+            const issue = rowIssues.get(item.id);
+            const photos = result?.status === 'NOK' ? (result.photos?.length ?? 0) : 0;
+            return (
+              <li
+                key={item.id}
+                id={`row-${item.id}`}
+                tabIndex={-1}
+                aria-label={`Row ${refWithText(ref, item.text)}`}
+                className={clsx(
+                  'relative scroll-mt-2',
+                  ROW_FOCUS,
+                  result?.status === 'NOK' && NOK_BAR,
+                  issue && ISSUE_OUTLINE,
+                )}
+              >
+                <div className={clsx(READ_GRID, ROW_LINE)}>
+                  <span
+                    aria-hidden="true"
                     className={clsx(
-                      READ_CELL.resp,
-                      'text-sm leading-5 wrap-break-word text-ink-800 @min-[34rem]:px-2 @min-[34rem]:py-1.5',
+                      READ_CELL.ref,
+                      'pl-2 text-sm leading-8 text-ink-500 tabular-nums',
                     )}
                   >
-                    {/* The column label says it on tablets and desktops. */}
-                    <span className="font-medium text-ink-500 @min-[34rem]:sr-only">
-                      Responsible:{' '}
-                    </span>
-                    {result.resp}
-                  </p>
-                )}
-                <Notes result={result} />
-                {/* Nothing to add once finalised, so only photos that exist are shown. */}
-                {photos > 0 && (
-                  <div className={clsx(READ_CELL.photos, 'flex items-center')}>
-                    <PhotoCount count={photos} rowRef={ref} onClick={() => onShowPhotos(item.id)} />
+                    {rowLetter(rowIndex)}
+                  </span>
+                  <div className={clsx(READ_CELL.text, 'flex items-start gap-1')}>
+                    <p className="min-w-0 flex-1 py-1.5 text-sm leading-5 wrap-break-word text-ink-900">
+                      {item.text}
+                    </p>
+                    {item.guide && (
+                      <GuideButton
+                        guide={item.guide}
+                        rowRef={ref}
+                        onClick={() => onShowGuide(item.id)}
+                        inTabOrder
+                      />
+                    )}
                   </div>
-                )}
-              </div>
-              {issue && <IssueNote id={`issue-${item.id}`} messages={[issue]} />}
-            </li>
-          );
-        })}
-      </ol>
+                  {/* Inset like the column labels above it. */}
+                  <div className={clsx(READ_CELL.status, '@min-[34rem]:px-2')}>
+                    <StatusMark status={result?.status} />
+                  </div>
+                  {result?.resp && (
+                    <p
+                      className={clsx(
+                        READ_CELL.resp,
+                        'text-sm leading-5 wrap-break-word text-ink-800 @min-[34rem]:px-2 @min-[34rem]:py-1.5',
+                      )}
+                    >
+                      {/* The column label says it on tablets and desktops. */}
+                      <span className="font-medium text-ink-500 @min-[34rem]:sr-only">
+                        Responsible:{' '}
+                      </span>
+                      {result.resp}
+                    </p>
+                  )}
+                  <Notes result={result} />
+                  {/* Nothing to add once finalised, so only photos that exist are shown. */}
+                  {photos > 0 && (
+                    <div className={clsx(READ_CELL.photos, 'flex items-center')}>
+                      <PhotoCount
+                        count={photos}
+                        rowRef={ref}
+                        onClick={() => onShowPhotos(item.id)}
+                      />
+                    </div>
+                  )}
+                </div>
+                {issue && <IssueNote id={`issue-${item.id}`} messages={[issue]} />}
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </div>
   ));
 }

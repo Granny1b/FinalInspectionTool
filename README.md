@@ -172,7 +172,10 @@ it as in [Settings](#settings) (the capitals and digits of each word, e.g. RigiM
 with a number added when that code is taken) and can be changed. The model is added to the
 machine models in Settings along with the template. A code that a model or a template already
 uses (in any case), or a name another model has, is refused. **List** / **Cards** above the list
-switches the view (cards show the cover photos); each browser remembers its own choice.
+switches the view; each browser remembers its own choice. Cards show the cover photo whole in a
+frame of one shape (16:10), so the photo, name, model, badges and the Rows / Last edited footer
+line up across a row of cards whatever the photos' proportions; a template without a cover photo
+has an empty frame of the same size.
 
 - **Draft and revisions.** Every template has one draft, which admins edit, and numbered
   revisions, which never change once published. New inspections use the latest
@@ -190,9 +193,14 @@ switches the view (cards show the cover photos); each browser remembers its own 
   the latest version.", stops saving and offers **Reload** (in the banner and next to _Not
   saved_).
 - **Publish.** **Publish** freezes the draft as the next revision, with an optional change note.
-  A template needs a name and a section; every section needs a title and a row, and no row may be
-  empty. Otherwise Publish lists the problems, with links that jump to each, and marks them in
-  red.
+  A template needs a name, a section and at least one row; every section needs a title, and no
+  row may be empty. Otherwise Publish lists the problems, with links that jump to each, and marks
+  them in red.
+- **Sections without rows.** A section may be published before it has rows: a heading for
+  checkpoints still to be written. In the editor it says "No rows yet" with its **+ Add row**,
+  and rows can be dragged into it. It keeps its number (4 stays 4), inspections show its heading
+  with "No checkpoints in this section yet.", and it prints its heading with its spare lines (see
+  [Printing](#printing)).
 - **Revision history.** Next to the front page: each revision with its date, who published it and
   the note. **View** opens that revision read-only.
 - **Export and import (JSON).** The editor's **⋯** menu has **Export JSON**: the draft as shown,
@@ -237,7 +245,8 @@ identity, which is what later phases key results and statistics on.
 
 ## Inspections
 
-Inspectors and admins create and fill in inspections; only admins reopen a finalised one.
+Inspectors and admins create and fill in inspections; only admins reopen a finalised one or
+delete one.
 
 - **New inspection.** **New inspection** on the list: pick the machine model's checklist (only
   templates with a published revision are offered) and fill in the front page: machine name and
@@ -294,6 +303,11 @@ every row of that section that has no status yet as OK: mark the exceptions, the
 row with a guide shows its icon (a camera when it has images); the icon or `G` opens the guide
 (see [Guides](#guides)).
 
+A section published without checkpoints (a heading for ones still to be written) shows its
+heading and "No checkpoints in this section yet.", with nothing to set: the keys and `Tab` go from
+the row before it straight on to the row after it, and the progress and _Continue at_ count only
+rows.
+
 ### Deviations, saving, finalising
 
 - **Deviation Summary.** The _Deviations_ tab has a card for every NOK row, in checklist order,
@@ -318,6 +332,14 @@ row with a guide shows its icon (a camera when it has images); the icon or `G` o
   again.
 - **Reopen.** Admins only: makes a finalised inspection editable again; it counts as in progress
   until it is finalised again.
+- **Delete.** Admins only, mainly to clear out trial inspections: **Delete inspection** in the
+  header's ⋯ menu asks first ("Delete FI-2026-0012?"), then deletes the inspection, in progress or
+  finalised, with its deviation photos and its rows in the deviation table, so Insights stops
+  counting it. It can't be undone, and its number is never given out again. The machine photo
+  stays (it may be the template's cover photo), and so does everything the template owns. Pending
+  changes are saved first and autosave then stops. If someone else changed the inspection
+  meanwhile, nothing is deleted and the dialog offers **Reload**. Afterwards the list says
+  "FI-2026-0012 was deleted."
 
 ### The deviation table
 
@@ -472,7 +494,10 @@ machine name longer than 60 characters is shortened in the footer.
   section title never stands alone at the foot of a page. _Blank_: tick boxes, rows at least
   9 mm high for handwriting, and the template's spare lines after each section, lettered on. _Report_:
   the status as a symbol and a word (✓ OK, ✗ NOK, – N/A), a NOK row's severity above its comment
-  ("Severity: Major"), and Resp.
+  ("Severity: Major"), and Resp. A section without checkpoints prints its title and column
+  labels, then on a blank checklist its spare lines lettered from a (2.a, 2.b…) and in a report
+  one line, "No checkpoints in this section."; it keeps with its title but never holds the next
+  section on its page. Word does the same.
 - **Deviations**, starting on a new page. _Blank_: the Deviation Summary to fill in by hand, lines
   D-01 to D-24, filling the page (No. | Ref | Description | Severity | Category | Resp | Closed).
   _Report_: a card per deviation: "D-03 · 4.c · MAJOR" (an extra deviation says "Not on the
@@ -541,10 +566,22 @@ Admins only (Insights in the sidebar). The numbers come from the inspection list
 `deviations` table, so the page needs one blob listing and one table query.
 
 - **Filters**, in one row above everything they scope, and in the URL, so a view can be shared:
-  the period (last 12 months, the default; this year; last year; all time; or a custom range),
-  the model, and **Include inspections in progress** (off: only finalised inspections count, as
-  the brief asks). Dates are the inspection's front-page date. A period is relative: a link to
-  "last 12 months" shows the 12 months before the day it is opened.
+  the period, the model, and **Include inspections in progress** (off: only finalised inspections
+  count, as the brief asks). Dates are the inspection's front-page date. The periods:
+  - **Last 12 months** (the default), **This year**, **Last year** and **All time** are relative:
+    a link to "last 12 months" shows the 12 months before the day it is opened. The dates they
+    cover today show next to the menu.
+  - **Single month**: one month from a menu (`?period=month&month=2026-10`), its first to its
+    last day.
+  - **Month range**: a from month and a to month, both included
+    (`?period=months&fromMonth=2026-01&toMonth=2026-06`).
+  - **Custom dates**: any two dates (`?period=custom&from=2026-02-10&to=2026-05-20`).
+- **Choosing months:** the month menus list every month from the first inspection's (whatever the
+  filters) to the current one, newest first, as "2026-10". Switching to a month, a month range or
+  custom dates starts from the dates on screen: "Last year" becomes 2025-01 to 2025-12, so the
+  numbers don't jump until you narrow them. A range that ends before it starts says so under it
+  and shows no numbers until it makes sense. A selection without inspections says which ("There
+  are no finalised inspections in 2025-08.") and offers **Show all time**.
 - **Headline numbers:** inspections finalised (with in-progress ones, how many of each),
   deviations (NOK rows plus extra deviations), deviations per machine (deviations ÷ inspections),
   and the first-pass rate: the share of checked rows that were OK. N/A rows were not checked, so
@@ -572,6 +609,51 @@ If some deviation records can't be read (a row edited by hand, say), the page sa
 left out, so its numbers may be too low; the API log names the first problem.
 
 The chart library (Recharts) loads only when Insights opens.
+
+### Report
+
+**Preview report** and **Print report**, next to Export CSV, turn the page into a printed
+deviation report: the same numbers, for exactly the filters chosen on the page.
+
+- **Preview report** shows the A4 pages at once in a full-screen window, scaled to fit a phone
+  or tablet, on light paper in either theme. Its **Print / Save PDF** (or Ctrl+P) prints them;
+  Escape or **Close** go back to Insights.
+- **Print report** opens the report in a new tab, which opens the print dialog once it has
+  loaded, as an inspection's Print / Save PDF does. The print dialog's settings are those under
+  [Printing](#printing). The tab's toolbar leads back to Insights with the same filters.
+- **Include deviation list**, in the preview and the print toolbar, adds every deviation behind
+  the numbers on pages of their own (greyed out when there are none).
+- Address: `/insights/report?<the Insights page's filters>[&deviations=1]`, for admins only.
+
+**What it says**, A4 portrait, in black and white:
+
+- **The header:** logo, "Deviation report", the company name, then what the report covers:
+  _Period_ ("2026-10" for a whole month, "2026-01 – 2026-10" for whole months, otherwise the
+  dates, such as "2025-12-01 – 2026-11-05 (last 12 months)", or "All time"), _Model_ ("All
+  models" or its name), _Inspections_ ("Finalised only" or "Finalised and in progress") and
+  _Generated_ (date, time and who). If some deviation records could not be read, it says so, as
+  the page does.
+- **Headline numbers:** the four tiles' figures, each with what it counts.
+- **Deviations per month:** columns for one or two months, a line from three on, and under it
+  each month's deviations and inspections, a year to a row.
+- **By severity, Per section, Per model, By responsible, By category:** tables with every entry
+  (no "Show all"), its count, its share of all the deviations and a bar as long as the count
+  against the largest; per model also its inspections and deviations per machine.
+- **Top 10 recurring checkpoints:** rank, ref, checkpoint ("No longer in the checklist" under a
+  removed one), section, the model when there are several, how many inspections it failed in and
+  that as a share of the inspections whose checklist had it ("50% of 4").
+- **The deviation list**, when included: each inspection's deviations under a line naming it
+  (number, date, model, machine and serial number, "In progress" when it is), with ref,
+  checkpoint and comment, severity, category and responsible, in the order of the CSV export.
+  Refs and checkpoints are as they were inspected.
+- **When no inspection matches**, "No inspections match these filters" instead of the tables.
+
+Each part stays on one page with its heading when it fits; tables repeat their column labels on
+every page they run onto. Chrome and Edge print "Deviation report · 2026-10 · RigiMill MG" bottom
+left and "Page X of Y" bottom right; Firefox and Safari repeat the left part under the deviation
+list. The PDF is named after the filters, as the CSV is: `Deviation report 2026-01-01 to
+2026-10-31, RMMG.pdf`, `Deviation report 2026-10, RMMG.pdf`, or `Deviation report start to
+2026-11-05.pdf` for all time (`, incl. in progress` when they are included).
 
 ## Settings
 
@@ -602,8 +684,9 @@ between, nothing is overwritten: the card says so and offers **Reload**.
 
 Managed Functions under `/api`, all JSON. Every function checks the role itself; errors are
 `{ error, message, details? }`. Saves (settings too), publishing, finalising, reopening and
-deleting a template need the document's `ETag` in `If-Match` and get `412` if someone else changed
-it. A `503` with `unavailable` means nothing was changed and the same request can be sent again.
+deleting a template or an inspection need the document's `ETag` in `If-Match` and get `412` if
+someone else changed it. A `503` with `unavailable` means nothing was changed and the same request
+can be sent again.
 
 | Method and route                        | Role      | What                                                                    |
 | --------------------------------------- | --------- | ----------------------------------------------------------------------- |
@@ -625,10 +708,12 @@ it. A `503` with `unavailable` means nothing was changed and the same request ca
 | `POST /api/inspections`                 | inspector | New inspection from a template's latest published revision              |
 | `GET /api/inspections/{id}`             | inspector | One inspection and its `ETag`                                           |
 | `PUT /api/inspections/{id}`             | inspector | Save front page, results and extra deviations (`If-Match`)              |
+| `DELETE /api/inspections/{id}`          | admin     | Delete it, its deviation rows and deviation photos (`If-Match`)         |
 | `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                        |
 | `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                              |
 | `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)              |
 | `GET /api/insights/export.csv`          | admin     | The deviation rows under the same filters, as a CSV file                |
+| `GET /api/insights/deviations`          | admin     | The same rows as JSON, for the printed report's deviation list          |
 | `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                          |
 | `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                       |
 
@@ -695,7 +780,8 @@ because it usually means the command that produced it failed.
   long word at tablet width, dragging a row into another section, the section menu, saving before
   leaving and the tab-close warning, publishing with a change note, two admins in conflict, a lost
   save answer, a save after signing out, a cover photo upload (also leaving while it uploads), a
-  new template whose empty row blocks publishing; spare lines deleted, put back with Undo, added
+  new template whose empty row blocks publishing; a section without rows published, shown in an
+  inspection and printed; spare lines deleted, put back with Undo, added
   and printed per section; the list shown as cards and remembered; deleting a template (asks
   first, its inspection kept, its revisions gone); the new machine model fields (suggested code, a
   taken code refused); Export JSON, a wrong file explained, and Import JSON making a new draft
@@ -707,7 +793,10 @@ because it usually means the command that produced it failed.
   `finalised` flag, a row deleted when NOK becomes OK); Finalise blocked by a missing row, its
   jump link, the locked page and the API's 409; Reopen refused to an inspector (403) and done by
   an admin; an inspection unchanged after its template publishes a new revision; and two
-  inspectors in conflict. For deviation photos: a photo added to a deviation, an arrow and a
+  inspectors in conflict. Deleting one (`e2e/delete-inspection.spec.ts`): an admin from its page
+  (asks first, then it is gone from the list, the deviation table and storage, photo included),
+  refused with Reload after someone else saved, and an inspector without the action (the API
+  refuses with 403). For deviation photos: a photo added to a deviation, an arrow and a
   label drawn on it with the mouse in the real editor, saved, and after a reload the marks stored
   as fractions, the flattened copy a JPEG of the photo's size that is red along the arrow, shown
   as the thumbnail and on the printed card; at most two photos (then Add goes away, and a paste or
@@ -728,8 +817,12 @@ because it usually means the command that produced it failed.
   of its own, so other tests' inspections never mix in): the headline numbers, the top
   checkpoints with their shares, the month, severity, section, responsible and category figures,
   in-progress inspections joining in, the CSV download (name, header, rows) and no console errors
-  under the Content-Security-Policy; a custom range that ends before it starts; and inspectors
-  refused the page and both endpoints.
+  under the Content-Security-Policy; a custom range that ends before it starts; a single month and a month range narrowing the
+  numbers, kept in the URL; a month range that ends before it starts; a month without
+  inspections; and inspectors refused the page and both endpoints. The deviation report
+  (`e2e/insights-report.spec.ts`): previewed from Insights with the deviation list added and
+  printed, A4 pages with the footer and the list on pages of its own, a single month stated as the
+  month and an empty selection saying so, and admins only.
 - **Print tests** (`e2e/print.spec.ts`) print real PDFs with Chromium's `page.pdf` (A4, the
   page's own `@page` rule, background graphics on) and measure them with `pdfjs-dist`: a blank
   checklist of the 90-row RigiMill MG, a finalised report in both deviation layouts (long
@@ -738,8 +831,9 @@ because it usually means the command that produced it failed.
   (it gets a page of its own, full width, and no empty page follows), a template preview with
   spare lines lettered past z, a report with its reference images (also as Firefox and Safari
   print it, with the footer on every appendix page), a front page with very long values (the
-  signatures and revision move on together) and refs up to 10.an inside their column, and 2 per
-  page with long texts (no photo under 50 mm).
+  signatures and revision move on together) and refs up to 10.an inside their column, 2 per
+  page with long texts (no photo under 50 mm), and a section without checkpoints (spare lines
+  blank, one line in a report).
   They check that every page is A4, the page count is in a range derived from the layout, page 1
   is the front page, every page has the footer and "Page X of Y" with the right total and nothing
   else in the bottom margin, every row is whole on the one page that has its ref, no section
@@ -817,16 +911,16 @@ JPEG straight to the `images` container. To show it, it asks for a read-only URL
 minutes. Documents store only image ids: a template's `coverImageId` and its rows' guide images
 (see [Guides](#guides)), which inspections share through their copy of the checklist, and an
 inspection's `front.photoId` and its deviation photos (see [Deviation photos](#deviation-photos)).
-Replacing or removing a photo leaves the old file in storage. Locally the API sets Azurite's blob
-CORS rule for the dev origins (ports 4280 and 5173) on its first storage call; in Azure the rule
-comes from the Bicep file.
+Replacing or removing a photo leaves the old file in storage; deleting an inspection deletes its
+deviation photos. Locally the API sets Azurite's blob CORS rule for the dev origins (ports 4280
+and 5173) on its first storage call; in Azure the rule comes from the Bicep file.
 
 ## Auth model and roles
 
 - Static Web Apps built-in authentication with Microsoft Entra ID (`/.auth/login/aad`). There are
   no passwords. Other providers (GitHub, X) are switched off.
 - Two roles: **`inspector`** creates and fills in inspections; **`admin`** can also edit
-  templates, see insights and change settings.
+  templates, see insights, change settings, reopen inspections and delete them.
 - **Who has which role is decided by the API.** A person's role and the name shown for them come
   from the people list (`config/people.json`), which admins manage in Settings → Users & access.
   The list is matched on the sign-in's email (lowercased). Someone not on the list keeps the role

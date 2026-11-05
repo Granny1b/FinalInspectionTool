@@ -5,7 +5,13 @@
  */
 import { z } from 'zod';
 import type { InspectionSummary } from './inspections';
-import { ModelCodeSchema, SEVERITIES, type DeviationRow, type Severity } from './schemas';
+import {
+  DeviationRowSchema,
+  ModelCodeSchema,
+  SEVERITIES,
+  type DeviationRow,
+  type Severity,
+} from './schemas';
 
 // ---------------------------------------------------------------------------------------------
 // Filters: GET /api/insights?from&to&model&includeInProgress (the same for …/export.csv)
@@ -92,6 +98,12 @@ export const TOP_CHECKPOINTS = 10;
 export const InsightsSchema = z.object({
   /** Model codes of every inspection, whatever the filters: the model filter's choices. */
   modelCodes: z.array(z.string()),
+  /**
+   * The earliest front-page date of any inspection, whatever the filters ("YYYY-MM-DD"); null
+   * without inspections. The month filter offers the months from this one to the current one.
+   * Defaulted, so an answer from an API without it still parses.
+   */
+  firstInspectionDate: z.string().nullable().default(null),
   /** Inspections in scope. `inProgress` is 0 unless in-progress ones are included. */
   inspections: z.object({ finalised: Count, inProgress: Count }),
   /** Deviations of those inspections: NOK rows plus extra deviations. */
@@ -228,6 +240,11 @@ export function aggregateInsights({
 
   return {
     modelCodes: [...new Set(inspections.map((inspection) => inspection.modelCode))].sort(),
+    // Every inspection, in scope or not, like the model codes above.
+    firstInspectionDate: inspections.reduce<string | null>(
+      (first, { date }) => (date && (first === null || date < first) ? date : first),
+      null,
+    ),
     inspections: {
       finalised: scope.filter((inspection) => inspection.state === 'finalised').length,
       inProgress: scope.filter((inspection) => inspection.state === 'in_progress').length,
@@ -444,3 +461,16 @@ function refParts(ref: string): [section: number, letters: string] {
   const match = /^(\d+)\.([a-z]+)$/.exec(ref);
   return match ? [Number(match[1]), match[2]!] : [Number.MAX_SAFE_INTEGER, ref];
 }
+
+// ---------------------------------------------------------------------------------------------
+// The deviation list: GET /api/insights/deviations?from&to&model&includeInProgress
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The deviation rows behind the numbers, for the printed report's "Include deviation list": the
+ * rows the CSV export holds, under the same filters and in the same order (oldest inspection
+ * first, each inspection's rows in checklist order, extra deviations last). A row's ref and text
+ * are as they were inspected, as that inspection's own report prints them.
+ */
+export const InsightsDeviationsSchema = z.object({ rows: z.array(DeviationRowSchema) });
+export type InsightsDeviations = z.infer<typeof InsightsDeviationsSchema>;

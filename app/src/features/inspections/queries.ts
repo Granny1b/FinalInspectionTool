@@ -10,6 +10,7 @@ import {
   type FinaliseIssue,
   type Inspection,
   type InspectionDraftInput,
+  type InspectionSummary,
 } from '@modig/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -97,6 +98,42 @@ export async function saveInspection(
       signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
     }),
   );
+}
+
+/** Every Insights query starts with this key: deleting an inspection changes their numbers. */
+const INSIGHTS_KEY = ['insights'] as const;
+
+/**
+ * DELETE (admins) of the version the page shows: `ifMatch` is asked for once its pending saves
+ * have settled. A 404 counts as deleted: another admin got there first, or this is a retry of a
+ * delete whose answer was lost.
+ */
+export function useDeleteInspection(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ifMatch: () => Promise<string>) => {
+      const etag = await ifMatch();
+      await apiFetch(inspectionPath(id), {
+        method: 'DELETE',
+        ifMatch: etag,
+        signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
+      }).catch((error: unknown) => {
+        if (!(error instanceof ApiRequestError && error.status === 404)) throw error;
+      });
+    },
+    onSuccess: () => {
+      // Out of the cached list at once, so the list never shows it while it is fetched again.
+      queryClient.setQueryData<InspectionSummary[]>(inspectionKeys.list, (list) =>
+        list?.filter((summary) => summary.id !== id),
+      );
+      // The page's own query is left alone: it is dropped once the page has gone (gcTime 0).
+      // Removed now, it would fetch the deleted inspection again under the open page.
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: inspectionKeys.list }),
+        queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY }),
+      ]);
+    },
+  });
 }
 
 export type StateChange = 'finalise' | 'reopen';

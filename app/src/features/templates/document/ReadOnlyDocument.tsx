@@ -78,34 +78,45 @@ function Sections({
           </div>
           {sectionIssues && <IssueNote id={`issues-${section.id}`} messages={sectionIssues} />}
         </div>
-        <ol>
-          {section.items.map((item, rowIndex) => {
-            const itemIssues = issues.items.get(item.id);
-            return (
-              <li key={item.id} id={`row-${item.id}`} className={clsx(itemIssues && ISSUE_OUTLINE)}>
-                <div className={clsx(GRID, ROW_LINE)}>
-                  <span className={clsx(REF_CELL, 'leading-10 text-ink-500')}>
-                    {rowLetter(rowIndex)}
-                  </span>
-                  <div className={clsx(TEXT_CELL, 'items-start')}>
-                    <p className="min-w-0 flex-1 px-2 py-2 text-sm leading-6 wrap-break-word text-ink-900">
-                      {item.text || <span className="text-ink-500">Empty row</span>}
-                    </p>
-                    {item.guide && (
-                      <GuideMark
-                        guide={item.guide}
-                        rowRef={rowRef(index, rowIndex)}
-                        onOpen={() => onOpenGuide(item.id)}
-                      />
-                    )}
+        {section.items.length === 0 ? (
+          // Published as a heading for checkpoints still to be written; it keeps its number.
+          <p className={clsx(ROW_LINE, 'flex items-center pl-11 text-sm text-ink-500')}>
+            No checkpoints in this section yet.
+          </p>
+        ) : (
+          <ol>
+            {section.items.map((item, rowIndex) => {
+              const itemIssues = issues.items.get(item.id);
+              return (
+                <li
+                  key={item.id}
+                  id={`row-${item.id}`}
+                  className={clsx(itemIssues && ISSUE_OUTLINE)}
+                >
+                  <div className={clsx(GRID, ROW_LINE)}>
+                    <span className={clsx(REF_CELL, 'leading-10 text-ink-500')}>
+                      {rowLetter(rowIndex)}
+                    </span>
+                    <div className={clsx(TEXT_CELL, 'items-start')}>
+                      <p className="min-w-0 flex-1 px-2 py-2 text-sm leading-6 wrap-break-word text-ink-900">
+                        {item.text || <span className="text-ink-500">Empty row</span>}
+                      </p>
+                      {item.guide && (
+                        <GuideMark
+                          guide={item.guide}
+                          rowRef={rowRef(index, rowIndex)}
+                          onOpen={() => onOpenGuide(item.id)}
+                        />
+                      )}
+                    </div>
+                    <PaperCells />
                   </div>
-                  <PaperCells />
-                </div>
-                {itemIssues && <IssueNote id={`issues-${item.id}`} messages={itemIssues} />}
-              </li>
-            );
-          })}
-        </ol>
+                  {itemIssues && <IssueNote id={`issues-${item.id}`} messages={itemIssues} />}
+                </li>
+              );
+            })}
+          </ol>
+        )}
         <SpareRows
           start={section.items.length}
           count={sectionSpareRows(section, { spareRowsPerSection })}

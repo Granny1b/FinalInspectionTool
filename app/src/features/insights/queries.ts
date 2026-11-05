@@ -1,5 +1,10 @@
-/** Server state for Insights (brief §5.5, §8): the KPIs and the CSV export of their rows. */
-import { insightsQueryParams, InsightsSchema, type InsightsQuery } from '@modig/shared';
+/** Server state for Insights (brief §5.5, §8): the KPIs, the CSV export and the report's rows. */
+import {
+  InsightsDeviationsSchema,
+  insightsQueryParams,
+  InsightsSchema,
+  type InsightsQuery,
+} from '@modig/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiDownload, apiFetch } from '../../lib/api';
 
@@ -17,6 +22,24 @@ export function useInsights(query: InsightsQuery | null) {
     enabled: query !== null,
     // Changing a filter keeps the previous numbers on screen (dimmed) until the new ones arrive.
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * The deviation rows behind the numbers, for the printed report's deviation list. Asked for only
+ * while `enabled` (the list is included) and the filters can be used.
+ */
+export function useInsightsDeviations(query: InsightsQuery | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['insights', 'deviations', query],
+    queryFn: async ({ signal }) =>
+      (
+        await apiFetch(withQuery('/api/insights/deviations', query!), {
+          schema: InsightsDeviationsSchema,
+          signal,
+        })
+      ).data.rows,
+    enabled: enabled && query !== null,
   });
 }
 

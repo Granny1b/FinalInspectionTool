@@ -231,14 +231,16 @@ export async function deleteTemplate(
 ): Promise<void> {
   await ensureStorage();
   const container = containerClient(templates);
-  await container
-    .getBlobClient(blobNames.templateDraft(id))
-    .delete({ conditions: { ifMatch } })
-    .catch((error: unknown) => {
-      if (isRestError(error) && error.statusCode === 412) throw new PreconditionFailedError();
-      if (isRestError(error) && error.statusCode === 404) throw templateNotFound();
-      throw error;
-    });
+  const blob = container.getBlobClient(blobNames.templateDraft(id));
+  await blob.delete({ conditions: { ifMatch } }).catch(async (error: unknown) => {
+    if (isRestError(error) && error.statusCode === 412) {
+      // Storage may answer the condition with 412 when the blob is gone, too: another admin
+      // deleted it first, which is a 404 to the caller, not a conflict.
+      throw (await blob.exists()) ? new PreconditionFailedError() : templateNotFound();
+    }
+    if (isRestError(error) && error.statusCode === 404) throw templateNotFound();
+    throw error;
+  });
   // Listed again: a publish may have added a revision since the caller read the template.
   const names = await listBlobNames(templates, `${id}/`);
   const results = await Promise.allSettled(

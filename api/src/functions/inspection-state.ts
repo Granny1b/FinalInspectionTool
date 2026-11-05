@@ -13,7 +13,7 @@
  */
 import { app, type HttpRequest, type InvocationContext } from '@azure/functions';
 import { validateForFinalise, type Inspection } from '@modig/shared';
-import { syncDeviations } from '../lib/deviations';
+import { deleteDeviationRows, syncDeviations } from '../lib/deviations';
 import {
   BadRequestError,
   endpoint,
@@ -94,7 +94,7 @@ async function unchanged(stored: StoredInspection, context: InvocationContext) {
 async function commit(changed: Inspection, ifMatch: string, context: InvocationContext) {
   await orUnavailable(syncDeviations(changed), changed.id, context);
   const etag = await writeInspection(changed, { ifMatch }).catch(async (error: unknown) => {
-    await resyncFromBlob(changed.id, context);
+    await resyncFromBlob(changed, context);
     throw error;
   });
   await syncSettled(changed, etag, context).catch((error: unknown) => {
@@ -112,13 +112,17 @@ async function orUnavailable(sync: Promise<void>, id: string, context: Invocatio
   });
 }
 
-/** Best effort: the next successful write syncs again anyway. */
-async function resyncFromBlob(id: string, context: InvocationContext): Promise<void> {
+/**
+ * Best effort: the next successful write syncs again anyway. When the blob is gone (an admin
+ * deleted the inspection in between), the rows just synced for it are removed again.
+ */
+async function resyncFromBlob(changed: Inspection, context: InvocationContext): Promise<void> {
   try {
-    const latest = await loadInspection(id);
+    const latest = await loadInspection(changed.id);
     if (latest) await syncSettled(latest.data, latest.etag, context);
+    else await deleteDeviationRows(changed.front.modelCode, changed.id);
   } catch (error) {
-    context.warn(`Re-syncing the deviations of inspection ${id} failed`, error);
+    context.warn(`Re-syncing the deviations of inspection ${changed.id} failed`, error);
   }
 }
 

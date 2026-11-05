@@ -4,6 +4,7 @@ import {
   ApiErrorSchema,
   blobNames,
   CONTAINERS,
+  InsightsDeviationsSchema,
   InsightsSchema,
   newId,
   type Inspection,
@@ -23,7 +24,7 @@ import { syncDeviations } from '../lib/deviations';
 import { writeInspection } from '../lib/inspections';
 import { clearRevisionCache } from '../lib/insights';
 import { deviationsTable, writeJson } from '../lib/storage';
-import { exportInsightsCsv, getInsights } from './insights';
+import { exportInsightsCsv, getInsights, getInsightsDeviations } from './insights';
 
 // Record the registrations instead of letting the package (in "test mode") warn about them.
 const registrations = vi.hoisted((): unknown[][] => []);
@@ -96,7 +97,7 @@ async function inspect(
 }
 
 describe('insights endpoints', () => {
-  it('registers two GETs', () => {
+  it('registers three GETs', () => {
     expect(registrations).toEqual([
       [
         'insights',
@@ -111,6 +112,15 @@ describe('insights endpoints', () => {
           handler: exportInsightsCsv,
         },
       ],
+      [
+        'insightsDeviations',
+        {
+          methods: ['GET'],
+          authLevel: 'anonymous',
+          route: 'insights/deviations',
+          handler: getInsightsDeviations,
+        },
+      ],
     ]);
   });
 
@@ -119,6 +129,9 @@ describe('insights endpoints', () => {
     expect((await insights({}, INSPECTOR)).status).toBe(403);
     const csv = await exportInsightsCsv(request({ principal: INSPECTOR }), context());
     expect(csv.status).toBe(403);
+    expect((await getInsightsDeviations(request(), context())).status).toBe(401);
+    const list = await getInsightsDeviations(request({ principal: INSPECTOR }), context());
+    expect(list.status).toBe(403);
   });
 
   it('refuses filters that are not valid, saying which', async () => {
@@ -132,6 +145,11 @@ describe('insights endpoints', () => {
       context(),
     );
     expect(csv.status).toBe(400);
+    const list = await getInsightsDeviations(
+      request({ principal: ADMIN, query: { from: '0026-01-01' } }),
+      context(),
+    );
+    expect(list.status).toBe(400);
   });
 });
 
@@ -139,6 +157,7 @@ describe('GET /api/insights', () => {
   it('is all zeros without inspections', async () => {
     expect(parsed(await insights())).toEqual({
       modelCodes: [],
+      firstInspectionDate: null,
       inspections: { finalised: 0, inProgress: 0 },
       deviations: 0,
       rows: { ok: 0, nok: 0, na: 0 },
@@ -258,6 +277,7 @@ describe('GET /api/insights', () => {
     expect(otherModel.inspections.finalised).toBe(0);
     expect(otherModel.deviations).toBe(0);
     expect(otherModel.modelCodes).toEqual(['RMMG']);
+    expect(otherModel.firstInspectionDate).toBe('2026-01-31');
   });
 
   it('shows where a checkpoint is now, and counts only inspections whose checklist had it', async () => {
@@ -383,5 +403,67 @@ describe('GET /api/insights/export.csv', () => {
         /^attachment; filename="Deviations 2026-01-01 to \d{4}-\d{2}-\d{2}, incl\. in progress\.csv"$/,
       ),
     });
+  });
+});
+
+describe('GET /api/insights/deviations', () => {
+  const deviations = async (query: Record<string, string> = {}) => {
+    const response = await getInsightsDeviations(request({ principal: ADMIN, query }), context());
+    expect(response.status).toBe(200);
+    return InsightsDeviationsSchema.parse(response.jsonBody).rows;
+  };
+
+  it('lists the rows behind the numbers as the CSV does: filtered, oldest inspection first', async () => {
+    const { template, items } = await publishedTemplate();
+    const [a, b] = items as [string, string];
+    const extra = { id: newId(), description: 'Scratch on the door', severity: 'minor' as const };
+    await inspect(
+      template,
+      {
+        [b]: { status: 'NOK', comment: 'Skruv lös', resp: 'Mekanik', category: 'Leakage' },
+        [a]: { status: 'NOK', severity: 'critical' },
+      },
+      {
+        number: 'FI-2026-0002',
+        front: { ...sampleInspection().front, date: '2026-10-08' },
+        extraDeviations: [extra],
+      },
+    );
+    await inspect(template, { [b]: { status: 'NOK' } }, { number: 'FI-2026-0001' });
+    await inspect(template, { [a]: { status: 'NOK' } }, { state: 'in_progress' });
+    await inspect(
+      template,
+      { [a]: { status: 'NOK' } },
+      { front: { ...sampleInspection().front, date: '2026-11-02' } },
+    );
+
+    const rows = await deviations({ to: '2026-10-31', model: 'RMMG' });
+    // In each inspection checklist order, then the extra deviation; in progress and November out.
+    expect(rows.map((row) => [row.inspectionNumber, row.displayRef])).toEqual([
+      ['FI-2026-0001', '1.b'],
+      ['FI-2026-0002', '1.a'],
+      ['FI-2026-0002', '1.b'],
+      ['FI-2026-0002', '—'],
+    ]);
+    expect(rows[2]).toMatchObject({
+      inspectionDate: '2026-10-08',
+      modelCode: 'RMMG',
+      itemId: b,
+      comment: 'Skruv lös',
+      resp: 'Mekanik',
+      category: 'Leakage',
+      severity: 'minor',
+      finalised: true,
+    });
+    expect(rows[1]).toMatchObject({ itemId: a, severity: 'critical', category: '' });
+    expect(rows[3]).toMatchObject({ itemId: '', checkpointText: 'Scratch on the door' });
+
+    // In-progress inspections join in when asked; another model has none.
+    expect(await deviations({ includeInProgress: 'true' })).toHaveLength(6);
+    expect(await deviations({ model: 'XYZ' })).toEqual([]);
+  });
+
+  it('is empty without inspections', async () => {
+    expect(await deviations()).toEqual([]);
   });
 });

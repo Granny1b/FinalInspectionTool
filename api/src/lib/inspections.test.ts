@@ -2,16 +2,20 @@ import {
   blobNames,
   CONTAINERS,
   InspectionCounterSchema,
+  InspectionSchema,
   type Inspection,
   type InspectionSummary,
 } from '@modig/shared';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { context } from '../../test/requests';
 import { resetStorage, sampleInspection, useTestStorage } from '../../test/storage';
-import { ServiceUnavailableError } from './http';
+import { NotFoundError, PreconditionFailedError, ServiceUnavailableError } from './http';
 import {
+  deleteInspection,
   inspectionSummary,
   loadSummaries,
   nextInspectionNumber,
+  ownImageIds,
   writeInspection,
 } from './inspections';
 import type * as Storage from './storage';
@@ -208,5 +212,75 @@ describe('loadSummaries', () => {
 
   it('is empty when there are no inspections', async () => {
     expect(await loadSummaries()).toEqual([]);
+  });
+});
+
+describe('deleteInspection', () => {
+  it('deletes only the version it was given: 412 if the blob changed after it was read', async () => {
+    const inspection = sampleInspection();
+    const etag = await writeInspection(inspection, { ifNoneMatch: '*' });
+    // A save lands between the endpoint's check and the delete.
+    await writeInspection({ ...inspection, updatedBy: 'kim@modig.se' }, { ifMatch: etag });
+
+    await expect(deleteInspection(inspection, etag, context())).rejects.toBeInstanceOf(
+      PreconditionFailedError,
+    );
+    expect(
+      await readJson(inspections, blobNames.inspection(inspection.id), InspectionSchema),
+    ).not.toBeNull();
+  });
+
+  it('404 when it is gone already', async () => {
+    const inspection = sampleInspection();
+    const etag = await writeInspection(inspection, { ifNoneMatch: '*' });
+    await deleteInspection(inspection, etag, context());
+    await expect(deleteInspection(inspection, etag, context())).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+});
+
+describe('ownImageIds', () => {
+  const photo = (imageId: string, renderedImageId?: string) => ({
+    imageId,
+    annotations: [],
+    ...(renderedImageId && { renderedImageId }),
+  });
+
+  it('is the photos of its rows and extra deviations, with their marked-up copies', () => {
+    const base = sampleInspection();
+    const [a, b] = base.templateSnapshot.sections[0]!.items;
+    const inspection: Inspection = {
+      ...base,
+      results: {
+        [a!.id]: { status: 'NOK', photos: [photo('p1', 'p1m'), photo('p2')] },
+        [b!.id]: { status: 'OK' },
+      },
+      extraDeviations: [
+        { id: 'x', description: 'Paint', severity: 'minor', photos: [photo('p3', 'p3m')] },
+        { id: 'y', description: 'Dent', severity: 'minor' },
+      ],
+    };
+    expect(ownImageIds(inspection)).toEqual(['p1', 'p1m', 'p2', 'p3', 'p3m']);
+  });
+
+  it('never names a guide image, the machine photo or an image to keep', () => {
+    const base = sampleInspection();
+    const [section] = base.templateSnapshot.sections;
+    const [a, b] = section!.items;
+    const guided = {
+      ...a!,
+      guide: { images: [{ ...photo('guide', 'guideMarked'), verdict: 'good' as const }] },
+    };
+    const inspection: Inspection = {
+      ...base,
+      templateSnapshot: { ...base.templateSnapshot, sections: [{ ...section!, items: [guided] }] },
+      front: { ...base.front, photoId: 'cover' },
+      results: {
+        [a!.id]: { status: 'NOK', photos: [photo('guide', 'guideMarked'), photo('cover', 'own')] },
+        [b!.id]: { status: 'NOK', photos: [photo('logo')] },
+      },
+    };
+    expect(ownImageIds(inspection, ['logo'])).toEqual(['own']);
   });
 });

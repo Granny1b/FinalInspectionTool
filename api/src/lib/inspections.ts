@@ -7,6 +7,7 @@
  */
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { InvocationContext } from '@azure/functions';
+import { isRestError } from '@azure/storage-blob';
 import {
   blobNames,
   CONTAINERS,
@@ -16,17 +17,20 @@ import {
   InspectionSchema,
   InspectionSummarySchema,
   inspectionProgress,
+  templateImageIds,
   type Inspection,
   type InspectionCounter,
   type InspectionSummary,
 } from '@modig/shared';
-import { syncDeviations } from './deviations';
+import { deleteDeviationRows, syncDeviations } from './deviations';
 import {
   ConflictError,
   NotFoundError,
   PreconditionFailedError,
   ServiceUnavailableError,
 } from './http';
+import { deleteImages } from './images';
+import { loadSettings } from './settings';
 import {
   containerClient,
   ensureStorage,
@@ -76,11 +80,91 @@ export async function syncSettled(
   let last = etag;
   for (let round = 0; round < SETTLE_ROUNDS; round++) {
     const latest = await loadInspection(synced.id);
-    if (!latest || latest.etag === last) return;
+    // Deleted meanwhile: the rows just written belong to nothing. The delete removes the rows
+    // after the blob, so whichever of the two finishes last leaves none behind.
+    if (!latest) return deleteDeviationRows(synced.front.modelCode, synced.id);
+    if (latest.etag === last) return;
     await syncDeviations(latest.data);
     last = latest.etag;
   }
   context.warn(`The deviations of inspection ${synced.id} kept changing while being synced`);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Delete (admins)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Deletes an inspection for good: its blob, only while it is still version `ifMatch` (412
+ * otherwise, 404 if it is gone already), then its deviation rows and the photos only it uses. The
+ * blob goes first: without it the inspection no longer exists anywhere the app looks (the list,
+ * its page, Insights, which counts only the rows of listed inspections). The rest is best effort:
+ * whatever can't be deleted is logged and left behind, unused, and the delete still succeeds,
+ * since a retry would only get a 404. Its number is never handed out again (the counter only
+ * counts up, and a lost counter carries on from the highest number in use).
+ */
+export async function deleteInspection(
+  inspection: Inspection,
+  ifMatch: string,
+  context: InvocationContext,
+): Promise<void> {
+  await ensureStorage();
+  const { id } = inspection;
+  const blob = containerClient(inspections).getBlobClient(blobNames.inspection(id));
+  await blob.delete({ conditions: { ifMatch } }).catch(async (error: unknown) => {
+    if (isRestError(error) && error.statusCode === 404) throw inspectionNotFound();
+    if (isRestError(error) && error.statusCode === 412) {
+      // Storage may answer the condition with 412 when the blob is gone, too: another admin
+      // deleted it meanwhile, which is a 404 (the app counts that as deleted), not a conflict.
+      throw (await blob.exists()) ? new PreconditionFailedError() : inspectionNotFound();
+    }
+    throw error;
+  });
+  await Promise.all([
+    deleteDeviationRows(inspection.front.modelCode, id).catch((error: unknown) => {
+      context.warn(`Deleted inspection ${id}; deleting its deviation rows failed`, error);
+    }),
+    deletePhotos(inspection, context).catch((error: unknown) => {
+      context.warn(`Deleted inspection ${id}; deleting its photos failed`, error);
+    }),
+  ]);
+}
+
+/** The photos only `inspection` uses; the logo is read first, so it is never one of them. */
+async function deletePhotos(inspection: Inspection, context: InvocationContext): Promise<void> {
+  const logo = (await loadSettings())?.logoImageId;
+  const failed = await deleteImages(ownImageIds(inspection, logo ? [logo] : []));
+  for (const { imageId, reason } of failed) {
+    context.warn(
+      `Deleted inspection ${inspection.id}; images/${blobNames.image(imageId)} was left`,
+      reason,
+    );
+  }
+}
+
+/**
+ * The images only this inspection uses: its deviations' photos (on rows and extra deviations)
+ * and their marked-up copies. Every upload gets a new id, so no other document names them. As a
+ * guard against hand-edited data, an id the inspection also uses for anything else is never one
+ * of them: a guide image of its frozen checklist (it belongs to the template, and other
+ * inspections share it), the machine photo (often the template's cover), or one in `keep`.
+ */
+export function ownImageIds(inspection: Inspection, keep: Iterable<string> = []): string[] {
+  const photos = [
+    ...Object.values(inspection.results).flatMap((result) => result.photos ?? []),
+    ...inspection.extraDeviations.flatMap((extra) => extra.photos ?? []),
+  ];
+  const own = new Set(
+    photos.flatMap(({ imageId, renderedImageId }) =>
+      renderedImageId ? [imageId, renderedImageId] : [imageId],
+    ),
+  );
+  const shared = new Set([
+    ...keep,
+    ...templateImageIds({ sections: inspection.templateSnapshot.sections }),
+    ...(inspection.front.photoId ? [inspection.front.photoId] : []),
+  ]);
+  return [...own].filter((imageId) => !shared.has(imageId));
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import {
   ApiErrorSchema,
   blobNames,
   CONTAINERS,
+  InspectionCounterSchema,
   InspectionListSchema,
   InspectionSchema,
   MAX_PHOTOS_PER_DEVIATION,
@@ -11,6 +12,7 @@ import {
   snapshotTemplate,
   TemplateDetailSchema,
   TemplateListSchema,
+  type AnnotatedImage,
   type ApiError,
   type Inspection,
   type InspectionDraftInput,
@@ -21,14 +23,23 @@ import { context, principal, request } from '../../test/requests';
 import {
   draftTemplate,
   resetStorage,
+  sampleInspection,
   storeTemplate,
   useTestStorage,
   writeSettings,
 } from '../../test/storage';
+import { syncDeviations } from '../lib/deviations';
 import type * as Deviations from '../lib/deviations';
+import { writeInspection } from '../lib/inspections';
 import type * as Storage from '../lib/storage';
-import { deviationsTable, readJson, writeJson } from '../lib/storage';
-import { createInspection, getInspection, listInspections, saveInspection } from './inspections';
+import { containerClient, deviationsTable, readJson, writeJson } from '../lib/storage';
+import {
+  createInspection,
+  deleteInspection,
+  getInspection,
+  listInspections,
+  saveInspection,
+} from './inspections';
 import { publishTemplate } from './template-revisions';
 import { getTemplate, listTemplates, saveTemplate } from './templates';
 
@@ -42,6 +53,8 @@ vi.mock('@azure/functions', async (importOriginal) => ({
 const hooks = vi.hoisted(() => ({
   /** Makes the deviation table fail. */
   failSync: false,
+  /** Makes deleting an inspection's deviation rows fail. */
+  failRowDelete: false,
   /** Runs once, just before the next blob write, the way a concurrent save could. */
   beforeWrite: undefined as (() => Promise<void>) | undefined,
   /** Runs once, just before the next deviation sync, the way a slow table could. */
@@ -57,6 +70,10 @@ vi.mock('../lib/deviations', async (importOriginal) => {
       hooks.beforeSync = undefined;
       await hook?.();
       return actual.syncDeviations(...args);
+    },
+    deleteDeviationRows: async (...args: Parameters<typeof actual.deleteDeviationRows>) => {
+      if (hooks.failRowDelete) throw new Error('Table storage is down');
+      return actual.deleteDeviationRows(...args);
     },
   };
 });
@@ -86,6 +103,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   hooks.failSync = false;
+  hooks.failRowDelete = false;
   hooks.beforeWrite = undefined;
   hooks.beforeSync = undefined;
 });
@@ -184,7 +202,7 @@ describe('registration', () => {
       handler: expect.any(Function),
     });
     expect(registered('inspection')).toEqual({
-      methods: ['GET', 'PUT'],
+      methods: ['GET', 'PUT', 'DELETE'],
       authLevel: 'anonymous',
       route: 'inspections/{id}',
       handler: expect.any(Function),
@@ -216,6 +234,8 @@ describe('registration', () => {
     expect(errorOf(await call(one, 'PUT', {}, id)).message).toBe(
       'The If-Match header is required.',
     );
+    // An inspector refused: proof that DELETE reached the (admin-only) delete handler.
+    expect((await call(one, 'DELETE', undefined, id)).status).toBe(403);
   });
 });
 
@@ -224,6 +244,7 @@ describe.each([
   ['POST /api/inspections', createInspection],
   ['GET /api/inspections/{id}', getInspection],
   ['PUT /api/inspections/{id}', saveInspection],
+  ['DELETE /api/inspections/{id}', deleteInspection],
 ])('%s access', (_name, handler) => {
   it('401 without a client principal', async () => {
     expect((await handler(request({ params: { id: newId() } }), context())).status).toBe(401);
@@ -751,5 +772,274 @@ describe('PUT /api/inspections/{id}', () => {
       '"0x8DC1"',
     );
     expect(response.status).toBe(404);
+  });
+});
+
+describe('DELETE /api/inspections/{id}', () => {
+  function remove(id: string, ifMatch: string | null, ctx = context(), who = admin) {
+    return deleteInspection(
+      request({
+        principal: who,
+        method: 'DELETE',
+        params: { id },
+        headers: ifMatch ? { 'If-Match': ifMatch } : {},
+      }),
+      ctx,
+    );
+  }
+
+  const images = () => containerClient(CONTAINERS.images);
+
+  /** Stores an image blob, as an upload would, and returns its id. */
+  async function storeImage(): Promise<string> {
+    const imageId = newId();
+    await images().getBlockBlobClient(blobNames.image(imageId)).upload('jpeg', 4);
+    return imageId;
+  }
+
+  /** Which of these images are still stored. */
+  async function storedImages(ids: string[]): Promise<string[]> {
+    const exists = await Promise.all(
+      ids.map((imageId) => images().getBlobClient(blobNames.image(imageId)).exists()),
+    );
+    return ids.filter((_, index) => exists[index]);
+  }
+
+  async function counter() {
+    return (await readJson(CONTAINERS.config, blobNames.inspectionCounter, InspectionCounterSchema))
+      ?.data;
+  }
+
+  /** A marked-up deviation photo: the original and its flattened copy, both stored. */
+  async function markedPhoto(): Promise<AnnotatedImage> {
+    return { imageId: await storeImage(), annotations: [], renderedImageId: await storeImage() };
+  }
+
+  /** RigiMill MG, published, with a stored cover and a marked-up guide image on row 1.a. */
+  async function guidedTemplate(): Promise<{ template: Template; templateImages: string[] }> {
+    const [cover, guide, guideMarked] = [
+      await storeImage(),
+      await storeImage(),
+      await storeImage(),
+    ];
+    const base = draftTemplate({ revision: 3, coverImageId: cover });
+    const [first, second] = base.sections;
+    const [row, ...rows] = first!.items;
+    const guided = {
+      ...row!,
+      guide: {
+        images: [
+          {
+            imageId: guide,
+            renderedImageId: guideMarked,
+            annotations: [],
+            verdict: 'good' as const,
+          },
+        ],
+      },
+    };
+    const template = { ...base, sections: [{ ...first!, items: [guided, ...rows] }, second!] };
+    await storeTemplate(template, [1, 2]);
+    return { template, templateImages: [cover, guide, guideMarked] };
+  }
+
+  /** A new inspection of `template`, saved with 1.a NOK and an extra deviation, each with a photo. */
+  async function withPhotos(template: Template) {
+    const { inspection, etag } = await created(template);
+    const [a] = itemIds(inspection);
+    const [rowPhoto, extraPhoto] = [await markedPhoto(), await markedPhoto()];
+    const saved = await put(
+      inspection.id,
+      {
+        ...draftOf(inspection),
+        results: { [a!]: { status: 'NOK', comment: 'Screw missing', photos: [rowPhoto] } },
+        extraDeviations: [
+          { id: newId(), description: 'Paint damage', severity: 'minor', photos: [extraPhoto] },
+        ],
+      },
+      etag,
+    );
+    expect(saved.status).toBe(200);
+    const photos = [rowPhoto, extraPhoto].flatMap((photo) => [
+      photo.imageId,
+      photo.renderedImageId!,
+    ]);
+    return { inspection: inspectionOf(saved), etag: etagOf(saved)!, photos };
+  }
+
+  /** The RowKeys an inspection's deviations have in the table. */
+  const rowKeysOf = (inspection: Inspection) =>
+    [
+      ...Object.keys(inspection.results).map((itemId) => `${inspection.id}_${itemId}`),
+      ...inspection.extraDeviations.map((extra) => `${inspection.id}_${extra.id}`),
+    ].sort();
+
+  it("deletes the inspection, its deviation rows and its photos, and nothing else's", async () => {
+    const { template, templateImages } = await guidedTemplate();
+    const other = await withPhotos(template);
+    const deleted = await withPhotos(template);
+    // The machine photo is the template's cover, which the inspection shares.
+    expect(deleted.inspection.front.photoId).toBe(template.coverImageId);
+    expect(deleted.inspection.templateSnapshot.sections[0]!.items[0]!.guide).toBeDefined();
+    expect(await deviationRowKeys()).toHaveLength(4);
+    const counted = await counter();
+
+    const response = await remove(deleted.inspection.id, deleted.etag);
+    expect(response).toMatchObject({ status: 204 });
+    expect(response.jsonBody).toBeUndefined();
+
+    expect(await stored(deleted.inspection.id)).toBeNull();
+    expect((await get(deleted.inspection.id)).status).toBe(404);
+    const list = await listInspections(request({ principal: inspector }), context());
+    expect(InspectionListSchema.parse(list.jsonBody).map(({ id }) => id)).toEqual([
+      other.inspection.id,
+    ]);
+    expect(await deviationRowKeys()).toEqual(rowKeysOf(other.inspection));
+    expect(await storedImages(deleted.photos)).toEqual([]);
+    // The template's cover and guide images, and the other inspection's photos, stay.
+    expect(await storedImages(templateImages)).toEqual(templateImages);
+    expect(await storedImages(other.photos)).toEqual(other.photos);
+    expect((await stored(other.inspection.id))?.data).toEqual(other.inspection);
+
+    // Its number is never handed out again: the counter is untouched and carries on.
+    expect(await counter()).toEqual(counted);
+    const { inspection: next } = await created(template);
+    expect(next.number).toBe(`FI-${year}-0003`);
+  });
+
+  it('deletes a finalised inspection too', async () => {
+    const template = draftTemplate({ status: 'published', revision: 2 });
+    const [a] = template.sections[0]!.items;
+    const photo = await markedPhoto();
+    const inspection = sampleInspection(
+      {
+        state: 'finalised',
+        finalisedAt: '2026-10-08T08:00:00.000Z',
+        finalisedBy: 'sam.andersson@modig.se',
+        results: { [a!.id]: { status: 'NOK', severity: 'major', photos: [photo] } },
+      },
+      template,
+    );
+    const etag = await writeInspection(inspection, {});
+    await syncDeviations(inspection);
+    expect(await deviationRowKeys()).toEqual([`${inspection.id}_${a!.id}`]);
+
+    expect((await remove(inspection.id, etag)).status).toBe(204);
+    expect(await stored(inspection.id)).toBeNull();
+    expect(await deviationRowKeys()).toEqual([]);
+    expect(await storedImages([photo.imageId, photo.renderedImageId!])).toEqual([]);
+  });
+
+  it('never deletes a guide image, the machine photo or the logo, even named as a photo', async () => {
+    const { template, templateImages } = await guidedTemplate();
+    const [cover, guide] = templateImages as [string, string, string];
+    const logo = await storeImage();
+    await writeJson(CONTAINERS.config, blobNames.settings, {
+      ...(await writeSettings()),
+      logoImageId: logo,
+    });
+    const { inspection, etag } = await created(template);
+    const [, b, c] = itemIds(inspection);
+    const own = await markedPhoto();
+    // Hand-edited data: deviation photos that name images other documents own.
+    const tampered: Inspection = {
+      ...inspection,
+      results: {
+        [b!]: {
+          status: 'NOK',
+          photos: [{ imageId: guide, renderedImageId: logo, annotations: [] }, own],
+        },
+        [c!]: { status: 'NOK', photos: [{ imageId: cover, annotations: [] }] },
+      },
+    };
+    const tamperedEtag = await writeInspection(tampered, { ifMatch: etag });
+
+    expect((await remove(inspection.id, tamperedEtag)).status).toBe(204);
+    expect(await storedImages([...templateImages, logo])).toEqual([...templateImages, logo]);
+    expect(await storedImages([own.imageId, own.renderedImageId!])).toEqual([]);
+  });
+
+  it('still deletes when its rows cannot be cleaned up, and logs it', async () => {
+    const { inspection, etag, photos } = await withPhotos(await publishedTemplate());
+    hooks.failRowDelete = true;
+    const ctx = context();
+    const warn = vi.spyOn(ctx, 'warn');
+
+    expect((await remove(inspection.id, etag, ctx)).status).toBe(204);
+    expect(await stored(inspection.id)).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      `Deleted inspection ${inspection.id}; deleting its deviation rows failed`,
+      expect.any(Error),
+    );
+    // The photos went all the same. The rows are left behind, and Insights ignores them.
+    expect(await storedImages(photos)).toEqual([]);
+    expect(await deviationRowKeys()).toEqual(rowKeysOf(inspection));
+  });
+
+  it('leaves no rows behind when a save’s slow sync lands after the delete', async () => {
+    const { inspection, etag } = await created(await publishedTemplate());
+    const [a] = itemIds(inspection);
+    const held = holdNextSync();
+    const saving = put(
+      inspection.id,
+      { ...draftOf(inspection), results: { [a!]: { status: 'NOK' } } },
+      etag,
+    );
+    await held.reached;
+    // The save is stored and its sync waits; an admin opens that version and deletes it.
+    const current = await get(inspection.id, admin);
+    expect((await remove(inspection.id, etagOf(current))).status).toBe(204);
+    held.release();
+
+    expect((await saving).status).toBe(200);
+    expect(await stored(inspection.id)).toBeNull();
+    expect(await deviationRowKeys()).toEqual([]);
+  });
+
+  it('403 for an inspector, deleting nothing', async () => {
+    const { inspection, etag, photos } = await withPhotos(await publishedTemplate());
+    const response = await remove(inspection.id, etag, context(), inspector);
+    expect(response.status).toBe(403);
+    expect((await stored(inspection.id))?.etag).toBe(etag);
+    expect(await deviationRowKeys()).toEqual(rowKeysOf(inspection));
+    expect(await storedImages(photos)).toEqual(photos);
+  });
+
+  it('400 without If-Match, and with "*"', async () => {
+    const { inspection } = await created(await publishedTemplate());
+    for (const ifMatch of [null, '*']) {
+      expect((await remove(inspection.id, ifMatch)).status).toBe(400);
+    }
+    expect(errorOf(await remove(inspection.id, null)).message).toBe(
+      'The If-Match header is required.',
+    );
+    expect(await stored(inspection.id)).not.toBeNull();
+  });
+
+  it('412 for a stale ETag, deleting nothing', async () => {
+    const { inspection, etag, photos } = await withPhotos(await publishedTemplate());
+    // Someone saves meanwhile.
+    const newer = await put(inspection.id, { ...draftOf(inspection), extraDeviations: [] }, etag);
+    expect(newer.status).toBe(200);
+
+    const response = await remove(inspection.id, etag);
+    expect(response.status).toBe(412);
+    expect(errorOf(response).error).toBe('precondition_failed');
+    expect((await stored(inspection.id))?.etag).toBe(etagOf(newer));
+    expect(await deviationRowKeys()).toEqual(rowKeysOf(inspectionOf(newer)));
+    expect(await storedImages(photos)).toEqual(photos);
+  });
+
+  it('404 for an unknown inspection, 400 for a malformed id', async () => {
+    const unknown = await remove(newId(), '"0x8DC1"');
+    expect(unknown.status).toBe(404);
+    expect(errorOf(unknown).message).toBe('This inspection does not exist.');
+    expect((await remove('../config/settings', '"0x8DC1"')).status).toBe(400);
+  });
+
+  it('404 the second time: a retry finds nothing left to delete', async () => {
+    const { inspection, etag } = await created(await publishedTemplate());
+    expect((await remove(inspection.id, etag)).status).toBe(204);
+    expect((await remove(inspection.id, etag)).status).toBe(404);
   });
 });

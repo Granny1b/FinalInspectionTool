@@ -6,6 +6,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { FitScaleContext } from './fitScale';
 import { fitScale, SHEET_WIDTH_PX } from './preview';
 
 /**
@@ -36,7 +37,7 @@ export function FittedPages({ children }: { children: ReactNode }) {
   return (
     <div ref={fitRef} className="paper-fit" style={style}>
       <div ref={pagesRef} className="paper-fit-pages">
-        {children}
+        <FitScaleContext value={scale}>{children}</FitScaleContext>
       </div>
     </div>
   );

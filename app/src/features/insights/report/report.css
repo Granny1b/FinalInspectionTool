@@ -1,0 +1,527 @@
+/*
+ * The Insights report on paper. It lies on the inspection printout's sheets (print.css: A4, the
+ * margins, the greys, the edge inset, the footer, the grey desk on screen) and adds what a report
+ * of numbers needs: a header that states the filters, headline figures, a month chart and ruled
+ * tables of counts, shares and slim bars. Black and white throughout: words, greys and black.
+ *
+ * Plain CSS outside Tailwind's layers, like print.css, and only under .paper-report.
+ */
+
+.paper-report {
+  /* Bars and columns: a dark grey that prints solid on a laser printer and leaves black for text
+     and the line. */
+  --report-bar: #5c5c5c;
+  /* Rules between table rows: lighter than the cell rules of the checklist, as rows here are
+     read across, not filled in. */
+  --report-rule: #c4c4c4;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Header: the logo and the period over a black rule, the title, the company, then what the    */
+/* report covers, line by line as on the inspection's front page.                             */
+/* ------------------------------------------------------------------------------------------ */
+
+.report-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8mm;
+  padding-bottom: 4mm;
+  border-bottom: 0.4mm solid var(--paper-ink);
+}
+
+.report-head-period {
+  font-size: 11pt;
+  font-weight: 600;
+  text-align: right;
+}
+
+.report-title {
+  margin-top: 7mm;
+  font-size: 22pt;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.report-facts {
+  margin: 6mm 0 0;
+  border-top: 0.25mm solid var(--paper-rule);
+}
+
+.report-facts > div {
+  display: flex;
+  align-items: baseline;
+  gap: 4mm;
+  padding: 2.4mm 0 1.2mm;
+  border-bottom: 0.25mm solid var(--paper-rule);
+}
+
+.report-facts dt {
+  flex: none;
+  width: 26mm;
+  font-size: 8pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+.report-facts dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 10pt;
+  overflow-wrap: anywhere;
+}
+
+/* Deviation records the API couldn't read: framed, so it isn't missed. */
+.report-note {
+  margin-top: 5mm;
+  padding: 2.5mm 3mm;
+  border: 0.4mm solid var(--paper-ink);
+  font-weight: 600;
+}
+
+/* No inspection matches: one framed statement instead of empty tables. */
+.report-empty {
+  margin-top: 12mm;
+  padding: 14mm 10mm;
+  border: 0.3mm dashed var(--paper-rule);
+  border-radius: 1mm;
+  text-align: center;
+}
+
+.report-empty h3 {
+  font-size: 13pt;
+  font-weight: 600;
+}
+
+.report-empty p {
+  max-width: 120mm;
+  margin: 2mm auto 0;
+  color: var(--paper-muted);
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Sections: a heading, what it counts, the figure. A section never parts from its heading and */
+/* is never split, unless it is taller than a page (a long table): then its rows run on under  */
+/* its repeated column labels.                                                                */
+/* ------------------------------------------------------------------------------------------ */
+
+.report-section {
+  margin-top: 8mm;
+  break-inside: avoid;
+}
+
+/* Deviations per month over more than a year: the chart and its first year stay with the heading,
+   later years may go on to the next page. Kept whole, two or three years took half a page with
+   them and left the first page half empty. */
+.report-section[data-breakable] {
+  break-inside: auto;
+}
+
+.report-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6mm;
+  margin-bottom: 3mm;
+  break-after: avoid;
+}
+
+.report-section h3 {
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+.report-section-description {
+  margin-top: 0.6mm;
+  font-size: 8pt;
+  color: var(--paper-muted);
+}
+
+.report-section-aside {
+  flex: none;
+  font-size: 8pt;
+  color: var(--paper-muted);
+}
+
+.report-none {
+  padding: 3mm 0;
+  border-top: 0.3mm solid var(--paper-ink);
+  border-bottom: 0.3mm solid var(--paper-ink);
+  color: var(--paper-muted);
+}
+
+/* The headline numbers: four framed figures in a row, each with what it counts under it. */
+.report-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3mm;
+  margin: 0;
+}
+
+.report-kpis > div {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: 0;
+  padding: 3mm 3.5mm;
+  border: 0.3mm solid var(--paper-rule);
+  border-radius: 1mm;
+}
+
+.report-kpis dt {
+  font-size: 7.5pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+.report-kpis dd {
+  margin: 0;
+}
+
+/* Proportional figures, as on the screen's tiles: a big standalone number looks loose with
+   tabular ones. */
+.report-kpi-value {
+  margin-top: 1.5mm;
+  font-size: 20pt;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+
+.report-kpi-detail {
+  margin-top: 1.5mm;
+  font-size: 7pt;
+  color: var(--paper-muted);
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Tables: a black rule over the column labels, a thinner one under them, light rules between  */
+/* rows and a black one at the foot. Labels repeat on every page a table runs onto; a row is   */
+/* never split. Counts are right-aligned in tabular figures, so their digits line up.         */
+/* ------------------------------------------------------------------------------------------ */
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border-bottom: 0.3mm solid var(--paper-ink);
+}
+
+.report-table thead {
+  display: table-header-group;
+}
+
+.report-table tr {
+  break-inside: avoid;
+}
+
+.report-table th,
+.report-table td {
+  padding: 1.1mm 1.5mm;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.report-table th:first-child,
+.report-table td:first-child {
+  padding-left: 0;
+}
+
+.report-table th:last-child,
+.report-table td:last-child {
+  padding-right: 0;
+}
+
+.report-table thead th {
+  padding-block: 1.2mm;
+  border-top: 0.3mm solid var(--paper-ink);
+  border-bottom: 0.25mm solid var(--paper-ink);
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--paper-muted);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.report-table tbody tr + tr > * {
+  border-top: 0.2mm solid var(--report-rule);
+}
+
+.report-table th[scope='row'] {
+  font-weight: 400;
+}
+
+.report-table .report-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.report-sub {
+  display: block;
+  margin-top: 0.4mm;
+  font-size: 7.5pt;
+  color: var(--paper-muted);
+}
+
+.report-muted {
+  color: var(--paper-muted);
+}
+
+.report-note-inline {
+  margin-left: 1.2mm;
+  font-size: 7.5pt;
+  color: var(--paper-muted);
+}
+
+/* A slim bar in the last column, as long as the count against the largest. */
+.report-table .report-bar-cell {
+  padding-left: 3mm;
+  vertical-align: middle;
+}
+
+.report-bar {
+  display: block;
+  height: 2mm;
+  min-width: 0.4mm;
+  background: var(--report-bar);
+}
+
+/* No bar for a count of zero, rather than a sliver. */
+.report-bar[data-zero] {
+  visibility: hidden;
+}
+
+.report-ref {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Column widths */
+.report-col-rank {
+  width: 6mm;
+}
+.report-col-ref {
+  width: 11mm;
+}
+.report-col-section {
+  width: 34mm;
+}
+.report-col-model {
+  width: 26mm;
+}
+.report-col-count {
+  width: 19mm;
+}
+.report-col-share {
+  width: 16mm;
+}
+.report-col-of {
+  width: 23mm;
+}
+.report-col-bar {
+  width: 40mm;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Deviations per month: the chart (SVG, millimetre units) and its numbers in a table whose    */
+/* label column is the chart's axis gutter, so a year's months sit under their points.        */
+/* ------------------------------------------------------------------------------------------ */
+
+.report-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-chart-grid {
+  stroke: #d0d0d0;
+}
+
+.report-chart-axis {
+  stroke: var(--paper-ink);
+}
+
+.report-chart-tick,
+.report-chart-month {
+  fill: var(--paper-muted);
+}
+
+.report-chart-line {
+  fill: none;
+  stroke: var(--paper-ink);
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.report-chart-dot {
+  fill: var(--paper-ink);
+  stroke: #fff;
+}
+
+.report-chart-column {
+  fill: var(--report-bar);
+}
+
+.report-chart-value {
+  fill: var(--paper-ink);
+  font-weight: 600;
+}
+
+.report-months {
+  width: 100%;
+  margin-top: 2mm;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-months {
+  break-inside: avoid;
+}
+
+.report-chart + .report-months {
+  break-before: avoid;
+}
+
+.report-months + .report-months {
+  margin-top: 3mm;
+}
+
+.report-months th,
+.report-months td {
+  padding: 0.9mm 0.5mm;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.report-months thead th {
+  font-size: 7pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+/* The rules run under the labels and the months, not on into the cells that only pad a short
+   last row to a year's width. */
+.report-months thead > tr > :not([data-pad]) {
+  border-bottom: 0.25mm solid var(--paper-ink);
+}
+
+.report-months tbody tr + tr > :not([data-pad]) {
+  border-top: 0.2mm solid var(--report-rule);
+}
+
+.report-months th[scope='row'] {
+  padding-left: 0;
+  font-size: 7.5pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+  text-align: left;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* The deviation list (optional, a sheet of its own): each inspection's rows under a grey line */
+/* naming it, which stays with its first row.                                                */
+/* ------------------------------------------------------------------------------------------ */
+
+/* The table's own top rule is the heading's: the sheet heading's rule over it doubled it. */
+.paper-heading.report-list-heading {
+  margin-bottom: 2mm;
+  border-bottom: 0;
+}
+
+/* A little smaller than the report's tables: five columns, and a category such as "Loose or
+   wrong torque" on one line. */
+.report-list {
+  font-size: 8.5pt;
+}
+
+/* In the table's head, so it comes again on a page that carries on with the rows: not styled
+   as the column labels there. */
+.report-list .report-group th {
+  padding: 1.6mm 2mm;
+  border-top: 0.3mm solid var(--paper-ink);
+  border-bottom: 0;
+  background: var(--paper-fill-light);
+  font-size: inherit;
+  font-weight: 400;
+  letter-spacing: normal;
+  color: inherit;
+  white-space: normal;
+  vertical-align: baseline;
+}
+
+/* Under the column labels, their rule is its own. */
+.report-list thead tr + .report-group th {
+  border-top: 0;
+}
+
+/* The tables follow on as one list: the next inspection's line is the rule between them. */
+.report-list:not(:last-of-type) {
+  border-bottom: 0;
+}
+
+.report-group {
+  break-after: avoid;
+}
+
+.report-group-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 6mm;
+}
+
+.report-group-number {
+  font-size: 9.5pt;
+  font-weight: 700;
+}
+
+.report-group-machine {
+  color: var(--paper-muted);
+}
+
+/* "In progress", in words in a frame like a card's severity. */
+.report-state {
+  margin-left: 2mm;
+  padding: 0.2mm 1.4mm;
+  border: 0.3mm solid var(--paper-ink);
+  border-radius: 0.6mm;
+  font-size: 6.5pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The refs and their column label in line with the inspection's line above them. */
+.report-list th:first-child,
+.report-list td:first-child {
+  padding-left: 2mm;
+}
+
+.report-comment {
+  display: block;
+  margin-top: 0.6mm;
+  color: var(--paper-muted);
+  white-space: pre-line;
+}
+
+.report-severity[data-severity='critical'] {
+  font-weight: 700;
+}
+
+.report-col-severity {
+  width: 14mm;
+}
+.report-col-category {
+  width: 38mm;
+}
+.report-col-resp {
+  width: 28mm;
+}

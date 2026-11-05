@@ -186,6 +186,20 @@ describe('aggregateInsights', () => {
     expect(oneModel.modelCodes).toEqual(['RMMG', 'RMMT']);
   });
 
+  it('gives the earliest inspection date whatever the filters, for the month filter', () => {
+    const inspections = [
+      inspection('1', { date: '2026-03-31' }),
+      inspection('2', { date: '2025-11-02', state: 'in_progress', modelCode: 'RMMT' }),
+      inspection('3', { date: '2026-01-15' }),
+    ];
+    const filtered = aggregate(
+      { from: '2026-03-01', to: '2026-03-31', model: 'RMMG', includeInProgress: false },
+      inspections,
+    );
+    expect(filtered.firstInspectionDate).toBe('2025-11-02');
+    expect(aggregate(ALL, []).firstInspectionDate).toBeNull();
+  });
+
   it('ignores deviation rows of inspections it does not know', () => {
     const result = aggregate(ALL, [inspection('1')], [row('1'), row('gone')]);
     expect(result.deviations).toBe(1);

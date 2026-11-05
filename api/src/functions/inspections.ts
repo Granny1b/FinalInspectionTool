@@ -1,11 +1,12 @@
 /**
- * Inspections (brief §5.1, §5.3, §8): list and create inspections, read and save one. Finalise
- * and reopen are in inspection-state.ts.
+ * Inspections (brief §5.1, §5.3, §8): list and create inspections, read, save and delete one.
+ * Finalise and reopen are in inspection-state.ts.
  *
- *   GET  /api/inspections       inspector  InspectionSummary[], newest number first
- *   POST /api/inspections       inspector  CreateInspectionRequest → 201 Inspection + ETag
- *   GET  /api/inspections/{id}  inspector  Inspection + ETag
- *   PUT  /api/inspections/{id}  inspector  If-Match, InspectionDraftInput → Inspection + ETag
+ *   GET    /api/inspections       inspector  InspectionSummary[], newest number first
+ *   POST   /api/inspections       inspector  CreateInspectionRequest → 201 Inspection + ETag
+ *   GET    /api/inspections/{id}  inspector  Inspection + ETag
+ *   PUT    /api/inspections/{id}  inspector  If-Match, InspectionDraftInput → Inspection + ETag
+ *   DELETE /api/inspections/{id}  admin      If-Match → 204
  */
 import { app } from '@azure/functions';
 import {
@@ -28,6 +29,7 @@ import {
   requireIfMatch,
 } from '../lib/http';
 import {
+  deleteInspection as deleteStoredInspection,
   inspectionNotFound,
   loadInspection,
   loadSummaries,
@@ -119,6 +121,22 @@ export const saveInspection = endpoint({ role: 'inspector' }, async (req, contex
 });
 
 /**
+ * Deletes an inspection for good, in progress or finalised (mainly to clear out trial ones while
+ * setting the app up). If-Match is the version the admin is looking at, so nobody's newer save is
+ * deleted unseen. Its deviation rows and the photos only it uses go with it.
+ */
+export const deleteInspection = endpoint({ role: 'admin' }, async (req, context) => {
+  const id = idParam(req);
+  const ifMatch = requireIfMatch(req);
+  const current = await loadInspection(id);
+  if (!current) throw inspectionNotFound();
+  // As for saves: an outdated page sees the conflict, before anything is deleted.
+  if (current.etag !== ifMatch) throw new PreconditionFailedError();
+  await deleteStoredInspection(current.data, ifMatch, context);
+  return { status: 204 };
+});
+
+/**
  * Results must belong to rows of the frozen checklist. Extra deviation ids share the deviation
  * table's RowKeys with those rows, so they must be unique and never equal a row id.
  */
@@ -151,8 +169,13 @@ app.http('inspections', {
 });
 
 app.http('inspection', {
-  methods: ['GET', 'PUT'],
+  methods: ['GET', 'PUT', 'DELETE'],
   authLevel: 'anonymous',
   route: 'inspections/{id}',
-  handler: (req, context) => (req.method === 'PUT' ? saveInspection : getInspection)(req, context),
+  handler: (req, context) =>
+    (req.method === 'PUT'
+      ? saveInspection
+      : req.method === 'DELETE'
+        ? deleteInspection
+        : getInspection)(req, context),
 });

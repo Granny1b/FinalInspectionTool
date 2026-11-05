@@ -55,6 +55,9 @@ export function inspectionsListHref(): string {
   return search ? `/inspections?${search}` : '/inspections';
 }
 
+/** Router state for the inspections list: an admin just deleted the inspection with this number. */
+export type InspectionsPageState = { deleted?: string };
+
 export function isFiltered({ query, model, state }: InspectionFilter): boolean {
   return Boolean(query.trim() || model || state);
 }

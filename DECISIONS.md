@@ -2258,3 +2258,257 @@ them.
 - **The search placeholder is "Number, machine or S/N",** which fits a 320 px phone.
 - **A participant chip's 36 px remove area is for coarse pointers only,** so a mouse click near the
   end of a name doesn't remove it.
+
+## Feature batch 2026-11-05
+
+### Empty sections and template cards
+
+- **A section may be published without rows; a checklist without any row may not ("Add at least
+  one row.").** An admin can publish a heading as a reminder of checkpoints still to be written.
+  A checklist with no row at all would give an inspection nothing to check: 0 / 0 rows, nothing
+  for Continue at, a Finalise that every inspection passes at once and a report of empty tables,
+  counted by Insights as an inspection. It is a template-level problem, after the name's; its
+  "Go to it" focuses the first section's Add row (`data-add-row`). An empty section title and an
+  empty row text are still refused: the row would reach inspections as a checkpoint without text.
+- **An empty section keeps its number.** Sections are numbered by position (numbering.ts), so 4
+  stays 4 and the sections after it keep theirs; nothing about numbering changed.
+- **In the editor an empty section has a dashed frame where its rows will go, holding its Add
+  row.** A section has one Add row: at the end of its rows, or in that frame, never both (the
+  accessible name "Add row to section N" stays unique). The whole rows area stays the drop target,
+  so a row dragged into an empty section lands as its first row; the frame says "Drop the row
+  here" while a row is dragged. A folded section (being dragged) reads "No rows" rather than "0
+  rows".
+- **On an inspection, an empty section is its heading and a quiet line, "No checkpoints in this
+  section yet."** No column labels (no column under them), no Set remaining to OK and nothing
+  focusable, so `↑`/`↓`, `J`/`K` and `Tab` go from the row before it to the row after it. Progress
+  and Continue at count rows, so they are unchanged. The finalised view, and the read-only
+  template view for inspectors and revisions, show the same line.
+- **Print: a blank checklist prints the heading over the section's spare lines, lettered from a;
+  a report prints the heading and one muted line, "No checkpoints in this section."** Word the
+  same. Without spare lines a blank checklist prints that line too.
+- **A section's only row keeps with its title, not with the next section.** "First row keeps with
+  next" also applied to a row that was the last one, and a last row's `break-after: avoid` passes
+  on to its table: an empty or one-row section then dragged the next section's start along. In a
+  90-row report with two empty sections Chrome moved section 2 to the next page and printed 7
+  pages instead of 6; now it stays under section 1 (checked in a PDF). Word's `keepNext` follows
+  the same rule (`keepsWithNext`), though there a spacer paragraph stopped the chain anyway.
+- **The seed imports a workbook section without checkpoints as an empty section, with a
+  warning;** a checklist sheet without any checkpoint is still refused, as Publish refuses it.
+- **Template cards: every photo in a 16:10 frame, fitted whole (`object-contain`) with 16 px
+  around it.** Product renders are mostly wide: a 2.9:1 HHV3 render keeps the full width and a
+  4:3 RigiMill render about 83 % of it, where 4:3 would have shrunk wide renders to a strip and 16:9
+  left 4:3 ones narrow. A card without a cover keeps the frame with an icon.
+- **The photo is multiplied onto a light panel (`mix-blend-multiply`, panel `isolate`d):** a
+  render's white background takes the panel's colour, so the photo looks printed on it instead of
+  a white box pasted in. Light: ink-50 with an ink-200 inner ring. Dark: a light grey mat inset in
+  the card (ink-800 there, #dde1e7, with an ink-600 ring), which doesn't glare as pure white does
+  on the dark card and dims the photo by about a tenth. Without a photo the frame is the card's
+  own ink-50, in both themes.
+- **Each card spans four rows of the list's grid and lays out its parts on them** (a subgrid, as
+  the Insights KPI tiles), so across a row of cards the photos, names, badges and footers start at
+  the same height even when a name or the badges wrap. The covers had a fixed ratio before, but
+  the image's own height overrode it (`size-full` on an image in a box sized by `aspect-ratio`
+  alone), so taller renders made taller cards.
+
+### Admins delete inspections
+
+- **`DELETE /api/inspections/{id}`, admins only, shares the `inspections/{id}` registration**
+  (still 17 in all), as the template delete shares its route's. Like it: If-Match is required
+  (400 without), an unknown id is a 404 and a stale ETag a 412, both before anything is deleted,
+  and success is a 204. In progress and finalised alike.
+- **The blob goes first, conditionally on the If-Match; the rest is best effort.** Without its blob
+  the inspection is gone from the list, its page and Insights (which counts only the rows of
+  listed inspections). Its deviation rows and photos are deleted after that; whatever fails is
+  logged (`context.warn`) and left behind, unused, and the delete still answers 204, since a retry
+  would only get a 404. Storage may answer the blob's condition with 412 when the blob is already
+  gone (Azurite does): that is a 404, so two admins deleting at once never see a conflict.
+- **The images that go are its deviations' photos and their marked-up copies, on rows and extra
+  deviations.** Every upload gets a new id, so no other document names them. As a guard against
+  hand-edited data, an id the inspection also uses as a guide image of its frozen checklist (the
+  template's, shared with every inspection of that revision), as its machine photo, or that is the
+  settings' logo is never deleted (one settings read). The machine photo always stays, even one
+  uploaded for this inspection: telling it from the template's cover would mean reading the
+  template's revision, and a photo left behind only costs storage. Photos replaced or removed
+  earlier were already unreferenced and stay, as before.
+- **A save whose deviation sync is slow can't leave rows behind.** `syncSettled` now deletes the
+  inspection's rows when it finds the blob gone after syncing; the delete removes the rows after
+  the blob, so whichever finishes last leaves none. A finalise or reopen racing a delete can still
+  leave rows (it syncs the table before its blob write, which then fails); Insights ignores them.
+- **Numbers are never handed out again: the counter is not touched.** Only if the counter blob
+  were lost as well would the newest number come back after its inspection was deleted, since a
+  lost counter carries on from the highest number in use.
+- **The page saves what is pending, then stops autosave before it sends the DELETE with the latest
+  ETag**, so no save or retry follows the delete; a save after it would be a 404 anyway (a save
+  never creates an inspection). If the delete fails, autosave carries on, and a failed save's
+  retry, whose timer stopping cleared, is sent again. A 404 counts as deleted (another admin got
+  there first, or a lost answer's retry). A 412 keeps the dialog open with "Someone else changed
+  this inspection since you opened it, so nothing was deleted." and Reload in place of Delete, and
+  the page shows the conflict as after a finalise's 412.
+- **Delete inspection is the only item of an admins-only ⋯ menu ("Inspection actions") after
+  Finalise or Reopen,** as Delete template is on the template editor. It has no other item, so
+  the menu's divider above destructive items is drawn above it too (`ActionMenu` draws one before
+  every danger item; asked for a fix there). On a phone the menu's button is pulled 4 px closer to
+  Finalise, so it shares their line at 390 px; narrower (360 px) it wraps onto a line of its own.
+- **The dialog names the inspection and what goes** ("Delete FI-2026-0012?", its deviation photos
+  and records, Insights stops counting it, can't be undone) and **adds a line for a finalised
+  one:** its report may already have been sent.
+- **Afterwards the list shows "FI-2026-0012 was deleted."** from router state, as the Templates
+  page does after a template delete; dismissing it clears the state, search and filters kept. The
+  row leaves the cached list at once, and the list and every Insights query (`['insights', …]`)
+  are invalidated.
+- **The e2e tests are a file of their own** (`e2e/delete-inspection.spec.ts`), with their own
+  throwaway template, so they merge cleanly with the inspection tests.
+
+### Insights month filters and page pass
+
+- **Two new periods, Single month and Month range,** next to the relative ones and custom dates.
+  "Custom range" is now "Custom dates", so it isn't mistaken for a range of months. The URL
+  carries them as `month`, `fromMonth` and `toMonth` ("2026-10", in 2000–2099; anything else is
+  ignored), and they reach the API as the first and last day of their months, so the API's
+  filters are unchanged.
+- **Months are chosen from menus, not `<input type="month">`,** which Firefox and Safari on a
+  desktop show as a plain text field. The menus list every month from the earliest inspection's
+  to the current one, newest first. A month a shared link names outside that stretch widens it,
+  so the menu can show it. An inspection dated in the future doesn't lengthen the list.
+- **The answer gains `firstInspectionDate`:** the earliest front-page date of any inspection,
+  in any state and whatever the filters (like `modelCodes`), or null without inspections. It
+  defaults to null in `InsightsSchema`, so an answer without it still parses.
+- **A month range's open ends** (a link without `fromMonth` or `toMonth`) are the first
+  inspection's month and the current month, which is what the menus show; a single month without
+  `month` is the current one. The page always writes both ends into the URL.
+- **Switching the kind of period starts from the dates on screen.** From Last 12 months a month
+  range starts at 2025-12 to 2026-11, from Last year at 2025-01 to 2025-12; a single month takes
+  the stretch's last month, never one after the current month; custom dates start at the
+  stretch's dates unless dates were already typed. Picking the kind of period and then narrowing
+  it is two steps, and the numbers shouldn't change at the first.
+- **A month range that ends before it starts** says "The start month is after the end month."
+  under the menus, marks both invalid and asks for nothing, as custom dates do.
+- **The relative periods show the dates they cover today** next to the menu
+  ("2025-12-01 – 2026-11-05"); the menu points to them with `aria-describedby`.
+- **Merge safety for the filters module:** no existing export changed its name or signature. The
+  month fields of `InsightsFilter` are optional and `filterFromParams` leaves them out when the
+  URL has none, so code that builds or compares a filter without months still works. `Period`
+  has two more values. New exports: `withPeriod`, `monthOptions`, `describePeriod`.
+- **Month labels on the chart are chosen for its width,** measured from its container: every
+  month when they fit, otherwise every 2nd, 3rd (quarters), 6th or 12th month, always the same
+  months of the year (quarters start in January, April, July and October), at least 56 px apart.
+  Recharts' own thinning left uneven gaps (2025-03, 2025-07, 2025-10, 2026-01, 2026-04, then
+  2026-10). The plot keeps 26 px on its right, so the last month's label isn't cut off.
+- **Loading draws the dashboard's shape** (the filter row, four tiles and the top 10 card)
+  instead of one grey block. While other filters load, the previous numbers stay, dimmed, as
+  before, and "Updating…" with a spinner shows at the end of the filter row: a status message,
+  so a screen reader hears it too. On a phone it is for screen readers only, as it would add a
+  line under the filters.
+- **An empty selection says which:** "There are no finalised RigiMill MG inspections in
+  2025-08. Inspections in progress count only when you include them.", with **Show all time**
+  unless the period already is.
+- **Ranked panels without rows say "No deviations."** (inspections that had none); the card
+  body was blank.
+- **A severity block shows its percentage only when it has room for it.** Each block is a CSS
+  container; a fixed minimum share (8 %) still overflowed in a narrow card.
+- **On a phone every filter has a line of its own,** the two ends of a range side by side.
+- **The panel layout stays two columns.** A month chart across two thirds read better, but its
+  gutter no longer lined up with the tiles', and the six panels then left one alone in a row;
+  quarters fit the half-width chart.
+- **Month labels and menus use proportional figures:** tabular ones spread "2026-10" out.
+- **Tests:** `filters.test.ts` (URL round trips, month ranges, the month list, switching periods,
+  the period in words, the month range error), `axis.test.ts` (month ticks: calendar steps, never
+  closer than a label), `shared/src/insights.test.ts` (`firstInspectionDate`). In
+  `e2e/insights.spec.ts` the `inspect` fixture takes a date; three tests cover a single month and
+  a range narrowing the numbers with the URL keeping them, a backwards range, and an empty month.
+
+### Insights report
+
+- **A print route, `/insights/report`, under the print shell** (no sidebar) and for admins only,
+  like Insights. A guard (`report/AdminOnly`) shows the app's "Admins only" page in the print
+  routes' message column; the API checks the role again. The route reads the filters only through
+  `features/insights/filters.ts` (`filterFromParams`, `insightsQuery`, and `filterToParams` for the
+  links to and from it), so a period the Insights page learns is the report's too. Its own
+  parameters are `deviations=1` (the list) and `autoprint=1`.
+- **The numbers are the page's own query** (`useInsights`, same key), so a preview opened from the
+  page has them at once. The report waits for the numbers of exactly its filters, never the
+  previous filters' that the page keeps on screen meanwhile.
+- **What the paper says is worked out in one pure module** (`report/model.ts`, unit-tested): the
+  KPI tiles' words, the panels' labels ("Not assigned", "No category", "Extra deviations (not
+  tied to a row)"), shares and bars. Paper and screen say the same.
+- **The period is stated as months when it is whole months** ("2026-10", "2026-01 – 2026-10"),
+  otherwise as dates; a period that moves with the day ("last 12 months", "this year", "last
+  year") is named after its dates, which say what it meant that day. No ends: "All time"; one:
+  "From …" or "Up to …".
+- **The PDF is named like the CSV export** ("Deviation report 2026-01-01 to 2026-10-31, RMMG"):
+  months for whole months, "start" and today for open ends, the model code (ASCII) and ", incl. in
+  progress", so the two files of one selection sort together.
+- **"Generated" is when the numbers were read** (the query's time), with the signed-in user's
+  name (the email when the API knows no name), as the inspection report names people.
+- **Ruled tables instead of the screen's widgets:** severity, sections, models, responsibles and
+  categories as tables with a black rule over and under and light rules between rows, each entry
+  with its count, its share of all deviations and a slim dark-grey bar as long as the count against
+  the largest (as the page's bars). Every entry is printed; there is no "Show all" on paper.
+  Severity is a table too, not the stacked bar: three greys would not read as severities in black
+  and white, the words do.
+- **The top 10 on paper** has a Section column of its own and "50% of 4" on one line; the Model
+  column only with several models in the selection, as on the page.
+- **The month chart is an SVG the report draws itself, not Recharts:** a fixed geometry prints
+  sharp and identical at any size and in any browser, and Recharts stays in the page's own chunk.
+  It follows the page's rules: columns for one or two months, a line from three, dots up to 36
+  months, round ticks from `countTicks`. The numbers are a table under it, a year to a row. With a
+  year or less the table's columns sit under the chart's (its label column is the axis gutter), so
+  its header names the months and the chart doesn't repeat them; with more, the chart labels every
+  few months, counted back from the latest.
+- **The chart is drawn in CSS pixels and redrawn when the fit scale changes.** Chrome lays SVG text
+  out for the scale it is drawn at and doesn't redo it when only an HTML ancestor's transform
+  changes. FittedPages measures at full size and then scales down, so on a phone the axis labels
+  came out twice their size and out of place. `FittedPages` now provides its scale
+  (`print/fitScale.ts`, additive) and the chart is keyed on it. Millimetre user units (text 2.5
+  units high) were tried first and were not the cause.
+- **Page breaks:** each part keeps its heading and stays whole on a page when it fits
+  (`break-inside: avoid`), so no heading ends a page; a part taller than a page breaks between rows
+  and its column labels repeat. The month part may break between its yearly tables, the chart and
+  the first year kept together: three years kept whole left half of the first page empty.
+- **The deviation list is a new endpoint, `GET /api/insights/deviations`:** the CSV's rows as JSON
+  (`loadExportRows`: the same filters, rows and order), in `InsightsDeviationsSchema` (`{ rows }`)
+  in shared. It is fetched only when the list is included. On paper it starts a page of its own,
+  each inspection's rows under a grey line (number, date, model, the machine when it says more
+  than the model, the serial number, "In progress"), in five columns: ref, checkpoint and comment,
+  severity (critical in bold), category, responsible ("—" when empty). Refs and texts are as they
+  were inspected, not the current ones: it is the record of what was found.
+- **The list is off by default** (Print report and the preview open without it) and greyed out,
+  with no page of its own, when the selection has no deviations.
+- **Firefox and Safari** print no page numbers; the footer's text repeats under the deviation
+  list (a table footer), as under the inspection's tables. The report before it is a few pages.
+- **An empty selection** prints the header and one framed "No inspections match these filters";
+  filters that can't be used (a range that ends before it starts) show why instead of printing.
+- **The print toolbar is shared:** its "Include reference images" became optional and it gained a
+  `choices` slot, where the report puts "Include deviation list", drawn like the reference images
+  toggle. The inspection's toolbar is unchanged.
+- **The preview dialog is the report's own** (`ReportPreviewDialog`): `PrintPreviewDialog` is built
+  around the inspection's print model and its mode switch. It behaves the same: Close has the
+  focus, Escape or Close hand it back to Preview report, Ctrl+P prints, the pages region scrolls
+  from the keyboard and has a brand-500 ring in dark.
+- **Print report opens a new tab that prints once loaded**, as the inspection's Print / Save PDF;
+  there is nothing to save first.
+- **The Insights page got two secondary buttons before Export CSV** (`report/ReportActions`), shown
+  and disabled under the same conditions as Export CSV.
+- **Tests:** unit tests for the model (period, file names, facts, KPIs, shares and bars, top 10,
+  empty, unreadable records, the list's groups), the chart's geometry and the links; API tests for
+  the endpoint (registration, roles, a bad filter, filters and order). `e2e/insights-report.spec.ts`:
+  the preview and both ways of printing from the Insights page (dark theme, light paper, the list,
+  the new tab's autoprint and its address), a real PDF (A4, footer and page numbers on every page,
+  nothing past the right margin, the parts in order, no page ending on a heading, the list on a
+  page of its own), a single month, an empty selection and unusable filters, and admins only.
+
+### Review fixes (feature batch)
+
+- **A menu never opens past the screen's left edge.** `ActionMenu` right-aligns its menu under its
+  button; on a 360–375 px phone the inspection page's ⋯ button wraps to the far left, and the menu
+  ran 136 px off screen. Once the menu has a width, its left edge is kept 8 px inside the viewport.
+- **The report chart keeps room for the latest month's label.** With more than a year the chart
+  writes its own month labels, the last one centred on the last point; past about 17 months half a
+  month's slot is narrower than half a label, and Chrome cut "2026-11" to "2026-1" at the content
+  edge. The plot now ends half a label short of the edge when it writes labels. With a year or less
+  it still spans the full width, so the month table's columns stay under its points.
+- **The deviation list is a table to an inspection, with the inspection's line in its head**, so a
+  page that carries on with an inspection's rows starts with that line again. The column labels
+  head the first table only: in every table they would come round again for each inspection of a
+  row or two. Browsers without margin boxes get the fallback footer from the last table only, for
+  the same reason.
