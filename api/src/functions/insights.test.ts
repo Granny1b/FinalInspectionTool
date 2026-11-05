@@ -10,7 +10,7 @@ import {
   type RowResult,
   type Template,
 } from '@modig/shared';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { context, principal, request } from '../../test/requests';
 import {
   draftTemplate,
@@ -22,7 +22,7 @@ import {
 import { syncDeviations } from '../lib/deviations';
 import { writeInspection } from '../lib/inspections';
 import { clearRevisionCache } from '../lib/insights';
-import { writeJson } from '../lib/storage';
+import { deviationsTable, writeJson } from '../lib/storage';
 import { exportInsightsCsv, getInsights } from './insights';
 
 // Record the registrations instead of letting the package (in "test mode") warn about them.
@@ -36,6 +36,9 @@ beforeAll(useTestStorage);
 beforeEach(async () => {
   await resetStorage();
   clearRevisionCache();
+});
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const ADMIN = principal('anna@modig.se', ['admin']);
@@ -55,6 +58,26 @@ async function publishedTemplate(): Promise<{ template: Template; items: string[
   await storeTemplate(template, [2]);
   const items = template.sections.flatMap((section) => section.items.map((item) => item.id));
   return { template, items };
+}
+
+/**
+ * Makes the table answer as Azure's Table service does rather than Azurite: `change` is applied to
+ * every entity a query returns. Azure returns a property named in $select that a row lacks as
+ * null, where Azurite leaves it out.
+ */
+function tableAnswers(
+  change: (entity: Record<string, unknown>) => Record<string, unknown>,
+  extra: Record<string, unknown>[] = [],
+) {
+  const table = deviationsTable();
+  const list = table.listEntities.bind(table);
+  async function* changed(options: Parameters<typeof list>[0]) {
+    for await (const entity of list(options)) yield change(entity as Record<string, unknown>);
+    yield* extra;
+  }
+  vi.spyOn(table, 'listEntities').mockImplementation(
+    (options) => changed(options) as unknown as ReturnType<typeof list>,
+  );
 }
 
 /** Stores an inspection the way the API does (blob with its list summary, then the table). */
@@ -126,7 +149,36 @@ describe('GET /api/insights', () => {
       topCheckpoints: [],
       byResp: [],
       byCategory: [],
+      unreadableRows: 0,
     });
+  });
+
+  it('counts rows written before categories existed, which Azure returns with category null', async () => {
+    const { template, items } = await publishedTemplate();
+    await inspect(template, {
+      [items[0]!]: { status: 'NOK', severity: 'major', resp: 'Mechanics' },
+      [items[1]!]: { status: 'NOK' },
+    });
+    tableAnswers((entity) => ({ ...entity, category: null }));
+    const result = parsed(await insights());
+    expect(result.deviations).toBe(2);
+    expect(result.bySeverity).toEqual({ minor: 1, major: 1, critical: 0 });
+    expect(result.byCategory).toEqual([{ category: '', deviations: 2 }]);
+    expect(result.unreadableRows).toBe(0);
+  });
+
+  it('counts the rows it could not read, so the page can say its numbers are short', async () => {
+    const { template, items } = await publishedTemplate();
+    const inspection = await inspect(template, { [items[0]!]: { status: 'NOK' } });
+    tableAnswers((entity) => entity, [{ inspectionId: inspection.id, severity: null }]);
+    const invocation = context();
+    const warn = vi.spyOn(invocation, 'warn');
+    const result = parsed(await getInsights(request({ principal: ADMIN }), invocation));
+    expect(result.deviations).toBe(1);
+    expect(result.unreadableRows).toBe(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('skipped 1 unreadable deviation rows'),
+    );
   });
 
   it('counts finalised inspections, their rows and their deviations', async () => {

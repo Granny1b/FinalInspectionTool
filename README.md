@@ -568,6 +568,9 @@ Admins only (Insights in the sidebar). The numbers come from the inspection list
   after the filters, e.g.
   `Deviations 2025-12-01 to 2026-11-03, RMMG.csv`.
 
+If some deviation records can't be read (a row edited by hand, say), the page says how many are
+left out, so its numbers may be too low; the API log names the first problem.
+
 The chart library (Recharts) loads only when Insights opens.
 
 ## Settings

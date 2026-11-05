@@ -29,13 +29,19 @@ export async function loadInsights(
   query: InsightsQuery,
   context: InvocationContext,
 ): Promise<Insights> {
-  const [inspections, deviations] = await Promise.all([
+  const [inspections, { rows: deviations, unreadable }] = await Promise.all([
     loadSummaries(),
     loadDeviationRows(query, context),
   ]);
   const scope = inspections.filter((inspection) => inScope(inspection, query));
   const checklists = await loadChecklists(scope, deviations, context);
-  return aggregateInsights({ query, inspections, deviations, checklists });
+  return aggregateInsights({
+    query,
+    inspections,
+    deviations,
+    checklists,
+    unreadableRows: unreadable,
+  });
 }
 
 /**
@@ -46,7 +52,7 @@ export async function loadExportRows(
   query: InsightsQuery,
   context: InvocationContext,
 ): Promise<DeviationRow[]> {
-  const [inspections, deviations] = await Promise.all([
+  const [inspections, { rows: deviations }] = await Promise.all([
     loadSummaries(),
     loadDeviationRows(query, context),
   ]);
@@ -69,13 +75,14 @@ export async function loadExportRows(
 
 /**
  * The table's rows under the filters. The model is the PartitionKey, so a model filter reads one
- * partition. A row that doesn't match the schema (written by hand, say) is skipped and logged:
- * it must not take the whole dashboard down.
+ * partition. A row that doesn't match the schema (written by hand, say) is skipped, logged and
+ * counted, so the dashboard can say its numbers are short: it must not take the whole dashboard
+ * down, nor go unnoticed.
  */
 async function loadDeviationRows(
   query: InsightsQuery,
   context: InvocationContext,
-): Promise<DeviationRow[]> {
+): Promise<{ rows: DeviationRow[]; unreadable: number }> {
   await ensureTable();
   const conditions: string[] = [];
   if (query.model) conditions.push(odata`PartitionKey eq ${query.model}`);
@@ -84,20 +91,41 @@ async function loadDeviationRows(
   if (!query.includeInProgress) conditions.push(odata`finalised eq ${true}`);
 
   const rows: DeviationRow[] = [];
-  let skipped = 0;
-  const entities = deviationsTable().listEntities({
+  let unreadable = 0;
+  let firstProblem = '';
+  const entities = deviationsTable().listEntities<Record<string, unknown>>({
     queryOptions: {
       filter: conditions.length > 0 ? conditions.join(' and ') : undefined,
       select: [...DEVIATION_COLUMNS],
     },
   });
   for await (const entity of entities) {
-    const row = DeviationRowSchema.safeParse(entity);
-    if (row.success) rows.push(row.data);
-    else skipped += 1;
+    const row = DeviationRowSchema.safeParse(withoutNulls(entity));
+    if (row.success) {
+      rows.push(row.data);
+    } else {
+      unreadable += 1;
+      firstProblem ||= row.error.issues
+        .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+        .join('; ');
+    }
   }
-  if (skipped > 0) context.warn(`Insights skipped ${skipped} unreadable deviation rows`);
-  return rows;
+  if (unreadable > 0) {
+    context.warn(
+      `Insights skipped ${unreadable} unreadable deviation rows; the first: ${firstProblem}`,
+    );
+  }
+  return { rows, unreadable };
+}
+
+/**
+ * The entity without its null properties. Azure's Table service returns a property named in
+ * $select that a row doesn't have as null (Azurite leaves it out): a row written before a column
+ * existed, such as `category`, would otherwise fail the schema and be dropped, where the
+ * schema's default is meant to fill it in. A required column that is missing still fails.
+ */
+function withoutNulls(entity: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(entity).filter(([, value]) => value !== null));
 }
 
 // ---------------------------------------------------------------------------------------------
