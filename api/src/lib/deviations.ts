@@ -61,8 +61,28 @@ export async function syncDeviations(inspection: Inspection): Promise<void> {
   for (const rowKey of existing.keys()) {
     if (!wantedKeys.has(rowKey)) actions.push(['delete', { partitionKey, rowKey }]);
   }
+  await submitInBatches(actions);
+}
 
-  // One partition, so each chunk is atomic; chunks after a failed one are simply not sent.
+/**
+ * Deletes every row of an inspection (an admin deleted it). Its rows are all in its model's
+ * partition: an inspection's model never changes. Idempotent, like the sync: a failed delete is
+ * finished by simply deleting again, and a row left behind meanwhile never counts in Insights,
+ * which only counts rows of inspections that still exist.
+ */
+export async function deleteDeviationRows(
+  partitionKey: string,
+  inspectionId: string,
+): Promise<void> {
+  await ensureTable();
+  const existing = await loadRows(partitionKey, inspectionId);
+  await submitInBatches(
+    [...existing.keys()].map((rowKey): TransactionAction => ['delete', { partitionKey, rowKey }]),
+  );
+}
+
+/** One partition's actions; each chunk is atomic, and chunks after a failed one are not sent. */
+async function submitInBatches(actions: readonly TransactionAction[]): Promise<void> {
   for (let start = 0; start < actions.length; start += BATCH_SIZE) {
     await deviationsTable().submitTransaction(actions.slice(start, start + BATCH_SIZE));
   }
