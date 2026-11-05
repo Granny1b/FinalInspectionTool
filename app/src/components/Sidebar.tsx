@@ -19,7 +19,8 @@ import { ThemeToggle } from './ThemeToggle';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 
-const FINAL_INSPECTION_NAV: NavItem[] = [
+/** Final inspections and quality checks: both kinds of checks live under Templates. */
+const QUALITY_NAV: NavItem[] = [
   { to: '/inspections', label: 'Inspections', icon: ClipboardCheck },
   { to: '/templates', label: 'Templates', icon: LayoutTemplate },
 ];
@@ -59,7 +60,7 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
       </div>
 
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-5">
-        <NavGroup label="Final inspection" items={FINAL_INSPECTION_NAV} onNavigate={onNavigate} />
+        <NavGroup label="Quality" items={QUALITY_NAV} onNavigate={onNavigate} />
         {hasRole(me.roles, 'admin') && (
           <NavGroup label="Admin" items={ADMIN_NAV} onNavigate={onNavigate} className="mt-7" />
         )}
@@ -77,7 +78,7 @@ type NavGroupProps = {
   className?: string;
 };
 
-/** Links under a small label ("Final inspection", "Admin"), which names the list for screen readers. */
+/** Links under a small label ("Quality", "Admin"), which names the list for screen readers. */
 function NavGroup({ label, items, onNavigate, className }: NavGroupProps) {
   const labelId = useId();
   return (

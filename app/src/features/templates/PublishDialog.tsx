@@ -6,6 +6,7 @@ import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
 import { Field, INPUT } from '../../components/Field';
 import { focusIssue, templateIssueField } from './publishIssues';
+import { TEMPLATE_NAME_ID } from './TemplateSettingsCard';
 import { errorMessage, isConflict } from '../../lib/api';
 import { publishIssuesOf } from './queries';
 
@@ -18,7 +19,11 @@ type Props = {
   revision: number;
   /** Problems found in the draft when the dialog opened: they are listed instead of the form. */
   issues: PublishIssue[];
+  /** The name (a quality check's position) is blank: its problem jumps to `nameFieldId`. */
   nameBlank: boolean;
+  nameFieldId?: string;
+  /** Under the title; what a final inspection template's revision means unless given. */
+  description?: string;
   /** Saves pending edits first, so what gets published is what the user sees. */
   flush: () => Promise<FlushResult>;
   /** Publishes the saved draft; rejects with the API's error. */
@@ -38,6 +43,8 @@ export function PublishDialog({
   revision,
   issues,
   nameBlank,
+  nameFieldId = TEMPLATE_NAME_ID,
+  description = 'New inspections will use this revision. A published revision can’t be changed: later edits go into the next one.',
   flush,
   publish,
   onIssues,
@@ -107,7 +114,11 @@ export function PublishDialog({
                 onClick={() => {
                   // Closing hands focus back to the Publish button; then move it to the problem.
                   close();
-                  focusIssue(issue.target, templateIssueField(problems, issue, nameBlank));
+                  focusIssue(
+                    issue.target,
+                    templateIssueField(problems, issue, nameBlank),
+                    nameFieldId,
+                  );
                 }}
                 className="group flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-ink-900 transition-colors hover:bg-nok-bg"
               >
@@ -134,7 +145,7 @@ export function PublishDialog({
     <Dialog
       dialogRef={dialogRef}
       title={`Publish revision ${revision}`}
-      description="New inspections will use this revision. A published revision can’t be changed: later edits go into the next one."
+      description={description}
       onClose={onClose}
       busy={busy}
     >

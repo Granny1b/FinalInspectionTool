@@ -1,8 +1,11 @@
 import {
   APP_NAME,
+  newQualityFront,
+  qualityCheckTitle,
   sameTemplateContent,
   validateForPublish,
   type PublishIssue,
+  type QualityFront,
   type Section,
   type Template,
   type TemplateDetail,
@@ -13,7 +16,7 @@ import { Ellipsis, FileDown, Printer, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ActionMenu } from '../../components/ActionMenu';
-import { BackLink } from '../../components/BackLink';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { Button, ButtonLink } from '../../components/Button';
 import { Callout } from '../../components/Callout';
 import { ApiRequestError } from '../../lib/api';
@@ -24,18 +27,25 @@ import { useAutosave } from '../../lib/autosave/useAutosave';
 import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
 import { useReload } from '../../lib/autosave/useReload';
 import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
-import { useSettings } from '../../lib/useSettings';
+import { modelName, useSettings } from '../../lib/useSettings';
 import { useScrollPaddingBelow } from '../../lib/useScrollPaddingBelow';
 import { templatePrintHref } from '../print/links';
+import { QUALITY_POSITION_ID, QualityFrontCard } from '../qualityChecks/QualityFrontCard';
+import { downloadQualityCheck } from '../qualityChecks/transfer';
 import { Badge } from './Badge';
 import { ChecklistHeading } from './ChecklistHeading';
 import { DeleteTemplateDialog } from './DeleteTemplateDialog';
 import { TemplateDocument } from './document/TemplateDocument';
 import type { TemplatesPageState } from './listView';
+import { MachineHeader } from './MachineHeader';
 import { PublishDialog, type FlushResult } from './PublishDialog';
 import {
   fetchTemplate,
+  finalTemplates,
   publishDraft,
+  qualityCheckHref,
+  qualityChecksHref,
+  qualityChecksOf,
   saveDraft,
   templateKeys,
   useDeleteTemplate,
@@ -43,7 +53,7 @@ import {
   type LoadedTemplate,
 } from './queries';
 import { RevisionHistory } from './RevisionHistory';
-import { TemplateSettingsCard } from './TemplateSettingsCard';
+import { TEMPLATE_NAME_ID, TemplateSettingsCard } from './TemplateSettingsCard';
 import { downloadTemplate } from './transfer';
 
 type Props = {
@@ -66,9 +76,13 @@ const NO_ISSUES: PublishIssue[] = [];
 /**
  * The template editor (brief §5.2): the front-page settings, the revision history and the
  * checklist, all edited in place and autosaved to the draft; Publish freezes it as a revision.
+ * A final inspection template's editor is its machine's Final inspection tab; a quality check's
+ * has its own front page and rows as cards, under its machine's Quality checks.
  */
 export function TemplateEditor({ loaded, onReload }: Props) {
   const id = loaded.detail.draft.id;
+  const { kind, parentId } = loaded.detail.draft;
+  const quality = kind === 'quality';
   const queryClient = useQueryClient();
   const settings = useSettings();
   const templates = useTemplates();
@@ -129,16 +143,25 @@ export function TemplateEditor({ loaded, onReload }: Props) {
     [saver],
   );
   const updateSections = useCallback((sections: Section[]) => update({ sections }), [update]);
+  // A quality check's name follows its position and operation, so lists show its title.
+  const updateFront = useCallback(
+    (patch: Partial<QualityFront>) => {
+      const front = { ...(draftRef.current.quality ?? newQualityFront(EMPTY_TITLE)), ...patch };
+      update({ quality: front, name: qualityCheckTitle(front) });
+    },
+    [update],
+  );
 
   // After a publish attempt with problems, they stay highlighted (and update) until published.
   const [checking, setChecking] = useState(false);
-  const issueKey = checking ? JSON.stringify(validateForPublish(draft)) : '';
+  const issueKey = checking ? JSON.stringify(validateForPublish({ ...draft, kind })) : '';
   // Same problems → same array, so the checklist's memoised rows don't re-render per keystroke.
   const issues = useMemo(
     () => (issueKey ? (JSON.parse(issueKey) as PublishIssue[]) : NO_ISSUES),
     [issueKey],
   );
-  const nameBlank = !draft.name.trim();
+  // The template's name, or a quality check's position, which its title starts with.
+  const nameBlank = quality ? !draft.quality?.position.trim() : !draft.name.trim();
 
   const [publishing, setPublishing] = useState<PublishIssue[] | null>(null);
   const [publishConflict, setPublishConflict] = useState(false);
@@ -162,7 +185,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   const latestRevision = server.revisions[0]?.revision ?? null;
 
   function openPublish() {
-    const found = validateForPublish(draftRef.current);
+    const found = validateForPublish({ ...draftRef.current, kind });
     if (found.length > 0) setChecking(true);
     setPublished(null);
     setPublishing(found);
@@ -212,22 +235,41 @@ export function TemplateEditor({ loaded, onReload }: Props) {
     throw failure;
   }
 
+  // Quality checks share their machine's model: only final inspection templates take one.
   const takenModels = useMemo(
     () =>
       new Set(
-        (templates.data ?? [])
+        finalTemplates(templates.data ?? [])
           .filter((template) => template.id !== id)
           .map((template) => template.modelCode),
       ),
     [templates.data, id],
   );
-  const title = draft.name.trim() || 'Untitled template';
+  const title = quality
+    ? qualityCheckTitle(draft.quality ?? newQualityFront(EMPTY_TITLE)) || 'Untitled quality check'
+    : draft.name.trim() || 'Untitled template';
+  // Under its machine's heading on the Final inspection tab; the page's heading for a quality check.
+  const Title = quality ? 'h1' : 'h2';
+  const machine = templates.data?.find((template) => template.id === parentId);
+  const machineName = modelName(
+    settings.data?.machineModels,
+    machine?.modelCode ?? draft.modelCode,
+  );
+  // Deleting a final inspection template deletes its quality checks too: the dialog says so.
+  const qualityChecks = useMemo(
+    () => (quality ? [] : qualityChecksOf(templates.data ?? [], id)),
+    [quality, templates.data, id],
+  );
 
   const navigate = useNavigate();
   const remove = useDeleteTemplate(id);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  // How many quality checks went with it, counted before the list is loaded again without them.
+  const deletedChecks = useRef(0);
+
   function deleteTemplate() {
+    deletedChecks.current = qualityChecks.length;
     remove.mutate(
       // Whatever is unsaved is saved first, so the delete names the draft's latest version (a
       // failed save leaves the ETag of the last one that worked; a conflict refuses the delete).
@@ -244,14 +286,20 @@ export function TemplateEditor({ loaded, onReload }: Props) {
     );
   }
 
-  // After the render that let go of the leave guard.
+  // After the render that let go of the leave guard. A quality check goes back to its machine's
+  // Quality checks, a final inspection template to the list.
   useEffect(() => {
     if (!deleted) return;
-    const state: TemplatesPageState = { deleted: draftRef.current.name.trim() };
-    void navigate('/templates', { replace: true, state });
-  }, [deleted, navigate]);
+    const state: TemplatesPageState = {
+      deleted: draftRef.current.name.trim(),
+      ...(deletedChecks.current > 0 && { qualityChecks: deletedChecks.current }),
+    };
+    const back = quality && parentId ? qualityChecksHref(parentId) : '/templates';
+    void navigate(back, { replace: true, state });
+  }, [deleted, navigate, quality, parentId]);
 
   function exportJson() {
+    if (quality) return downloadQualityCheck(draftRef.current, machineName);
     const model = settings.data?.machineModels.find(
       (candidate) => candidate.code === draftRef.current.modelCode,
     );
@@ -261,7 +309,22 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   return (
     <div>
       <title>{`${title} · ${APP_NAME}`}</title>
-      <BackLink to="/templates" label="Templates" />
+      {quality && parentId ? (
+        <Breadcrumbs
+          items={[
+            { to: '/templates', label: 'Templates' },
+            { to: `/templates/${parentId}`, label: machineName },
+            { to: qualityChecksHref(parentId), label: 'Quality checks' },
+          ]}
+        />
+      ) : (
+        <MachineHeader
+          templateId={id}
+          modelCode={draft.modelCode}
+          coverImageId={draft.coverImageId}
+          tab="final"
+        />
+      )}
 
       {/*
         Sticky where it leaves room to work, as the inspection's header. On a phone, upright or on
@@ -275,14 +338,15 @@ export function TemplateEditor({ loaded, onReload }: Props) {
         {/* At least 20rem beside the buttons, or it takes a line of its own above them: a long
             name then wraps instead of being cut to "Final inspection – RigiMill …". */}
         <div className="min-w-0 flex-1 basis-80">
-          {/* Focusable from script: it takes the focus when the "Published" notice is dismissed. */}
-          <h1
+          {/* Focusable from script: it takes the focus when the "Published" notice is dismissed. A
+              final inspection's sits under its machine's heading. */}
+          <Title
             ref={titleRef}
             tabIndex={-1}
             className="line-clamp-2 text-xl font-semibold tracking-tight wrap-break-word text-ink-900 outline-none"
           >
             {title}
-          </h1>
+          </Title>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge>Draft · Rev {server.revision}</Badge>
             {latestRevision === null ? (
@@ -305,30 +369,34 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           <div className="flex items-center gap-2">
             {/* The draft as it prints; leaving the editor saves first, like any link. On a phone
                 just the printer, so the header keeps to one row of buttons. Spaced as the
-                inspection's header buttons. */}
-            <ButtonLink variant="secondary" to={templatePrintHref(id)} className="max-sm:px-2.5">
-              <Printer size={16} aria-hidden="true" />
-              <span className="max-sm:sr-only">Print preview</span>
-            </ButtonLink>
+                inspection's header buttons. Quality checks don't print yet. */}
+            {!quality && (
+              <ButtonLink variant="secondary" to={templatePrintHref(id)} className="max-sm:px-2.5">
+                <Printer size={16} aria-hidden="true" />
+                <span className="max-sm:sr-only">Print preview</span>
+              </ButtonLink>
+            )}
             {/* Nothing to publish when the draft equals the latest revision (the badges say so). */}
             <Button onClick={openPublish} disabled={!unpublished || conflict}>
               <Upload size={16} aria-hidden="true" />
               Publish
             </Button>
             <ActionMenu
-              label="Template actions"
+              label={quality ? 'Quality check actions' : 'Template actions'}
               triggerData={{ 'data-template-menu': '' }}
               trigger={
                 <>
                   <Ellipsis size={16} aria-hidden="true" />
-                  <span className="sr-only">Template actions</span>
+                  <span className="sr-only">
+                    {quality ? 'Quality check actions' : 'Template actions'}
+                  </span>
                 </>
               }
               items={[
                 // The draft as shown, unsaved changes included.
                 { label: 'Export JSON', icon: FileDown, onSelect: exportJson },
                 {
-                  label: 'Delete template',
+                  label: quality ? 'Delete quality check' : 'Delete template',
                   icon: Trash2,
                   danger: true,
                   onSelect: () => {
@@ -375,8 +443,8 @@ export function TemplateEditor({ loaded, onReload }: Props) {
                 titleRef.current?.focus();
               }}
             >
-              <strong className="font-semibold">Published revision {published}.</strong> New
-              inspections use it from now on.
+              <strong className="font-semibold">Published revision {published}.</strong>
+              {quality ? ' Inspectors see it from now on.' : ' New inspections use it from now on.'}
             </Callout>
           </div>
         )}
@@ -385,27 +453,48 @@ export function TemplateEditor({ loaded, onReload }: Props) {
       {/* One shrinkable column below xl: an implicit one would grow to the longest unbroken
           line (a revision's date and author), wider than a phone. */}
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <TemplateSettingsCard
-          name={draft.name}
-          modelCode={draft.modelCode}
-          coverImageId={draft.coverImageId}
-          revision={server.revision}
-          models={settings.data?.machineModels}
-          takenModels={takenModels}
-          nameError={checking && nameBlank ? 'The template needs a name.' : undefined}
-          onChange={update}
-          onUpload={trackUpload}
+        {quality ? (
+          <QualityFrontCard
+            front={draft.quality ?? newQualityFront(EMPTY_TITLE)}
+            revision={server.revision}
+            departments={settings.data?.responsibles}
+            positionError={
+              checking && nameBlank ? 'The quality check needs a position.' : undefined
+            }
+            onChange={updateFront}
+          />
+        ) : (
+          <TemplateSettingsCard
+            name={draft.name}
+            modelCode={draft.modelCode}
+            coverImageId={draft.coverImageId}
+            revision={server.revision}
+            models={settings.data?.machineModels}
+            takenModels={takenModels}
+            nameError={checking && nameBlank ? 'The template needs a name.' : undefined}
+            onChange={update}
+            onUpload={trackUpload}
+          />
+        )}
+        <RevisionHistory
+          basePath={quality && parentId ? qualityCheckHref(parentId, id) : `/templates/${id}`}
+          revisions={server.revisions}
+          emptyText={
+            quality
+              ? 'Not published yet. Publishing creates revision 1.'
+              : 'Not published yet. Publishing creates revision 1, which new inspections then use.'
+          }
         />
-        <RevisionHistory templateId={id} revisions={server.revisions} />
       </div>
 
       <section aria-labelledby="checklist-title" className="mt-10">
-        <ChecklistHeading id="checklist-title" sections={draft.sections} />
+        <ChecklistHeading id="checklist-title" sections={draft.sections} withTime={quality} />
         <TemplateDocument
           sections={draft.sections}
           onChange={updateSections}
           issues={issues}
           onEditorDirtyChange={setEditorDirty}
+          variant={kind}
         />
       </section>
 
@@ -414,6 +503,12 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           revision={server.revision}
           issues={publishing}
           nameBlank={nameBlank}
+          nameFieldId={quality ? QUALITY_POSITION_ID : TEMPLATE_NAME_ID}
+          description={
+            quality
+              ? 'A published revision can’t be changed: later edits go into the next one.'
+              : undefined
+          }
           flush={flushForPublish}
           publish={publish}
           onIssues={() => setChecking(true)}
@@ -424,6 +519,8 @@ export function TemplateEditor({ loaded, onReload }: Props) {
       {confirmingDelete && (
         <DeleteTemplateDialog
           name={title}
+          kind={kind}
+          qualityChecks={qualityChecks.map((check) => check.name || 'Untitled quality check')}
           revisions={server.revisions.length}
           busy={remove.isPending || deleted}
           error={remove.error}
@@ -438,15 +535,27 @@ export function TemplateEditor({ loaded, onReload }: Props) {
         />
       )}
       {reload.dialog}
-      <LeaveDialog guard={leaveGuard} conflict={conflict} noun="template" />
+      <LeaveDialog
+        guard={leaveGuard}
+        conflict={conflict}
+        noun={quality ? 'quality check' : 'template'}
+      />
     </div>
   );
 }
 
 /** The fields a client may send (brief §8 PUT body); the rest of the draft belongs to the server. */
-function draftInput({ name, modelCode, coverImageId, sections }: Template): TemplateDraftInput {
-  return { name, modelCode, coverImageId, sections };
+function draftInput({
+  name,
+  modelCode,
+  coverImageId,
+  quality,
+  sections,
+}: Template): TemplateDraftInput {
+  return { name, modelCode, coverImageId, ...(quality && { quality }), sections };
 }
+
+const EMPTY_TITLE = { position: '', operation: '' };
 
 function serverState(detail: TemplateDetail): ServerState {
   return {

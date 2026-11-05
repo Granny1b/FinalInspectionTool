@@ -13,6 +13,7 @@ import type { Inspection, Template } from './schemas';
 
 const template: Template = {
   id: 'tpl1',
+  kind: 'final',
   name: 'Final inspection – RigiMill MG',
   modelCode: 'RMMG',
   revision: 2,

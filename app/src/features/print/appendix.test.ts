@@ -131,6 +131,7 @@ describe('chunk', () => {
 describe('the appendix in a printout', () => {
   const template: Template = {
     id: id('Tmpl', 1),
+    kind: 'final',
     name: 'Final inspection – RigiMill MG',
     modelCode: 'RMMG',
     revision: 3,

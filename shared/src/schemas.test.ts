@@ -45,8 +45,68 @@ describe('TemplateSchema', () => {
     updatedBy: 'seed',
   };
 
-  it('accepts a valid template', () => {
-    expect(TemplateSchema.parse(template)).toEqual(template);
+  it('accepts a valid template; one stored before quality checks existed is a final inspection', () => {
+    expect(TemplateSchema.parse(template)).toEqual({ ...template, kind: 'final' });
+    expect(TemplateSchema.parse({ ...template, kind: 'final' })).toEqual({
+      ...template,
+      kind: 'final',
+    });
+  });
+
+  it('reads a quality check: its machine, front page and rows with how, references and time', () => {
+    const parentId = newId();
+    const check = {
+      ...template,
+      kind: 'quality',
+      parentId,
+      name: 'QC4 · Pre start up',
+      quality: {
+        position: 'QC4',
+        operation: 'Pre start up',
+        department: 'Quality',
+        documentNumber: '1.22.2',
+        madeBy: 'Sam Andersson',
+        date: '2026-11-05',
+      },
+      sections: [
+        {
+          id: newId(),
+          title: 'Safety features',
+          items: [
+            {
+              id: newId(),
+              text: 'Check and verify safety decals on balancing tubes.',
+              how: 'Should be visible and not turned inward.',
+              references: ['ISO 12100', 'ISO 7010'],
+              timeHours: 0.2,
+            },
+          ],
+        },
+      ],
+    };
+    expect(TemplateSchema.parse(check)).toEqual(check);
+    // An undated front page is allowed; a date that isn't one is not.
+    const undated = { ...check, quality: { ...check.quality, date: '' } };
+    expect(TemplateSchema.safeParse(undated).success).toBe(true);
+    const misdated = { ...check, quality: { ...check.quality, date: '05/11/2026' } };
+    expect(TemplateSchema.safeParse(misdated).success).toBe(false);
+  });
+
+  it('checks the new row fields: references short and not blank, time not negative', () => {
+    const withItem = (item: Record<string, unknown>) => ({
+      ...template,
+      sections: [{ id: newId(), title: 'A', items: [{ id: newId(), text: 'x', ...item }] }],
+    });
+    expect(TemplateSchema.safeParse(withItem({ references: ['  '] })).success).toBe(false);
+    expect(TemplateSchema.safeParse(withItem({ references: ['x'.repeat(101)] })).success).toBe(
+      false,
+    );
+    expect(TemplateSchema.safeParse(withItem({ timeHours: -0.1 })).success).toBe(false);
+    expect(TemplateSchema.safeParse(withItem({ timeHours: 0 })).success).toBe(true);
+    expect(TemplateSchema.safeParse({ ...template, kind: 'other' }).success).toBe(false);
+    // Trimmed as stored.
+    const parsed = TemplateSchema.parse(withItem({ references: [' ISO 4413 '] }));
+    expect(parsed.sections[0]!.items[0]!.references).toEqual(['ISO 4413']);
   });
 
   it('allows empty row text in drafts', () => {
@@ -73,7 +133,7 @@ describe('TemplateSchema', () => {
       sections: template.sections.map((section) => ({ ...section, spareRows: 5 })),
     };
     const parsed = TemplateSchema.parse(stored);
-    expect(parsed).toEqual(template);
+    expect(parsed).toEqual({ ...template, kind: 'final' });
     expect('printSettings' in parsed).toBe(false);
     expect('spareRows' in parsed.sections[0]!).toBe(false);
   });

@@ -1,6 +1,8 @@
 import type { PublishIssue, Section } from '@modig/shared';
 import { useMemo, type JSX } from 'react';
+import { QualityChecklistView } from '../../qualityChecks/QualityChecklistView';
 import { EditableDocument } from './EditableDocument';
+import type { DocumentVariant } from './EditableSection';
 import { indexIssues } from './issues';
 import { SHEET } from './layout';
 import { ReadOnlyDocument } from './ReadOnlyDocument';
@@ -16,6 +18,8 @@ export type TemplateDocumentProps = {
    * leave guard can ask before they are lost.
    */
   onEditorDirtyChange?: (dirty: boolean) => void;
+  /** A final inspection's checklist (the default), or a quality check's rows as cards. */
+  variant?: DocumentVariant;
 };
 
 /**
@@ -31,6 +35,7 @@ export function TemplateDocument({
   onChange,
   issues,
   onEditorDirtyChange,
+  variant = 'final',
 }: TemplateDocumentProps): JSX.Element {
   const issueIndex = useMemo(() => indexIssues(issues ?? []), [issues]);
   return (
@@ -43,7 +48,10 @@ export function TemplateDocument({
             onChange={onChange}
             issues={issueIndex}
             onEditorDirtyChange={onEditorDirtyChange}
+            variant={variant}
           />
+        ) : variant === 'quality' ? (
+          <QualityChecklistView sections={sections} issues={issueIndex} />
         ) : (
           <ReadOnlyDocument sections={sections} issues={issueIndex} />
         )}

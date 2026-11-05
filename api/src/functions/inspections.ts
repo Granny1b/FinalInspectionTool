@@ -50,6 +50,12 @@ export const createInspection = endpoint({ role: 'inspector' }, async (req, _con
   const { templateId, front } = await readJsonBody(req, CreateInspectionRequestSchema);
   const template = await loadTemplate(templateId);
   if (!template) throw templateNotFound();
+  // Quality checks are done along the build, not as an inspection (doing them comes later).
+  if (template.draft.kind === 'quality') {
+    throw new BadRequestError(
+      'A quality check can’t be used for an inspection. Choose the machine’s final inspection template.',
+    );
+  }
   const revision = await loadLatestPublished(template);
   if (!revision) throw new ConflictError('Publish the template first.');
 

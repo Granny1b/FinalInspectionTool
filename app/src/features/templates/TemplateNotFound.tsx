@@ -3,17 +3,23 @@ import { ButtonLink } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { PageHeader } from '../../components/PageHeader';
 
-export function TemplateNotFound({ what = 'template' }: { what?: 'template' | 'revision' }) {
+export function TemplateNotFound({
+  what = 'template',
+}: {
+  what?: 'template' | 'revision' | 'quality check';
+}) {
   return (
     <>
       <PageHeader title={`No such ${what}`} description="There's nothing at this address." />
       <EmptyState
         icon={SearchX}
-        title={what === 'template' ? 'This template doesn’t exist' : 'This revision doesn’t exist'}
+        title={`This ${what} doesn’t exist`}
         hint={
-          what === 'template'
-            ? 'The link may be mistyped.'
-            : 'The link may be mistyped, or that revision was never published.'
+          what === 'revision'
+            ? 'The link may be mistyped, or that revision was never published.'
+            : what === 'quality check'
+              ? 'The link may be mistyped, or the quality check was deleted.'
+              : 'The link may be mistyped.'
         }
         action={
           <ButtonLink to="/templates" variant="secondary">

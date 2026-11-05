@@ -5,9 +5,13 @@ import { formatDate } from '../../lib/format';
 import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
 import { Badge, PublishedBadge } from './Badge';
+import { qualityCheckPositions } from './qualityCheckList';
 
 type Props = {
+  /** The final inspection templates, one per machine model. */
   templates: TemplateSummary[];
+  /** Each template's quality checks, by its id. */
+  qualityChecks: ReadonlyMap<string, TemplateSummary[]>;
   models: MachineModel[] | undefined;
   /** Admins also see which drafts have unpublished changes. */
   showDrafts: boolean;
@@ -26,7 +30,7 @@ const FROM_SM = 'hidden sm:table-cell';
 const FROM_MD = 'hidden md:table-cell';
 
 /** One row per template; the whole row opens it. */
-export function TemplateList({ templates, models, showDrafts }: Props) {
+export function TemplateList({ templates, qualityChecks, models, showDrafts }: Props) {
   const personName = usePersonName();
   return (
     <div className="overflow-x-auto rounded-lg border border-ink-200 bg-surface">
@@ -44,6 +48,9 @@ export function TemplateList({ templates, models, showDrafts }: Props) {
             </th>
             <th scope="col" className={clsx(HEAD, FROM_SM, 'text-right')}>
               Rows
+            </th>
+            <th scope="col" className={clsx(HEAD, FROM_SM)}>
+              Quality checks
             </th>
             <th scope="col" className={clsx(HEAD, FROM_MD)}>
               Last edited
@@ -79,6 +86,7 @@ export function TemplateList({ templates, models, showDrafts }: Props) {
               <td className={clsx(CELL, FROM_SM, 'text-right text-ink-700 tabular-nums')}>
                 {template.itemCount}
               </td>
+              <QualityChecksCell checks={qualityChecks.get(template.id) ?? []} />
               <td className={clsx(CELL, FROM_MD, 'max-w-56')}>
                 <div className="whitespace-nowrap text-ink-700">
                   {formatDate(template.updatedAt)}
@@ -92,5 +100,22 @@ export function TemplateList({ templates, models, showDrafts }: Props) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** How many quality checks a machine has, and their positions. */
+function QualityChecksCell({ checks }: { checks: TemplateSummary[] }) {
+  const positions = qualityCheckPositions(checks);
+  return (
+    <td className={clsx(CELL, FROM_SM, 'max-w-48')}>
+      <div className="text-ink-700 tabular-nums">
+        {checks.length === 0 ? 'None' : checks.length}
+      </div>
+      {positions && (
+        <div className="truncate text-xs text-ink-500" title={positions}>
+          {positions}
+        </div>
+      )}
+    </td>
   );
 }

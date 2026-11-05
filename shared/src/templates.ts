@@ -9,28 +9,39 @@ import {
   IdSchema,
   MachineModelSchema,
   ModelCodeSchema,
+  QualityFrontSchema,
+  TemplateKindSchema,
   TemplateSchema,
   type MachineModel,
+  type QualityFront,
   type Section,
   type Template,
+  type TemplateKind,
 } from './schemas';
-import { TemplateExportSchema } from './templateTransfer';
+import { QualityCheckExportSchema, TemplateExportSchema } from './templateTransfer';
 
 const IsoDateTime = z.iso.datetime({ offset: true });
 
 /**
- * The parts of a draft the editor may change. `id`, `revision`, `status`, `updatedAt` and
- * `updatedBy` are owned by the server and never taken from the client.
+ * The parts of a draft the editor may change. `id`, `kind`, `parentId`, `revision`, `status`,
+ * `updatedAt` and `updatedBy` are owned by the server and never taken from the client. A quality
+ * check's editor sends its front page (`quality`); its name follows from it and its model is its
+ * machine's, whatever is sent.
  */
 export const TemplateDraftInputSchema = TemplateSchema.pick({
   name: true,
   modelCode: true,
   coverImageId: true,
+  quality: true,
   sections: true,
 });
 export type TemplateDraftInput = z.infer<typeof TemplateDraftInputSchema>;
 
 const TemplateNameSchema = z.string().trim().min(1, 'Name is required').max(200);
+
+/** A quality check's position ("QC4"), required when it is created and to publish it. */
+const PositionSchema = z.string().trim().min(1, 'Position is required').max(50);
+const OperationSchema = z.string().trim().max(200);
 
 /** A machine model created along with its template must have the template's model code. */
 const newModelMatches = {
@@ -46,6 +57,8 @@ const newModelMatches = {
  */
 export const CreateTemplateRequestSchema = z
   .object({
+    /** A final inspection template (the default); see CreateQualityCheckRequestSchema. */
+    kind: z.literal('final').optional(),
     name: TemplateNameSchema,
     modelCode: ModelCodeSchema,
     newModel: MachineModelSchema.optional(),
@@ -54,11 +67,31 @@ export const CreateTemplateRequestSchema = z
 export type CreateTemplateRequest = z.infer<typeof CreateTemplateRequestSchema>;
 
 /**
+ * POST /api/templates with `kind: 'quality'`: a new, empty quality check under the machine whose
+ * final inspection template is `parentId`. It gets that template's model; its title is
+ * "{position} · {operation}".
+ */
+export const CreateQualityCheckRequestSchema = z.object({
+  kind: z.literal('quality'),
+  parentId: IdSchema,
+  position: PositionSchema,
+  operation: OperationSchema,
+});
+export type CreateQualityCheckRequest = z.infer<typeof CreateQualityCheckRequestSchema>;
+
+/** Everything POST /api/templates accepts: a final inspection template or a quality check. */
+export const CreateAnyTemplateRequestSchema = z.union([
+  CreateQualityCheckRequestSchema,
+  CreateTemplateRequestSchema,
+]);
+
+/**
  * POST /api/templates/import: a new draft from a template file (templateTransfer.ts), for the
  * model and under the name the admin chose; `newModel` as for creating a template.
  */
 export const ImportTemplateRequestSchema = z
   .object({
+    kind: z.literal('final').optional(),
     name: TemplateNameSchema,
     modelCode: ModelCodeSchema,
     newModel: MachineModelSchema.optional(),
@@ -66,6 +99,26 @@ export const ImportTemplateRequestSchema = z
   })
   .refine(newModelMatches.check, { ...newModelMatches.params, path: ['newModel', 'code'] });
 export type ImportTemplateRequest = z.infer<typeof ImportTemplateRequestSchema>;
+
+/**
+ * POST /api/templates/import with `kind: 'quality'`: a new quality check draft from a quality
+ * check file, under the machine whose final inspection template is `parentId`, with the position
+ * and operation the admin chose (the rest of the front page comes from the file).
+ */
+export const ImportQualityCheckRequestSchema = z.object({
+  kind: z.literal('quality'),
+  parentId: IdSchema,
+  position: PositionSchema,
+  operation: OperationSchema,
+  file: QualityCheckExportSchema,
+});
+export type ImportQualityCheckRequest = z.infer<typeof ImportQualityCheckRequestSchema>;
+
+/** Everything POST /api/templates/import accepts. */
+export const ImportAnyTemplateRequestSchema = z.union([
+  ImportQualityCheckRequestSchema,
+  ImportTemplateRequestSchema,
+]);
 
 /** POST /api/templates/{id}/publish */
 export const PublishTemplateRequestSchema = z.object({
@@ -82,9 +135,12 @@ export const TemplateRevisionInfoSchema = z.object({
 });
 export type TemplateRevisionInfo = z.infer<typeof TemplateRevisionInfoSchema>;
 
-/** GET /api/templates — one entry per template. */
+/** GET /api/templates — one entry per template, final inspections and quality checks alike. */
 export const TemplateSummarySchema = z.object({
   id: IdSchema,
+  kind: TemplateKindSchema.default('final'),
+  /** A quality check's machine: its final inspection template. */
+  parentId: IdSchema.optional(),
   name: z.string(),
   modelCode: ModelCodeSchema,
   /** Latest published revision, or null if the template has never been published. */
@@ -101,6 +157,10 @@ export const TemplateSummarySchema = z.object({
   itemCount: z.number().int().min(0),
   /** The draft's cover photo, for the card view. */
   coverImageId: IdSchema.optional(),
+  /** Quality checks only, from the draft: the front page, the section titles and the time. */
+  quality: QualityFrontSchema.optional(),
+  sectionTitles: z.array(z.string()).optional(),
+  totalHours: z.number().min(0).optional(),
   updatedAt: IsoDateTime,
   updatedBy: z.string(),
 });
@@ -175,9 +235,19 @@ export type PublishIssue = z.infer<typeof PublishIssueSchema>;
  * show a status and would finalise as an empty report. A row needs its text: a checkpoint without
  * one would reach inspections.
  */
-export function validateForPublish(template: Pick<Template, 'name' | 'sections'>): PublishIssue[] {
+export function validateForPublish(template: {
+  name: string;
+  sections: Section[];
+  /** Final when left out. */
+  kind?: TemplateKind | undefined;
+  quality?: QualityFront | undefined;
+}): PublishIssue[] {
   const issues: PublishIssue[] = [];
-  if (!template.name.trim()) {
+  const quality = template.kind === 'quality';
+  // A quality check's name follows from its position and operation: the position is what it needs.
+  if (quality && !template.quality?.position.trim()) {
+    issues.push({ target: { kind: 'template' }, message: 'The quality check needs a position.' });
+  } else if (!quality && !template.name.trim()) {
     issues.push({ target: { kind: 'template' }, message: 'The template needs a name.' });
   }
   if (template.sections.length === 0) {
@@ -196,7 +266,9 @@ export function validateForPublish(template: Pick<Template, 'name' | 'sections'>
       if (!item.text.trim()) {
         issues.push({
           target: { kind: 'item', sectionId: section.id, itemId: item.id },
-          message: `Row ${rowRef(sectionIndex, rowIndex)} is empty.`,
+          message: quality
+            ? `Row ${rowRef(sectionIndex, rowIndex)} needs “What to check”.`
+            : `Row ${rowRef(sectionIndex, rowIndex)} is empty.`,
         });
       }
     });
@@ -213,22 +285,42 @@ type TemplateContent = {
   name: string;
   modelCode: string;
   coverImageId?: string | undefined;
+  quality?: QualityFront | undefined;
   sections: Section[];
 };
 
 function publishedContent(t: TemplateContent): string {
   // Built field by field so key order (and therefore the string) is stable, and fields a stored
   // template may still carry from an earlier version (printSettings, a section's spareRows) are
-  // no change.
+  // no change. A quality check's front page and its rows' how, references and time count too; a
+  // blank how or an empty list of references is the same as none.
+  const front = t.quality;
   return JSON.stringify([
     t.name,
     t.modelCode,
     t.coverImageId ?? null,
+    front
+      ? [
+          front.position,
+          front.operation,
+          front.department,
+          front.documentNumber,
+          front.madeBy,
+          front.date,
+        ]
+      : null,
     t.sections.map((s) => [
       s.id,
       s.title,
       // Guides come out of zod parsing, which emits keys in schema order on both sides.
-      s.items.map((i) => [i.id, i.text, i.guide ?? null]),
+      s.items.map((i) => [
+        i.id,
+        i.text,
+        i.guide ?? null,
+        i.how || null,
+        i.references?.length ? i.references : null,
+        i.timeHours ?? null,
+      ]),
     ]),
   ]);
 }

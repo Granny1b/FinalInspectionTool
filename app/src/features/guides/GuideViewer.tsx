@@ -1,4 +1,4 @@
-import { GUIDE_VERDICT_LABELS, refWithText, type Guide, type GuideImage } from '@modig/shared';
+import { refWithText, type Guide, type GuideImage } from '@modig/shared';
 import clsx from 'clsx';
 import { ImageOff, LoaderCircle } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
@@ -7,6 +7,7 @@ import { useImageUrl } from '../../lib/images';
 import { shownImageId } from '../annotate/photos';
 import { PhotoViewer } from '../annotate/PhotoViewer';
 import { VerdictBadge } from './Verdict';
+import { FINAL_GUIDE_WORDING, type GuideWording } from './wording';
 
 type Props = {
   /** "3.c" */
@@ -14,6 +15,8 @@ type Props = {
   rowText: string;
   guide: Guide;
   onClose: () => void;
+  /** A final inspection's guide unless given (a quality check's pictures). */
+  wording?: GuideWording;
 };
 
 /**
@@ -21,7 +24,13 @@ type Props = {
  * their verdicts and captions. A click shows an image large, where ← / → step through them;
  * in the gallery the arrow keys move between the images. Escape closes.
  */
-export function GuideViewer({ rowRef, rowText, guide, onClose }: Props) {
+export function GuideViewer({
+  rowRef,
+  rowText,
+  guide,
+  onClose,
+  wording = FINAL_GUIDE_WORDING,
+}: Props) {
   const [viewing, setViewing] = useState<number | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -73,7 +82,7 @@ export function GuideViewer({ rowRef, rowText, guide, onClose }: Props) {
     >
       <header className="border-b border-ink-200 px-5 py-3.5">
         <h2 id={titleId} className="line-clamp-2 text-base font-semibold">
-          Guide · {refWithText(rowRef, rowText)}
+          {wording.title} · {refWithText(rowRef, rowText)}
         </h2>
       </header>
 
@@ -86,7 +95,7 @@ export function GuideViewer({ rowRef, rowText, guide, onClose }: Props) {
         {images.length > 0 && (
           <ul
             ref={listRef}
-            aria-label="Reference images"
+            aria-label={wording.imagesHeading}
             className={clsx(
               'grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-x-4 gap-y-5',
               description && 'mt-5',
@@ -98,19 +107,20 @@ export function GuideViewer({ rowRef, rowText, guide, onClose }: Props) {
                 image={image}
                 index={index}
                 onOpen={() => setViewing(index)}
+                wording={wording}
               />
             ))}
           </ul>
         )}
         {!description && images.length === 0 && (
-          <p className="text-sm text-ink-500">This guide is empty.</p>
+          <p className="text-sm text-ink-500">{wording.empty}</p>
         )}
       </div>
 
       <footer className="flex items-center justify-between gap-3 border-t border-ink-200 px-5 py-3">
         {images.length > 1 ? (
           <p className="text-xs text-ink-500 pointer-coarse:invisible">
-            ← / → move between the images
+            ← / → move between the {wording.noun}s
           </p>
         ) : (
           <span />
@@ -125,9 +135,9 @@ export function GuideViewer({ rowRef, rowText, guide, onClose }: Props) {
       {viewing !== null && shown && (
         <PhotoViewer
           photo={shown}
-          title={`Image ${viewing + 1} of ${images.length}`}
-          label={`Guide · ${rowRef}`}
-          badge={<VerdictBadge verdict={shown.verdict} />}
+          title={`${wording.noun === 'picture' ? 'Picture' : 'Image'} ${viewing + 1} of ${images.length}`}
+          label={`${wording.title} · ${rowRef}`}
+          badge={<VerdictBadge verdict={shown.verdict} labels={wording.verdicts} />}
           browse={{ index: viewing, count: images.length, onStep: setViewing }}
           onClose={() => {
             // Back in the gallery on the image last shown, not the one first opened.
@@ -141,15 +151,25 @@ export function GuideViewer({ rowRef, rowText, guide, onClose }: Props) {
 }
 
 /** One reference image: its marked-up copy with the verdict on it, the caption below. */
-function Tile({ image, index, onOpen }: { image: GuideImage; index: number; onOpen: () => void }) {
+function Tile({
+  image,
+  index,
+  onOpen,
+  wording,
+}: {
+  image: GuideImage;
+  index: number;
+  onOpen: () => void;
+  wording: GuideWording;
+}) {
   const url = useImageUrl(shownImageId(image));
-  const verdict = GUIDE_VERDICT_LABELS[image.verdict];
+  const verdict = wording.verdicts[image.verdict];
   return (
     <li data-guide-image={index}>
       <button
         type="button"
         onClick={onOpen}
-        aria-label={`View image ${index + 1}, ${verdict}${image.caption ? `: ${image.caption}` : ''}`}
+        aria-label={`View ${wording.noun} ${index + 1}, ${verdict}${image.caption ? `: ${image.caption}` : ''}`}
         className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg border border-ink-200 bg-ink-50 transition-colors hover:border-ink-400"
       >
         {url.data ? (
@@ -165,7 +185,11 @@ function Tile({ image, index, onOpen }: { image: GuideImage; index: number; onOp
         ) : (
           <LoaderCircle size={18} aria-hidden="true" className="animate-spin text-ink-400" />
         )}
-        <VerdictBadge verdict={image.verdict} className="absolute top-2 left-2 shadow-sm" />
+        <VerdictBadge
+          verdict={image.verdict}
+          labels={wording.verdicts}
+          className="absolute top-2 left-2 shadow-sm"
+        />
       </button>
       {image.caption && <p className="mt-1.5 text-sm leading-5 text-ink-700">{image.caption}</p>}
     </li>

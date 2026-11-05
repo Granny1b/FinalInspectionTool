@@ -30,7 +30,10 @@ export function InspectionNewPage() {
     );
   } else {
     // Inspections start from the latest published revision; drafts can't be used.
-    const published = templates.data.filter((template) => template.publishedRevision !== null);
+    // Quality checks are never inspected this way: only the machines' final inspection templates.
+    const published = templates.data.filter(
+      (template) => template.kind === 'final' && template.publishedRevision !== null,
+    );
     body =
       published.length === 0 ? (
         <EmptyState

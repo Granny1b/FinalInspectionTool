@@ -141,6 +141,40 @@ export function setRowGuide(
   });
 }
 
+/** What a quality check's row says besides its What: how, references and time. */
+export type RowFields = {
+  how?: string | undefined;
+  references?: string[] | undefined;
+  timeHours?: number | undefined;
+};
+
+/**
+ * Changes a quality check's row's how, references or time (only the fields in `patch`). An empty
+ * how, no references or no time leave the field out, as a row without them is stored.
+ */
+export function setRowFields(sections: Section[], itemId: string, patch: RowFields): Section[] {
+  return updateItem(sections, itemId, (item) => {
+    const next: Item = { ...item };
+    if ('how' in patch) {
+      delete next.how;
+      if (patch.how) next.how = patch.how;
+    }
+    if ('references' in patch) {
+      delete next.references;
+      if (patch.references?.length) next.references = patch.references;
+    }
+    if ('timeHours' in patch) {
+      delete next.timeHours;
+      if (patch.timeHours !== undefined) next.timeHours = patch.timeHours;
+    }
+    const same =
+      next.how === item.how &&
+      next.timeHours === item.timeHours &&
+      JSON.stringify(next.references ?? null) === JSON.stringify(item.references ?? null);
+    return same ? item : next;
+  });
+}
+
 /** Deep copy (guide included) right after the original, with a fresh id. */
 export function duplicateRow(sections: Section[], itemId: string): Created | null {
   const at = locateRow(sections, itemId);

@@ -7,16 +7,23 @@ import { usePersonName } from '../../lib/usePeople';
 import { Badge } from './Badge';
 
 type Props = {
-  templateId: string;
+  /** The template's address; a revision is `{basePath}/revisions/{n}`. */
+  basePath: string;
   /** Newest first. */
   revisions: TemplateRevisionInfo[];
+  /** Said while nothing is published. */
+  emptyText: string;
 };
 
 /**
  * Revision, date, who and note for every published revision (brief §5.2), newest first.
  * Memoised: the editor re-renders on every keystroke, the history only on publish.
  */
-export const RevisionHistory = memo(function RevisionHistory({ templateId, revisions }: Props) {
+export const RevisionHistory = memo(function RevisionHistory({
+  basePath,
+  revisions,
+  emptyText,
+}: Props) {
   const titleId = useId();
   const personName = usePersonName();
   return (
@@ -31,16 +38,14 @@ export const RevisionHistory = memo(function RevisionHistory({ templateId, revis
         </h2>
       </div>
       {revisions.length === 0 ? (
-        <p className="px-5 py-5 text-sm text-ink-500">
-          Not published yet. Publishing creates revision 1, which new inspections then use.
-        </p>
+        <p className="px-5 py-5 text-sm text-ink-500">{emptyText}</p>
       ) : (
         <ol className="max-h-[26rem] divide-y divide-ink-100 overflow-y-auto">
           {revisions.map((revision, index) => (
             <li key={revision.revision} className="group relative px-5 py-3 hover:bg-ink-50">
               <div className="flex items-center gap-2">
                 <Link
-                  to={`/templates/${templateId}/revisions/${revision.revision}`}
+                  to={`${basePath}/revisions/${revision.revision}`}
                   className="text-sm font-semibold text-ink-900 outline-none after:absolute after:inset-0 focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-brand-600"
                 >
                   Rev {revision.revision}

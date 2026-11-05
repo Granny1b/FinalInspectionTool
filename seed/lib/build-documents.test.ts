@@ -31,6 +31,7 @@ describe('buildTemplateDocuments', () => {
     expect(TemplateSchema.parse(draft)).toEqual(draft);
     expect(published).toEqual({
       id: templateId,
+      kind: 'final',
       name: 'Final inspection – RigiMill MG',
       modelCode: 'RMMG',
       revision: 2,

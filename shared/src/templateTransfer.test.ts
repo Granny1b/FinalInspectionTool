@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { GuideImage, Section } from './schemas';
 import {
   checklistIds,
+  QualityCheckExportSchema,
+  qualityCheckExport,
   TemplateExportSchema,
   templateExport,
   templateImageIds,
@@ -53,6 +55,61 @@ describe('templateExport', () => {
       '2026-11-04T08:00:00.000Z',
     );
     expect(Object.keys(file.template)).toEqual(['name', 'modelCode', 'sections']);
+  });
+});
+
+describe('qualityCheckExport', () => {
+  const quality = {
+    position: 'QC4',
+    operation: 'Pre start up',
+    department: 'Quality',
+    documentNumber: '1.22.2',
+    madeBy: 'Sam Andersson',
+    date: '2026-11-05',
+  };
+  const rows: Section[] = [
+    {
+      id: 's1',
+      title: 'Safety features',
+      items: [
+        {
+          id: 'i1',
+          text: 'Safety decals on the X motors',
+          how: 'Visible',
+          references: ['ISO 7010'],
+          timeHours: 0.1,
+          guide: { description: 'Both sides', images: [image('p1', 'r1')] },
+        },
+      ],
+    },
+  ];
+
+  it('writes a file of its own format: front page, model and rows with every field', () => {
+    const file = qualityCheckExport(
+      { modelCode: 'RMMG', quality, sections: rows },
+      'RigiMill MG',
+      '2026-11-05T08:00:00.000Z',
+    );
+    expect(QualityCheckExportSchema.parse(file)).toEqual({
+      format: 'modig-final-inspection/quality-check',
+      version: 1,
+      exportedAt: '2026-11-05T08:00:00.000Z',
+      qualityCheck: { quality, modelCode: 'RMMG', modelName: 'RigiMill MG', sections: rows },
+    });
+    // Neither file passes for the other.
+    expect(TemplateExportSchema.safeParse(file).success).toBe(false);
+    const templateFile = templateExport(template, undefined, '2026-11-05T08:00:00.000Z');
+    expect(QualityCheckExportSchema.safeParse(templateFile).success).toBe(false);
+  });
+
+  it('writes an empty front page for a check without one', () => {
+    const file = qualityCheckExport(
+      { modelCode: 'RMMG', quality: undefined, sections: [] },
+      undefined,
+      '2026-11-05T08:00:00.000Z',
+    );
+    expect(file.qualityCheck.quality.position).toBe('');
+    expect(Object.keys(file.qualityCheck)).toEqual(['quality', 'modelCode', 'sections']);
   });
 });
 

@@ -11,6 +11,8 @@ import { InspectionPage } from './pages/InspectionPage';
 import { InspectionPrintPage } from './pages/InspectionPrintPage';
 import { InspectionsPage } from './pages/InspectionsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { QualityCheckPage } from './pages/QualityCheckPage';
+import { QualityChecksPage } from './pages/QualityChecksPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { TemplatePrintPage } from './pages/TemplatePrintPage';
@@ -31,6 +33,13 @@ export const router = createBrowserRouter([
       // Admins get the editor, inspectors the latest published revision (decided in the page).
       { path: 'templates/:id', element: <TemplateEditorPage /> },
       { path: 'templates/:id/revisions/:revision', element: <TemplateRevisionPage /> },
+      // A machine's quality checks: its Quality checks tab, one quality check, a revision of one.
+      { path: 'templates/:id/quality-checks', element: <QualityChecksPage /> },
+      { path: 'templates/:id/quality-checks/:qcId', element: <QualityCheckPage /> },
+      {
+        path: 'templates/:id/quality-checks/:qcId/revisions/:revision',
+        element: <TemplateRevisionPage />,
+      },
       {
         element: <RequireRole role="admin" />,
         children: [

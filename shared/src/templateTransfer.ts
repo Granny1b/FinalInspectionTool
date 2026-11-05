@@ -4,12 +4,23 @@
  * within the same installation, where those images exist. Files exported before spare lines were
  * removed also hold `printSettings` and sections' `spareRows`: still version 1, they import as
  * before, without those fields (zod strips unknown keys).
+ *
+ * A quality check is a file of its own format (`…/quality-check`), so neither import takes the
+ * other's file: a final inspection template file stays exactly as it was.
  */
 import { z } from 'zod';
 import { newId } from './ids';
-import { IdSchema, ModelCodeSchema, SectionSchema, type Section, type Template } from './schemas';
+import {
+  IdSchema,
+  ModelCodeSchema,
+  QualityFrontSchema,
+  SectionSchema,
+  type Section,
+  type Template,
+} from './schemas';
 
 export const TEMPLATE_EXPORT_FORMAT = 'modig-final-inspection/template';
+export const QUALITY_CHECK_EXPORT_FORMAT = 'modig-final-inspection/quality-check';
 
 export const TemplateExportSchema = z.object({
   format: z.literal(TEMPLATE_EXPORT_FORMAT),
@@ -26,6 +37,21 @@ export const TemplateExportSchema = z.object({
   }),
 });
 export type TemplateExport = z.infer<typeof TemplateExportSchema>;
+
+/** A quality check's file: its front page and checklist (rows with how, references and time). */
+export const QualityCheckExportSchema = z.object({
+  format: z.literal(QUALITY_CHECK_EXPORT_FORMAT),
+  version: z.literal(1),
+  exportedAt: z.iso.datetime({ offset: true }),
+  qualityCheck: z.object({
+    quality: QualityFrontSchema,
+    /** Its machine's model; an import puts it under the machine it is imported on. */
+    modelCode: ModelCodeSchema,
+    modelName: z.string().max(100).optional(),
+    sections: z.array(SectionSchema),
+  }),
+});
+export type QualityCheckExport = z.infer<typeof QualityCheckExportSchema>;
 
 /** What a file is made from, and what an import builds a draft from. */
 type Checklist = {
@@ -49,6 +75,33 @@ export function templateExport(
       modelCode,
       ...(modelName && { modelName }),
       ...(coverImageId && { coverImageId }),
+      sections,
+    },
+  };
+}
+
+/** The file for a quality check: its draft as the editor shows it, with its machine's name. */
+export function qualityCheckExport(
+  check: Pick<Template, 'modelCode' | 'quality' | 'sections'>,
+  modelName: string | undefined,
+  exportedAt: string,
+): QualityCheckExport {
+  const { quality, modelCode, sections } = check;
+  return {
+    format: QUALITY_CHECK_EXPORT_FORMAT,
+    version: 1,
+    exportedAt,
+    qualityCheck: {
+      quality: quality ?? {
+        position: '',
+        operation: '',
+        department: '',
+        documentNumber: '',
+        madeBy: '',
+        date: '',
+      },
+      modelCode,
+      ...(modelName && { modelName }),
       sections,
     },
   };

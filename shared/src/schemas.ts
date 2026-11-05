@@ -134,6 +134,15 @@ export const GUIDE_VERDICT_LABELS: Record<GuideVerdict, string> = {
   bad: 'Bad',
   info: 'Info',
 };
+/**
+ * The same verdicts as quality checks word them: a picture shows how the checkpoint should, or
+ * should not, look. The stored values stay `good`, `bad` and `info`.
+ */
+export const QUALITY_VERDICT_LABELS: Record<GuideVerdict, string> = {
+  good: 'Should look like this',
+  bad: 'Should not look like this',
+  info: 'Info',
+};
 /** Enough for good/bad pairs from a few angles; small enough for the print appendix. */
 export const MAX_GUIDE_IMAGES = 6;
 
@@ -152,12 +161,32 @@ export type Guide = z.infer<typeof GuideSchema>;
 // Templates (brief §4, §5.2)
 // ---------------------------------------------------------------------------------------------
 
+/** One reference of a quality check's row, such as "ISO 12100". */
+export const ReferenceSchema = z.string().trim().min(1).max(100);
+/** At most this many references on a row. */
+export const MAX_REFERENCES = 20;
+/** The most hours a row's time may say. */
+export const MAX_ROW_HOURS = 999;
+
 export const ItemSchema = z.object({
   /** STABLE forever – survives renumbering, rewording and new revisions. KPIs group by it. */
   id: IdSchema,
-  /** "Lifting columns - Marked screws, blue/red/yellow". May be empty while a draft is edited. */
+  /**
+   * "Lifting columns - Marked screws, blue/red/yellow". May be empty while a draft is edited. A
+   * quality check's row calls it "What".
+   */
   text: z.string().max(1000),
+  /**
+   * Pictures and more information. A quality check's row shows its images as how the checkpoint
+   * should (good) or should not (bad) look, and its description as "More information".
+   */
   guide: GuideSchema.optional(),
+  /** Quality checks only: how to check it. Final inspection templates leave it out. */
+  how: z.string().max(2000).optional(),
+  /** Quality checks only: standards and documents, e.g. "ISO 12100". */
+  references: z.array(ReferenceSchema).max(MAX_REFERENCES).optional(),
+  /** Quality checks only: the time the check takes, in hours (one decimal). */
+  timeHours: z.number().min(0).max(MAX_ROW_HOURS).optional(),
 });
 export type Item = z.infer<typeof ItemSchema>;
 
@@ -172,15 +201,50 @@ export type Section = z.infer<typeof SectionSchema>;
 export const TemplateStatusSchema = z.enum(['draft', 'published']);
 export type TemplateStatus = z.infer<typeof TemplateStatusSchema>;
 
+/**
+ * What a template is: a machine model's final inspection checklist, or one of its quality checks
+ * (checks at positions along the build, such as "QC4 · Pre start up").
+ */
+export const TEMPLATE_KINDS = ['final', 'quality'] as const;
+export const TemplateKindSchema = z.enum(TEMPLATE_KINDS);
+export type TemplateKind = z.infer<typeof TemplateKindSchema>;
+
+/** A quality check's front page. Empty strings while it is being written. */
+export const QualityFrontSchema = z.object({
+  /** "QC4": where along the build the check is done. Required to publish. */
+  position: z.string().max(50),
+  /** "Pre start up" */
+  operation: z.string().max(200),
+  /** The department that owns the check, e.g. "Quality" (from the Responsible list). */
+  department: z.string().max(200),
+  /** "1.22.2" */
+  documentNumber: z.string().max(100),
+  /** Who wrote the check (a name as typed). */
+  madeBy: z.string().max(200),
+  /** "YYYY-MM-DD", or '' when not set. */
+  date: z.union([IsoDate, z.literal('')]),
+});
+export type QualityFront = z.infer<typeof QualityFrontSchema>;
+
 export const TemplateSchema = z.object({
   id: IdSchema,
-  /** "Final inspection – RigiMill MG" */
+  /** Templates stored before quality checks existed have no kind: they are final inspections. */
+  kind: TemplateKindSchema.default('final'),
+  /** A quality check's machine: the id of its model's final inspection template. */
+  parentId: IdSchema.optional(),
+  /**
+   * "Final inspection – RigiMill MG". A quality check's is "{position} · {operation}", kept in
+   * step with its front page.
+   */
   name: z.string().max(200),
+  /** A quality check has its machine's code, copied when it is created. */
   modelCode: ModelCodeSchema,
   /** Published revision number; a draft carries last published + 1. */
   revision: z.number().int().min(1),
   status: TemplateStatusSchema,
   coverImageId: IdSchema.optional(),
+  /** Quality checks only: the front page. */
+  quality: QualityFrontSchema.optional(),
   sections: z.array(SectionSchema),
   /** Optional note written when a revision is published (shown in revision history). */
   changeNote: z.string().max(1000).optional(),

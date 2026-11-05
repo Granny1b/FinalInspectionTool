@@ -7,8 +7,12 @@ export type TemplateView = (typeof TEMPLATE_VIEWS)[number];
 
 const VIEW_KEY = 'templates.view';
 
-/** Router state for the Templates page: the editor just deleted the template with this name. */
-export type TemplatesPageState = { deleted?: string };
+/**
+ * Router state for the Templates page (or a machine's Quality checks tab): the editor just
+ * deleted the template or quality check with this name, and with a template this many quality
+ * checks.
+ */
+export type TemplatesPageState = { deleted?: string; qualityChecks?: number };
 
 export function loadTemplateView(): TemplateView {
   try {

@@ -22,14 +22,19 @@ export function templateIssueField(
  * is none and only Add section is there, or "Add at least one row", when every section is empty:
  * then the first section's Add row.
  */
-export function focusIssue(target: PublishIssue['target'], templateField: 'name' | 'checklist') {
+export function focusIssue(
+  target: PublishIssue['target'],
+  templateField: 'name' | 'checklist',
+  /** The name's input, or a quality check's position's. */
+  nameFieldId: string = TEMPLATE_NAME_ID,
+) {
   const selector =
     target.kind === 'item'
       ? `[data-item-text="${CSS.escape(target.itemId)}"]`
       : target.kind === 'section'
         ? `[data-section-title="${CSS.escape(target.sectionId)}"]`
         : templateField === 'name'
-          ? `#${TEMPLATE_NAME_ID}`
+          ? `#${CSS.escape(nameFieldId)}`
           : '[data-add-row], [data-add-section]';
   const element = document.querySelector<HTMLElement>(selector);
   if (!element) return;

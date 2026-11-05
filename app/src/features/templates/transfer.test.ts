@@ -1,4 +1,4 @@
-import { templateExport, type TemplateDraftInput } from '@modig/shared';
+import { qualityCheckExport, templateExport, type TemplateDraftInput } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
 import {
   parseTemplateFile,
@@ -56,6 +56,11 @@ describe('parseTemplateFile', () => {
     ['JSON of something else', text({ name: 'x' }), /not a template file/],
     ['a JSON list', text([file]), /not a template file/],
     ['a newer version', text({ ...file, version: 2 }), /newer version/],
+    [
+      'a quality check file',
+      text(qualityCheckExport({ ...draft, quality: undefined }, undefined, file.exportedAt)),
+      /This is a quality check file\. Import it on the Quality checks tab/,
+    ],
     [
       'a damaged file',
       text({ ...file, template: { ...file.template, sections: [{ id: 'x' }] } }),

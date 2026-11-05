@@ -6,10 +6,14 @@ import { formatDate } from '../../lib/format';
 import { useImageUrl } from '../../lib/images';
 import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
-import { Badge, PublishedBadge } from './Badge';
+import { Badge, PublishedBadge, QualityChecksBadge } from './Badge';
+import { qualityCheckPositions } from './qualityCheckList';
 
 type Props = {
+  /** The final inspection templates, one per machine model. */
   templates: TemplateSummary[];
+  /** Each template's quality checks, by its id. */
+  qualityChecks: ReadonlyMap<string, TemplateSummary[]>;
   models: MachineModel[] | undefined;
   /** Admins also see which drafts have unpublished changes. */
   showDrafts: boolean;
@@ -23,49 +27,57 @@ type Props = {
  * the same height: a name on two lines or badges that wrap move the line below them in every
  * card of the row, and the footers line up at the bottom.
  */
-export function TemplateCards({ templates, models, showDrafts }: Props) {
+export function TemplateCards({ templates, qualityChecks, models, showDrafts }: Props) {
   // The name, as in the list; the email stays in the tooltip.
   const personName = usePersonName();
   return (
     <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {templates.map((template) => (
-        <li
-          key={template.id}
-          // The name's link covers the card; the outline shows where keyboard focus is.
-          className="relative row-span-4 grid grid-rows-subgrid gap-y-0 overflow-hidden rounded-lg border border-ink-200 bg-surface shadow-xs outline-brand-600 transition-colors hover:border-ink-300 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2"
-        >
-          <Cover imageId={template.coverImageId} />
-          <div className="min-w-0 px-4 pt-3.5">
-            <h2 className="text-sm font-semibold text-ink-900">
-              <Link
-                to={`/templates/${template.id}`}
-                className="outline-none after:absolute after:inset-0"
-              >
-                {template.name || 'Untitled template'}
-              </Link>
-            </h2>
-            <p className="mt-0.5 truncate text-sm text-ink-600">
-              {modelName(models, template.modelCode)}
-            </p>
-          </div>
-          {/* The list's badges: the draft is only mentioned when it differs from the published
+      {templates.map((template) => {
+        const checks = qualityChecks.get(template.id) ?? [];
+        return (
+          <li
+            key={template.id}
+            // The name's link covers the card; the outline shows where keyboard focus is.
+            className="relative row-span-4 grid grid-rows-subgrid gap-y-0 overflow-hidden rounded-lg border border-ink-200 bg-surface shadow-xs outline-brand-600 transition-colors hover:border-ink-300 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2"
+          >
+            <Cover imageId={template.coverImageId} />
+            <div className="min-w-0 px-4 pt-3.5">
+              <h2 className="text-sm font-semibold text-ink-900">
+                <Link
+                  to={`/templates/${template.id}`}
+                  className="outline-none after:absolute after:inset-0"
+                >
+                  {template.name || 'Untitled template'}
+                </Link>
+              </h2>
+              <p className="mt-0.5 truncate text-sm text-ink-600">
+                {modelName(models, template.modelCode)}
+              </p>
+            </div>
+            {/* The list's badges: the draft is only mentioned when it differs from the published
               revision, as otherwise there is nothing to publish. */}
-          <div className="flex flex-wrap content-start gap-1.5 px-4 pt-3 pb-4">
-            <PublishedBadge revision={template.publishedRevision} />
-            {showDrafts && template.hasUnpublishedChanges && (
-              <Badge tone="brand">Unpublished changes</Badge>
-            )}
-          </div>
-          <dl className="mx-4 grid grid-cols-[auto_minmax(0,1fr)] content-end gap-x-3 gap-y-1 border-t border-ink-100 py-3 text-xs">
-            <dt className="text-ink-500">Rows</dt>
-            <dd className="text-ink-800 tabular-nums">{template.itemCount}</dd>
-            <dt className="text-ink-500">Last edited</dt>
-            <dd className="truncate text-ink-800" title={template.updatedBy}>
-              {formatDate(template.updatedAt)} · {personName(template.updatedBy)}
-            </dd>
-          </dl>
-        </li>
-      ))}
+            <div className="flex flex-wrap content-start gap-1.5 px-4 pt-3 pb-4">
+              <PublishedBadge revision={template.publishedRevision} />
+              {showDrafts && template.hasUnpublishedChanges && (
+                <Badge tone="brand">Unpublished changes</Badge>
+              )}
+              <QualityChecksBadge count={checks.length} />
+            </div>
+            <dl className="mx-4 grid grid-cols-[auto_minmax(0,1fr)] content-end gap-x-3 gap-y-1 border-t border-ink-100 py-3 text-xs">
+              <dt className="text-ink-500">Rows</dt>
+              <dd className="text-ink-800 tabular-nums">{template.itemCount}</dd>
+              <dt className="text-ink-500">Quality checks</dt>
+              <dd className="truncate text-ink-800" title={qualityCheckPositions(checks)}>
+                {qualityCheckPositions(checks) || '–'}
+              </dd>
+              <dt className="text-ink-500">Last edited</dt>
+              <dd className="truncate text-ink-800" title={template.updatedBy}>
+                {formatDate(template.updatedAt)} · {personName(template.updatedBy)}
+              </dd>
+            </dl>
+          </li>
+        );
+      })}
     </ul>
   );
 }

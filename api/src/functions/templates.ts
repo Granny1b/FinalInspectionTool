@@ -1,33 +1,41 @@
 /**
  * Templates (brief §5.2, §8): list, create, import and delete templates, read and save a
- * template's draft. Publishing and published revisions are in template-revisions.ts.
+ * template's draft. Publishing and published revisions are in template-revisions.ts. A quality
+ * check is a template too (`kind: 'quality'`, under its machine's final inspection template):
+ * the same routes create, import, save and delete it.
  *
  *   GET    /api/templates         inspector  TemplateSummary[]
- *   POST   /api/templates         admin      CreateTemplateRequest → 201 TemplateDetail + ETag
- *   POST   /api/templates/import  admin      ImportTemplateRequest
+ *   POST   /api/templates         admin      CreateTemplateRequest | CreateQualityCheckRequest
+ *                                            → 201 TemplateDetail + ETag
+ *   POST   /api/templates/import  admin      ImportTemplateRequest | ImportQualityCheckRequest
  *                                            → 201 ImportTemplateResponse + ETag
  *   GET    /api/templates/{id}    admin      TemplateDetail + ETag
  *   PUT    /api/templates/{id}    admin      If-Match, TemplateDraftInput
  *                                            → SaveTemplateResponse + ETag
- *   DELETE /api/templates/{id}    admin      If-Match → 204
+ *   DELETE /api/templates/{id}    admin      If-Match → 204 (a final inspection template's
+ *                                            quality checks go with it)
  */
 import { app } from '@azure/functions';
 import {
   blobNames,
   checklistIds,
   CONTAINERS,
-  CreateTemplateRequestSchema,
+  CreateAnyTemplateRequestSchema,
   hasUnpublishedChanges,
-  ImportTemplateRequestSchema,
+  ImportAnyTemplateRequestSchema,
   newId,
   newModelConflict,
+  newQualityFront,
+  qualityCheckTitle,
   TemplateDraftInputSchema,
   templateImageIds,
   TemplateSchema,
   withAvailableImages,
   withNewIds,
+  type ImportQualityCheckRequest,
   type ImportTemplateResponse,
   type MachineModel,
+  type QualityFront,
   type SaveTemplateResponse,
   type Section,
   type Template,
@@ -40,6 +48,7 @@ import {
   etagHeader,
   idParam,
   json,
+  NotFoundError,
   PreconditionFailedError,
   readJsonBody,
   requireIfMatch,
@@ -47,12 +56,14 @@ import {
 import { loadSettings, updateSettings } from '../lib/settings';
 import { writeJson } from '../lib/storage';
 import {
+  deleteQualityCheck,
   deleteTemplate as deleteStoredTemplate,
   duplicateIds,
   findTemplateForModel,
   loadAllTemplates,
   loadDetail,
   loadLatestPublished,
+  loadQualityChecks,
   loadSummaries,
   loadTemplate,
   nextRevision,
@@ -66,15 +77,35 @@ export const listTemplates = endpoint({ role: 'inspector' }, async () =>
 );
 
 export const createTemplate = endpoint({ role: 'admin' }, async (req, _context, user) => {
-  const { name, modelCode, newModel } = await readJsonBody(req, CreateTemplateRequestSchema);
-  await prepareModel(modelCode, newModel, user.email);
-  const { draft, etag } = await writeNewDraft({
-    name,
-    modelCode,
-    // The editor starts from an empty state with "+ Add section".
-    sections: [],
-    updatedBy: user.email,
-  });
+  const body = await readJsonBody(req, CreateAnyTemplateRequestSchema);
+  let created: { draft: Template; etag: string };
+  if (body.kind === 'quality') {
+    const machine = await loadMachine(body.parentId);
+    created = await writeNewDraft({
+      kind: 'quality',
+      parentId: machine.id,
+      modelCode: machine.draft.modelCode,
+      // Filled in on its front page; who made it and when start as the admin and today.
+      ...withQuality(
+        newQualityFront({ ...body, madeBy: user.name, date: swedishDate.format(new Date()) }),
+      ),
+      // The editor starts from an empty state with "+ Add section".
+      sections: [],
+      updatedBy: user.email,
+    });
+  } else {
+    const { name, modelCode, newModel } = body;
+    await prepareModel(modelCode, newModel, user.email);
+    created = await writeNewDraft({
+      kind: 'final',
+      name,
+      modelCode,
+      // The editor starts from an empty state with "+ Add section".
+      sections: [],
+      updatedBy: user.email,
+    });
+  }
+  const { draft, etag } = created;
   const detail: TemplateDetail = { draft, revisions: [], hasUnpublishedChanges: true };
   return json(201, detail, etagHeader(etag));
 });
@@ -86,7 +117,9 @@ export const createTemplate = endpoint({ role: 'admin' }, async (req, _context, 
  * out, and the answer says how many.
  */
 export const importTemplate = endpoint({ role: 'admin' }, async (req, _context, user) => {
-  const { name, modelCode, newModel, file } = await readJsonBody(req, ImportTemplateRequestSchema);
+  const body = await readJsonBody(req, ImportAnyTemplateRequestSchema);
+  if (body.kind === 'quality') return importQualityCheck(body, user.email);
+  const { name, modelCode, newModel, file } = body;
   const { coverImageId, sections } = file.template;
   checkIds(sections);
 
@@ -103,6 +136,7 @@ export const importTemplate = endpoint({ role: 'admin' }, async (req, _context, 
   // Last, so a refused import never adds a machine model.
   await prepareModel(modelCode, newModel, user.email);
   const { draft, etag } = await writeNewDraft({
+    kind: 'final',
     name,
     modelCode,
     ...(checklist.coverImageId && { coverImageId: checklist.coverImageId }),
@@ -117,6 +151,40 @@ export const importTemplate = endpoint({ role: 'admin' }, async (req, _context, 
   };
   return json(201, imported, etagHeader(etag));
 });
+
+/**
+ * A new quality check draft from a quality check file, under the machine it is imported on, with
+ * the position and operation the admin chose and the rest of the file's front page. Every section
+ * and row gets a new id (a quality check's rows have no history yet), and images this
+ * installation doesn't have are left out, as for a template.
+ */
+async function importQualityCheck(body: ImportQualityCheckRequest, by: string) {
+  const { parentId, position, operation, file } = body;
+  const { quality, sections } = file.qualityCheck;
+  const [machine, stored] = await Promise.all([
+    loadMachine(parentId),
+    storedImages(templateImageIds({ sections })),
+  ]);
+  const { template: checklist, dropped } = withAvailableImages(
+    { sections: withNewIds(sections) },
+    stored,
+  );
+  const { draft, etag } = await writeNewDraft({
+    kind: 'quality',
+    parentId: machine.id,
+    modelCode: machine.draft.modelCode,
+    ...withQuality({ ...quality, position, operation }),
+    sections: checklist.sections,
+    updatedBy: by,
+  });
+  const imported: ImportTemplateResponse = {
+    draft,
+    revisions: [],
+    hasUnpublishedChanges: true,
+    droppedImages: dropped,
+  };
+  return json(201, imported, etagHeader(etag));
+}
 
 export const getTemplate = endpoint({ role: 'admin' }, async (req) => {
   const found = await loadDetail(idParam(req));
@@ -135,13 +203,27 @@ export const saveTemplate = endpoint({ role: 'admin' }, async (req, _context, us
   if (!current) throw templateNotFound();
   // Checked here as well as by the write, so a stale editor gets the 412, not a model error.
   if (current.etag !== ifMatch) throw new PreconditionFailedError();
+  const { kind, parentId } = current.draft;
   // An unchanged model is not re-checked: a model removed from the settings later must not make
-  // its template unsaveable.
-  if (input.modelCode !== current.draft.modelCode) await checkModel(input.modelCode, id);
+  // its template unsaveable. A quality check keeps its machine's model.
+  if (kind === 'final' && input.modelCode !== current.draft.modelCode) {
+    await checkModel(input.modelCode, id);
+  }
 
+  const { quality, ...content } = input;
   const draft: Template = {
-    ...input,
     id,
+    kind,
+    ...(kind === 'quality'
+      ? {
+          ...content,
+          ...(parentId && { parentId }),
+          modelCode: current.draft.modelCode,
+          // Its name follows its front page; a front page left out stays as it was.
+          ...withQuality(quality ?? current.draft.quality ?? newQualityFront(EMPTY_FRONT)),
+        }
+      : // A final inspection template has no front page of a quality check.
+        content),
     status: 'draft',
     revision: nextRevision(current.revisions),
     updatedAt: new Date().toISOString(),
@@ -160,7 +242,9 @@ export const saveTemplate = endpoint({ role: 'admin' }, async (req, _context, us
 
 /**
  * Deletes the draft and every published revision; If-Match is the draft the admin is looking at,
- * so nobody's newer save is deleted unseen. Inspections, their deviation rows and all images stay.
+ * so nobody's newer save is deleted unseen. A final inspection template's quality checks go with
+ * it, after it (best effort: the machine's template is already gone). Inspections, their
+ * deviation rows and all images stay.
  */
 export const deleteTemplate = endpoint({ role: 'admin' }, async (req, context) => {
   const id = idParam(req);
@@ -170,8 +254,42 @@ export const deleteTemplate = endpoint({ role: 'admin' }, async (req, context) =
   // As for saves: an outdated page sees the conflict, before anything is deleted.
   if (current.etag !== ifMatch) throw new PreconditionFailedError();
   await deleteStoredTemplate(id, ifMatch, context);
+  if (current.draft.kind === 'final') {
+    const checks = await loadQualityChecks(id).catch((error: unknown) => {
+      context.warn(`Deleted template ${id}; listing its quality checks failed`, error);
+      return [];
+    });
+    await Promise.all(checks.map((check) => deleteQualityCheck(check.id, context)));
+  }
   return { status: 204 };
 });
+
+/** A quality check's front page with the name that follows from it ("QC4 · Pre start up"). */
+function withQuality(quality: QualityFront): { name: string; quality: QualityFront } {
+  return { name: qualityCheckTitle(quality), quality };
+}
+
+const EMPTY_FRONT = { position: '', operation: '' };
+
+/** "2026-11-05" in Sweden, where the checks are written. */
+const swedishDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' });
+
+/**
+ * The machine a quality check belongs to: its final inspection template. 404 when it doesn't
+ * exist, 400 when the id is a quality check's.
+ */
+async function loadMachine(parentId: string) {
+  const machine = await loadTemplate(parentId);
+  if (!machine) {
+    throw new NotFoundError('The final inspection template of this machine does not exist.');
+  }
+  if (machine.draft.kind !== 'final') {
+    throw new BadRequestError(
+      "A quality check belongs to a machine's final inspection template, not to another quality check.",
+    );
+  }
+  return machine;
+}
 
 /** Ids must be unique: among sections, and among all rows (results and KPIs key on row ids). */
 function checkIds(sections: readonly Section[]): void {
@@ -207,9 +325,11 @@ async function prepareModel(
 ): Promise<void> {
   if (!newModel) return checkModel(modelCode);
   // A template may already use the code without the settings having it (a model removed since);
-  // in any case, as for the settings' codes.
+  // in any case, as for the settings' codes. Quality checks have their machine's code.
   const other = (await loadAllTemplates()).find(
-    (template) => template.draft.modelCode.toLowerCase() === modelCode.toLowerCase(),
+    (template) =>
+      template.draft.kind === 'final' &&
+      template.draft.modelCode.toLowerCase() === modelCode.toLowerCase(),
   );
   if (other) {
     throw new ConflictError(
