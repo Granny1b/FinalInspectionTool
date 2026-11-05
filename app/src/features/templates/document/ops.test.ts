@@ -19,6 +19,7 @@ import {
   renameSection,
   restoreRow,
   restoreSection,
+  rowCountText,
   setRowGuide,
   setRowText,
   setSpareRows,
@@ -384,6 +385,12 @@ describe('focus', () => {
   });
 });
 
+describe('rowCountText', () => {
+  it('says how many rows a folded section has, "No rows" for an empty one', () => {
+    expect([0, 1, 2, 90].map(rowCountText)).toEqual(['No rows', '1 row', '2 rows', '90 rows']);
+  });
+});
+
 describe('singleLine', () => {
   it('turns pasted line breaks into single spaces', () => {
     expect(singleLine('Lifting columns -\nMarked screws')).toBe('Lifting columns - Marked screws');
@@ -399,9 +406,9 @@ describe('indexIssues', () => {
     sections[0] = { ...sections[0]!, items: [{ id: 'a1', text: '' }] };
     const index = indexIssues(validateForPublish({ name: '', sections }));
     expect(index.sections.get('sB')).toEqual(['Section 2 needs a title.']);
-    expect(index.sections.get('sC')).toEqual(['Section 3 has no rows.']);
+    // A section without rows (sC) is no problem.
     expect(index.items.get('a1')).toEqual(['Row 1.a is empty.']);
-    expect(index.sections.size + index.items.size).toBe(3);
+    expect(index.sections.size + index.items.size).toBe(2);
   });
 
   it('collects several messages for one target', () => {

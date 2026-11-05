@@ -4,6 +4,7 @@ import { CheckCheck } from 'lucide-react';
 import { memo } from 'react';
 import { ChecklistRow } from './ChecklistRow';
 import { CONTROL_HEIGHT } from './layout';
+import { EmptySectionNote } from './parts';
 import { rowsWithoutStatus, type Results } from './results';
 import { SectionHeader } from './SectionHeader';
 import type { ChecklistActions } from './useChecklistActions';
@@ -30,6 +31,15 @@ export const ChecklistSection = memo(function ChecklistSection({
 }: Props) {
   const number = sectionNumber(index);
   const remaining = rowsWithoutStatus(section, results);
+  if (section.items.length === 0) {
+    // Nothing to set or move to: the heading keeps its number, with a quiet line under it.
+    return (
+      <div id={`section-${section.id}`} className="mt-8 first:mt-0">
+        <SectionHeader number={number} title={section.title} empty />
+        <EmptySectionNote />
+      </div>
+    );
+  }
   return (
     <div id={`section-${section.id}`} className="mt-8 first:mt-0">
       <SectionHeader number={number} title={section.title}>

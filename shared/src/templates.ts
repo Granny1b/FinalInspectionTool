@@ -171,6 +171,11 @@ export type PublishIssue = z.infer<typeof PublishIssueSchema>;
  * Everything that must hold before a draft becomes an immutable revision. Drafts may be
  * incomplete while being edited; a printed checklist may not. Problems come in document order,
  * so a list of them reads top to bottom like the checklist.
+ *
+ * A section may have no rows yet: an admin can publish a heading as a reminder of what is still
+ * to be added, and it prints with its spare lines. The checklist as a whole needs a row, though:
+ * an inspection of it would have nothing to check, could never show a status and would finalise
+ * as an empty report. A row needs its text: a checkpoint without one would reach inspections.
  */
 export function validateForPublish(template: Pick<Template, 'name' | 'sections'>): PublishIssue[] {
   const issues: PublishIssue[] = [];
@@ -179,19 +184,14 @@ export function validateForPublish(template: Pick<Template, 'name' | 'sections'>
   }
   if (template.sections.length === 0) {
     issues.push({ target: { kind: 'template' }, message: 'Add at least one section.' });
+  } else if (template.sections.every((section) => section.items.length === 0)) {
+    issues.push({ target: { kind: 'template' }, message: 'Add at least one row.' });
   }
   template.sections.forEach((section, sectionIndex) => {
-    const label = `Section ${sectionIndex + 1}`;
     if (!section.title.trim()) {
       issues.push({
         target: { kind: 'section', sectionId: section.id },
-        message: `${label} needs a title.`,
-      });
-    }
-    if (section.items.length === 0) {
-      issues.push({
-        target: { kind: 'section', sectionId: section.id },
-        message: `${label} has no rows.`,
+        message: `Section ${sectionIndex + 1} needs a title.`,
       });
     }
     section.items.forEach((item, rowIndex) => {

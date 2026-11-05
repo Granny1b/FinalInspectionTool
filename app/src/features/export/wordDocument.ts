@@ -588,10 +588,13 @@ function sectionTable(section: PrintSection, mode: PrintMode): Table {
       ),
     }),
   ];
+  // An empty section (a heading for checkpoints still to be written, without spare lines): one
+  // muted line under its heading, which keeps with it.
   const rows =
     section.rows.length === 0
       ? [
           new TableRow({
+            cantSplit: true,
             children: [
               cell(
                 [
@@ -607,9 +610,18 @@ function sectionTable(section: PrintSection, mode: PrintMode): Table {
           }),
         ]
       : section.rows.map((row, index) =>
-          checklistRow(row, mode, index === 0 || index === section.rows.length - 2),
+          checklistRow(row, mode, keepsWithNext(index, section.rows.length)),
         );
   return table([...header, ...rows], CHECKLIST_COLUMNS);
+}
+
+/**
+ * The first row keeps with the second and the one before last with the last, so neither a
+ * section's heading with one row nor its last row is left alone. A section's only row has no next
+ * row to keep with (its heading keeps with it), as print.css has it.
+ */
+export function keepsWithNext(index: number, rowCount: number): boolean {
+  return index < rowCount - 1 && (index === 0 || index === rowCount - 2);
 }
 
 function checklistRow(row: PrintRow, mode: PrintMode, keepWithNext: boolean): TableRow {

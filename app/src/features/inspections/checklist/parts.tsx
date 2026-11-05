@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { Camera, ImagePlus, Info } from 'lucide-react';
 import { imageCountText } from '../../guides/guide';
 import { photoCountText } from '../deviations';
-import { CONTROL_HEIGHT } from './layout';
+import { CONTROL_HEIGHT, ROW_LINE } from './layout';
 import { STATUS_ICONS, STATUS_TONES } from './status';
 
 type StatusControlProps = {
@@ -146,5 +146,18 @@ export function PhotoCount({ count, rowRef, onClick }: PhotoCountProps) {
       <Icon size={15} aria-hidden="true" />
       {text}
     </button>
+  );
+}
+
+/**
+ * Under the heading of a section without checkpoints (published as a heading for ones still to be
+ * written): one quiet line where its rows would be, in line with a row's text. Nothing in it
+ * takes the focus, so the keyboard's row order and Tab pass it by.
+ */
+export function EmptySectionNote() {
+  return (
+    <p className={clsx(ROW_LINE, 'pl-11 text-sm leading-5 text-ink-500')}>
+      No checkpoints in this section yet.
+    </p>
   );
 }

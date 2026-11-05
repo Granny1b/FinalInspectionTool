@@ -325,12 +325,15 @@
 /* Never split a row; never leave a section title with one row at the foot of a page, or one row
    alone on the next. Not for a row with a very long comment (data-long, a third of a page or
    more): in a short section the two rules would chain every row into one block taller than a
-   page, and Chrome then splits a row rather than break between them. */
+   page, and Chrome then splits a row rather than break between them. A section's only row (one
+   checkpoint, or the "No checkpoints" line of an empty section) keeps with its title alone: as
+   the last row its "keep with the next" would pass on to the table and hold the next section on
+   the same page too. */
 .paper-table tr {
   break-inside: avoid;
 }
 
-.paper-table tbody tr:first-child:not([data-long], :has(+ [data-long])) {
+.paper-table tbody tr:first-child:not(:last-child, [data-long], :has(+ [data-long])) {
   break-after: avoid;
 }
 

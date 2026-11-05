@@ -123,6 +123,29 @@ describe('parseWorkbook — rules', () => {
     ]);
   });
 
+  it('imports a section without checkpoints as a heading without rows, with a warning', () => {
+    const parsed = parseWorkbook(
+      workbook({
+        checklist: [
+          [1, 'Loading area'],
+          ['a', null],
+          [2, 'Tool Arena'],
+          ['a', 'Robot - Warning labels visible'],
+          [3, 'Documentation'],
+        ],
+      }),
+    );
+    expect(parsed.sections.map((s) => [s.title, s.items.map((i) => i.text)])).toEqual([
+      ['Loading area', []],
+      ['Tool Arena', ['Robot - Warning labels visible']],
+      ['Documentation', []],
+    ]);
+    expect(parsed.warnings).toEqual([
+      expect.stringContaining('section 1 "Loading area" has no checkpoints'),
+      expect.stringContaining('section 3 "Documentation" has no checkpoints'),
+    ]);
+  });
+
   it('warns about letters out of sequence but keeps the row in position', () => {
     const parsed = parseWorkbook(
       workbook({
@@ -190,16 +213,15 @@ describe('parseWorkbook — rules', () => {
       /section 2 where section 1 was expected/,
     ],
     [
-      'a section without items',
+      'a checklist without a single checkpoint',
       {
         checklist: [
           [1, 'Loading area'],
           ['a', null],
           [2, 'Tool Arena'],
-          ['a', 'Robot'],
         ],
       },
-      /section 1 "Loading area" has no items/,
+      /no checkpoints in any section/,
     ],
     ['an item before any section', { checklist: [['a', 'Robot']] }, /before the first section/],
     [

@@ -364,6 +364,109 @@ test.describe('an admin', () => {
     expect((await revision.json()).sections[0].items[0].text).toBe(row.text);
   });
 
+  test('a section without rows publishes; inspections show it and print its heading', async ({
+    page,
+    template,
+  }) => {
+    const [, arena] = template.sections;
+    await openEditor(page, template);
+
+    // A new section, kept empty: its rows' place says so and offers Add row.
+    await page.getByRole('button', { name: 'Add section' }).click();
+    await expect(page.getByRole('textbox', { name: 'Section 3 title' })).toBeFocused();
+    await page.keyboard.type('Electrical cabinet');
+    await expect(page.getByText('No rows yet.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add row to section 3' })).toHaveCount(1);
+
+    // Moved up between the two others: sections are numbered by position, empty or not.
+    await page.getByRole('button', { name: 'Section 3 actions' }).click();
+    await page.getByRole('menuitem', { name: 'Move up' }).click();
+    await expect(page.getByRole('textbox', { name: 'Section 2 title' })).toHaveValue(
+      'Electrical cabinet',
+    );
+    await expect(page.getByRole('textbox', { name: 'Section 3 title' })).toHaveValue(arena!.title);
+    await expect(page.getByRole('textbox', { name: 'Row 3.a text' })).toHaveValue(
+      arena!.items[0]!.text,
+    );
+    await expect
+      .poll(async () =>
+        (await savedDraft(page.request, template.id)).sections.map((section) => [
+          section.title,
+          section.items.length,
+        ]),
+      )
+      .toEqual([
+        [template.sections[0]!.title, 3],
+        ['Electrical cabinet', 0],
+        [arena!.title, 3],
+      ]);
+
+    // An empty section is no problem when publishing.
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Publish revision 1' });
+    await dialog.getByRole('button', { name: 'Publish revision 1' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Published revision 1.' }),
+    ).toBeVisible();
+
+    const created = await page.request.post('/api/inspections', {
+      data: {
+        templateId: template.id,
+        front: {
+          machineName: 'RigiMill MG – Empty section',
+          serialNumber: 'SN-4711',
+          participants: ['Anna Andersson'],
+          location: 'Kalmar, Sweden',
+          date: '2026-11-05',
+        },
+      },
+    });
+    expect(created.status()).toBe(201);
+    const inspection = (await created.json()) as { id: string };
+    try {
+      await page.goto(`/inspections/${inspection.id}`);
+      // The heading and a quiet line; nothing to set in it, and nothing counted.
+      await expect(
+        page.getByRole('heading', { level: 3, name: 'Section 2: Electrical cabinet' }),
+      ).toBeVisible();
+      await expect(page.getByText('No checkpoints in this section yet.')).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: /Set remaining to OK in section/ }),
+      ).toHaveCount(2);
+      await expect(
+        page.getByRole('button', { name: /Set remaining to OK in section 2/ }),
+      ).toHaveCount(0);
+      await expect(page.locator('main header').getByText(/rows filled/)).toHaveText(
+        '0 / 6 rows filled · 0 NOK',
+      );
+
+      // The keyboard goes from 1.c straight on to 3.a.
+      await expect(page.getByRole('button', { name: 'Continue at 1.a' })).toBeFocused();
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('j');
+      await page.keyboard.press('j');
+      await expect(page.locator(`#row-${template.sections[0]!.items[2]!.id}`)).toBeFocused();
+      await page.keyboard.press('j');
+      await expect(page.locator(`#row-${arena!.items[0]!.id}`)).toBeFocused();
+
+      // The blank checklist prints its heading over its spare lines, lettered from a; the report
+      // says it has no checkpoints.
+      await page.goto(`/inspections/${inspection.id}/print?mode=blank`);
+      const printed = page.locator('table[data-section-ref="2"]');
+      await expect(printed.locator('thead')).toContainText('Electrical cabinet');
+      await expect(printed.locator('tbody tr[data-spare]')).toHaveCount(3);
+      await expect(printed.locator('tbody tr').first()).toHaveAttribute('data-row-ref', '2.a');
+      await expect(page.locator('table[data-section-ref="3"] tbody tr').first()).toHaveAttribute(
+        'data-row-ref',
+        '3.a',
+      );
+      await page.goto(`/inspections/${inspection.id}/print?mode=report`);
+      await expect(printed.locator('tbody')).toHaveText('No checkpoints in this section.');
+    } finally {
+      await deleteInspection(inspection.id);
+    }
+  });
+
   test('two admins on one draft: the outdated save is refused with a reload', async ({
     page,
     browser,

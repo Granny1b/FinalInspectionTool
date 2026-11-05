@@ -48,20 +48,48 @@ describe('validateForPublish', () => {
     ]);
   });
 
-  it('flags missing name, untitled and empty sections, and no sections at all', () => {
+  it('flags a missing name, untitled sections and no sections at all', () => {
     expect(validateForPublish({ name: ' ', sections: [] }).map((i) => i.message)).toEqual([
       'The template needs a name.',
       'Add at least one section.',
     ]);
     const issues = validateForPublish({
       name: 'x',
-      sections: [{ id: 's2', title: '', items: [] }],
+      sections: [
+        { id: 's2', title: '', items: [] },
+        { id: 's3', title: 'Tool arena', items: [{ id: 'i1', text: 'Tool magazine' }] },
+      ],
     });
-    expect(issues.map((i) => i.message)).toEqual([
-      'Section 1 needs a title.',
-      'Section 1 has no rows.',
+    expect(issues).toEqual([
+      { target: { kind: 'section', sectionId: 's2' }, message: 'Section 1 needs a title.' },
     ]);
-    expect(issues[0]!.target).toEqual({ kind: 'section', sectionId: 's2' });
+  });
+
+  it('accepts sections without rows (headings to fill in later), keeping their numbers', () => {
+    const sections = [
+      { id: 's1', title: 'Loading area', items: [] },
+      { id: 's2', title: 'Tool arena', items: [{ id: 'i1', text: 'Tool magazine' }] },
+      { id: 's3', title: 'Electrical cabinet', items: [] },
+      { id: 's4', title: 'Chip conveyor', items: [{ id: 'i2', text: '' }] },
+    ];
+    expect(validateForPublish({ name: 'x', sections })).toEqual([
+      // Section 4 is still 4, though two sections before it have no rows.
+      { target: { kind: 'item', sectionId: 's4', itemId: 'i2' }, message: 'Row 4.a is empty.' },
+    ]);
+  });
+
+  it('refuses a checklist without a single row: an inspection would have nothing to check', () => {
+    const issues = validateForPublish({
+      name: 'x',
+      sections: [
+        { id: 's1', title: 'Loading area', items: [] },
+        { id: 's2', title: '', items: [] },
+      ],
+    });
+    expect(issues).toEqual([
+      { target: { kind: 'template' }, message: 'Add at least one row.' },
+      { target: { kind: 'section', sectionId: 's2' }, message: 'Section 2 needs a title.' },
+    ]);
   });
 
   it('lists the problems in document order', () => {
