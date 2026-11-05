@@ -541,10 +541,22 @@ Admins only (Insights in the sidebar). The numbers come from the inspection list
 `deviations` table, so the page needs one blob listing and one table query.
 
 - **Filters**, in one row above everything they scope, and in the URL, so a view can be shared:
-  the period (last 12 months, the default; this year; last year; all time; or a custom range),
-  the model, and **Include inspections in progress** (off: only finalised inspections count, as
-  the brief asks). Dates are the inspection's front-page date. A period is relative: a link to
-  "last 12 months" shows the 12 months before the day it is opened.
+  the period, the model, and **Include inspections in progress** (off: only finalised inspections
+  count, as the brief asks). Dates are the inspection's front-page date. The periods:
+  - **Last 12 months** (the default), **This year**, **Last year** and **All time** are relative:
+    a link to "last 12 months" shows the 12 months before the day it is opened. The dates they
+    cover today show next to the menu.
+  - **Single month**: one month from a menu (`?period=month&month=2026-10`), its first to its
+    last day.
+  - **Month range**: a from month and a to month, both included
+    (`?period=months&fromMonth=2026-01&toMonth=2026-06`).
+  - **Custom dates**: any two dates (`?period=custom&from=2026-02-10&to=2026-05-20`).
+- **Choosing months:** the month menus list every month from the first inspection's (whatever the
+  filters) to the current one, newest first, as "2026-10". Switching to a month, a month range or
+  custom dates starts from the dates on screen: "Last year" becomes 2025-01 to 2025-12, so the
+  numbers don't jump until you narrow them. A range that ends before it starts says so under it
+  and shows no numbers until it makes sense. A selection without inspections says which ("There
+  are no finalised inspections in 2025-08.") and offers **Show all time**.
 - **Headline numbers:** inspections finalised (with in-progress ones, how many of each),
   deviations (NOK rows plus extra deviations), deviations per machine (deviations ÷ inspections),
   and the first-pass rate: the share of checked rows that were OK. N/A rows were not checked, so

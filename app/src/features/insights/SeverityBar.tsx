@@ -13,9 +13,6 @@ const FILL: Record<Severity, string> = {
   critical: 'bg-severity-critical text-on-severity-critical',
 };
 
-/** Below this share a block is too narrow for its label; the legend still gives the count. */
-const LABEL_MIN_SHARE = 0.08;
-
 /**
  * Deviations by severity (brief §5.5 "stacked bar"): the selection as one bar split into minor,
  * major and critical, each block labelled with its share, and a legend with the counts.
@@ -44,12 +41,14 @@ export function SeverityBar({ bySeverity }: { bySeverity: Insights['bySeverity']
               key={part.severity}
               title={`${SEVERITY_LABELS[part.severity]}: ${formatCount(part.count)} (${formatPercent(part.share)})`}
               className={clsx(
-                'flex min-w-0 items-center rounded-sm px-2 text-xs font-semibold',
+                // Each block is a container, so its label shows only when the block is wide
+                // enough for it, whatever the card's width; the legend still gives the count.
+                '@container flex min-w-0 items-center rounded-sm px-2 text-xs font-semibold',
                 FILL[part.severity],
               )}
               style={{ flexGrow: part.count, flexBasis: 0 }}
             >
-              {part.share >= LABEL_MIN_SHARE && formatPercent(part.share)}
+              <span className="@max-[1.75rem]:hidden">{formatPercent(part.share)}</span>
             </div>
           ))}
       </div>

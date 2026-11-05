@@ -3,6 +3,7 @@
  * lazily), so Recharts never weighs on the pages inspectors use.
  */
 import type { Insights } from '@modig/shared';
+import { useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -17,7 +18,7 @@ import {
   type TooltipContentProps,
   type TooltipValueType,
 } from 'recharts';
-import { countTicks } from './axis';
+import { countTicks, monthTicks } from './axis';
 import { formatCount, formatMonthLong, formatMonthShort, plural } from './format';
 
 type Month = Insights['perMonth'][number];
@@ -47,17 +48,33 @@ const CHART = [
   '[&_.recharts-rectangle.recharts-tooltip-cursor]:fill-ink-100',
 ].join(' ');
 
-const MARGIN = { top: 8, right: 12, bottom: 0, left: -12 };
+/**
+ * The line's last point sits on the plot's right edge, and its month label is centred under it:
+ * half a label ("2026-10") of room on the right keeps it whole. On the left the axis numbers'
+ * band gives it that room.
+ */
+const MARGIN = { top: 8, right: 26, bottom: 0, left: -12 };
+const Y_AXIS_WIDTH = 48;
 
 export default function MonthlyChart({ months }: { months: Month[] }) {
+  // The chart's width, for the month labels that fit it; 0 until the container is measured.
+  const [width, setWidth] = useState(0);
   const ticks = countTicks(Math.max(0, ...months.map((month) => month.deviations)));
+  const plotWidth = width - Y_AXIS_WIDTH - MARGIN.left - MARGIN.right;
   // The same axes for both forms (spread, as Recharts finds its parts among its chart's children).
   const xAxis = {
     dataKey: 'month',
     tickFormatter: formatMonthShort,
     tickMargin: 8,
-    minTickGap: 16,
-    interval: 'preserveStartEnd',
+    // Evenly spaced months that never collide ("2026-01", "2026-04", …), every one drawn.
+    ticks:
+      width > 0
+        ? monthTicks(
+            months.map((month) => month.month),
+            plotWidth,
+          )
+        : [],
+    interval: 0,
   } as const;
   const yAxis = {
     allowDecimals: false,
@@ -65,13 +82,13 @@ export default function MonthlyChart({ months }: { months: Month[] }) {
     ticks,
     tickLine: false,
     axisLine: false,
-    width: 48,
+    width: Y_AXIS_WIDTH,
   };
   return (
     <>
       <div className={CHART}>
         {/* The chart's height includes the axis band, so nothing scrolls inside the card. */}
-        <ResponsiveContainer width="100%" height={240}>
+        <ResponsiveContainer width="100%" height={240} onResize={setWidth}>
           {months.length < LINE_FROM ? (
             <BarChart data={months} margin={MARGIN}>
               <CartesianGrid vertical={false} />

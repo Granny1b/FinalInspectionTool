@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatCount } from './format';
+import { PanelEmpty } from './Panel';
 
 export type BarItem = {
   key: string;
@@ -13,6 +14,8 @@ type Props = {
   items: BarItem[];
   /** Rows shown before "Show all"; every row when omitted. */
   limit?: number;
+  /** What the card says without rows (a selection without deviations). */
+  empty?: string;
 };
 
 /**
@@ -21,8 +24,9 @@ type Props = {
  * printed, so nothing hides in a tooltip. One hue: the bars are counts of one thing, the rank is
  * in their length.
  */
-export function BarList({ items, limit }: Props) {
+export function BarList({ items, limit, empty = 'No deviations.' }: Props) {
   const [expanded, setExpanded] = useState(false);
+  if (items.length === 0) return <PanelEmpty>{empty}</PanelEmpty>;
   const max = Math.max(1, ...items.map((item) => item.value));
   const shown = limit && !expanded ? items.slice(0, limit) : items;
   return (
