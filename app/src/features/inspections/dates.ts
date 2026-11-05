@@ -7,11 +7,11 @@ export function localDate(now = new Date()): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-// Read and written in UTC, so no time zone can move the date to the day before.
-const CALENDAR = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
-
-/** "7 Oct 2026" for "2026-10-07", like the app's other dates (lib/format). */
+/**
+ * "2026-10-07" for "2026-10-07": a calendar date is already shown as the app shows dates (ISO,
+ * lib/format), so it is never read through a time zone that could move it to the day before.
+ * Kept as the one place that decides, in case the format changes again.
+ */
 export function formatCalendarDate(date: string): string {
-  const parsed = new Date(`${date}T00:00:00Z`);
-  return Number.isNaN(parsed.getTime()) ? date : CALENDAR.format(parsed);
+  return date;
 }

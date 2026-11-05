@@ -103,7 +103,7 @@ describe('a blank checklist', () => {
       { label: 'Serial number', value: 'RM-2026-031' },
       { label: 'Participants', value: 'Erik Lund, Anna Andersson' },
       { label: 'Location', value: 'Kalmar, Sweden' },
-      { label: 'Date', value: '7 Oct 2026' },
+      { label: 'Date', value: '2026-10-07' },
     ]);
     expect(model.front.photoId).toBe('Phot000000000001');
     expect(model.front.revision).toBe('Rev: 2');

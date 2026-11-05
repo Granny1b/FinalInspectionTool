@@ -161,7 +161,7 @@ test('an admin reads the KPIs of finalised inspections and exports their deviati
   await expect(perMonth.locator('.recharts-bar-rectangle')).toHaveCount(1);
   await expect(perMonth.locator('.recharts-line-dot')).toHaveCount(0);
   await expect(perMonth.locator('.recharts-label-list .recharts-label')).toHaveText(['3']);
-  await expect(perMonth.getByRole('table')).toContainText('October 202632');
+  await expect(perMonth.getByRole('table')).toContainText('2026-1032');
   const severity = panel(page, 'By severity');
   await expect(severity.getByRole('img')).toHaveAccessibleName(
     'Deviations by severity: Minor 1, Major 1, Critical 1',

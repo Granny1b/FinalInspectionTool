@@ -1,6 +1,6 @@
 import type { InspectionFrontInput } from '@modig/shared';
 import clsx from 'clsx';
-import { useState } from 'react';
+import { DateInput } from '../../components/DateInput';
 import { Field, INPUT } from '../../components/Field';
 import { FRONT_FIELD_IDS } from './issues';
 import { ParticipantsField, type PendingParticipant } from './ParticipantsField';
@@ -89,24 +89,19 @@ export function FrontPageFields({
 }
 
 /**
- * The date picker reports '' while a date is half typed or cleared, which the API would refuse;
- * only complete dates are passed on, and leaving the field shows the last one again.
+ * "2026-11-05", typed or picked. Only complete dates are passed on (the API refuses anything
+ * else), and leaving a half-typed or emptied field shows the last date again.
  */
 function DateField({ value, onChange }: { value: string; onChange: (date: string) => void }) {
-  const [text, setText] = useState<string | null>(null);
   return (
     <Field label="Date">
       {(control) => (
-        <input
+        <DateInput
           {...control}
-          type="date"
-          value={text ?? value}
-          onChange={(event) => {
-            setText(event.target.value);
-            if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) onChange(event.target.value);
-          }}
-          onBlur={() => setText(null)}
-          className={clsx(INPUT, 'h-9 tabular-nums')}
+          value={value}
+          onChange={onChange}
+          min="2000-01-01"
+          max="2099-12-31"
         />
       )}
     </Field>

@@ -162,11 +162,8 @@ async function openInspection(page: Page, { inspection }: Loaded): Promise<void>
   );
 }
 
-/** "7 Oct 2026", as the list shows a front-page date. */
-const calendarDate = (date: string) =>
-  new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(
-    new Date(`${date}T00:00:00Z`),
-  );
+/** "2026-10-07", as the list shows a front-page date: as stored, ISO. */
+const calendarDate = (date: string) => date;
 
 test.describe('an inspector', () => {
   test.beforeEach(({ context }) => signIn(context, INSPECTOR, ['inspector']));

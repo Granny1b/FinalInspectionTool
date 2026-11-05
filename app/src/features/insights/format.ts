@@ -1,4 +1,4 @@
-/** Numbers and months as the Insights page shows them (en-GB, like the app's dates). */
+/** Numbers and months as the Insights page shows them: en-GB numbers, ISO months ("2026-10"). */
 
 const COUNT = new Intl.NumberFormat('en-GB');
 const DECIMAL = new Intl.NumberFormat('en-GB', {
@@ -11,17 +11,6 @@ const PERCENT_DECIMAL = new Intl.NumberFormat('en-GB', {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
-// Read in UTC, so no time zone can move the month. The whole year: "Oct 26" reads as a date.
-const MONTH_SHORT = new Intl.DateTimeFormat('en-GB', {
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-const MONTH_LONG = new Intl.DateTimeFormat('en-GB', {
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
 
 /** "1,284" */
 export const formatCount = (value: number) => COUNT.format(value);
@@ -33,13 +22,14 @@ export const formatDecimal = (value: number) => DECIMAL.format(value);
 export const formatPercent = (share: number, decimals: 0 | 1 = 0) =>
   (decimals ? PERCENT_DECIMAL : PERCENT).format(share);
 
-const monthDate = (month: string) => new Date(`${month}-01T00:00:00Z`);
+/**
+ * "2026-10" for "2026-10" (axis): months are ISO like the app's dates (lib/format). One function
+ * per use, so a place can change on its own.
+ */
+export const formatMonthShort = (month: string) => month;
 
-/** "Oct 2026" for "2026-10" (axis). */
-export const formatMonthShort = (month: string) => MONTH_SHORT.format(monthDate(month));
-
-/** "October 2026" for "2026-10" (tooltip, table). */
-export const formatMonthLong = (month: string) => MONTH_LONG.format(monthDate(month));
+/** "2026-10" for "2026-10" (tooltip, table). */
+export const formatMonthLong = (month: string) => month;
 
 /** "3 deviations", "1 deviation" */
 export function plural(count: number, one: string, many = `${one}s`): string {

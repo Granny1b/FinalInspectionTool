@@ -9,9 +9,9 @@ describe('localDate', () => {
 });
 
 describe('formatCalendarDate', () => {
-  it('reads like the app’s other dates and never shifts the day', () => {
-    expect(formatCalendarDate('2026-10-07')).toBe('7 Oct 2026');
-    expect(formatCalendarDate('2026-01-01')).toBe('1 Jan 2026');
+  it('is ISO, like the app’s other dates, and never shifts the day', () => {
+    expect(formatCalendarDate('2026-10-07')).toBe('2026-10-07');
+    expect(formatCalendarDate('2026-01-01')).toBe('2026-01-01');
   });
 
   it('shows anything unparseable as it is', () => {

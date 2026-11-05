@@ -1,5 +1,6 @@
 import type { MachineModel } from '@modig/shared';
 import clsx from 'clsx';
+import { DateInput } from '../../components/DateInput';
 import { INPUT } from '../../components/Field';
 import { PERIOD_LABELS, PERIODS, type InsightsFilter, type Period } from './filters';
 
@@ -37,30 +38,30 @@ export function InsightsFilters({ filter, models, error, onChange }: Props) {
         </div>
         {custom && (
           <div className="flex w-full items-center gap-2 sm:w-auto">
-            <input
-              type="date"
+            <DateInput
               aria-label="From"
               min="2000-01-01"
               max="2099-12-31"
+              clearable
               value={filter.from}
-              onChange={(event) => onChange({ ...filter, from: event.target.value })}
+              onChange={(from) => onChange({ ...filter, from })}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? 'insights-range-error' : undefined}
-              className={clsx(INPUT, 'h-9 sm:w-40')}
+              className="min-w-0 flex-1 sm:w-40 sm:flex-none"
             />
             <span aria-hidden="true" className="text-sm text-ink-500">
               –
             </span>
-            <input
-              type="date"
+            <DateInput
               aria-label="To"
               min="2000-01-01"
               max="2099-12-31"
+              clearable
               value={filter.to}
-              onChange={(event) => onChange({ ...filter, to: event.target.value })}
+              onChange={(to) => onChange({ ...filter, to })}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? 'insights-range-error' : undefined}
-              className={clsx(INPUT, 'h-9 sm:w-40')}
+              className="min-w-0 flex-1 sm:w-40 sm:flex-none"
             />
           </div>
         )}
