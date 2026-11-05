@@ -1,6 +1,6 @@
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { rowRef, sectionNumber, sectionSpareRows, type Section } from '@modig/shared';
+import { rowRef, sectionNumber, type Section } from '@modig/shared';
 import clsx from 'clsx';
 import { GripVertical, ListChecks, Plus, Undo2, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
@@ -19,19 +19,11 @@ import { useDocumentDnd, type DragState } from './useDocumentDnd';
 type Props = {
   sections: Section[];
   onChange: (sections: Section[]) => void;
-  /** The template's default, for sections without a number of their own. */
-  spareRowsPerSection: number;
   issues: IssueIndex;
   onEditorDirtyChange?: (dirty: boolean) => void;
 };
 
-export function EditableDocument({
-  sections,
-  onChange,
-  spareRowsPerSection,
-  issues,
-  onEditorDirtyChange,
-}: Props) {
+export function EditableDocument({ sections, onChange, issues, onEditorDirtyChange }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<Deleted | null>(null);
@@ -40,7 +32,6 @@ export function EditableDocument({
   const actions = useDocumentActions({
     sections,
     onChange,
-    spareRowsPerSection,
     rootRef,
     confirmDelete: setConfirmingDelete,
     onDeleted: setDeleted,
@@ -82,7 +73,6 @@ export function EditableDocument({
                   section={section}
                   index={index}
                   sectionCount={shown.length}
-                  spareRows={sectionSpareRows(section, { spareRowsPerSection })}
                   issues={issues.sections.get(section.id)}
                   itemIssues={issues.items}
                   collapsed={drag?.kind === 'section' && drag.sectionId === section.id}
@@ -163,8 +153,9 @@ type UndoBarProps = {
 };
 
 /**
- * "Row 1.c deleted · Undo" (or a section, or a spare line) at the bottom of the window until the
- * next change to the structure; not timed. The live region stays mounted so screen readers announce the message when it appears.
+ * "Row 1.c deleted · Undo" (or a section) at the bottom of the window until the next change to
+ * the structure; not timed. The live region stays mounted so screen readers announce the message
+ * when it appears.
  */
 function UndoBar({ deleted, onUndo, onDismiss }: UndoBarProps) {
   return createPortal(

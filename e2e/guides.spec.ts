@@ -404,7 +404,6 @@ test('an inspection shows the guide as it was when it was created, from the rowâ
     data: {
       name: draft.name,
       modelCode: draft.modelCode,
-      printSettings: draft.printSettings,
       sections,
     },
   });

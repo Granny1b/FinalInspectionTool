@@ -449,19 +449,19 @@ test.describe('an admin', () => {
       await page.keyboard.press('j');
       await expect(page.locator(`#row-${arena!.items[0]!.id}`)).toBeFocused();
 
-      // The blank checklist prints its heading over its spare lines, lettered from a; the report
-      // says it has no checkpoints.
-      await page.goto(`/inspections/${inspection.id}/print?mode=blank`);
+      // The blank checklist and the report alike print its heading over a line saying it has no
+      // checkpoints; section 3 keeps its number.
       const printed = page.locator('table[data-section-ref="2"]');
-      await expect(printed.locator('thead')).toContainText('Electrical cabinet');
-      await expect(printed.locator('tbody tr[data-spare]')).toHaveCount(3);
-      await expect(printed.locator('tbody tr').first()).toHaveAttribute('data-row-ref', '2.a');
-      await expect(page.locator('table[data-section-ref="3"] tbody tr').first()).toHaveAttribute(
-        'data-row-ref',
-        '3.a',
-      );
-      await page.goto(`/inspections/${inspection.id}/print?mode=report`);
-      await expect(printed.locator('tbody')).toHaveText('No checkpoints in this section.');
+      for (const mode of ['blank', 'report']) {
+        await page.goto(`/inspections/${inspection.id}/print?mode=${mode}`);
+        await expect(printed.locator('thead')).toContainText('Electrical cabinet');
+        await expect(printed.locator('tbody')).toHaveText('No checkpoints in this section.');
+        await expect(printed.locator('tbody tr[data-row-ref]')).toHaveCount(0);
+        await expect(page.locator('table[data-section-ref="3"] tbody tr').first()).toHaveAttribute(
+          'data-row-ref',
+          '3.a',
+        );
+      }
     } finally {
       await deleteInspection(inspection.id);
     }
@@ -597,52 +597,6 @@ test.describe('an admin', () => {
     release();
     await page.waitForURL(/\/templates$/);
     expect((await savedDraft(page.request, template.id)).coverImageId).toEqual(expect.any(String));
-  });
-
-  test('spare lines: one deleted comes back with Undo, one added; each section keeps its own', async ({
-    page,
-    template,
-  }) => {
-    const spare = (ref: string) => page.getByRole('button', { name: `Delete spare line ${ref}` });
-    const addSpare = page.getByRole('button', { name: 'Add spare line to section 1' });
-    const spareRows = async () =>
-      (await savedDraft(page.request, template.id)).sections[0]!.spareRows;
-    await openEditor(page, template);
-    // Three rows and the template's three spare lines in each section.
-    await expect(spare('1.f')).toHaveCount(1);
-
-    // Shown on hover, like a row's actions.
-    await spare('1.f').hover();
-    await spare('1.f').click();
-    await expect(spare('1.f')).toHaveCount(0);
-    // The line before it keeps the keyboard focus; section 2 is as it was.
-    await expect(spare('1.e')).toBeFocused();
-    await expect(spare('2.f')).toHaveCount(1);
-    const undo = page.getByRole('status').filter({ hasText: 'Spare line 1.f deleted.' });
-    await expect(undo).toBeVisible();
-    await expect.poll(spareRows).toBe(2);
-
-    await undo.getByRole('button', { name: 'Undo' }).click();
-    await expect(spare('1.f')).toHaveCount(1);
-    await expect(addSpare).toBeFocused();
-    await expect.poll(spareRows).toBeUndefined();
-
-    await addSpare.click();
-    await expect(spare('1.g')).toHaveCount(1);
-    await expect.poll(spareRows).toBe(4);
-
-    // The template's number is the default: it changes only the sections left as they were.
-    await page.getByLabel('Spare lines per section (default)').fill('1');
-    await expect(spare('2.d')).toHaveCount(1);
-    await expect(spare('2.e')).toHaveCount(0);
-    await expect(spare('1.g')).toHaveCount(1);
-    await expect(saveStatus(page)).toHaveText('Saved');
-
-    // And so it prints: four spare lines after section 1, one after section 2.
-    await page.getByRole('link', { name: 'Print preview' }).click();
-    await expect(page.locator('tr[data-spare]')).toHaveCount(5);
-    await expect(page.locator('tr[data-row-ref="1.g"][data-spare]')).toHaveCount(1);
-    await expect(page.locator('tr[data-row-ref="2.d"][data-spare]')).toHaveCount(1);
   });
 
   test('the templates can be shown as cards, and stay that way', async ({ page, published }) => {
@@ -899,7 +853,7 @@ test.describe('an inspector', () => {
     await expect(page.locator('main').locator('input, textarea, select')).toHaveCount(0);
     await expect(
       page.getByRole('button', {
-        name: /Publish|Add row|Add section|Add spare line|Delete spare line|Move|Template actions/,
+        name: /Publish|Add row|Add section|Move|Template actions/,
       }),
     ).toHaveCount(0);
 

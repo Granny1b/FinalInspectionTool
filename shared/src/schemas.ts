@@ -5,6 +5,11 @@
  * Schemas are deliberately permissive about *content* (empty strings are allowed in drafts)
  * and strict about *structure*. Stricter rules (e.g. "every row needs text before publishing")
  * belong to the specific action that needs them.
+ *
+ * Objects strip keys they don't know (zod's default; never `.strict()`), so data stored by an
+ * earlier version still parses after a field is removed: templates, inspections and template
+ * files from before spare lines were removed carry `printSettings` and `Section.spareRows`, and
+ * parse without them.
  */
 import { z } from 'zod';
 import { DEFAULT_DEVIATION_CATEGORIES, DEFAULT_RESPONSIBLES } from './constants';
@@ -161,29 +166,8 @@ export const SectionSchema = z.object({
   id: IdSchema,
   title: z.string().max(200),
   items: z.array(ItemSchema),
-  /**
-   * Spare (blank) lines printed after this section's rows. Absent: the template's
-   * `printSettings.spareRowsPerSection`. Set when an admin adds or deletes spare lines of one
-   * section. Use `sectionSpareRows()` to read it.
-   */
-  spareRows: z.number().int().min(0).max(30).optional(),
 });
 export type Section = z.infer<typeof SectionSchema>;
-
-export const DEFAULT_SPARE_ROWS_PER_SECTION = 3;
-
-/** The spare lines a section prints: its own count, else the template's. */
-export function sectionSpareRows(
-  section: { spareRows?: number },
-  printSettings: { spareRowsPerSection: number },
-): number {
-  return section.spareRows ?? printSettings.spareRowsPerSection;
-}
-
-export const PrintSettingsSchema = z.object({
-  spareRowsPerSection: z.number().int().min(0).max(30),
-});
-export type PrintSettings = z.infer<typeof PrintSettingsSchema>;
 
 export const TemplateStatusSchema = z.enum(['draft', 'published']);
 export type TemplateStatus = z.infer<typeof TemplateStatusSchema>;
@@ -197,7 +181,6 @@ export const TemplateSchema = z.object({
   revision: z.number().int().min(1),
   status: TemplateStatusSchema,
   coverImageId: IdSchema.optional(),
-  printSettings: PrintSettingsSchema,
   sections: z.array(SectionSchema),
   /** Optional note written when a revision is published (shown in revision history). */
   changeNote: z.string().max(1000).optional(),
@@ -292,13 +275,12 @@ export const InspectionSchema = z.object({
   templateRevision: z.number().int().min(1),
   /**
    * FROZEN copy at creation – template edits never change existing inspections. Besides the
-   * sections it keeps the template's name and print settings, so printing an inspection never
-   * depends on the live template.
+   * sections it keeps the template's name, so printing an inspection never depends on the live
+   * template.
    */
   templateSnapshot: z.object({
     name: z.string().max(200),
     sections: z.array(SectionSchema),
-    printSettings: PrintSettingsSchema,
   }),
   front: InspectionFrontSchema,
   /** Keyed by Item.id */

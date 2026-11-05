@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Guide, Template } from './schemas';
+import { TemplateSchema, type Guide, type Template } from './schemas';
 import { templateExport } from './templateTransfer';
 import {
   CreateTemplateRequestSchema,
@@ -16,7 +16,6 @@ const base: Template = {
   modelCode: 'RMMG',
   revision: 3,
   status: 'draft',
-  printSettings: { spareRowsPerSection: 3 },
   sections: [
     {
       id: 's1',
@@ -124,7 +123,7 @@ describe('hasUnpublishedChanges', () => {
     ).toBe(false);
   });
 
-  it('detects reworded, reordered and moved rows, and print setting / cover changes', () => {
+  it('detects reworded, reordered and moved rows, and cover changes', () => {
     const s = base.sections[0]!;
     expect(
       hasUnpublishedChanges(
@@ -141,22 +140,27 @@ describe('hasUnpublishedChanges', () => {
         published,
       ),
     ).toBe(true);
-    expect(
-      hasUnpublishedChanges({ ...base, printSettings: { spareRowsPerSection: 5 } }, published),
-    ).toBe(true);
     expect(hasUnpublishedChanges({ ...base, coverImageId: 'img1' }, published)).toBe(true);
   });
 
-  it("compares the spare lines each section prints, not how they're stored", () => {
+  it('sees no change in the spare lines an older stored revision still carries', () => {
     const s = base.sections[0]!;
-    const withSpare = (spareRows: number): Template => ({
-      ...base,
-      sections: [{ ...s, spareRows }],
-    });
-    expect(hasUnpublishedChanges(withSpare(2), published)).toBe(true);
-    // Its own count equals the template's 3: the same lines on paper.
-    expect(hasUnpublishedChanges(withSpare(3), published)).toBe(false);
-    expect(hasUnpublishedChanges(base, { ...withSpare(0), status: 'published' })).toBe(true);
+    // A revision published before spare lines were removed, as it is stored.
+    const stored = {
+      ...published,
+      printSettings: { spareRowsPerSection: 5 },
+      sections: [{ ...s, spareRows: 2 }],
+    };
+    const parsed = TemplateSchema.parse(stored);
+    expect('printSettings' in parsed).toBe(false);
+    expect('spareRows' in parsed.sections[0]!).toBe(false);
+    // The draft as saved now: the same checklist without those fields.
+    expect(hasUnpublishedChanges(base, parsed)).toBe(false);
+    // Even unparsed, they are no part of what is compared.
+    expect(hasUnpublishedChanges(base, stored as Template)).toBe(false);
+    expect(
+      hasUnpublishedChanges(TemplateSchema.parse({ ...stored, status: 'draft' }), published),
+    ).toBe(false);
   });
 
   it('detects a guide added, changed or removed, but not the same guide again', () => {
@@ -196,7 +200,17 @@ describe('request schemas', () => {
       status: 'published',
       updatedBy: 'evil',
     });
-    expect(Object.keys(parsed).sort()).toEqual(['modelCode', 'name', 'printSettings', 'sections']);
+    expect(Object.keys(parsed).sort()).toEqual(['modelCode', 'name', 'sections']);
+  });
+
+  it('draft input from an editor that still sends spare lines saves without them', () => {
+    const parsed = TemplateDraftInputSchema.parse({
+      ...base,
+      printSettings: { spareRowsPerSection: 3 },
+      sections: base.sections.map((section) => ({ ...section, spareRows: 1 })),
+    });
+    expect('printSettings' in parsed).toBe(false);
+    expect(parsed.sections).toEqual(base.sections);
   });
 
   it('create needs a name and a valid model code', () => {
@@ -247,6 +261,20 @@ describe('request schemas', () => {
         newModel: { code: 'RMMG', name: 'RigiMill MG' },
       }).success,
     ).toBe(false);
+  });
+
+  it('import takes a file exported before spare lines were removed, and drops them', () => {
+    const current = templateExport(base, 'RigiMill MG', '2026-10-20T08:00:00.000Z');
+    const old = {
+      ...current,
+      template: {
+        ...current.template,
+        printSettings: { spareRowsPerSection: 3 },
+        sections: current.template.sections.map((section) => ({ ...section, spareRows: 4 })),
+      },
+    };
+    const parsed = ImportTemplateRequestSchema.parse({ name: 'Copy', modelCode: 'IM', file: old });
+    expect(parsed.file).toEqual(current);
   });
 });
 

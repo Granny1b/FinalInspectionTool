@@ -11,12 +11,10 @@ const draft: TemplateDraftInput = {
   name: 'Final inspection – RigiMill MG',
   modelCode: 'RMMG',
   coverImageId: undefined,
-  printSettings: { spareRowsPerSection: 3 },
   sections: [
     {
       id: 'Sect000000000001',
       title: 'Loading area',
-      spareRows: 1,
       items: [{ id: 'Item000000000001', text: 'Lifting columns - Marked screws' }],
     },
   ],
@@ -39,6 +37,18 @@ describe('templateFileName', () => {
 describe('parseTemplateFile', () => {
   it('reads back an exported template', () => {
     expect(parseTemplateFile(JSON.stringify(file, null, 2))).toEqual(file);
+  });
+
+  it('reads a file exported before spare lines were removed, without them', () => {
+    const old = {
+      ...file,
+      template: {
+        ...file.template,
+        printSettings: { spareRowsPerSection: 3 },
+        sections: file.template.sections.map((section) => ({ ...section, spareRows: 1 })),
+      },
+    };
+    expect(parseTemplateFile(text(old))).toEqual(file);
   });
 
   it.each([

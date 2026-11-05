@@ -588,8 +588,8 @@ function sectionTable(section: PrintSection, mode: PrintMode): Table {
       ),
     }),
   ];
-  // An empty section (a heading for checkpoints still to be written, without spare lines): one
-  // muted line under its heading, which keeps with it.
+  // An empty section (a heading for checkpoints still to be written), blank or report: one muted
+  // line under its heading, which keeps with it.
   const rows =
     section.rows.length === 0
       ? [

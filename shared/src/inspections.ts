@@ -83,7 +83,6 @@ export function snapshotTemplate(revision: Template): Inspection['templateSnapsh
   const snapshot: Inspection['templateSnapshot'] = {
     name: revision.name,
     sections: revision.sections,
-    printSettings: revision.printSettings,
   };
   // Plain JSON data, so a JSON round trip is a complete deep copy.
   return JSON.parse(JSON.stringify(snapshot)) as Inspection['templateSnapshot'];

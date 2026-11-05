@@ -1,18 +1,13 @@
 /**
  * Templates as JSON files (export and import between installations, or as a backup). The file
- * holds the checklist and its print settings; images (cover, guide images) are referenced by id,
- * so they come along only within the same installation, where those images exist.
+ * holds the checklist; images (cover, guide images) are referenced by id, so they come along only
+ * within the same installation, where those images exist. Files exported before spare lines were
+ * removed also hold `printSettings` and sections' `spareRows`: still version 1, they import as
+ * before, without those fields (zod strips unknown keys).
  */
 import { z } from 'zod';
 import { newId } from './ids';
-import {
-  IdSchema,
-  ModelCodeSchema,
-  PrintSettingsSchema,
-  SectionSchema,
-  type Section,
-  type Template,
-} from './schemas';
+import { IdSchema, ModelCodeSchema, SectionSchema, type Section, type Template } from './schemas';
 
 export const TEMPLATE_EXPORT_FORMAT = 'modig-final-inspection/template';
 
@@ -27,7 +22,6 @@ export const TemplateExportSchema = z.object({
     /** The model's name, so an import into an installation without that model can create it. */
     modelName: z.string().max(100).optional(),
     coverImageId: IdSchema.optional(),
-    printSettings: PrintSettingsSchema,
     sections: z.array(SectionSchema),
   }),
 });
@@ -41,11 +35,11 @@ type Checklist = {
 
 /** The file for a template: its draft as the editor shows it, with the model's name. */
 export function templateExport(
-  template: Pick<Template, 'name' | 'modelCode' | 'coverImageId' | 'printSettings' | 'sections'>,
+  template: Pick<Template, 'name' | 'modelCode' | 'coverImageId' | 'sections'>,
   modelName: string | undefined,
   exportedAt: string,
 ): TemplateExport {
-  const { name, modelCode, coverImageId, printSettings, sections } = template;
+  const { name, modelCode, coverImageId, sections } = template;
   return {
     format: TEMPLATE_EXPORT_FORMAT,
     version: 1,
@@ -55,7 +49,6 @@ export function templateExport(
       modelCode,
       ...(modelName && { modelName }),
       ...(coverImageId && { coverImageId }),
-      printSettings,
       sections,
     },
   };

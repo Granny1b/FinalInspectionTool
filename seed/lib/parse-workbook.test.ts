@@ -104,7 +104,7 @@ describe('parseWorkbook — rules', () => {
     return wb;
   }
 
-  it('skips lettered rows without text (spare lines)', () => {
+  it('skips lettered rows without text', () => {
     const parsed = parseWorkbook(
       workbook({
         checklist: [

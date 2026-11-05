@@ -10,7 +10,6 @@ import { BlobServiceClient } from '@azure/storage-blob';
 import {
   blobNames,
   CONTAINERS,
-  DEFAULT_SPARE_ROWS_PER_SECTION,
   DEVIATIONS_TABLE,
   InspectionSchema,
   newId,
@@ -96,7 +95,7 @@ const CHECKLIST = [
 export async function createTemplate(
   name: string,
   published = false,
-  checklist?: { sections: Section[]; spareRowsPerSection?: number },
+  checklist?: { sections: Section[] },
   modelCode = TEST_MODEL,
 ): Promise<Template> {
   const draft: Template = {
@@ -105,9 +104,6 @@ export async function createTemplate(
     modelCode,
     revision: published ? 2 : 1,
     status: 'draft',
-    printSettings: {
-      spareRowsPerSection: checklist?.spareRowsPerSection ?? DEFAULT_SPARE_ROWS_PER_SECTION,
-    },
     sections:
       checklist?.sections ??
       CHECKLIST.map(({ title, rows }) => ({

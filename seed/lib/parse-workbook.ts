@@ -49,7 +49,7 @@ export function parseWorkbook(workbook: Workbook): ParsedWorkbook {
 /**
  * The brief's rule, literally: a section header row has an integer in column B and the title in
  * column D; item rows have a letter in column B and the checkpoint text in column D. Lettered rows
- * with an empty column D are spare lines for handwritten findings — now a print setting (brief §6).
+ * with an empty column D (blank lines on the paper form) are skipped: the app prints no blank rows.
  * Text in column D next to anything else in B ("b.", a note) is skipped with a warning, never
  * silently.
  */
@@ -73,7 +73,7 @@ function parseChecklist(ws: Worksheet, warnings: string[]): Section[] {
       return;
     }
 
-    if (!text) return; // a spare line or an empty row
+    if (!text) return; // a lettered row without text, or an empty row
     const letter = cellText(marker).toLowerCase();
     if (/^\d+$/.test(letter)) {
       throw new Error(
@@ -106,8 +106,9 @@ function parseChecklist(ws: Worksheet, warnings: string[]): Section[] {
       `Sheet "${ws.name}": no section header rows found (integer in column B, title in column D)`,
     );
   }
-  // As in the app, a section may wait for its checkpoints (it prints as a heading with its spare
-  // lines), but a checklist without any would give inspections nothing to check.
+  // As in the app, a section may wait for its checkpoints (it prints as its heading with "No
+  // checkpoints in this section."), but a checklist without any would give inspections nothing
+  // to check.
   if (sections.every((section) => section.items.length === 0)) {
     throw new Error(`Sheet "${ws.name}": no checkpoints in any section (row letter in column B)`);
   }

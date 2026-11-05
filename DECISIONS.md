@@ -520,8 +520,9 @@ The calls with product, security or data impact. Each is explained in its sectio
   are hidden on tablets.
 - **Rows show only their letter; the section number is in the header.** Labels and screen reader
   announcements use the full ref ("Row 3.c text").
-- **Spare rows are previewed faint and hidden from screen readers** (one sentence says how many),
-  before **+ Add row**, so the lettering continues as on paper.
+- _Superseded: spare lines were removed, see 'Spare lines removed'._ **Spare rows are previewed
+  faint and hidden from screen readers** (one sentence says how many), before **+ Add row**, so the
+  lettering continues as on paper.
 - **Row actions (Guide, Duplicate, Delete) appear on hover and on keyboard focus; on touch
   screens each row has one ⋯ menu instead.** Three icons on 90 rows of a tablet were noise.
 - **The Guide action is shown disabled, with "Guide: coming in phase 5".**
@@ -643,7 +644,8 @@ The calls with product, security or data impact. Each is explained in its sectio
 - **New template offers only models without a template.** The name defaults to "Final
   inspection – {model}" and follows the model until edited. (Later it also offers a new machine
   model: see Templates: delete, spare lines, cards, JSON files, new models.)
-- **Spare rows accept whole numbers in the schema's range (0–30);** anything else reverts on blur.
+- _Superseded: spare lines were removed, see 'Spare lines removed'._ **Spare rows accept whole
+  numbers in the schema's range (0–30);** anything else reverts on blur.
 - **"Who" is the stored email,** with dates in en-GB ("6 Oct 2026, 14:32"), so a Swedish browser
   doesn't mix Swedish month names into the English UI. (Since Users and names: the name on the
   people list, else the email.)
@@ -1989,12 +1991,14 @@ The people list in Settings → Users & access, and names instead of emails.
   delete (412). A 404 counts as deleted.
 - **Locally, deleting the seeded RigiMill MG template brings it back at the next `npm run dev`.**
   The seed imports it whenever no template for RMMG exists. Production seeds once, by hand.
-- **Spare lines: a section gets its own `spareRows` the first time one of its spare lines is added
-  or deleted. The template's number stays the default for the other sections, and nothing
-  normalises a section's count back to it.** Deleting a spare line removes the last one: the lines
-  are all alike, so the letters never jump. Undo puts back the previous own count, or none.
-- **"Unpublished changes" compares the spare lines each section prints, not how they are
-  stored.** A section's own 3 next to a default of 3 is the same paper.
+- _Superseded: spare lines were removed, see 'Spare lines removed'._ **Spare lines: a section gets
+  its own `spareRows` the first time one of its spare lines is added or deleted. The template's
+  number stays the default for the other sections, and nothing normalises a section's count back to
+  it.** Deleting a spare line removes the last one: the lines are all alike, so the letters never
+  jump. Undo puts back the previous own count, or none.
+- _Superseded: spare lines were removed, see 'Spare lines removed'._ **"Unpublished changes"
+  compares the spare lines each section prints, not how they are stored.** A section's own 3 next to
+  a default of 3 is the same paper.
 - **Import keeps the file's section and row ids only when no draft or revision anywhere uses any
   of them; otherwise every section and row gets a new id.** Re-importing an exported template (a
   backup, a move between installations) keeps its checkpoints' KPI history. Copying one next to
@@ -2283,9 +2287,10 @@ them.
   focusable, so `↑`/`↓`, `J`/`K` and `Tab` go from the row before it to the row after it. Progress
   and Continue at count rows, so they are unchanged. The finalised view, and the read-only
   template view for inspectors and revisions, show the same line.
-- **Print: a blank checklist prints the heading over the section's spare lines, lettered from a;
-  a report prints the heading and one muted line, "No checkpoints in this section."** Word the
-  same. Without spare lines a blank checklist prints that line too.
+- _Superseded: spare lines were removed, see 'Spare lines removed'._ **Print: a blank checklist
+  prints the heading over the section's spare lines, lettered from a; a report prints the heading
+  and one muted line, "No checkpoints in this section."** Word the same. Without spare lines a blank
+  checklist prints that line too.
 - **A section's only row keeps with its title, not with the next section.** "First row keeps with
   next" also applied to a row that was the last one, and a last row's `break-after: avoid` passes
   on to its table: an empty or one-row section then dragged the next section's start along. In a
@@ -2512,3 +2517,51 @@ them.
   head the first table only: in every table they would come round again for each inspection of a
   row or two. Browsers without margin boxes get the fallback footer from the last table only, for
   the same reason.
+
+## Spare lines removed (2026-11-05)
+
+- **Spare lines are gone from the whole product.** They were the blank, lettered lines printed
+  after a section's rows on a blank checklist (template preview, an inspection's blank print, the
+  Word export), with a template default (`printSettings.spareRowsPerSection`, 3) and a count per
+  section (`Section.spareRows`) edited in the template editor. The user never uses them and asked
+  for the function to go. Gone with them: the editor's spare lines with their delete, Undo and
+  **+ Add spare line**, the "Spare lines per section (default)" setting on the front page card and
+  in the read-only front page, the print row's `spare` flag and `data-spare`, and in shared
+  `SectionSchema.spareRows`, `DEFAULT_SPARE_ROWS_PER_SECTION`, `sectionSpareRows`,
+  `PrintSettingsSchema`, `Template.printSettings`, `templateSnapshot.printSettings` and the
+  template file's `printSettings`. There is no other print setting, so nothing replaces
+  `printSettings`. On paper a finding that belongs to no row goes on the blank Deviation
+  Summary's lines; in a report it is an extra deviation, as before.
+- **A blank checklist prints the checkpoints and nothing more.** The rows still letter 1.a, 1.b…
+  and are at least 9 mm high; the page-break rules are unchanged (a section's first row keeps with
+  the next, its last with the one before, a section's only row with its title). A blank
+  checklist and a template preview take fewer pages; the e2e page-count ranges follow.
+- **A section without rows prints, blank or report, its heading and the muted line "No
+  checkpoints in this section."** That is the line reports already printed; with spare lines a
+  blank checklist printed the heading over them instead. The line keeps with its heading and never
+  holds the next section on its page, in print and in Word alike.
+- **Backward compatibility: stored data and exported files keep working, and nothing migrates
+  them.** Template drafts and revisions and inspections in blob storage, and template files
+  exported before this change, carry `printSettings` and sections' `spareRows`. The zod objects
+  strip keys they don't know (the default; no schema uses `.strict()`), so the API reads them, and
+  the app and the import parse them, without those fields. A draft or inspection loses them at
+  its next save; a published revision, never rewritten, keeps them in storage, where nothing reads
+  them. Template files stay format `modig-final-inspection/template`, version 1: a version 1 file
+  with spare lines imports like one without (version 2 would have made every exported file
+  unreadable for no gain).
+- **"Unpublished changes" ignores them too.** `sameTemplateContent` compares name, model, cover
+  and sections field by field, never whole objects, so a draft saved now is not "changed" just
+  because the latest revision still carries spare lines. A draft whose only difference from its
+  revision was its spare lines shows no unpublished changes any more; there is nothing left to
+  publish.
+- **Tests:** shared unit tests parse an old stored template, an old inspection and an old export
+  file (version 1, with `printSettings` and `sections[].spareRows`) and check the fields are
+  dropped and the comparison is unchanged; the API tests store an old draft, revisions and
+  inspection (`withSpareLines` in `api/test/storage.ts`), read and save them without unpublished
+  changes, create an inspection from an old revision and import an old file; the app parses an
+  old file. The e2e test of the editor's spare lines is deleted; the print tests count the
+  checkpoints only and expect the empty section's line in the blank print too.
+- **Earlier entries that mention spare lines in passing are left as written:** the seed skipping
+  lettered rows without text (Phase 1, Seed; it still does, they are simply blank lines on the
+  paper form), the snapshot keeping print settings (Phase 3, Contract), spare lines printing in
+  blank mode only and the page-count ranges (Phase 4, Print and Tests and tooling).

@@ -53,8 +53,8 @@ type Cleanup = {
 };
 
 const test = base.extend<{
-  /** A published copy of the seeded checklist; `spareRows` per section (3 if omitted). */
-  copyOfSeeded: (name: string, spareRows?: number) => Promise<Template>;
+  /** A published copy of the seeded checklist. */
+  copyOfSeeded: (name: string) => Promise<Template>;
   cleanup: Cleanup;
   /** The inspector's page in a browser of its own that keeps download names (see below). */
   downloadingPage: Page;
@@ -63,12 +63,9 @@ const test = base.extend<{
   copyOfSeeded: async ({}, use) => {
     const ids: string[] = [];
     const seeded = await findSeededRevision();
-    await use(async (name, spareRows) => {
+    await use(async (name) => {
       expect(seeded?.revision.sections.flatMap((section) => section.items)).toHaveLength(90);
-      const template = await createTemplate(name, true, {
-        sections: seeded!.revision.sections,
-        spareRowsPerSection: spareRows,
-      });
+      const template = await createTemplate(name, true, { sections: seeded!.revision.sections });
       ids.push(template.id);
       return template;
     });
@@ -185,33 +182,24 @@ function expectFrontPage(page: PdfPage, texts: (string | RegExp)[]): void {
 
 /**
  * The checklist pages (after the front page, before the deviations): every row in order, each
- * whole on the one page that has its ref; spare rows (blank) continue the lettering; no section
- * title is left at the foot of a page without a row of its section after it.
+ * whole on the one page that has its ref, and no other row; no section title is left at the foot
+ * of a page without a row of its section after it. For sections that all have rows.
  */
-function expectChecklist(
-  pages: PdfPage[],
-  sections: Section[],
-  spareRows: number,
-): { checklistPages: PdfPage[] } {
+function expectChecklist(pages: PdfPage[], sections: Section[]): { checklistPages: PdfPage[] } {
   const firstDeviationPage = pages.findIndex(isDeviationPage);
   expect(firstDeviationPage).toBeGreaterThan(1);
   const checklistPages = pages.slice(1, firstDeviationPage);
   expect(checklistPages[0]!.texts.some((text) => text.text === 'Checklist')).toBe(true);
 
-  const expected = sections.flatMap((section, index) => {
-    const rows = [...section.items.map((item) => item.text), ...Array<string>(spareRows).fill('')];
-    return rows.map((text, row) => ({ ref: `${index + 1}.${rowLetter(row)}`, text }));
-  });
+  const expected = sections.flatMap((section, index) =>
+    section.items.map((item, row) => ({ ref: `${index + 1}.${rowLetter(row)}`, text: item.text })),
+  );
   const printed = checklistPages.flatMap((page) =>
     refsOn(page).map((ref) => ({ ref: ref.text, page })),
   );
   expect(printed.map(({ ref }) => ref)).toEqual(expected.map(({ ref }) => ref));
   expected.forEach(({ ref, text }, index) => {
-    if (text) {
-      expect(pageText(printed[index]!.page), `row ${ref} whole on its page`).toContain(
-        compact(text),
-      );
-    }
+    expect(pageText(printed[index]!.page), `row ${ref} whole on its page`).toContain(compact(text));
   });
 
   const titled = new Set<number>();
@@ -730,20 +718,21 @@ test('a blank checklist of the 90-row RigiMill MG prints on A4 with room to writ
   await page.goto(`/inspections/${inspection.id}/print?mode=blank`);
   const pages = await printPdf(page, 'blank-checklist');
   await expect(page.locator('[data-print-root]')).toHaveAttribute('data-print-mode', 'blank');
-  await expect(page.locator('tr[data-spare]')).toHaveCount(6 * 3);
+  // A row per checkpoint, and no blank lines after them.
+  await expect(page.locator('tr[data-row-ref]')).toHaveCount(90);
   // The seeded checklist has no guides: no reference images to include.
   const appendix = page.getByRole('checkbox', { name: 'Include reference images' });
   await expect(appendix).toBeDisabled();
   await expect(appendix).toHaveAccessibleDescription('No reference images in this checklist');
 
-  // 90 checkpoints and 3 spare lines per section, each at least 9 mm: 108 × 9 mm = 972 mm, at
-  // least 4 of the 267 mm content pages; measured 5 (most checkpoints take two lines). With the
-  // front page and the Deviation Summary: 7, and one page more is allowed.
+  // 90 checkpoints, each at least 9 mm: 810 mm, more than 3 of the 267 mm content pages, so at
+  // least 4; most checkpoints take two lines, so 5 is likely. With the front page and the
+  // Deviation Summary: 6 or 7, and one page more is allowed.
   expect(pages.length).toBeGreaterThanOrEqual(6);
   expect(pages.length).toBeLessThanOrEqual(8);
   expectPages(pages, inspectionFooter(await companyName(page.request), inspection));
   expectFrontPage(pages[0]!, [inspection.number, 'Rev: 1', 'Inspected by', 'Signature']);
-  const { checklistPages } = expectChecklist(pages, inspection.templateSnapshot.sections, 3);
+  const { checklistPages } = expectChecklist(pages, inspection.templateSnapshot.sections);
   expect(smallestRowPitch(checklistPages) / MM).toBeGreaterThanOrEqual(9);
   expectBlankDeviationTable(pages);
 });
@@ -811,7 +800,7 @@ for (const perPage of [2, 4] as const) {
     ]);
     // The front page shows the logo and the machine photo.
     expect(pdf[0]!.images).toBe(2);
-    expectChecklist(pdf, inspection.templateSnapshot.sections, 0);
+    expectChecklist(pdf, inspection.templateSnapshot.sections);
     expectCards(pdf, cards, pagesOf(cards, perPage), inspection.number);
   });
 }
@@ -863,7 +852,7 @@ test('a page holds fewer cards when their text needs the room; no card is ever s
     `${inspectionFooter(await companyName(page.request), inspection)} · Not finalised`,
   );
   expectFrontPage(pdf[0]!, [inspection.number, 'NOT FINALISED – DRAFT REPORT']);
-  expectChecklist(pdf, inspection.templateSnapshot.sections, 0);
+  expectChecklist(pdf, inspection.templateSnapshot.sections);
   expectCards(
     pdf,
     expectedCards(noks, []),
@@ -950,7 +939,7 @@ test('a deviation too tall to share a page of four has one of its own, full widt
     pdf,
     `${inspectionFooter(await companyName(page.request), inspection)} · Not finalised`,
   );
-  expectChecklist(pdf, inspection.templateSnapshot.sections, 0);
+  expectChecklist(pdf, inspection.templateSnapshot.sections);
   expectCards(
     pdf,
     expectedCards(noks, extras),
@@ -959,33 +948,34 @@ test('a deviation too tall to share a page of four has one of its own, full widt
   );
 });
 
-test('a template preview prints the draft as a blank checklist; spare rows run on past z', async ({
+test('a template preview prints the draft as a blank checklist', async ({
   page,
   context,
   copyOfSeeded,
 }) => {
   await signIn(context, ADMIN, ['admin']);
-  // Section 5 has 22 rows: five spare lines are 5.w to 5.aa.
-  const template = await copyOfSeeded('E2E print – template preview', 5);
+  const template = await copyOfSeeded('E2E print – template preview');
 
   await page.goto(`/templates/${template.id}/print`);
   const pages = await printPdf(page, 'template-preview');
-  await expect(page.locator('tr[data-row-ref="5.aa"][data-spare]')).toHaveCount(1);
+  // A row per checkpoint, and no blank lines after them: section 5's 22 rows end at 5.v. (Refs
+  // past z, on real rows, are in "long front-page values and a section past z".)
+  await expect(page.locator('tr[data-row-ref]')).toHaveCount(90);
+  await expect(page.locator('tr[data-row-ref="5.v"]')).toHaveCount(1);
+  await expect(page.locator('tr[data-row-ref="5.w"]')).toHaveCount(0);
 
-  // 90 checkpoints and 5 spare lines per section at 9 mm or more: 120 × 9 mm = 1080 mm, at
-  // least 5 content pages; measured 6. With the front page and the Deviation Summary: 8, and one
-  // page more is allowed.
-  expect(pages.length).toBeGreaterThanOrEqual(7);
-  expect(pages.length).toBeLessThanOrEqual(9);
+  // As the blank checklist: 90 checkpoints at 9 mm or more, at least 4 content pages, 5 likely.
+  // With the front page and the Deviation Summary: 6 or 7, and one page more is allowed.
+  expect(pages.length).toBeGreaterThanOrEqual(6);
+  expect(pages.length).toBeLessThanOrEqual(8);
   expectPages(pages, `${await companyName(page.request)} · ${template.name} · Draft – Rev 2`);
   expectFrontPage(pages[0]!, ['Draft – Rev 2', 'Inspected by']);
-  const { checklistPages } = expectChecklist(pages, template.sections, 5);
-  expect(checklistPages.flatMap(refsOn).map((ref) => ref.text)).toContain('5.aa');
+  const { checklistPages } = expectChecklist(pages, template.sections);
   expect(smallestRowPitch(checklistPages) / MM).toBeGreaterThanOrEqual(9);
   expectBlankDeviationTable(pages);
 });
 
-test('a section without checkpoints prints its heading: spare lines blank, one line in a report', async ({
+test('a section without checkpoints prints its heading and one line saying so, blank or report', async ({
   page,
   context,
   cleanup,
@@ -999,38 +989,34 @@ test('a section without checkpoints prints its heading: spare lines blank, one l
     { id: newId(), title: 'Electrical cabinet', items: [] },
     { id: newId(), title: 'Tool arena', items: checkpoints(3) },
   ];
-  const template = await createTemplate('E2E print – empty section', true, {
-    sections,
-    spareRowsPerSection: 2,
-  });
+  const template = await createTemplate('E2E print – empty section', true, { sections });
   cleanup.template(template.id);
   const { inspection } = await createInspection(page.request, template, 'RigiMill MG – Empty');
   cleanup.inspection(inspection.id);
   const footer = inspectionFooter(await companyName(page.request), inspection);
 
-  // Blank: the heading over its two spare lines, 2.a and 2.b; section 3 keeps its number.
-  await page.goto(`/inspections/${inspection.id}/print?mode=blank`);
-  const blank = await printPdf(page, 'empty-section-blank');
-  expectPages(blank, footer);
-  expectChecklist(blank, sections, 2);
-
-  // Report: the heading and one line saying so, on the page of its heading; no row refs.
-  await page.goto(`/inspections/${inspection.id}/print?mode=report`);
-  const report = await printPdf(page, 'empty-section-report');
-  expectPages(report, `${footer} · Not finalised`);
-  const refs = report.flatMap(refsOn).map((ref) => ref.text);
-  expect(refs).toEqual(['1.a', '1.b', '3.a', '3.b']);
-  const headed = report.filter((pdfPage) =>
-    pdfPage.texts.some((text) => text.text === 'Electrical cabinet' && text.size > 9.5),
-  );
-  expect(headed).toHaveLength(1);
-  expect(pageText(headed[0]!)).toContain(
-    compact(
-      'Electrical cabinet No. Checkpoint Comment OK NOK N/A Resp No checkpoints in this section.',
-    ),
-  );
-  // Counted as before: the empty section adds no checkpoint.
-  expect(pageText(report[0]!)).toContain(compact('4 checkpoints: 0 OK · 0 NOK · 0 N/A'));
+  // Blank and report alike: the heading and one line saying so, on the page of its heading; no
+  // row refs, and section 3 keeps its number.
+  for (const mode of ['blank', 'report'] as const) {
+    await page.goto(`/inspections/${inspection.id}/print?mode=${mode}`);
+    const pdf = await printPdf(page, `empty-section-${mode}`);
+    expectPages(pdf, mode === 'report' ? `${footer} · Not finalised` : footer);
+    const refs = pdf.flatMap(refsOn).map((ref) => ref.text);
+    expect(refs, mode).toEqual(['1.a', '1.b', '3.a', '3.b']);
+    const headed = pdf.filter((pdfPage) =>
+      pdfPage.texts.some((text) => text.text === 'Electrical cabinet' && text.size > 9.5),
+    );
+    expect(headed, mode).toHaveLength(1);
+    expect(pageText(headed[0]!), mode).toContain(
+      compact(
+        'Electrical cabinet No. Checkpoint Comment OK NOK N/A Resp No checkpoints in this section.',
+      ),
+    );
+    // Counted as before: the empty section adds no checkpoint.
+    if (mode === 'report') {
+      expect(pageText(pdf[0]!)).toContain(compact('4 checkpoints: 0 OK · 0 NOK · 0 N/A'));
+    }
+  }
 });
 
 test('long front-page values and a section past z still print cleanly', async ({
@@ -1048,10 +1034,7 @@ test('long front-page values and a section past z still print cleanly', async ({
       text: `Checkpoint ${index + 1}-${row + 1} - In order`,
     })),
   }));
-  const template = await createTemplate('E2E print – long values', true, {
-    sections,
-    spareRowsPerSection: 0,
-  });
+  const template = await createTemplate('E2E print – long values', true, { sections });
   cleanup.template(template.id);
   // Every front-page value long, thirty participants: more than a front page holds.
   const response = await page.request.post('/api/inspections', {
@@ -1230,7 +1213,7 @@ test('reference images print in an appendix, two to a row, captioned with ref an
   const appendixPages = all.slice(first);
   expect(appendixPages.length).toBeGreaterThanOrEqual(2);
   expect(appendixPages.length).toBeLessThanOrEqual(3);
-  expectChecklist(pages, inspection.templateSnapshot.sections, 0);
+  expectChecklist(pages, inspection.templateSnapshot.sections);
   const nok = {
     text: inspection.templateSnapshot.sections[0]!.items[1]!.text,
     comment: NOK_COMMENT,

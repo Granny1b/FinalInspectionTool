@@ -51,10 +51,7 @@ export function PublishedTemplateView({
       <PublishedFrontPage template={template} models={settings.data?.machineModels} />
       <section aria-labelledby="checklist-title" className="mt-10">
         <ChecklistHeading id="checklist-title" sections={template.sections} />
-        <TemplateDocument
-          sections={template.sections}
-          spareRowsPerSection={template.printSettings.spareRowsPerSection}
-        />
+        <TemplateDocument sections={template.sections} />
       </section>
     </>
   );

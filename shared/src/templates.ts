@@ -9,10 +9,8 @@ import {
   IdSchema,
   MachineModelSchema,
   ModelCodeSchema,
-  sectionSpareRows,
   TemplateSchema,
   type MachineModel,
-  type PrintSettings,
   type Section,
   type Template,
 } from './schemas';
@@ -28,7 +26,6 @@ export const TemplateDraftInputSchema = TemplateSchema.pick({
   name: true,
   modelCode: true,
   coverImageId: true,
-  printSettings: true,
   sections: true,
 });
 export type TemplateDraftInput = z.infer<typeof TemplateDraftInputSchema>;
@@ -173,9 +170,10 @@ export type PublishIssue = z.infer<typeof PublishIssueSchema>;
  * so a list of them reads top to bottom like the checklist.
  *
  * A section may have no rows yet: an admin can publish a heading as a reminder of what is still
- * to be added, and it prints with its spare lines. The checklist as a whole needs a row, though:
- * an inspection of it would have nothing to check, could never show a status and would finalise
- * as an empty report. A row needs its text: a checkpoint without one would reach inspections.
+ * to be added, and it prints as its heading over "No checkpoints in this section." The checklist
+ * as a whole needs a row, though: an inspection of it would have nothing to check, could never
+ * show a status and would finalise as an empty report. A row needs its text: a checkpoint without
+ * one would reach inspections.
  */
 export function validateForPublish(template: Pick<Template, 'name' | 'sections'>): PublishIssue[] {
   const issues: PublishIssue[] = [];
@@ -215,22 +213,20 @@ type TemplateContent = {
   name: string;
   modelCode: string;
   coverImageId?: string | undefined;
-  printSettings: PrintSettings;
   sections: Section[];
 };
 
 function publishedContent(t: TemplateContent): string {
-  // Built field by field so key order (and therefore the string) is stable.
+  // Built field by field so key order (and therefore the string) is stable, and fields a stored
+  // template may still carry from an earlier version (printSettings, a section's spareRows) are
+  // no change.
   return JSON.stringify([
     t.name,
     t.modelCode,
     t.coverImageId ?? null,
-    t.printSettings.spareRowsPerSection,
     t.sections.map((s) => [
       s.id,
       s.title,
-      // The lines it prints: a section's own count equal to the default is no change on paper.
-      sectionSpareRows(s, t.printSettings),
       // Guides come out of zod parsing, which emits keys in schema order on both sides.
       s.items.map((i) => [i.id, i.text, i.guide ?? null]),
     ]),

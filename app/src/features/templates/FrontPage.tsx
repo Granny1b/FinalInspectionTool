@@ -51,23 +51,17 @@ export function PublishedFrontPage({
   return (
     <FrontPageFrame revisionLabel={`Rev: ${template.revision}`}>
       <PhotoFrame imageId={template.coverImageId} noun="cover photo" />
-      <dl className="grid content-start gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-        <Detail label="Template name" wide>
-          {template.name}
-        </Detail>
+      <dl className="grid content-start gap-y-4 text-sm">
+        <Detail label="Template name">{template.name}</Detail>
         <Detail label="Machine model">{modelName(models, template.modelCode)}</Detail>
-        <Detail label="Spare lines per section (default)">
-          {template.printSettings.spareRowsPerSection}
-        </Detail>
-        {/* The whole row: nothing sits beside it, and the author's name needs the room. */}
-        <Detail label="Published" wide>
+        <Detail label="Published">
           {formatDateTime(template.updatedAt)}
           <span className="block truncate text-ink-500" title={template.updatedBy}>
             {personName(template.updatedBy)}
           </span>
         </Detail>
         {template.changeNote && (
-          <Detail label="Change note" wide>
+          <Detail label="Change note">
             <span className="whitespace-pre-line">{template.changeNote}</span>
           </Detail>
         )}
@@ -76,9 +70,9 @@ export function PublishedFrontPage({
   );
 }
 
-function Detail({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
+function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={wide ? 'sm:col-span-2' : undefined}>
+    <div>
       <dt className="text-xs font-medium text-ink-500">{label}</dt>
       <dd className="mt-1 text-ink-900">{children}</dd>
     </div>

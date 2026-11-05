@@ -75,11 +75,7 @@ const LONG_COMMENT = 600;
 
 function Row({ row }: { row: PrintRow }) {
   return (
-    <tr
-      data-row-ref={row.ref}
-      data-spare={row.spare || undefined}
-      data-long={row.comment.length > LONG_COMMENT || undefined}
-    >
+    <tr data-row-ref={row.ref} data-long={row.comment.length > LONG_COMMENT || undefined}>
       <td className="paper-ref">{row.ref}</td>
       <td>{row.text}</td>
       <td>

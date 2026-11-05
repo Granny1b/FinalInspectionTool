@@ -9,8 +9,8 @@ import { ActionMenu } from '../../../components/ActionMenu';
 import { bodyDndId, rowDndId, sectionDndId, type DragData } from './dnd';
 import { EditableRow } from './EditableRow';
 import { GRID, HEADER_FILL, ISSUE_OUTLINE, REF_CELL, SECTION_HEADER, TEXT_CELL } from './layout';
-import { MAX_SPARE_ROWS, rowCountText } from './ops';
-import { ColumnLabels, DragHandle, IssueNote, SpareRows } from './parts';
+import { rowCountText } from './ops';
+import { ColumnLabels, DragHandle, IssueNote } from './parts';
 import type { DocumentActions } from './useDocumentActions';
 import type { DragKind } from './useDocumentDnd';
 
@@ -21,7 +21,6 @@ type Props = {
   section: Section;
   index: number;
   sectionCount: number;
-  spareRows: number;
   issues: string[] | undefined;
   itemIssues: ReadonlyMap<string, string[]>;
   /** Only the header (and its row count) while this section is being dragged. */
@@ -38,7 +37,6 @@ export const EditableSection = memo(function EditableSection({
   section,
   index,
   sectionCount,
-  spareRows,
   issues,
   itemIssues,
   collapsed,
@@ -183,43 +181,17 @@ export const EditableSection = memo(function EditableSection({
             />
           ))}
         </SortableContext>
-        {rowCount === 0 && (
+        {/* An empty section offers Add row in its empty state, where its rows will go. */}
+        {rowCount === 0 ? (
           <EmptyRows
             dropping={activeType === 'row'}
             addRow={<AddRowButton sectionId={section.id} number={number} actions={actions} />}
           />
-        )}
-        <SpareRows
-          start={rowCount}
-          count={spareRows}
-          edit={{
-            sectionId: section.id,
-            sectionIndex: index,
-            onDelete: (offset) => actions.deleteSpareRow(section.id, offset),
-          }}
-        />
-        <div className="mt-1.5 ml-9 flex flex-wrap gap-x-1">
-          {/* An empty section offers it in its empty state instead, where its rows will go. */}
-          {rowCount > 0 && (
+        ) : (
+          <div className="mt-1.5 ml-9">
             <AddRowButton sectionId={section.id} number={number} actions={actions} />
-          )}
-          <button
-            type="button"
-            data-add-spare={section.id}
-            onClick={() => actions.addSpareRow(section.id)}
-            disabled={spareRows >= MAX_SPARE_ROWS}
-            aria-label={`Add spare line to section ${number}`}
-            title={
-              spareRows >= MAX_SPARE_ROWS
-                ? `A section has at most ${MAX_SPARE_ROWS} spare lines`
-                : 'A blank lettered line on the printed checklist, for findings written by hand'
-            }
-            className={clsx(ADD_BUTTON, 'disabled:opacity-50')}
-          >
-            <Plus size={15} aria-hidden="true" />
-            Add spare line
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

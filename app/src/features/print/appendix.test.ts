@@ -135,7 +135,6 @@ describe('the appendix in a printout', () => {
     modelCode: 'RMMG',
     revision: 3,
     status: 'draft',
-    printSettings: { spareRowsPerSection: 0 },
     sections: SECTIONS,
     updatedAt: '2026-10-07T08:00:00.000Z',
     updatedBy: 'anna@modig.se',
@@ -154,11 +153,7 @@ describe('the appendix in a printout', () => {
       number: 'FI-2026-0042',
       templateId: template.id,
       templateRevision: 2,
-      templateSnapshot: {
-        name: template.name,
-        sections: SECTIONS,
-        printSettings: { spareRowsPerSection: 0 },
-      },
+      templateSnapshot: { name: template.name, sections: SECTIONS },
       front: {
         machineName: 'RigiMill MG',
         modelCode: 'RMMG',

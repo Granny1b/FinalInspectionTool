@@ -14,6 +14,7 @@ import {
   type MachineModel,
   type People,
   type Person,
+  type Section,
   type Settings,
   type Template,
 } from '@modig/shared';
@@ -102,7 +103,6 @@ export function draftTemplate(overrides: Partial<Template> = {}): Template {
     modelCode: 'RMMG',
     revision: 1,
     status: 'draft',
-    printSettings: { spareRowsPerSection: 3 },
     sections: [
       {
         id: newId(),
@@ -121,6 +121,21 @@ export function draftTemplate(overrides: Partial<Template> = {}): Template {
     updatedAt: '2026-10-01T08:00:00.000Z',
     updatedBy: 'seed',
     ...overrides,
+  };
+}
+
+/**
+ * A template, or an inspection's template snapshot, as an earlier version stored it, before spare
+ * lines were removed: with print settings, and sections with spare lines of their own. Storage
+ * still holds such documents, and so do template files exported then.
+ */
+export function withSpareLines<T extends { sections: Section[] }>(
+  template: T,
+): T & { printSettings: { spareRowsPerSection: number } } {
+  return {
+    ...template,
+    printSettings: { spareRowsPerSection: 3 },
+    sections: template.sections.map((section, index) => ({ ...section, spareRows: index + 1 })),
   };
 }
 
