@@ -31,6 +31,11 @@ export type Created = { sections: Section[]; id: string };
 // Lookups
 // ---------------------------------------------------------------------------------------------
 
+/** A folded section's size, as the header and the floating copy show it while it is dragged. */
+export function rowCountText(count: number): string {
+  return count === 0 ? 'No rows' : count === 1 ? '1 row' : `${count} rows`;
+}
+
 export function findSection(sections: Section[], sectionId: string): number {
   return sections.findIndex((section) => section.id === sectionId);
 }

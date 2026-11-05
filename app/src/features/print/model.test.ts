@@ -408,6 +408,49 @@ describe('a report', () => {
   });
 });
 
+describe('an inspection with a section without checkpoints', () => {
+  // Published as a heading for checkpoints still to be written: section 2 of 3.
+  const sections = [SECTIONS[0]!, section(3, 'Electrical cabinet', 0), SECTIONS[1]!];
+  const withEmpty = inspection({
+    templateSnapshot: {
+      name: 'Final inspection – RigiMill MG',
+      sections,
+      printSettings: { spareRowsPerSection: 2 },
+    },
+    results: { [row2b!.id]: { status: 'NOK', comment: 'Label missing' } },
+  });
+
+  it('keeps its place and number; the sections after it keep theirs', () => {
+    for (const mode of ['blank', 'report'] as const) {
+      const model = inspectionPrint(withEmpty, mode, CONTEXT);
+      expect(model.sections.map((s) => [s.number, s.title])).toEqual([
+        [1, 'Loading area'],
+        [2, 'Electrical cabinet'],
+        [3, 'Tool arena'],
+      ]);
+    }
+  });
+
+  it('prints its spare lines on the blank checklist, lettered from a', () => {
+    const model = inspectionPrint(withEmpty, 'blank', CONTEXT);
+    expect(refs(model.sections[1]!.rows)).toEqual(['2.a', '2.b']);
+    expect(model.sections[1]!.rows.every((row) => row.spare && row.text === '')).toBe(true);
+  });
+
+  it('has no rows in the report (it prints "No checkpoints in this section.")', () => {
+    const model = inspectionPrint(withEmpty, 'report', CONTEXT);
+    expect(model.sections[1]!.rows).toEqual([]);
+    expect(refs(model.sections[2]!.rows)).toEqual(['3.a', '3.b', '3.c']);
+    // Counted and carded as before: the empty section adds nothing.
+    expect(model.front.report?.summary).toBe(
+      '5 checkpoints: 0 OK · 1 NOK · 0 N/A · 4 not checked · 1 deviation',
+    );
+    expect(cardsOf(model).map((card) => [card.ref, card.sectionTitle])).toEqual([
+      ['3.b', 'Tool arena'],
+    ]);
+  });
+});
+
 describe('a template preview', () => {
   it('prints the draft blank, marked as a draft, with its own spare rows', () => {
     const model = templatePrint(template(), { ...CONTEXT, draft: true });

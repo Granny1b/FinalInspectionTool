@@ -3,21 +3,13 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import { sectionNumber, type Section } from '@modig/shared';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from 'lucide-react';
-import { memo, useId, useMemo, type KeyboardEvent } from 'react';
+import { ArrowDown, ArrowUp, Copy, ListPlus, Pencil, Plus, Trash2 } from 'lucide-react';
+import { memo, useId, useMemo, type KeyboardEvent, type ReactNode } from 'react';
 import { ActionMenu } from '../../../components/ActionMenu';
 import { bodyDndId, rowDndId, sectionDndId, type DragData } from './dnd';
 import { EditableRow } from './EditableRow';
-import {
-  GRID,
-  HEADER_FILL,
-  ISSUE_OUTLINE,
-  REF_CELL,
-  ROW_LINE,
-  SECTION_HEADER,
-  TEXT_CELL,
-} from './layout';
-import { MAX_SPARE_ROWS } from './ops';
+import { GRID, HEADER_FILL, ISSUE_OUTLINE, REF_CELL, SECTION_HEADER, TEXT_CELL } from './layout';
+import { MAX_SPARE_ROWS, rowCountText } from './ops';
 import { ColumnLabels, DragHandle, IssueNote, SpareRows } from './parts';
 import type { DocumentActions } from './useDocumentActions';
 import type { DragKind } from './useDocumentDnd';
@@ -70,7 +62,7 @@ export const EditableSection = memo(function EditableSection({
   });
   // The rows area accepts rows even when it has none.
   const bodyData: DragData = { type: 'body', sectionId: section.id };
-  const body = useDroppable({
+  const { setNodeRef: setBodyRef } = useDroppable({
     id: bodyDndId(section.id),
     data: bodyData,
     disabled: activeType !== 'row',
@@ -132,9 +124,7 @@ export const EditableSection = memo(function EditableSection({
               className="h-8 min-w-0 flex-1 rounded-sm bg-transparent px-2 text-[0.9375rem] font-semibold text-ellipsis text-ink-900 placeholder:font-normal placeholder:text-ink-500 focus:bg-surface focus-visible:outline-1 focus-visible:-outline-offset-1"
             />
             {collapsed && (
-              <span className="shrink-0 px-2 text-xs text-ink-500">
-                {rowCount === 1 ? '1 row' : `${rowCount} rows`}
-              </span>
+              <span className="shrink-0 px-2 text-xs text-ink-500">{rowCountText(rowCount)}</span>
             )}
           </div>
           <div className="col-start-3 row-start-1 flex justify-end pr-1 @min-[52rem]:col-start-2 @min-[52rem]:justify-self-end">
@@ -178,7 +168,7 @@ export const EditableSection = memo(function EditableSection({
         {issues && <IssueNote id={issueId} messages={issues} />}
       </div>
 
-      <div ref={body.setNodeRef} className={clsx(collapsed && 'hidden')}>
+      <div ref={setBodyRef} className={clsx(collapsed && 'hidden')}>
         <SortableContext id={section.id} items={rowIds} strategy={verticalListSortingStrategy}>
           {section.items.map((item, rowIndex) => (
             <EditableRow
@@ -194,17 +184,10 @@ export const EditableSection = memo(function EditableSection({
           ))}
         </SortableContext>
         {rowCount === 0 && (
-          <p
-            className={clsx(
-              ROW_LINE,
-              'flex items-center pl-11 text-sm text-ink-500',
-              activeType === 'row' && 'bg-brand-50',
-            )}
-          >
-            {activeType === 'row'
-              ? 'Drop the row here'
-              : 'No rows yet. Add one, or drag rows here.'}
-          </p>
+          <EmptyRows
+            dropping={activeType === 'row'}
+            addRow={<AddRowButton sectionId={section.id} number={number} actions={actions} />}
+          />
         )}
         <SpareRows
           start={rowCount}
@@ -216,15 +199,10 @@ export const EditableSection = memo(function EditableSection({
           }}
         />
         <div className="mt-1.5 ml-9 flex flex-wrap gap-x-1">
-          <button
-            type="button"
-            onClick={() => actions.addRow(section.id)}
-            aria-label={`Add row to section ${number}`}
-            className={ADD_BUTTON}
-          >
-            <Plus size={15} aria-hidden="true" />
-            Add row
-          </button>
+          {/* An empty section offers it in its empty state instead, where its rows will go. */}
+          {rowCount > 0 && (
+            <AddRowButton sectionId={section.id} number={number} actions={actions} />
+          )}
           <button
             type="button"
             data-add-spare={section.id}
@@ -246,3 +224,63 @@ export const EditableSection = memo(function EditableSection({
     </div>
   );
 });
+
+/** The section's "+ Add row": one per section, at the end of its rows or in its empty state. */
+function AddRowButton({
+  sectionId,
+  number,
+  actions,
+}: {
+  sectionId: string;
+  number: number;
+  actions: DocumentActions;
+}) {
+  return (
+    <button
+      type="button"
+      data-add-row={sectionId}
+      onClick={() => actions.addRow(sectionId)}
+      aria-label={`Add row to section ${number}`}
+      className={ADD_BUTTON}
+    >
+      <Plus size={15} aria-hidden="true" />
+      Add row
+    </button>
+  );
+}
+
+/**
+ * Where the rows of a section without any will go: a dashed frame in the rows' place, which says
+ * so and holds the section's Add row, and lights up as the drop target while a row is dragged
+ * (the whole rows area takes the drop). A section may be published like this, as a heading for
+ * checkpoints still to be written.
+ */
+function EmptyRows({ dropping, addRow }: { dropping: boolean; addRow: ReactNode }) {
+  return (
+    <div className="border-b border-ink-200 py-2 pl-9">
+      <div
+        className={clsx(
+          'flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-dashed py-1.5 pr-1.5 pl-3 transition-colors',
+          dropping ? 'border-brand-400 bg-brand-50' : 'border-ink-300 bg-ink-50',
+        )}
+      >
+        <p className="flex min-w-0 items-center gap-2.5 text-sm text-ink-500">
+          <ListPlus
+            size={16}
+            aria-hidden="true"
+            className={clsx('shrink-0', dropping ? 'text-brand-600' : 'text-ink-400')}
+          />
+          {dropping ? (
+            <span className="font-medium text-brand-800">Drop the row here</span>
+          ) : (
+            <span>
+              <span className="font-medium text-ink-700">No rows yet.</span> Add the first
+              checkpoint, or drag rows here.
+            </span>
+          )}
+        </p>
+        {!dropping && addRow}
+      </div>
+    </div>
+  );
+}

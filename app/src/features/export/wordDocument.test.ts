@@ -10,7 +10,7 @@ import {
 } from '../print/model';
 import { wordFileName } from './exportWord';
 import type { WordImage } from './images';
-import { wordDocument, type WordImages } from './wordDocument';
+import { keepsWithNext, wordDocument, type WordImages } from './wordDocument';
 
 /**
  * Word documents built from print models, packed as Word would read them (`Packer.toBuffer`) and
@@ -509,6 +509,58 @@ describe('the Word export of a template preview', () => {
     expect(text(footer)).toContain(
       'Modig Machine Tool · Final inspection – RigiMill MG · Draft – Rev 3',
     );
+  });
+});
+
+describe('the Word export of a section without checkpoints', () => {
+  const empty: Section = { id: id('Sect', 9), title: 'Electrical cabinet', items: [] };
+  // The empty section is the second of three: the last keeps its number 3.
+  const sections = [SECTIONS[0]!, empty, SECTIONS[1]!];
+  const template: Template = {
+    id: id('Tmpl', 2),
+    name: 'Final inspection – RigiMill MG',
+    modelCode: 'RMMG',
+    revision: 3,
+    status: 'published',
+    printSettings: { spareRowsPerSection: 2 },
+    sections,
+    updatedAt: '2026-10-07T08:00:00.000Z',
+    updatedBy: 'anna@modig.se',
+  };
+  /** A section's table as text: from its number and title to the next section's. */
+  const sectionText = (all: string, title: string, next: string) =>
+    all.slice(all.indexOf(title), all.indexOf(next, all.indexOf(title)));
+
+  it('prints its heading and its spare lines, lettered from a, on a blank checklist', async () => {
+    const all = text((await build(templatePrint(template, { ...CONTEXT, draft: false }))).document);
+    const table = sectionText(all, '2Electrical cabinet', '3Tool arena');
+    expect(table).toBe('2Electrical cabinetNo.CheckpointCommentOKNOKN/AResp2.a☐☐☐2.b☐☐☐');
+    expect(all).toContain('3.aTool magazine - All pockets clean');
+  });
+
+  it('says it has no checkpoints in a report, on one line that keeps with the heading', async () => {
+    const report = inspectionPrint(
+      { ...INSPECTION, templateSnapshot: { ...INSPECTION.templateSnapshot, sections } },
+      'report',
+      CONTEXT,
+    );
+    const { document } = await build(report);
+    const table = sectionText(text(document), '2Electrical cabinet', '3Tool arena');
+    expect(table).toBe(
+      '2Electrical cabinetNo.CheckpointCommentOKNOKN/ARespNo checkpoints in this section.',
+    );
+    const line = tableRows(document).find((row) => row.includes('No checkpoints in this section.'));
+    expect(line).toContain('<w:cantSplit/>');
+    expect(line).toContain('<w:i/>');
+  });
+
+  it('keeps a first row with the next and the one before last with the last, never a lone row', () => {
+    const keeps = (count: number) =>
+      Array.from({ length: count }, (_, index) => keepsWithNext(index, count));
+    expect(keeps(1)).toEqual([false]);
+    expect(keeps(2)).toEqual([true, false]);
+    expect(keeps(3)).toEqual([true, true, false]);
+    expect(keeps(5)).toEqual([true, false, false, true, false]);
   });
 });
 

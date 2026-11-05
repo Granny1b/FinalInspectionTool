@@ -3,8 +3,8 @@
  * the caller loads the workbook and decides what to do with the result.
  *
  * Hard problems (nothing sensible to import) throw; oddities that still give a usable template
- * (a letter out of sequence, a row skipped for its column B, a missing "Rev: N") become
- * `warnings`.
+ * (a letter out of sequence, a row skipped for its column B, a section without checkpoints, a
+ * missing "Rev: N") become `warnings`.
  */
 import type { Cell, Workbook, Worksheet } from 'exceljs';
 import {
@@ -106,9 +106,16 @@ function parseChecklist(ws: Worksheet, warnings: string[]): Section[] {
       `Sheet "${ws.name}": no section header rows found (integer in column B, title in column D)`,
     );
   }
+  // As in the app, a section may wait for its checkpoints (it prints as a heading with its spare
+  // lines), but a checklist without any would give inspections nothing to check.
+  if (sections.every((section) => section.items.length === 0)) {
+    throw new Error(`Sheet "${ws.name}": no checkpoints in any section (row letter in column B)`);
+  }
   sections.forEach((section, index) => {
     if (section.items.length === 0) {
-      throw new Error(`Sheet "${ws.name}": section ${index + 1} "${section.title}" has no items`);
+      warnings.push(
+        `${ws.name}: section ${index + 1} "${section.title}" has no checkpoints; it is imported as a heading without rows`,
+      );
     }
   });
   return sections;

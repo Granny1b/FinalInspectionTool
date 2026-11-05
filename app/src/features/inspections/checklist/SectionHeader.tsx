@@ -12,6 +12,8 @@ type Props = {
   children?: ReactNode;
   /** A read-only sheet's columns (READ_GRID): Status and Responsible. */
   readOnly?: boolean;
+  /** A section without checkpoints: no column labels, as there is no column under them. */
+  empty?: boolean;
 };
 
 /**
@@ -19,7 +21,7 @@ type Props = {
  * tablet on a line of their own under the title (the action stays beside it), on a desktop beside
  * the title.
  */
-export function SectionHeader({ number, title, children, readOnly = false }: Props) {
+export function SectionHeader({ number, title, children, readOnly = false, empty = false }: Props) {
   const heading = (
     <>
       <span
@@ -34,6 +36,9 @@ export function SectionHeader({ number, title, children, readOnly = false }: Pro
       </h3>
     </>
   );
+  if (empty) {
+    return <div className={clsx(readOnly ? READ_GRID : GRID, SECTION_HEADER)}>{heading}</div>;
+  }
   if (readOnly) {
     return (
       <div className={clsx(READ_GRID, SECTION_HEADER)}>

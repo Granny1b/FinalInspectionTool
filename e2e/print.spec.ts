@@ -985,6 +985,54 @@ test('a template preview prints the draft as a blank checklist; spare rows run o
   expectBlankDeviationTable(pages);
 });
 
+test('a section without checkpoints prints its heading: spare lines blank, one line in a report', async ({
+  page,
+  context,
+  cleanup,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  // Section 2 was published as a heading for checkpoints still to be written.
+  const checkpoints = (section: number) =>
+    [1, 2].map((row) => ({ id: newId(), text: `Checkpoint ${section}-${row} - In order` }));
+  const sections: Section[] = [
+    { id: newId(), title: 'Loading area', items: checkpoints(1) },
+    { id: newId(), title: 'Electrical cabinet', items: [] },
+    { id: newId(), title: 'Tool arena', items: checkpoints(3) },
+  ];
+  const template = await createTemplate('E2E print – empty section', true, {
+    sections,
+    spareRowsPerSection: 2,
+  });
+  cleanup.template(template.id);
+  const { inspection } = await createInspection(page.request, template, 'RigiMill MG – Empty');
+  cleanup.inspection(inspection.id);
+  const footer = inspectionFooter(await companyName(page.request), inspection);
+
+  // Blank: the heading over its two spare lines, 2.a and 2.b; section 3 keeps its number.
+  await page.goto(`/inspections/${inspection.id}/print?mode=blank`);
+  const blank = await printPdf(page, 'empty-section-blank');
+  expectPages(blank, footer);
+  expectChecklist(blank, sections, 2);
+
+  // Report: the heading and one line saying so, on the page of its heading; no row refs.
+  await page.goto(`/inspections/${inspection.id}/print?mode=report`);
+  const report = await printPdf(page, 'empty-section-report');
+  expectPages(report, `${footer} · Not finalised`);
+  const refs = report.flatMap(refsOn).map((ref) => ref.text);
+  expect(refs).toEqual(['1.a', '1.b', '3.a', '3.b']);
+  const headed = report.filter((pdfPage) =>
+    pdfPage.texts.some((text) => text.text === 'Electrical cabinet' && text.size > 9.5),
+  );
+  expect(headed).toHaveLength(1);
+  expect(pageText(headed[0]!)).toContain(
+    compact(
+      'Electrical cabinet No. Checkpoint Comment OK NOK N/A Resp No checkpoints in this section.',
+    ),
+  );
+  // Counted as before: the empty section adds no checkpoint.
+  expect(pageText(report[0]!)).toContain(compact('4 checkpoints: 0 OK · 0 NOK · 0 N/A'));
+});
+
 test('long front-page values and a section past z still print cleanly', async ({
   page,
   context,

@@ -12,7 +12,7 @@ import { GuideEditor } from '../../guides/GuideEditor';
 import { sectionDndId } from './dnd';
 import { EditableSection } from './EditableSection';
 import type { IssueIndex } from './issues';
-import { findRow, findSection } from './ops';
+import { findRow, findSection, rowCountText } from './ops';
 import { useDocumentActions, type Deleted } from './useDocumentActions';
 import { useDocumentDnd, type DragState } from './useDocumentDnd';
 
@@ -228,9 +228,7 @@ function DragPreview({ drag, sections }: { drag: DragState; sections: Section[] 
       <GripVertical size={16} aria-hidden="true" className="shrink-0 text-ink-400" />
       <span className="w-6 shrink-0 font-semibold tabular-nums">{sectionNumber(index)}</span>
       <span className="min-w-0 truncate font-semibold">{section.title || 'Untitled section'}</span>
-      <span className="shrink-0 text-xs text-ink-500">
-        {section.items.length === 1 ? '1 row' : `${section.items.length} rows`}
-      </span>
+      <span className="shrink-0 text-xs text-ink-500">{rowCountText(section.items.length)}</span>
     </div>
   );
 }
