@@ -2258,3 +2258,54 @@ them.
 - **The search placeholder is "Number, machine or S/N",** which fits a 320 px phone.
 - **A participant chip's 36 px remove area is for coarse pointers only,** so a mouse click near the
   end of a name doesn't remove it.
+
+## Feature batch 2026-11-05
+
+### Empty sections and template cards
+
+- **A section may be published without rows; a checklist without any row may not ("Add at least
+  one row.").** An admin can publish a heading as a reminder of checkpoints still to be written.
+  A checklist with no row at all would give an inspection nothing to check: 0 / 0 rows, nothing
+  for Continue at, a Finalise that every inspection passes at once and a report of empty tables,
+  counted by Insights as an inspection. It is a template-level problem, after the name's; its
+  "Go to it" focuses the first section's Add row (`data-add-row`). An empty section title and an
+  empty row text are still refused: the row would reach inspections as a checkpoint without text.
+- **An empty section keeps its number.** Sections are numbered by position (numbering.ts), so 4
+  stays 4 and the sections after it keep theirs; nothing about numbering changed.
+- **In the editor an empty section has a dashed frame where its rows will go, holding its Add
+  row.** A section has one Add row: at the end of its rows, or in that frame, never both (the
+  accessible name "Add row to section N" stays unique). The whole rows area stays the drop target,
+  so a row dragged into an empty section lands as its first row; the frame says "Drop the row
+  here" while a row is dragged. A folded section (being dragged) reads "No rows" rather than "0
+  rows".
+- **On an inspection, an empty section is its heading and a quiet line, "No checkpoints in this
+  section yet."** No column labels (no column under them), no Set remaining to OK and nothing
+  focusable, so `↑`/`↓`, `J`/`K` and `Tab` go from the row before it to the row after it. Progress
+  and Continue at count rows, so they are unchanged. The finalised view, and the read-only
+  template view for inspectors and revisions, show the same line.
+- **Print: a blank checklist prints the heading over the section's spare lines, lettered from a;
+  a report prints the heading and one muted line, "No checkpoints in this section."** Word the
+  same. Without spare lines a blank checklist prints that line too.
+- **A section's only row keeps with its title, not with the next section.** "First row keeps with
+  next" also applied to a row that was the last one, and a last row's `break-after: avoid` passes
+  on to its table: an empty or one-row section then dragged the next section's start along. In a
+  90-row report with two empty sections Chrome moved section 2 to the next page and printed 7
+  pages instead of 6; now it stays under section 1 (checked in a PDF). Word's `keepNext` follows
+  the same rule (`keepsWithNext`), though there a spacer paragraph stopped the chain anyway.
+- **The seed imports a workbook section without checkpoints as an empty section, with a
+  warning;** a checklist sheet without any checkpoint is still refused, as Publish refuses it.
+- **Template cards: every photo in a 16:10 frame, fitted whole (`object-contain`) with 16 px
+  around it.** Product renders are mostly wide: a 2.9:1 HHV3 render keeps the full width and a
+  4:3 RigiMill render about 83 % of it, where 4:3 would have shrunk wide renders to a strip and 16:9
+  left 4:3 ones narrow. A card without a cover keeps the frame with an icon.
+- **The photo is multiplied onto a light panel (`mix-blend-multiply`, panel `isolate`d):** a
+  render's white background takes the panel's colour, so the photo looks printed on it instead of
+  a white box pasted in. Light: ink-50 with an ink-200 inner ring. Dark: a light grey mat inset in
+  the card (ink-800 there, #dde1e7, with an ink-600 ring), which doesn't glare as pure white does
+  on the dark card and dims the photo by about a tenth. Without a photo the frame is the card's
+  own ink-50, in both themes.
+- **Each card spans four rows of the list's grid and lays out its parts on them** (a subgrid, as
+  the Insights KPI tiles), so across a row of cards the photos, names, badges and footers start at
+  the same height even when a name or the badges wrap. The covers had a fixed ratio before, but
+  the image's own height overrode it (`size-full` on an image in a box sized by `aspect-ratio`
+  alone), so taller renders made taller cards.

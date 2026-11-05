@@ -172,7 +172,10 @@ it as in [Settings](#settings) (the capitals and digits of each word, e.g. RigiM
 with a number added when that code is taken) and can be changed. The model is added to the
 machine models in Settings along with the template. A code that a model or a template already
 uses (in any case), or a name another model has, is refused. **List** / **Cards** above the list
-switches the view (cards show the cover photos); each browser remembers its own choice.
+switches the view; each browser remembers its own choice. Cards show the cover photo whole in a
+frame of one shape (16:10), so the photo, name, model, badges and the Rows / Last edited footer
+line up across a row of cards whatever the photos' proportions; a template without a cover photo
+has an empty frame of the same size.
 
 - **Draft and revisions.** Every template has one draft, which admins edit, and numbered
   revisions, which never change once published. New inspections use the latest
@@ -190,9 +193,14 @@ switches the view (cards show the cover photos); each browser remembers its own 
   the latest version.", stops saving and offers **Reload** (in the banner and next to _Not
   saved_).
 - **Publish.** **Publish** freezes the draft as the next revision, with an optional change note.
-  A template needs a name and a section; every section needs a title and a row, and no row may be
-  empty. Otherwise Publish lists the problems, with links that jump to each, and marks them in
-  red.
+  A template needs a name, a section and at least one row; every section needs a title, and no
+  row may be empty. Otherwise Publish lists the problems, with links that jump to each, and marks
+  them in red.
+- **Sections without rows.** A section may be published before it has rows: a heading for
+  checkpoints still to be written. In the editor it says "No rows yet" with its **+ Add row**,
+  and rows can be dragged into it. It keeps its number (4 stays 4), inspections show its heading
+  with "No checkpoints in this section yet.", and it prints its heading with its spare lines (see
+  [Printing](#printing)).
 - **Revision history.** Next to the front page: each revision with its date, who published it and
   the note. **View** opens that revision read-only.
 - **Export and import (JSON).** The editor's **⋯** menu has **Export JSON**: the draft as shown,
@@ -293,6 +301,11 @@ the next section. **Set remaining to OK** on a section header (or `R` on one of 
 every row of that section that has no status yet as OK: mark the exceptions, then fill the rest. A
 row with a guide shows its icon (a camera when it has images); the icon or `G` opens the guide
 (see [Guides](#guides)).
+
+A section published without checkpoints (a heading for ones still to be written) shows its
+heading and "No checkpoints in this section yet.", with nothing to set: the keys and `Tab` go from
+the row before it straight on to the row after it, and the progress and _Continue at_ count only
+rows.
 
 ### Deviations, saving, finalising
 
@@ -472,7 +485,10 @@ machine name longer than 60 characters is shortened in the footer.
   section title never stands alone at the foot of a page. _Blank_: tick boxes, rows at least
   9 mm high for handwriting, and the template's spare lines after each section, lettered on. _Report_:
   the status as a symbol and a word (✓ OK, ✗ NOK, – N/A), a NOK row's severity above its comment
-  ("Severity: Major"), and Resp.
+  ("Severity: Major"), and Resp. A section without checkpoints prints its title and column
+  labels, then on a blank checklist its spare lines lettered from a (2.a, 2.b…) and in a report
+  one line, "No checkpoints in this section."; it keeps with its title but never holds the next
+  section on its page. Word does the same.
 - **Deviations**, starting on a new page. _Blank_: the Deviation Summary to fill in by hand, lines
   D-01 to D-24, filling the page (No. | Ref | Description | Severity | Category | Resp | Closed).
   _Report_: a card per deviation: "D-03 · 4.c · MAJOR" (an extra deviation says "Not on the
