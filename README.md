@@ -237,7 +237,8 @@ identity, which is what later phases key results and statistics on.
 
 ## Inspections
 
-Inspectors and admins create and fill in inspections; only admins reopen a finalised one.
+Inspectors and admins create and fill in inspections; only admins reopen a finalised one or
+delete one.
 
 - **New inspection.** **New inspection** on the list: pick the machine model's checklist (only
   templates with a published revision are offered) and fill in the front page: machine name and
@@ -318,6 +319,14 @@ row with a guide shows its icon (a camera when it has images); the icon or `G` o
   again.
 - **Reopen.** Admins only: makes a finalised inspection editable again; it counts as in progress
   until it is finalised again.
+- **Delete.** Admins only, mainly to clear out trial inspections: **Delete inspection** in the
+  header's ⋯ menu asks first ("Delete FI-2026-0012?"), then deletes the inspection, in progress or
+  finalised, with its deviation photos and its rows in the deviation table, so Insights stops
+  counting it. It can't be undone, and its number is never given out again. The machine photo
+  stays (it may be the template's cover photo), and so does everything the template owns. Pending
+  changes are saved first and autosave then stops. If someone else changed the inspection
+  meanwhile, nothing is deleted and the dialog offers **Reload**. Afterwards the list says
+  "FI-2026-0012 was deleted."
 
 ### The deviation table
 
@@ -602,8 +611,9 @@ between, nothing is overwritten: the card says so and offers **Reload**.
 
 Managed Functions under `/api`, all JSON. Every function checks the role itself; errors are
 `{ error, message, details? }`. Saves (settings too), publishing, finalising, reopening and
-deleting a template need the document's `ETag` in `If-Match` and get `412` if someone else changed
-it. A `503` with `unavailable` means nothing was changed and the same request can be sent again.
+deleting a template or an inspection need the document's `ETag` in `If-Match` and get `412` if
+someone else changed it. A `503` with `unavailable` means nothing was changed and the same request
+can be sent again.
 
 | Method and route                        | Role      | What                                                                    |
 | --------------------------------------- | --------- | ----------------------------------------------------------------------- |
@@ -625,6 +635,7 @@ it. A `503` with `unavailable` means nothing was changed and the same request ca
 | `POST /api/inspections`                 | inspector | New inspection from a template's latest published revision              |
 | `GET /api/inspections/{id}`             | inspector | One inspection and its `ETag`                                           |
 | `PUT /api/inspections/{id}`             | inspector | Save front page, results and extra deviations (`If-Match`)              |
+| `DELETE /api/inspections/{id}`          | admin     | Delete it, its deviation rows and deviation photos (`If-Match`)         |
 | `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                        |
 | `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                              |
 | `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)              |
@@ -707,7 +718,10 @@ because it usually means the command that produced it failed.
   `finalised` flag, a row deleted when NOK becomes OK); Finalise blocked by a missing row, its
   jump link, the locked page and the API's 409; Reopen refused to an inspector (403) and done by
   an admin; an inspection unchanged after its template publishes a new revision; and two
-  inspectors in conflict. For deviation photos: a photo added to a deviation, an arrow and a
+  inspectors in conflict. Deleting one (`e2e/delete-inspection.spec.ts`): an admin from its page
+  (asks first, then it is gone from the list, the deviation table and storage, photo included),
+  refused with Reload after someone else saved, and an inspector without the action (the API
+  refuses with 403). For deviation photos: a photo added to a deviation, an arrow and a
   label drawn on it with the mouse in the real editor, saved, and after a reload the marks stored
   as fractions, the flattened copy a JPEG of the photo's size that is red along the arrow, shown
   as the thumbnail and on the printed card; at most two photos (then Add goes away, and a paste or
@@ -817,16 +831,16 @@ JPEG straight to the `images` container. To show it, it asks for a read-only URL
 minutes. Documents store only image ids: a template's `coverImageId` and its rows' guide images
 (see [Guides](#guides)), which inspections share through their copy of the checklist, and an
 inspection's `front.photoId` and its deviation photos (see [Deviation photos](#deviation-photos)).
-Replacing or removing a photo leaves the old file in storage. Locally the API sets Azurite's blob
-CORS rule for the dev origins (ports 4280 and 5173) on its first storage call; in Azure the rule
-comes from the Bicep file.
+Replacing or removing a photo leaves the old file in storage; deleting an inspection deletes its
+deviation photos. Locally the API sets Azurite's blob CORS rule for the dev origins (ports 4280
+and 5173) on its first storage call; in Azure the rule comes from the Bicep file.
 
 ## Auth model and roles
 
 - Static Web Apps built-in authentication with Microsoft Entra ID (`/.auth/login/aad`). There are
   no passwords. Other providers (GitHub, X) are switched off.
 - Two roles: **`inspector`** creates and fills in inspections; **`admin`** can also edit
-  templates, see insights and change settings.
+  templates, see insights, change settings, reopen inspections and delete them.
 - **Who has which role is decided by the API.** A person's role and the name shown for them come
   from the people list (`config/people.json`), which admins manage in Settings → Users & access.
   The list is matched on the sign-in's email (lowercased). Someone not on the list keeps the role

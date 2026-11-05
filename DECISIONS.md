@@ -2258,3 +2258,54 @@ them.
 - **The search placeholder is "Number, machine or S/N",** which fits a 320 px phone.
 - **A participant chip's 36 px remove area is for coarse pointers only,** so a mouse click near the
   end of a name doesn't remove it.
+
+## Feature batch 2026-11-05
+
+### Admins delete inspections
+
+- **`DELETE /api/inspections/{id}`, admins only, shares the `inspections/{id}` registration**
+  (still 17 in all), as the template delete shares its route's. Like it: If-Match is required
+  (400 without), an unknown id is a 404 and a stale ETag a 412, both before anything is deleted,
+  and success is a 204. In progress and finalised alike.
+- **The blob goes first, conditionally on the If-Match; the rest is best effort.** Without its blob
+  the inspection is gone from the list, its page and Insights (which counts only the rows of
+  listed inspections). Its deviation rows and photos are deleted after that; whatever fails is
+  logged (`context.warn`) and left behind, unused, and the delete still answers 204, since a retry
+  would only get a 404. Storage may answer the blob's condition with 412 when the blob is already
+  gone (Azurite does): that is a 404, so two admins deleting at once never see a conflict.
+- **The images that go are its deviations' photos and their marked-up copies, on rows and extra
+  deviations.** Every upload gets a new id, so no other document names them. As a guard against
+  hand-edited data, an id the inspection also uses as a guide image of its frozen checklist (the
+  template's, shared with every inspection of that revision), as its machine photo, or that is the
+  settings' logo is never deleted (one settings read). The machine photo always stays, even one
+  uploaded for this inspection: telling it from the template's cover would mean reading the
+  template's revision, and a photo left behind only costs storage. Photos replaced or removed
+  earlier were already unreferenced and stay, as before.
+- **A save whose deviation sync is slow can't leave rows behind.** `syncSettled` now deletes the
+  inspection's rows when it finds the blob gone after syncing; the delete removes the rows after
+  the blob, so whichever finishes last leaves none. A finalise or reopen racing a delete can still
+  leave rows (it syncs the table before its blob write, which then fails); Insights ignores them.
+- **Numbers are never handed out again: the counter is not touched.** Only if the counter blob
+  were lost as well would the newest number come back after its inspection was deleted, since a
+  lost counter carries on from the highest number in use.
+- **The page saves what is pending, then stops autosave before it sends the DELETE with the latest
+  ETag**, so no save or retry follows the delete; a save after it would be a 404 anyway (a save
+  never creates an inspection). If the delete fails, autosave carries on, and a failed save's
+  retry, whose timer stopping cleared, is sent again. A 404 counts as deleted (another admin got
+  there first, or a lost answer's retry). A 412 keeps the dialog open with "Someone else changed
+  this inspection since you opened it, so nothing was deleted." and Reload in place of Delete, and
+  the page shows the conflict as after a finalise's 412.
+- **Delete inspection is the only item of an admins-only ⋯ menu ("Inspection actions") after
+  Finalise or Reopen,** as Delete template is on the template editor. It has no other item, so
+  the menu's divider above destructive items is drawn above it too (`ActionMenu` draws one before
+  every danger item; asked for a fix there). On a phone the menu's button is pulled 4 px closer to
+  Finalise, so it shares their line at 390 px; narrower (360 px) it wraps onto a line of its own.
+- **The dialog names the inspection and what goes** ("Delete FI-2026-0012?", its deviation photos
+  and records, Insights stops counting it, can't be undone) and **adds a line for a finalised
+  one:** its report may already have been sent.
+- **Afterwards the list shows "FI-2026-0012 was deleted."** from router state, as the Templates
+  page does after a template delete; dismissing it clears the state, search and filters kept. The
+  row leaves the cached list at once, and the list and every Insights query (`['insights', …]`)
+  are invalidated.
+- **The e2e tests are a file of their own** (`e2e/delete-inspection.spec.ts`), with their own
+  throwaway template, so they merge cleanly with the inspection tests.
