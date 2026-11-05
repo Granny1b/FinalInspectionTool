@@ -1,8 +1,9 @@
 import type { MachineModel } from '@modig/shared';
 import { ClipboardCheck, Plus, SearchX } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { Button, ButtonLink } from '../components/Button';
+import { Callout } from '../components/Callout';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
 import { LoadError, PageLoading } from '../components/PageStates';
@@ -15,6 +16,7 @@ import {
   isFiltered,
   rememberListSearch,
   type InspectionFilter,
+  type InspectionsPageState,
 } from '../features/inspections/listFilter';
 import { useInspections } from '../features/inspections/queries';
 import { errorMessage } from '../lib/api';
@@ -35,6 +37,10 @@ export function InspectionsPage() {
   // The inspection pages' "← Inspections" links come back to the same search and filters.
   const search = filterToParams(filter).toString();
   useEffect(() => rememberListSearch(search), [search]);
+  // An admin just deleted an inspection on its page, which brought them here.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const deleted = (location.state as InspectionsPageState | null)?.deleted;
 
   const all = inspections.data;
   const shown = all ? filterInspections(all, filter) : [];
@@ -65,6 +71,24 @@ export function InspectionsPage() {
         description="Final inspections of machines before delivery, newest first."
         actions={all?.length ? newInspection : undefined}
       />
+      {deleted && (
+        <div className="mb-6">
+          <Callout
+            tone="success"
+            role="status"
+            // Out of the history entry too (search and filters kept), so a reload doesn't bring
+            // it back.
+            onDismiss={() =>
+              void navigate(
+                { pathname: location.pathname, search: location.search },
+                { replace: true, state: null },
+              )
+            }
+          >
+            <strong className="font-semibold">{deleted} was deleted.</strong>
+          </Callout>
+        </div>
+      )}
       {inspections.isPending ? (
         <PageLoading label="Loading inspections…" header={false} />
       ) : inspections.isError ? (

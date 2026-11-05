@@ -23,9 +23,11 @@ import {
   Lock,
   LockOpen,
   Printer,
+  Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { useNavigate } from 'react-router';
 import { ActionMenu } from '../../components/ActionMenu';
 import { BackLink } from '../../components/BackLink';
 import { Button } from '../../components/Button';
@@ -49,6 +51,7 @@ import type { PrintMode } from '../print/model';
 import { inspectionOnScreen } from '../print/preview';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
 import { withPhotos } from './checklist/results';
+import { DeleteInspectionDialog } from './DeleteInspectionDialog';
 import { DeviationSummary } from './DeviationSummary';
 import { draftOf, sameDraft } from './draft';
 import { newExtraDeviation, removeExtra, updateExtra, type ExtraDeviationPatch } from './extras';
@@ -66,7 +69,7 @@ import {
   type FocusTarget,
   type InspectionTab,
 } from './issues';
-import { inspectionsListHref } from './listFilter';
+import { inspectionsListHref, type InspectionsPageState } from './listFilter';
 import type { PendingParticipant } from './ParticipantsField';
 import {
   changeState,
@@ -75,6 +78,7 @@ import {
   inspectionKeys,
   isUnavailable,
   saveInspection,
+  useDeleteInspection,
   type LoadedInspection,
   type StateChange,
 } from './queries';
@@ -165,7 +169,9 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const dirty = saveState.status !== 'saved' || uploading || participantPending;
   // A deviation photo open in the editor with marks: leaving asks first, saving can't keep them.
   const [editorDirty, setEditorDirty] = useState(false);
-  const leaveGuard = useLeaveGuard(dirty, saveAll, editorDirty);
+  // Once deleted (admins), there is nothing left to save: the page just goes.
+  const [deleted, setDeleted] = useState(false);
+  const leaveGuard = useLeaveGuard(dirty && !deleted, saveAll, editorDirty && !deleted);
   const reload = useReload(dirty, onReload);
 
   const update = useCallback(
@@ -413,6 +419,44 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     markListStale();
   }
 
+  const navigate = useNavigate();
+  const remove = useDeleteInspection(id);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  /**
+   * Saves what is pending first, so the delete names the latest version (an autosave landing
+   * meanwhile would make it fail on the page's own save; a failed save leaves the ETag of the last
+   * one that worked). Then autosave stops, so no save or retry is sent after the delete; if the
+   * delete fails, it carries on.
+   */
+  function deleteInspection() {
+    remove.mutate(
+      async () => {
+        await saveAll();
+        saver.dispose();
+        return saver.etag();
+      },
+      {
+        onSuccess: () => setDeleted(true),
+        onError: (failure) => {
+          saver.revive();
+          // Stopping cleared the timer of a failed save's retry: retry it now.
+          const state = saver.getState();
+          if (state.status === 'error' && state.willRetry) void saver.flush();
+          // Someone else's save got in first: the page is outdated, as after a finalise's 412.
+          if (isConflict(failure)) setStateConflict(true);
+        },
+      },
+    );
+  }
+
+  // After the render that let go of the leave guard.
+  useEffect(() => {
+    if (!deleted) return;
+    const state: InspectionsPageState = { deleted: number };
+    void navigate(inspectionsListHref(), { replace: true, state });
+  }, [deleted, navigate, number]);
+
   const modelLabel = modelName(settings.data?.machineModels, inspection.front.modelCode);
   const machine = draft.front.machineName.trim();
   // Once finalised there is nothing left to save: the header says so only if saving failed.
@@ -543,6 +587,30 @@ export function InspectionEditor({ loaded, onReload }: Props) {
                     Reopen
                   </Button>
                 )
+              )}
+              {/*
+                Admins only, as on the template editor; mainly to clear out trial inspections. On a
+                phone it moves 4 px closer (its icon has room of its own), so it still shares the
+                buttons' line on a 390 px screen.
+              */}
+              {isAdmin && (
+                <span className="inline-flex @max-[36rem]:-ml-1">
+                  <ActionMenu
+                    label="Inspection actions"
+                    triggerData={{ 'data-inspection-menu': '' }}
+                    items={[
+                      {
+                        label: 'Delete inspection',
+                        icon: Trash2,
+                        danger: true,
+                        onSelect: () => {
+                          remove.reset();
+                          setConfirmingDelete(true);
+                        },
+                      },
+                    ]}
+                  />
+                </span>
               )}
             </div>
           </div>
@@ -712,6 +780,24 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             // The dialog hands the focus back to what had it, but Safari doesn't focus a button
             // that is clicked or tapped: back to Preview in any case.
             previewRef.current?.focus();
+          }}
+        />
+      )}
+      {confirmingDelete && (
+        <DeleteInspectionDialog
+          number={number}
+          machine={machine}
+          finalised={finalised}
+          busy={remove.isPending || deleted}
+          error={remove.error}
+          onDelete={deleteInspection}
+          onReload={reload.askReload}
+          onClose={() => {
+            setConfirmingDelete(false);
+            // The menu item that opened it is gone with its menu: back to the menu's button.
+            if (!deleted) {
+              document.querySelector<HTMLElement>('[data-inspection-menu]')?.focus();
+            }
           }}
         />
       )}

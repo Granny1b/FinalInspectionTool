@@ -8,7 +8,7 @@ import {
 } from '@modig/shared';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { draftTemplate, resetStorage, sampleInspection, useTestStorage } from '../../test/storage';
-import { syncDeviations } from './deviations';
+import { deleteDeviationRows, syncDeviations } from './deviations';
 import { deviationsTable } from './storage';
 
 beforeAll(useTestStorage);
@@ -274,5 +274,36 @@ describe('syncDeviations', () => {
     await syncDeviations(withResults(mt, { [a!]: { status: 'NOK' } }));
     expect(await rows('RMMG')).toEqual([]);
     expect(await rows('RMMT')).toEqual([expect.objectContaining({ modelCode: 'RMMT', itemId: a })]);
+  });
+});
+
+describe('deleteDeviationRows', () => {
+  it("deletes every row of one inspection, in batches, and no other inspection's", async () => {
+    const items = Array.from({ length: 120 }, (_, i) => ({ id: newId(), text: `Check ${i + 1}` }));
+    const template = draftTemplate({
+      status: 'published',
+      sections: [{ id: newId(), title: 'Long section', items }],
+    });
+    const allNok = (inspection: Inspection) =>
+      withResults(
+        inspection,
+        Object.fromEntries(itemIds(inspection).map((id) => [id, { status: 'NOK' as const }])),
+      );
+    // An id that starts the same: its rows stay.
+    const target = allNok(sampleInspection({ id: 'Abc' }, template));
+    const neighbour = allNok(sampleInspection({ id: 'Abc0' }, template));
+    for (const inspection of [target, neighbour]) await syncDeviations(inspection);
+    const submit = vi.spyOn(deviationsTable(), 'submitTransaction');
+
+    await deleteDeviationRows('RMMG', target.id);
+    expect(submit.mock.calls.map(([actions]) => actions.length)).toEqual([100, 20]);
+    expect((await rows()).map((row) => row.inspectionId)).toEqual(
+      Array.from({ length: 120 }, () => neighbour.id),
+    );
+
+    // Nothing left: nothing to send.
+    submit.mockClear();
+    await deleteDeviationRows('RMMG', target.id);
+    expect(submit).not.toHaveBeenCalled();
   });
 });

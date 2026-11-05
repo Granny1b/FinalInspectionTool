@@ -49,6 +49,23 @@ export async function createReadUrl(imageId: string): Promise<ImageReadUrlRespon
   return { url, expiresAt: expiresOn.toISOString() };
 }
 
+/**
+ * Deletes these images (`images/{id}.jpg`), each on its own; one that is already gone counts as
+ * deleted. Returns the ones that could not be deleted, with the reason, for the caller to log: by
+ * then the document that named them is usually gone, so a failure only leaves an unused file.
+ */
+export async function deleteImages(
+  imageIds: readonly string[],
+): Promise<{ imageId: string; reason: unknown }[]> {
+  await ensureStorage();
+  const results = await Promise.allSettled(
+    imageIds.map((imageId) => imageBlob(imageId).deleteIfExists()),
+  );
+  return results.flatMap((result, index) =>
+    result.status === 'rejected' ? [{ imageId: imageIds[index]!, reason: result.reason }] : [],
+  );
+}
+
 function imageBlob(imageId: string): BlockBlobClient {
   return containerClient(CONTAINERS.images).getBlockBlobClient(blobNames.image(imageId));
 }
