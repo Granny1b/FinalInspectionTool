@@ -610,6 +610,51 @@ left out, so its numbers may be too low; the API log names the first problem.
 
 The chart library (Recharts) loads only when Insights opens.
 
+### Report
+
+**Preview report** and **Print report**, next to Export CSV, turn the page into a printed
+deviation report: the same numbers, for exactly the filters chosen on the page.
+
+- **Preview report** shows the A4 pages at once in a full-screen window, scaled to fit a phone
+  or tablet, on light paper in either theme. Its **Print / Save PDF** (or Ctrl+P) prints them;
+  Escape or **Close** go back to Insights.
+- **Print report** opens the report in a new tab, which opens the print dialog once it has
+  loaded, as an inspection's Print / Save PDF does. The print dialog's settings are those under
+  [Printing](#printing). The tab's toolbar leads back to Insights with the same filters.
+- **Include deviation list**, in the preview and the print toolbar, adds every deviation behind
+  the numbers on pages of their own (greyed out when there are none).
+- Address: `/insights/report?<the Insights page's filters>[&deviations=1]`, for admins only.
+
+**What it says**, A4 portrait, in black and white:
+
+- **The header:** logo, "Deviation report", the company name, then what the report covers:
+  _Period_ ("2026-10" for a whole month, "2026-01 – 2026-10" for whole months, otherwise the
+  dates, such as "2025-12-01 – 2026-11-05 (last 12 months)", or "All time"), _Model_ ("All
+  models" or its name), _Inspections_ ("Finalised only" or "Finalised and in progress") and
+  _Generated_ (date, time and who). If some deviation records could not be read, it says so, as
+  the page does.
+- **Headline numbers:** the four tiles' figures, each with what it counts.
+- **Deviations per month:** columns for one or two months, a line from three on, and under it
+  each month's deviations and inspections, a year to a row.
+- **By severity, Per section, Per model, By responsible, By category:** tables with every entry
+  (no "Show all"), its count, its share of all the deviations and a bar as long as the count
+  against the largest; per model also its inspections and deviations per machine.
+- **Top 10 recurring checkpoints:** rank, ref, checkpoint ("No longer in the checklist" under a
+  removed one), section, the model when there are several, how many inspections it failed in and
+  that as a share of the inspections whose checklist had it ("50% of 4").
+- **The deviation list**, when included: each inspection's deviations under a line naming it
+  (number, date, model, machine and serial number, "In progress" when it is), with ref,
+  checkpoint and comment, severity, category and responsible, in the order of the CSV export.
+  Refs and checkpoints are as they were inspected.
+- **When no inspection matches**, "No inspections match these filters" instead of the tables.
+
+Each part stays on one page with its heading when it fits; tables repeat their column labels on
+every page they run onto. Chrome and Edge print "Deviation report · 2026-10 · RigiMill MG" bottom
+left and "Page X of Y" bottom right; Firefox and Safari repeat the left part under the deviation
+list. The PDF is named after the filters, as the CSV is: `Deviation report 2026-01-01 to
+2026-10-31, RMMG.pdf`, `Deviation report 2026-10, RMMG.pdf`, or `Deviation report start to
+2026-11-05.pdf` for all time (`, incl. in progress` when they are included).
+
 ## Settings
 
 Admins only. The Settings page has two cards: _Users & access_, the people who may use the app
@@ -668,6 +713,7 @@ can be sent again.
 | `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                              |
 | `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)              |
 | `GET /api/insights/export.csv`          | admin     | The deviation rows under the same filters, as a CSV file                |
+| `GET /api/insights/deviations`          | admin     | The same rows as JSON, for the printed report's deviation list          |
 | `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                          |
 | `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                       |
 

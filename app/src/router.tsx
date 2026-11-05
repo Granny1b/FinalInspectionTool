@@ -2,8 +2,10 @@ import { createBrowserRouter, Navigate } from 'react-router';
 import { AppShell } from './components/AppShell';
 import { RequireRole } from './components/RequireRole';
 import { RouteError } from './components/RouteError';
+import { AdminOnly } from './features/insights/report/AdminOnly';
 import { PrintShell } from './features/print/PrintShell';
 import { InsightsPage } from './pages/InsightsPage';
+import { InsightsReportPage } from './pages/InsightsReportPage';
 import { InspectionNewPage } from './pages/InspectionNewPage';
 import { InspectionPage } from './pages/InspectionPage';
 import { InspectionPrintPage } from './pages/InspectionPrintPage';
@@ -46,6 +48,11 @@ export const router = createBrowserRouter([
     children: [
       { path: 'inspections/:id/print', element: <InspectionPrintPage /> },
       { path: 'templates/:id/print', element: <TemplatePrintPage /> },
+      // The Insights report, admins only like Insights.
+      {
+        element: <AdminOnly />,
+        children: [{ path: 'insights/report', element: <InsightsReportPage /> }],
+      },
     ],
   },
 ]);
