@@ -136,7 +136,7 @@ export function ActionMenu({ label, items, triggerData, trigger }: Props) {
       >
         {items.map((item, index) => (
           <Fragment key={item.label}>
-            {item.danger && (
+            {item.danger && index > 0 && (
               <div role="separator" className="mx-1 my-1 h-px bg-ink-200 dark:bg-ink-300" />
             )}
             <button

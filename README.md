@@ -780,7 +780,8 @@ because it usually means the command that produced it failed.
   long word at tablet width, dragging a row into another section, the section menu, saving before
   leaving and the tab-close warning, publishing with a change note, two admins in conflict, a lost
   save answer, a save after signing out, a cover photo upload (also leaving while it uploads), a
-  new template whose empty row blocks publishing; spare lines deleted, put back with Undo, added
+  new template whose empty row blocks publishing; a section without rows published, shown in an
+  inspection and printed; spare lines deleted, put back with Undo, added
   and printed per section; the list shown as cards and remembered; deleting a template (asks
   first, its inspection kept, its revisions gone); the new machine model fields (suggested code, a
   taken code refused); Export JSON, a wrong file explained, and Import JSON making a new draft
@@ -816,8 +817,12 @@ because it usually means the command that produced it failed.
   of its own, so other tests' inspections never mix in): the headline numbers, the top
   checkpoints with their shares, the month, severity, section, responsible and category figures,
   in-progress inspections joining in, the CSV download (name, header, rows) and no console errors
-  under the Content-Security-Policy; a custom range that ends before it starts; and inspectors
-  refused the page and both endpoints.
+  under the Content-Security-Policy; a custom range that ends before it starts; a single month and a month range narrowing the
+  numbers, kept in the URL; a month range that ends before it starts; a month without
+  inspections; and inspectors refused the page and both endpoints. The deviation report
+  (`e2e/insights-report.spec.ts`): previewed from Insights with the deviation list added and
+  printed, A4 pages with the footer and the list on pages of its own, a single month stated as the
+  month and an empty selection saying so, and admins only.
 - **Print tests** (`e2e/print.spec.ts`) print real PDFs with Chromium's `page.pdf` (A4, the
   page's own `@page` rule, background graphics on) and measure them with `pdfjs-dist`: a blank
   checklist of the 90-row RigiMill MG, a finalised report in both deviation layouts (long
@@ -826,8 +831,9 @@ because it usually means the command that produced it failed.
   (it gets a page of its own, full width, and no empty page follows), a template preview with
   spare lines lettered past z, a report with its reference images (also as Firefox and Safari
   print it, with the footer on every appendix page), a front page with very long values (the
-  signatures and revision move on together) and refs up to 10.an inside their column, and 2 per
-  page with long texts (no photo under 50 mm).
+  signatures and revision move on together) and refs up to 10.an inside their column, 2 per
+  page with long texts (no photo under 50 mm), and a section without checkpoints (spare lines
+  blank, one line in a report).
   They check that every page is A4, the page count is in a range derived from the layout, page 1
   is the front page, every page has the footer and "Page X of Y" with the right total and nothing
   else in the bottom margin, every row is whole on the one page that has its ref, no section

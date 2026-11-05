@@ -261,6 +261,35 @@ describe('POST /api/templates/{id}/publish', () => {
     });
   });
 
+  it('publishes a section without rows yet, kept in its place', async () => {
+    const empty = { id: newId(), title: 'Electrical cabinet', items: [] };
+    const draft = draftTemplate({
+      sections: [
+        { id: newId(), title: 'Covers', items: [{ id: newId(), text: 'Covers - Intact' }] },
+        empty,
+      ],
+    });
+    const response = await publish(draft.id, await storeTemplate(draft));
+    expect(response.status).toBe(200);
+    const published = await stored(blobNames.templateRevision(draft.id, 1));
+    expect(published?.sections[1]).toEqual(empty);
+  });
+
+  it('400 for a template whose sections are all still empty', async () => {
+    const draft = draftTemplate({
+      sections: [
+        { id: newId(), title: 'Covers', items: [] },
+        { id: newId(), title: 'Electrical cabinet', items: [] },
+      ],
+    });
+    const response = await publish(draft.id, await storeTemplate(draft));
+    expect(errorOf(response)).toMatchObject({
+      message: 'Fix one problem before publishing.',
+      details: [{ target: { kind: 'template' }, message: 'Add at least one row.' }],
+    });
+    expect(await revisionNumbers(draft.id)).toEqual([]);
+  });
+
   it('400 without If-Match or with an invalid body', async () => {
     const { draft, etag } = await editedTemplate();
     expect((await publish(draft.id, null)).status).toBe(400);

@@ -55,6 +55,7 @@ describe('reportFileName', () => {
 function insights(patch: Partial<Insights> = {}): Insights {
   return {
     modelCodes: ['RMMG', 'RMHS'],
+    firstInspectionDate: '2026-09-02',
     inspections: { finalised: 4, inProgress: 0 },
     deviations: 10,
     rows: { ok: 90, nok: 10, na: 4 },
