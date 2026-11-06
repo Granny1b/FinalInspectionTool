@@ -3561,5 +3561,11 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
 'instructions'`): its images are its pictures, it has no appendix and no deviation cards
   (`deviations: { kind: 'none' }`). Browsers without margin boxes get its blocks as table rows
   under a repeating footer, as the reference appendix does.
-- **Not (yet):** a machine's own copy of a check printed as instructions (its rows may differ
-  from the template's); it would be a third choice in a quality check's Print menu.
+- **From a started check too** (asked for the same day): _Instructions_ is a third choice in a
+  quality check's Print / Save PDF menu, its Preview and its print page (`?mode=instructions`),
+  printing the check's own copy (`checkInstructionsPrint`): a machine's check may have rows of its
+  own, which the template's instructions don't. Its cover names the machine and the check instead
+  of when the template was published ("This machine's copy, based on Rev 2"), and its footer is
+  the report's without "Not finalised", since the instructions don't change with the check's
+  state. `QualityReportMode` is what the report itself prints; `qualityCheckPrintout` picks the
+  document for a mode.

@@ -14,7 +14,7 @@ import { Segmented } from '../PrintToolbar';
 import {
   QUALITY_PRINT_MODE_LABELS,
   QUALITY_PRINT_MODES,
-  qualityCheckPrint,
+  qualityCheckPrintout,
   type QualityPrintMode,
 } from './model';
 
@@ -30,9 +30,9 @@ type Props = {
 };
 
 /**
- * A quality check's printout in the preview dialog: the entire report first, or only the
- * deviations, with the cards 2 or 4 to a page (as the print route opens them until one is
- * picked). Print / Save PDF prints what is shown.
+ * A quality check's printout in the preview dialog: the entire report first, only the deviations
+ * (the cards 2 or 4 to a page, as the print route opens them until one is picked), or its
+ * instructions. Print / Save PDF prints what is shown.
  */
 export function QualityCheckPreview({ inspection, onPrint, onClose }: Props) {
   const settings = useSettings();
@@ -48,7 +48,7 @@ export function QualityCheckPreview({ inspection, onPrint, onClose }: Props) {
   const model = useMemo(
     () =>
       settings.data && directory && !followUps.isPending
-        ? qualityCheckPrint(inspection, mode, {
+        ? qualityCheckPrintout(inspection, mode, {
             companyName: settings.data.companyName,
             modelLabel: modelName(settings.data.machineModels, inspection.front.modelCode),
             personName: (email) => personName(directory, email),
@@ -76,13 +76,16 @@ export function QualityCheckPreview({ inspection, onPrint, onClose }: Props) {
             value={mode}
             onChange={setMode}
           />
-          <Segmented
-            label="Deviations"
-            showLabel
-            options={DEVIATIONS_PER_PAGE.map((value) => ({ value, label: `${value} per page` }))}
-            value={shownPerPage}
-            onChange={setPerPage}
-          />
+          {/* The instructions have no deviation cards. */}
+          {mode !== 'instructions' && (
+            <Segmented
+              label="Deviations"
+              showLabel
+              options={DEVIATIONS_PER_PAGE.map((value) => ({ value, label: `${value} per page` }))}
+              value={shownPerPage}
+              onChange={setPerPage}
+            />
+          )}
         </div>
       }
       deviationsPerPage={shownPerPage}

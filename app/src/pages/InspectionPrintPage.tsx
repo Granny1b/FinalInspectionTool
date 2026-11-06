@@ -15,7 +15,7 @@ import {
 import { defaultDeviationsPerPage, inspectionPrint } from '../features/print/model';
 import { PrintLoadError, PrintLoading, PrintMessage } from '../features/print/PrintStates';
 import { PrintView } from '../features/print/PrintView';
-import { qualityCheckPrint } from '../features/print/quality/model';
+import { qualityCheckPrintout } from '../features/print/quality/model';
 import { usePrintImages } from '../features/print/usePrintImages';
 import { isMissing } from '../lib/api';
 import { personName, usePeopleDirectory } from '../lib/usePeople';
@@ -144,7 +144,7 @@ function QualityCheckPrint({ inspection, directory }: PrintProps) {
   const model = useMemo(
     () =>
       settings.data && !followUps.isPending
-        ? qualityCheckPrint(inspection, mode, {
+        ? qualityCheckPrintout(inspection, mode, {
             companyName: settings.data.companyName,
             modelLabel: modelName(settings.data.machineModels, inspection.front.modelCode),
             personName: (email) => personName(directory, email),

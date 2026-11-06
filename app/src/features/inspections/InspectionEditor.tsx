@@ -18,6 +18,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
+  BookOpen,
   ChevronDown,
   ClipboardCheck,
   ClipboardList,
@@ -583,7 +584,8 @@ export function InspectionEditor({
   }
 
   // What Print / Save PDF offers: an inspection's blank checklist or its report; a quality check's
-  // entire report or only its deviations, to close them at the machine (it has no blank form).
+  // entire report, only its deviations (to close them at the machine) or its instructions, a
+  // manual for the operator as this check has them (it has no blank form).
   const printItems = quality
     ? [
         {
@@ -595,6 +597,11 @@ export function InspectionEditor({
           label: QUALITY_PRINT_MODE_LABELS.deviations,
           icon: ClipboardX,
           onSelect: () => void openPrint(qualityCheckPrintHref(id, { mode: 'deviations' }, true)),
+        },
+        {
+          label: QUALITY_PRINT_MODE_LABELS.instructions,
+          icon: BookOpen,
+          onSelect: () => void openPrint(qualityCheckPrintHref(id, { mode: 'instructions' }, true)),
         },
       ]
     : [

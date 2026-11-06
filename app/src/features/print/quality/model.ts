@@ -36,14 +36,22 @@ import {
   type FrontField,
   type PrintContext,
 } from '../model';
+import { checkInstructionsPrint, type InstructionsModel } from './instructions';
 
-/** `report`: everything. `deviations`: the deviation cards alone, to close them at the machine. */
-export const QUALITY_PRINT_MODES = ['report', 'deviations'] as const;
+/**
+ * `report`: everything. `deviations`: the deviation cards alone, to close them at the machine.
+ * `instructions`: the check's rows as a manual for the operator, pictures included
+ * (instructions.ts).
+ */
+export const QUALITY_PRINT_MODES = ['report', 'deviations', 'instructions'] as const;
 export type QualityPrintMode = (typeof QUALITY_PRINT_MODES)[number];
+/** What the check's report prints: everything, or only its deviations. */
+export type QualityReportMode = Exclude<QualityPrintMode, 'instructions'>;
 /** How the print toolbar, the preview and the Print menu name each mode. */
 export const QUALITY_PRINT_MODE_LABELS: Record<QualityPrintMode, string> = {
   report: 'Entire report',
   deviations: 'Only deviations',
+  instructions: 'Instructions',
 };
 
 /** Above the deviation cards, on every page of them. */
@@ -102,7 +110,7 @@ export type QualityFrontPage = {
 export type QualityPrintModel = {
   /** Tells it from a final inspection's PrintModel. */
   document: 'quality';
-  mode: QualityPrintMode;
+  mode: QualityReportMode;
   front: QualityFrontPage;
   /**
    * Only deviations: the short header over the first page of cards (Machine ID, Machine model,
@@ -136,7 +144,7 @@ export type QualityPrintContext = PrintContext & {
 /** The entire report, or only its deviations, of a quality check, from its frozen copy. */
 export function qualityCheckPrint(
   inspection: Inspection,
-  mode: QualityPrintMode,
+  mode: QualityReportMode,
   context: QualityPrintContext,
 ): QualityPrintModel {
   const { front, number, templateSnapshot, templateRevision } = inspection;
@@ -228,7 +236,7 @@ export function qualityCheckPrint(
   };
 }
 
-function fileKind(mode: QualityPrintMode, finalised: boolean): string {
+function fileKind(mode: QualityReportMode, finalised: boolean): string {
   if (mode === 'deviations') return finalised ? 'Deviations' : 'Draft deviations';
   return finalised ? 'Quality check report' : 'Draft report';
 }
@@ -275,6 +283,20 @@ function printSections(
       };
     }),
   }));
+}
+
+/**
+ * What a quality check prints in `mode`: its entire report, only its deviations, or its
+ * instructions as the check has them.
+ */
+export function qualityCheckPrintout(
+  inspection: Inspection,
+  mode: QualityPrintMode,
+  context: QualityPrintContext,
+): QualityPrintModel | InstructionsModel {
+  return mode === 'instructions'
+    ? checkInstructionsPrint(inspection, context)
+    : qualityCheckPrint(inspection, mode, context);
 }
 
 /** Every uploaded image the report shows (the logo aside): the deviation photos, each once. */
