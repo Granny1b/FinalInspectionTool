@@ -16,10 +16,10 @@ Working now:
   earlier through Static Web Apps roles keep their access. A signed-in user who is neither on the
   list nor invited sees a "You don't have access yet" page. The API checks the role on every
   request.
-- **App shell.** A sidebar in four groups: _Final inspection_ (Inspections and Deviations),
-  _Quality check_ (Quality checks, the checks done on machines, and Deviations), _Setup_
-  (Templates, where both are set up) and, for admins, _Admin_ (Insights and Settings); a drawer
-  on tablets. Settings manages users and access, and admins edit the machine models, the
+- **App shell.** A sidebar with _Machines_ first, then four groups: _Final inspection_
+  (Inspections and Deviations), _Quality check_ (Quality checks, the checks done on machines, and
+  Deviations), _Setup_ (Templates, where both are set up) and, for admins, _Admin_ (Insights and
+  Settings); a drawer on tablets. The app opens on the machines. Settings manages users and access, and admins edit the machine models, the
   Responsible and deviation category lists, the default location and the company name and logo
   there (see [Settings](#settings)).
 - **Templates (phase 2).** The template list; a new template for a machine model that has none;
@@ -29,7 +29,8 @@ Working now:
   read-only views of any published revision. Inspectors see the latest published
   revision of each template, read-only. See [Editing templates](#editing-templates).
 - **Inspections (phase 3).** The inspection list with search and filters; a new inspection from a
-  model's latest published checklist, which it keeps as a frozen copy; the front page; the
+  model's latest published checklist, which it keeps as a frozen copy (started on a machine since
+  machines came, see [Machines](#machines)); the front page; the
   checklist, filled in from the keyboard; the live Deviation Summary with extra deviations;
   autosave with conflict detection; Finalise, which locks it, and Reopen for admins. Every
   deviation is mirrored into the `deviations` table for the KPIs. See
@@ -94,6 +95,13 @@ Added after the six phases:
 - **Quality checks (printing).** **Preview** and **Print / Save PDF** on a quality check print its
   entire report or only its deviations, each with places to sign it off at the machine. See
   [Printing a quality check](#printing-a-quality-check).
+- **Machines.** Each machine being built ("Magellan#1" of the RigiMill MG) gets its own copies of
+  the quality checks and final inspection ticked for it, as published when it is made; its checks
+  are started from its page. Admins change a machine's copy for that machine only, and bring it up
+  to a newer template revision with a three-way merge that keeps the machine's own changes and
+  results. The machine's status at a glance ("In build · QC 3/5", "Ready for final inspection",
+  "Done"), a Machine filter in Insights and the deviation log by machine. See
+  [Machines](#machines).
 
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
@@ -182,6 +190,84 @@ Use port 4280 here too: Azurite accepts the browser's photo uploads only from th
 
 This `swa start` prints "Error reading workflow configuration": it expects a different layout in
 the GitHub workflow file. The warning is harmless.
+
+## Machines
+
+A machine is one machine being built: its **Machine ID** (as in Monitor, "Magellan#1", unique),
+its model and its serial number. It has its own copy of each quality check and of the final
+inspection it gets, and its checks are started from it. _Machines_ is first in the sidebar, and
+where the app opens.
+
+- **The list** (`/machines`): Machine ID, serial number, model, **status**, quality checks
+  finalised (with a bar), the final inspection and open deviations; searched by Machine ID, serial
+  number or model and filtered by model and status (kept in the address). The status says where a
+  machine is: _No checks yet_, _In build · QC 3/5_ (quality checks still to finalise), _Ready for
+  final inspection_ (every quality check finalised), _Final inspection in progress_, _Finalised · 2
+  open deviations_ and _Done_ (everything finalised and no deviation open).
+- **New machine** (`/machines/new`, inspectors and admins): pick the model, type the Machine ID
+  and serial number (both required; a Machine ID another machine has, in any case, is refused),
+  and under **Checks** tick what it gets: a checkbox per published quality check of the model, in
+  their order, and its final inspection, all ticked to start with (**Select none / Select all**).
+  Each ticked check is copied from its template's **latest published revision**; a draft's
+  unpublished changes are not. **Create machine** opens its page.
+- **The machine's page** (`/machines/{id}`): its status, model, serial number and who made it;
+  **Edit** (its Machine ID and serial number), **Add check** (a check of its model it doesn't
+  have: not ticked when it was made, or published since, copied as published now) and, for
+  admins, ⋯ **Link an inspection…** and **Delete machine** (only while none of its checks is
+  started). Then its **Quality checks** in the order they are done ("2 / 5 finalised") and its
+  **Final inspection**, a card each: its state (_Not started_, _In progress_ with the rows filled,
+  _Finalised_), number, deviations open and closed (a link to them), where its copy came from
+  ("Based on Pre start up rev 3 · 2 rows added, 1 removed") and **Start** or **Open**. The next
+  check to do has the blue Start. Admins also get each check's ⋯ (**Edit checklist**, **Remove
+  from machine** for one not started) and, when its template has a newer published revision,
+  "Rev 4 available · this machine has rev 3" with **Update…**.
+- **Start** gives the check its number (`QC-2026-0004`, `FI-2026-0042`) and fills in its front
+  page from the machine: Machine ID, model and serial number, today's date, and you as Checked by
+  (a final inspection: as a participant; location from the settings, the template's cover photo).
+  Then it opens, and is filled in as any check. Starting the final inspection while quality checks
+  are not finalised says so ("2 of 5 quality checks of Magellan#1 are not finalised: Frame,
+  Covers") and starts anyway if asked. A check that is not started has no number and is in no
+  list: its page shows what it will check, **Start** and, for admins, **Edit checklist**.
+- **Machine ID and serial number belong to the machine.** A check's front page shows them as
+  text ("From the machine. Change it there"); **Edit** on the machine changes them on every check
+  that is not finalised (finalised ones keep what they were finalised with, for their history and
+  printouts).
+- **A machine's copy is its own.** Later template revisions never reach it unless an admin
+  updates it. Admins edit it for that machine only: **Edit checklist** opens the template editor's
+  document (rows and sections added, changed, moved and deleted, with the same keys, drag and drop,
+  Undo and pictures) saved to the check as you type; **Done** goes back to it. Rows copied from the
+  template keep their identity; new rows get new ones. Deleting a row that already has a result
+  (a status, comment, responsible or photo) asks first, as its result goes with it. A finalised
+  check is locked, its checklist too (reopen it first).
+- **Update to the latest template** (admins): **Update…** shows first what it will do: "From the
+  template: 3 rows added, 1 reworded, 1 removed", section by section; rows changed both here and in
+  the template, with both versions and a choice (this machine's wording stays unless you take the
+  template's); rows the template removed that this machine keeps (they have a result, or were
+  changed here), with "Remove it from this machine too"; and what is not brought in (a row this
+  machine removed that the template changed). **Update to rev 4** then merges: what the template
+  added or changed since the machine's revision comes in, the rows the machine added stay, rows it
+  removed stay removed, moves on either side are kept, and every result stays on its row. The
+  machine's copy is then based on rev 4. Quality checks and the final inspection alike, started or
+  not; a finalised one is reopened first.
+- **The order of quality checks** is the model's, set by admins on its Quality checks tab (see
+  [Quality checks](#quality-checks)).
+- **Inspections done before machines existed** keep working as they were. On _Machines_, admins
+  see how many belong to no machine and **Create machines from existing inspections**: one machine
+  for each Machine ID (trimmed, ignoring case) and model among them, named and with the serial
+  number of its newest inspection, each inspection linked to its machine (one in progress takes
+  the machine's Machine ID and serial number; a finalised one keeps its front page). An inspection
+  without a Machine ID, or with one a machine of another model has, stays as it is. It can be
+  linked by hand: **Link to a machine…** in its ⋯ menu (and **Unlink from the machine**), or
+  **Link an inspection…** on the machine's page (admins).
+
+**How they are stored.** A machine is `machines/{id}.json` (`machineName` is its Machine ID,
+`modelCode`, `serialNumber`, who made and changed it when), saved with ETags, its fields also in
+the blob's metadata for the list. Its checks are inspections that name it (`machineRef`), made when
+the machine is (or the check added) in the state `not_started`, without a number (`""`), with the
+copy as their `templateSnapshot` and the revision it came from as `templateId` +
+`templateRevision`, the base of the next update. Inspections stored before machines have no
+`machineRef` and read as before. The order of a model's quality checks is
+`config/quality-check-orders/{templateId}.json`.
 
 ## Editing templates
 
@@ -272,9 +358,12 @@ importing one from Excel, approvals, and protective equipment and tools per sect
   page lists the machines' final inspection templates only; each card says "1 quality check" (or
   "No quality checks") and lists their names under Rows, "Frame (draft), Pre start up", and the list has
   a Quality checks column.
-- **The Quality checks tab** shows the machine's quality checks as cards: the title, the
-  department, the revision, the sections, and the rows, time and last edit. A card opens the quality check: the editor for admins, the latest published
-  revision for inspectors.
+- **The Quality checks tab** shows the machine's quality checks as cards, numbered in the order
+  they are done on a machine: the title, the department, the revision, the sections, and the rows,
+  time and last edit. A card opens the quality check: the editor for admins, the latest published
+  revision for inspectors. Admins change the order by dragging a card by its handle (or `Space`
+  and the arrow keys on it); it is saved at once, and new machines offer their checks in it.
+  Quality checks not ordered yet come after, by title.
 - **New quality check** (admins): its Name (required), the in-process check, e.g. "Pre start
   up", which makes its title "Quality check – Pre start up" (shown as it is typed; a name that
   already starts with "Quality check" is not prefixed twice). A name another quality check of the
@@ -340,17 +429,18 @@ the deviation fields and photos, extra deviations, Finalise and Reopen, Delete a
   title, serial number, date, state (with rows filled while in progress) and NOK, newest first;
   searched by number, Machine ID, title or serial number and filtered by model and state, as the
   inspections list. Final inspections are never listed here, nor quality checks under
-  _Inspections_.
-- **Start a quality check** (`/quality-checks/new`): pick the machine (the models with at least one
-  published quality check; one machine is picked for you), then which of its quality checks (by
-  title, with the revision it will copy), then the **Machine ID** ("As in Monitor, e.g.
-  Magellan#1") and the serial number (both required), the date (today) and _Checked by_ (the
-  signed-in person to start with; `Enter`, a comma or a semicolon adds a name).
-  The quality check's title and department are shown under them. **Start
-  quality check** gives it the next number of its own series, `QC-2026-0001` (counted like the
-  inspections' FI- series, restarting every year), and opens it.
-- **A frozen copy.** It keeps its own copy of the quality check's latest published revision: the
-  rows with their how, references, time and pictures, and the front page's title and department. Later revisions, or deleting the quality check, never change it.
+  _Inspections_. A machine's checks are listed once they are started: before, they are on the
+  machine's page.
+- **Start a quality check** (`/quality-checks/new`): quality checks are done on a machine (see
+  [Machines](#machines)): pick the machine (searched by Machine ID or serial number, each with its
+  status), or make a **New machine**, then **Start** one of its quality checks. Starting gives it
+  the next number of its own series, `QC-2026-0001` (counted like the inspections' FI- series,
+  restarting every year), fills in its front page from the machine (Machine ID, model, serial
+  number, today's date and you as _Checked by_), and opens it.
+- **The machine's own copy.** It is the machine's copy of the quality check, made from its latest
+  published revision when the machine got it: the rows with their how, references, time and
+  pictures, and the front page's title and department. Later revisions, or deleting the quality
+  check, never change it, unless an admin updates it (see [Machines](#machines)).
 - **The page** (`/quality-checks/{id}`): the header with the number and machine, the quality
   check and its revision, the serial number, the save status, **Preview** and **Print / Save
   PDF** (_Entire report_ or _Only deviations_, see
@@ -359,7 +449,8 @@ the deviation fields and photos, extra deviations, Finalise and Reopen, Delete a
   at 1.d_.
   The front page has, in a final inspection's order, the Machine ID, the machine model (fixed),
   Serial number, Date and Checked by, and the quality check it follows, read-only; nothing about
-  delivery (no location or photo).
+  delivery (no location or photo). A machine's check shows its Machine ID and serial number as
+  text: they are the machine's, changed on it.
 - **The rows.** Each section is a header with its number, title, rows and time ("5 rows · 0.6 h"),
   how many are done and **Set remaining to OK**. Each row is a card: its first picture on the
   left (✓ or ✗, "+1" for more), the ref and what to check, how, the references and the time, and
@@ -390,19 +481,21 @@ deviations go into the `deviations` table with `kind: "quality"`, so Insights co
 Inspectors and admins create and fill in inspections; only admins reopen a finalised one or
 delete one.
 
-- **New final inspection.** **New final inspection** on the list: pick the machine model's checklist (only
-  templates with a published revision are offered) and fill in the front page: Machine ID (the
-  machine as the ERP, Monitor, knows it, e.g. Magellan#1) and serial number (both required), participants (`Enter`, a comma or a semicolon adds a name),
-  location (the default from the settings), date (today) and a photo (the template's cover photo
-  unless you add another). The checklist shows the model, name and revision of its latest
-  published revision, which is what the inspection copies. **Create inspection** gives it the
-  next number, `FI-2026-0042` (counting restarts every year, Swedish time; if the counter is ever
-  lost, it carries on from the highest number in use), and opens it.
+- **New final inspection.** **New final inspection** on the list: final inspections are done on a
+  machine (see [Machines](#machines)): pick the machine, or make a **New machine**, then **Start**
+  its final inspection (it warns when its quality checks are not all finalised). Starting gives it
+  the next number, `FI-2026-0042` (counting restarts every year, Swedish time; if the counter is
+  ever lost, it carries on from the highest number in use), fills in the front page from the
+  machine (Machine ID and serial number, which stay the machine's), the date (today), you as a
+  participant (`Enter`, a comma or a semicolon adds more), the location (the default from the
+  settings) and the template's cover photo (another can be added), and opens it.
 - **A frozen checklist.** The inspection keeps its own copy of the template's latest published
-  revision. Later edits and revisions of the template never change it; the header shows which
-  revision it follows.
+  revision (the machine's copy). Later edits and revisions of the template never change it unless
+  an admin updates it; the header shows which revision it follows. Inspections started before
+  machines existed have no machine and work as before.
 - **The list.** Number, Machine ID, serial number, model, date, state (with rows filled while in
-  progress) and the number of NOK rows, newest first. Search by number, Machine ID or serial number,
+  progress) and the number of NOK rows, newest first; started ones (a machine's final inspection
+  not started yet is on the machine's page). Search by number, Machine ID or serial number,
   and filter by model and state; the filters are kept in the address, so they survive opening an
   inspection and coming back (with the browser's Back or the page's _← Inspections_).
 - **The page.** A sticky header with the number, machine, state, revision, save status,
@@ -773,10 +866,13 @@ and per responsible. The two kinds are never shown together.
   with), a search (every word must appear somewhere: Machine ID, serial number, number, deviation
   ID, checkpoint, comment, action…), the model, the responsible ("Not assigned" for none) and the
   category ("No category").
-- **By machine.** A card per machine: its Machine ID and serial number (a quality check's title
-  too, since a machine has several), the model, the inspection and its date (a link to its
-  Deviations tab), "In progress" while it is, and "3 open · 9 closed" with a bar. Machines with
-  open deviations come first, then the newest. A machine inspected twice lists both inspections.
+- **By machine.** A card per machine: its Machine ID and serial number, the model, the inspection
+  and its date (a link to its Deviations tab), "In progress" while it is, and "3 open · 9 closed"
+  with a bar. A machine record's checks are under it, named as the machine is now (its Machine ID a
+  link to its page), all its quality checks together, each naming its check; an inspection
+  without a machine is grouped by its Machine ID and serial number (a quality check's title too).
+  Machines with open deviations come first, then the newest. A machine inspected twice lists both
+  inspections.
 - **Each deviation:** its ID, "QC-2026-0004 · D-03" (a link to it on the inspection's Deviations
   tab), the severity, the ref and checkpoint (or an extra deviation's description), the comment and
   what was done; Responsible, Category, Found (the day it was first recorded and, while it is
@@ -829,8 +925,11 @@ report is the **Quality check deviation report**, which also states the quality 
 PDF is named the same way.
 
 - **Filters**, in one row above everything they scope, and in the URL, so a view can be shared:
-  the period, the model, and **Include inspections in progress** (off: only finalised inspections
-  count, as the brief asks). Dates are the inspection's front-page date. The periods:
+  the period, the model, the **Machine** (`&machine={id}`: only the inspections linked to that
+  machine; its choices are the machines with inspections of the kind, of the model picked), and
+  **Include inspections in progress** (off: only finalised inspections count, as the brief asks).
+  Without a machine every inspection counts, those without a machine too. Dates are the
+  inspection's front-page date. The periods:
   - **Last 12 months** (the default), **This year**, **Last year** and **All time** are relative:
     a link to "last 12 months" shows the 12 months before the day it is opened. The dates they
     cover today show next to the menu.
@@ -967,6 +1066,19 @@ its own front page. `GET /api/inspections` lists both, each with its `kind` and 
 read, save, finalise, reopen and delete work the same for both. Insights takes `kind=quality` (and
 `check`) on all three of its routes; without it, it counts final inspections only.
 
+Machines (see [Machines](#machines)). `POST /api/machines` with `{ machineName, modelCode,
+serialNumber, templateIds }` makes a machine and a not-started copy of each template (each must be
+published and of the model: 404, 409 or 400 otherwise; a Machine ID in use is a 409). A machine's
+check is an inspection with `machineRef`: `POST …/start` (no If-Match; `{ date?, participants? }`)
+numbers it and fills in its front page, or answers with it when it is started already;
+`PUT …/checklist` (`{ sections }`) saves its own checklist and drops the results of rows no longer
+in it; `POST …/template-update` (`{ revision, takeTemplate?, removeRows? }`) merges its template's
+changes up to that revision (409 when not newer, 404 when it doesn't exist); both need a machine's
+check that is not finalised (409). `PUT …/machine` (`{ machineRef }`, null to unlink) links an
+inspection to a machine of its model. A machine's check that is not started is in no list, and
+can't be saved, finalised or reopened (409). `GET /api/inspections` lists started ones only.
+Insights takes `machine` too.
+
 The deviation log (see [Deviation log](#deviation-log)) takes `kind` (final when left out),
 `status` (`open` when left out, `closed` or `all`), `model`, `resp` and `category` (matched
 ignoring case; `-` for none) and `q` (words that must all appear). A follow-up is `PUT` as
@@ -976,38 +1088,51 @@ Sweden, the signed-in person's name; an edit keeps an earlier close's date and n
 item id or an extra deviation's id, and anything else is a 404. A `503` after a follow-up means
 it was stored but the log's table could not be updated: sending the same request again is safe.
 
-| Method and route                             | Role      | What                                                                     |
-| -------------------------------------------- | --------- | ------------------------------------------------------------------------ |
-| `GET /api/me`                                | inspector | Name, email and roles of the signed-in user                              |
-| `GET /api/settings`                          | inspector | Machine models, location, company name and logo, the pick lists, `ETag`  |
-| `PUT /api/settings`                          | admin     | Save every editable setting (`If-Match`)                                 |
-| `GET /api/users`                             | admin     | The people list (name, email, role, added by/when) and its `ETag`        |
-| `PUT /api/users`                             | admin     | Save the people list (`If-Match`, or `If-None-Match: *` for the first)   |
-| `GET /api/people`                            | inspector | Everyone's name by email, to show people by name                         |
-| `GET /api/templates`                         | inspector | All templates and quality checks (`kind`, `parentId`): latest revision   |
-| `POST /api/templates`                        | admin     | New template for a model without one or a new model; or a quality check  |
-| `GET /api/templates/{id}`                    | admin     | The draft, its revision history and its `ETag`                           |
-| `PUT /api/templates/{id}`                    | admin     | Save the draft (`If-Match`)                                              |
-| `DELETE /api/templates/{id}`                 | admin     | Delete draft and revisions (`If-Match`), a template's quality checks too |
-| `POST /api/templates/import`                 | admin     | New draft from a template file (model, name, new model) or quality check |
-| `POST /api/templates/{id}/publish`           | admin     | Publish the draft as the next revision (`If-Match`, change note)         |
-| `GET /api/templates/{id}/revisions/{n}`      | inspector | A published revision (cached by the browser: it never changes)           |
-| `GET /api/inspections`                       | inspector | All inspections and quality checks done (`kind`), newest number first    |
-| `POST /api/inspections`                      | inspector | New inspection, or quality check done, from a template's latest revision |
-| `GET /api/inspections/{id}`                  | inspector | One inspection and its `ETag`                                            |
-| `PUT /api/inspections/{id}`                  | inspector | Save front page, results and extra deviations (`If-Match`)               |
-| `DELETE /api/inspections/{id}`               | admin     | Delete it, its deviation rows, follow-ups and photos (`If-Match`)        |
-| `POST /api/inspections/{id}/finalise`        | inspector | Lock it once every row has a status (`If-Match`)                         |
-| `POST /api/inspections/{id}/reopen`          | admin     | Unlock a finalised inspection (`If-Match`)                               |
-| `GET /api/inspections/{id}/follow-ups`       | inspector | Its deviations' follow-ups by key (none yet: an empty map)               |
-| `PUT /api/inspections/{id}/follow-ups/{key}` | inspector | Close, edit or reopen one of its deviations                              |
-| `GET /api/deviations`                        | inspector | The deviation log for `?kind&status&model&resp&category&q`               |
-| `GET /api/deviations/export.csv`             | inspector | The same deviations as a CSV file, the Excel log's columns               |
-| `GET /api/insights`                          | admin     | KPIs for `?kind&from&to&model&check&includeInProgress` (all optional)    |
-| `GET /api/insights/export.csv`               | admin     | The deviation rows under the same filters, as a CSV file                 |
-| `GET /api/insights/deviations`               | admin     | The same rows as JSON, for the printed report's deviation list           |
-| `POST /api/images/upload-url`                | inspector | New image id and a 10-minute upload URL for it                           |
-| `GET /api/images/{id}/url`                   | inspector | A 15-minute read URL for an image                                        |
+| Method and route                              | Role      | What                                                                     |
+| --------------------------------------------- | --------- | ------------------------------------------------------------------------ |
+| `GET /api/me`                                 | inspector | Name, email and roles of the signed-in user                              |
+| `GET /api/settings`                           | inspector | Machine models, location, company name and logo, the pick lists, `ETag`  |
+| `PUT /api/settings`                           | admin     | Save every editable setting (`If-Match`)                                 |
+| `GET /api/users`                              | admin     | The people list (name, email, role, added by/when) and its `ETag`        |
+| `PUT /api/users`                              | admin     | Save the people list (`If-Match`, or `If-None-Match: *` for the first)   |
+| `GET /api/people`                             | inspector | Everyone's name by email, to show people by name                         |
+| `GET /api/templates`                          | inspector | All templates and quality checks (`kind`, `parentId`): latest revision   |
+| `POST /api/templates`                         | admin     | New template for a model without one or a new model; or a quality check  |
+| `GET /api/templates/{id}`                     | admin     | The draft, its revision history and its `ETag`                           |
+| `PUT /api/templates/{id}`                     | admin     | Save the draft (`If-Match`)                                              |
+| `DELETE /api/templates/{id}`                  | admin     | Delete draft and revisions (`If-Match`), a template's quality checks too |
+| `POST /api/templates/import`                  | admin     | New draft from a template file (model, name, new model) or quality check |
+| `POST /api/templates/{id}/publish`            | admin     | Publish the draft as the next revision (`If-Match`, change note)         |
+| `GET /api/templates/{id}/revisions/{n}`       | inspector | A published revision (cached by the browser: it never changes)           |
+| `GET /api/templates/{id}/quality-check-order` | inspector | The order of a model's quality checks (and its `ETag` once set)          |
+| `PUT /api/templates/{id}/quality-check-order` | admin     | A new order (`If-Match`, or `If-None-Match: *` the first time)           |
+| `GET /api/machines`                           | inspector | Every machine with its checks' and deviations' progress                  |
+| `POST /api/machines`                          | inspector | New machine with not-started copies of the templates ticked              |
+| `POST /api/machines/from-inspections`         | admin     | Machines for the inspections without one, and links them                 |
+| `GET /api/machines/{id}`                      | inspector | One machine, its checks in order (update available, changes) and `ETag`  |
+| `PUT /api/machines/{id}`                      | inspector | Its Machine ID and serial number (`If-Match`), onto its open checks      |
+| `DELETE /api/machines/{id}`                   | admin     | Delete it and its checks while none is started (`If-Match`; 409 after)   |
+| `POST /api/machines/{id}/checks`              | inspector | Another check, copied from its template's latest published revision      |
+| `GET /api/inspections`                        | inspector | All inspections and quality checks done (`kind`), newest number first    |
+| `POST /api/inspections`                       | inspector | New inspection, or quality check done, from a template's latest revision |
+| `GET /api/inspections/{id}`                   | inspector | One inspection and its `ETag`                                            |
+| `PUT /api/inspections/{id}`                   | inspector | Save front page, results and extra deviations (`If-Match`)               |
+| `DELETE /api/inspections/{id}`                | admin     | Delete it, its deviation rows, follow-ups and photos (`If-Match`)        |
+| `POST /api/inspections/{id}/finalise`         | inspector | Lock it once every row has a status (`If-Match`)                         |
+| `POST /api/inspections/{id}/reopen`           | admin     | Unlock a finalised inspection (`If-Match`)                               |
+| `GET /api/inspections/{id}/follow-ups`        | inspector | Its deviations' follow-ups by key (none yet: an empty map)               |
+| `PUT /api/inspections/{id}/follow-ups/{key}`  | inspector | Close, edit or reopen one of its deviations                              |
+| `POST /api/inspections/{id}/start`            | inspector | Start a machine's check: its number, front page from the machine         |
+| `PUT /api/inspections/{id}/checklist`         | admin     | A machine's check's own checklist (`If-Match`)                           |
+| `POST /api/inspections/{id}/template-update`  | admin     | Merge its template's newer revision into it (`If-Match`, choices)        |
+| `PUT /api/inspections/{id}/machine`           | admin     | Link it to a machine of its model, or unlink it (`If-Match`)             |
+| `GET /api/deviations`                         | inspector | The deviation log for `?kind&status&model&resp&category&q`               |
+| `GET /api/deviations/export.csv`              | inspector | The same deviations as a CSV file, the Excel log's columns               |
+| `GET /api/insights`                           | admin     | KPIs for `?kind&from&to&model&check&machine&includeInProgress`           |
+| `GET /api/insights/export.csv`                | admin     | The deviation rows under the same filters, as a CSV file                 |
+| `GET /api/insights/deviations`                | admin     | The same rows as JSON, for the printed report's deviation list           |
+| `POST /api/images/upload-url`                 | inspector | New image id and a 10-minute upload URL for it                           |
+| `GET /api/images/{id}/url`                    | inspector | A 15-minute read URL for an image                                        |
 
 ## Seed data
 
@@ -1048,8 +1173,17 @@ because it usually means the command that produced it failed.
 ## Tests
 
 - **Unit tests** (`npm test`): Vitest across `shared`, `api`, `seed` and `app`. The storage tests
-  start their own in-memory Azurite on free ports, so nothing else needs to be running. For the
-  deviation log: the follow-up contract and its defaults, the log's filters and old rows read as
+  start their own in-memory Azurite on free ports, so nothing else needs to be running. For
+  machines: the three-way merge of a machine's checklist with a newer template revision
+  (`shared/src/checklistMerge.test.ts`: additions, field changes and conflicts, removals with and
+  without results, moves on either side, a row moved on one side and edited on the other, deleted
+  on one side and edited on the other, added on both sides at one place, a whole section deleted
+  on one side while the other added to it, renames), the machine's status, the Machine ID rules
+  and the plan for older inspections (`shared/src/machines.test.ts`); the endpoints
+  (`api/src/functions/machines.test.ts`: roles, 404/409/412, copies of the latest published
+  revision, start, propagating a Machine ID, the checklist, the update, linking, the one-time
+  action, the order of quality checks, Insights' machine filter and the log); and the pages'
+  model (`app/src/features/machines`). For the deviation log: the follow-up contract and its defaults, the log's filters and old rows read as
   open (`shared/src/deviationLog.test.ts`); the follow-up and log endpoints
   (`api/src/functions/deviation-log.test.ts`: roles, a key that is no deviation, finalised
   inspections and quality checks, the inspection's version untouched, a follow-up kept across a
@@ -1059,7 +1193,7 @@ because it usually means the command that produced it failed.
   <http://localhost:4280>. If nothing is running there, Playwright starts `npm run dev` itself and
   stops it afterwards; locally it reuses a stack you already started. The tests cover the sign-in
   redirect for pages and the API, the anonymous pre-login files (and that an encoded `../` cannot
-  reach the app through them), the sign-in link, the inspector and admin navigation, the no-access
+  reach the app through them), the sign-in link, the inspector and admin navigation (Machines first, where the app opens), the no-access
   page (and Check again), an admin adding themselves and a colleague in Settings (the invitation,
   then the colleague signing in by name without any Static Web Apps role, an edit and a removal
   counting at once), a deep link, signing out and the seed. For the themes: System following the
@@ -1092,11 +1226,11 @@ because it usually means the command that produced it failed.
   Export JSON (unsaved changes included, the file name) and Import JSON on the same machine as a
   new draft with fresh ids, a template file refused with its reason; deleting the machine's
   template names its quality check and deletes it too; an inspector sees one read-only (the API
-  refuses their reads of the draft and every write with 403); and a new final inspection never
-  offers one, while the API starts a quality check (QC- number) from it. Doing quality checks
-  (`e2e/quality-check-inspections.spec.ts`): the sidebar's four groups (three for an inspector);
-  an inspector starts one from Quality checks (machine, quality check, the serial number it needs,
-  Checked by filled in), sees the rows as cards with how and references, opens a row's pictures
+  refuses their reads of the draft and every write with 403); and a machine's new final inspection
+  is its final inspection template only, while the API starts a quality check (QC- number) from
+  it. Doing quality checks (`e2e/quality-check-inspections.spec.ts`): the sidebar's Machines and
+  four groups (three for an inspector); an inspector starts one from Quality checks on a new
+  machine (the Machine ID and serial number it needs, Checked by and the date filled in), sees the rows as cards with how and references, opens a row's pictures
   from its button and its picture (Should look like this, More information, Escape), is stopped by
   Finalise while rows lack a status, marks a NOK with comment, severity and responsible and an OK
   with the keyboard, finalises (stored as a quality check, its frozen front page, its deviation row
@@ -1105,8 +1239,9 @@ because it usually means the command that produced it failed.
   its own print page; an admin sees it only under Quality checks in Insights (the API's numbers by kind, the
   switch, the quality check menu, the CSV's name and rows, the report's title and deviation list)
   while the final inspection's numbers and report leave it out; and an admin reopens and deletes
-  one while an inspector has no Delete and gets 403. For inspections: creating one from the front page form and
-  finding it in the list; a whole checklist filled in from the keyboard (status keys, moving between
+  one while an inspector has no Delete and gets 403. For inspections: starting one on a new machine, filled in from it, and
+  finding it in the list (and an inspection without a machine leading back to the list as it was
+  left); a whole checklist filled in from the keyboard (status keys, moving between
   rows, the comment, the Tab order, Escape, Enter, clearing, Set remaining to OK, the progress) and
   still there after a reload; the Deviation Summary's order and an extra deviation; the deviation table, read straight from Azurite (every column, the
   `finalised` flag, a row deleted when NOK becomes OK); Finalise blocked by a missing row, its
@@ -1149,6 +1284,18 @@ because it usually means the command that produced it failed.
   a deviation just marked closed from a final inspection's Deviations tab (saved first), a
   finalised inspection's followed up through the API and a key that is no deviation refused, and
   the CSV of the closed ones (name, header, row).
+- **Machines** (`e2e/machines.spec.ts`, each test with a machine model of its own, deleting its
+  machines, templates and checks): an inspector makes a machine with some checks ticked (all
+  ticked to start with, Select none / all, the Machine ID required), finds its page with the
+  checks not started, gets the final inspection's warning, starts a quality check filled in from
+  the machine (its Machine ID and serial number as text, Checked by), finds it in the list and
+  starts the final inspection from the start page; an admin edits a machine's checklist (a row
+  added, one deleted, one with a result only after asking) without touching the template,
+  publishes a newer revision, sees the badge, the preview and updates, keeping the machine's row,
+  the removal and the result; links an older inspection by hand (and is offered, then cancels, the
+  one-time action); orders a model's quality checks with the keyboard, which a new machine then
+  offers in that order; and the API refuses an inspector's checklist, update, link, delete and
+  one-time action, while an admin deletes a machine nobody started a check on.
 - **Quality check printing** (`e2e/quality-check-print.spec.ts`, each test with a throwaway
   machine and quality check): Preview from a quality check showing the entire report (front page
   with Machine ID, Department and "Rev: 1" and no document number, the summary, the checklist rows
@@ -1240,6 +1387,9 @@ config/inspection-counter.json           counter for FI-YYYY-NNNN numbers (final
 config/quality-check-counter.json        counter for QC-YYYY-NNNN numbers (quality checks done)
 follow-ups/{inspectionId}.json           its deviations' follow-up: open or closed, the action,
                                          when and by whom (the deviation log)
+machines/{machineId}.json                a machine being built: Machine ID, model, serial number
+                                         (its checks are inspections naming it, `machineRef`)
+config/quality-check-orders/{templateId}.json  the order of a model's quality checks
 table deviations                         one row per deviation, the source for KPIs and the
                                          deviation log
 ```
@@ -1263,9 +1413,12 @@ and 5173) on its first storage call; in Azure the rule comes from the Bicep file
 
 - Static Web Apps built-in authentication with Microsoft Entra ID (`/.auth/login/aad`). There are
   no passwords. Other providers (GitHub, X) are switched off.
-- Two roles: **`inspector`** creates and fills in inspections and quality checks and follows up
-  their deviations in the deviation log; **`admin`** can also edit
-  templates, see insights, change settings, reopen inspections and delete them.
+- Two roles: **`inspector`** makes machines (and edits their Machine ID and serial number), adds
+  and starts their checks, fills in inspections and quality checks and follows up their deviations
+  in the deviation log; **`admin`** can also edit templates and the order of quality checks, edit
+  a machine's own checklist and update it to a newer template, link and unlink inspections and
+  machines, delete a machine nobody has started a check on, see insights, change settings, reopen
+  inspections and delete them.
 - **Who has which role is decided by the API.** A person's role and the name shown for them come
   from the people list (`config/people.json`), which admins manage in Settings → Users & access.
   The list is matched on the sign-in's email (lowercased). Someone not on the list keeps the role
@@ -1299,8 +1452,8 @@ and 5173) on its first storage call; in Azure the rule comes from the Bicep file
 
 Everything Azure needs is in `infra/main.bicep`: a **Static Web App (Free)** that hosts the app and
 its managed Functions API, and one **storage account** (Standard_LRS) with the private blob
-containers `templates`, `inspections`, `images`, `config` and `follow-ups`, the table
-`deviations`, 7-day soft
+containers `templates`, `inspections`, `images`, `config`, `follow-ups` and `machines`, the
+table `deviations`, 7-day soft
 delete and blob CORS for the browser's SAS uploads. The deployment also writes the
 `STORAGE_CONNECTION_STRING` app setting, so there is nothing to set by hand. GitHub Actions
 (`.github/workflows/azure-static-web-apps.yml`) builds and deploys every push to `main`.

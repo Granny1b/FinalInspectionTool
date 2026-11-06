@@ -14,8 +14,11 @@
  *                                            → SaveTemplateResponse + ETag
  *   DELETE /api/templates/{id}    admin      If-Match → 204 (a final inspection template's
  *                                            quality checks go with it)
+ *   GET    /api/templates/{id}/quality-check-order  inspector  QualityCheckOrder (+ ETag once set)
+ *   PUT    /api/templates/{id}/quality-check-order  admin      If-Match (If-None-Match: * the
+ *                                                              first time), QualityCheckOrder
  */
-import { app } from '@azure/functions';
+import { app, type HttpRequest } from '@azure/functions';
 import {
   blobNames,
   checklistIds,
@@ -26,6 +29,7 @@ import {
   newId,
   newModelConflict,
   newQualityFront,
+  QualityCheckOrderSchema,
   qualityCheckTitle,
   TemplateDraftInputSchema,
   templateImageIds,
@@ -35,6 +39,7 @@ import {
   type ImportQualityCheckRequest,
   type ImportTemplateResponse,
   type MachineModel,
+  type QualityCheckOrder,
   type QualityFront,
   type SaveTemplateResponse,
   type Section,
@@ -57,12 +62,14 @@ import { loadSettings, updateSettings } from '../lib/settings';
 import { writeJson } from '../lib/storage';
 import {
   deleteQualityCheck,
+  deleteQualityCheckOrder,
   deleteTemplate as deleteStoredTemplate,
   duplicateIds,
   findTemplateForModel,
   loadAllTemplates,
   loadDetail,
   loadLatestPublished,
+  loadQualityCheckOrder,
   loadQualityChecks,
   loadSummaries,
   loadTemplate,
@@ -70,6 +77,7 @@ import {
   storedImages,
   templateNotFound,
   usedChecklistIds,
+  writeQualityCheckOrder,
 } from '../lib/templates';
 
 export const listTemplates = endpoint({ role: 'inspector' }, async () =>
@@ -257,9 +265,68 @@ export const deleteTemplate = endpoint({ role: 'admin' }, async (req, context) =
       return [];
     });
     await Promise.all(checks.map((check) => deleteQualityCheck(check.id, context)));
+    await deleteQualityCheckOrder(id).catch((error: unknown) => {
+      context.warn(`Deleted template ${id}; deleting its quality check order failed`, error);
+    });
   }
   return { status: 204 };
 });
+
+/**
+ * The order of a machine model's quality checks (`id` is its final inspection template), as its
+ * Quality checks tab shows them. Without one set, they are by title: an empty order.
+ */
+export const getQualityCheckOrder = endpoint({ role: 'inspector' }, async (req) => {
+  const id = idParam(req);
+  const template = await loadTemplate(id);
+  if (!template || template.draft.kind !== 'final') throw templateNotFound();
+  const stored = await loadQualityCheckOrder(id);
+  const body: QualityCheckOrder = { order: stored?.data.order ?? [] };
+  return json(200, body, stored ? etagHeader(stored.etag) : undefined);
+});
+
+/**
+ * A new order (admins), dragged on the Quality checks tab: every quality check of the machine
+ * model once, nothing else (400 otherwise; a quality check added or deleted meanwhile makes the
+ * page's list outdated, so it reloads). Saved over the version the page read (412 otherwise), or
+ * as the first one (If-None-Match: *).
+ */
+export const saveQualityCheckOrder = endpoint({ role: 'admin' }, async (req) => {
+  const id = idParam(req);
+  const condition = orderCondition(req);
+  const { order } = await readJsonBody(req, QualityCheckOrderSchema);
+  const template = await loadTemplate(id);
+  if (!template || template.draft.kind !== 'final') throw templateNotFound();
+  const checks = new Set((await loadQualityChecks(id)).map((check) => check.id));
+  if (order.length !== checks.size || new Set(order).size !== order.length) {
+    throw new BadRequestError('The order must have each of the machine’s quality checks once.');
+  }
+  if (order.some((checkId) => !checks.has(checkId))) {
+    throw new BadRequestError('The order must have each of the machine’s quality checks once.');
+  }
+  try {
+    const etag = await writeQualityCheckOrder(id, order, condition);
+    const body: QualityCheckOrder = { order };
+    return json(200, body, etagHeader(etag));
+  } catch (error) {
+    // Another admin saved the first order in between: the same conflict as a changed ETag.
+    if (error instanceof ConflictError) throw new PreconditionFailedError();
+    throw error;
+  }
+});
+
+/** If-Match with the version read, or If-None-Match: * when there was none to read. */
+function orderCondition(req: HttpRequest): { ifMatch: string } | { ifNoneMatch: '*' } {
+  const ifNoneMatch = req.headers.get('if-none-match')?.trim();
+  if (!ifNoneMatch) return { ifMatch: requireIfMatch(req) };
+  if (req.headers.has('if-match')) {
+    throw new BadRequestError('Send either If-Match or If-None-Match, not both.');
+  }
+  if (ifNoneMatch !== '*') {
+    throw new BadRequestError('If-None-Match must be "*": it is only for saving the first order.');
+  }
+  return { ifNoneMatch: '*' };
+}
 
 /** A quality check's front page with the title that follows from it ("Quality check – Pre start up"). */
 function withQuality(quality: QualityFront): { name: string; quality: QualityFront } {
@@ -372,6 +439,14 @@ app.http('templateImport', {
   authLevel: 'anonymous',
   route: 'templates/import',
   handler: importTemplate,
+});
+
+app.http('templateQualityCheckOrder', {
+  methods: ['GET', 'PUT'],
+  authLevel: 'anonymous',
+  route: 'templates/{id}/quality-check-order',
+  handler: (req, context) =>
+    (req.method === 'PUT' ? saveQualityCheckOrder : getQualityCheckOrder)(req, context),
 });
 
 app.http('template', {

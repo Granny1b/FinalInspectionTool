@@ -23,10 +23,13 @@ import {
   ClipboardList,
   ClipboardX,
   Eye,
+  Link2,
   Lock,
   LockOpen,
+  Pencil,
   Printer,
   Trash2,
+  Unlink,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -35,6 +38,7 @@ import { ActionMenu } from '../../components/ActionMenu';
 import { BackLink } from '../../components/BackLink';
 import { Button } from '../../components/Button';
 import { Callout } from '../../components/Callout';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ApiRequestError, errorMessage, isConflict } from '../../lib/api';
 import type { AutosaveState } from '../../lib/autosave/autosave';
 import { AutosaveAlerts } from '../../lib/autosave/AutosaveAlerts';
@@ -49,6 +53,9 @@ import { useCurrentUser } from '../../lib/useMe';
 import { usePersonName } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
 import { useFollowUps, usePendingFollowUps, useSetFollowUp } from '../deviationLog/queries';
+import { PickMachineDialog } from '../machines/MachineDialogs';
+import { checklistHref, machineHref } from '../machines/model';
+import { linkInspection, machineKeys } from '../machines/queries';
 import { InspectionPreview } from '../print/InspectionPreview';
 import { inspectionPrintHref, qualityCheckPrintHref } from '../print/links';
 import { inspectionOnScreen } from '../print/preview';
@@ -149,10 +156,19 @@ export function InspectionEditor({
   const categories = settings.data?.deviationCategories ?? NO_CHOICES;
   const personName = usePersonName();
   const idPrefix = useId();
-  // Back to the list as it was left (search and filters); one element for the page's lifetime.
-  const [backLink] = useState(() => (
-    <BackLink to={inspectionsListHref(kind)} label={quality ? 'Quality checks' : 'Inspections'} />
-  ));
+  // A machine's check: its Machine ID and serial number are the machine's, and it leads back
+  // there. Linking or unlinking opens the page again, so this holds for the page's lifetime.
+  const machineRef = inspection.machineRef;
+  const machinePage = machineRef ? machineHref(machineRef) : undefined;
+  // Back to its machine, or to the list as it was left (search and filters); one element for the
+  // page's lifetime.
+  const [backLink] = useState(() =>
+    machinePage ? (
+      <BackLink to={machinePage} label={inspection.front.machineName || 'Machine'} />
+    ) : (
+      <BackLink to={inspectionsListHref(kind)} label={quality ? 'Quality checks' : 'Inspections'} />
+    ),
+  );
   // What a quality check follows, as frozen in it; the same object for the page's lifetime.
   const [standard] = useState<QualityStandard>(() => ({
     title: templateSnapshot.name,
@@ -547,6 +563,25 @@ export function InspectionEditor({
     void navigate(inspectionsListHref(kind), { replace: true, state });
   }, [deleted, navigate, number, kind]);
 
+  // Admins: which machine it belongs to. Pending edits are saved first, so the link is made on
+  // the version on screen; then the page opens again on what was stored.
+  const [machineDialog, setMachineDialog] = useState<'link' | 'unlink' | null>(null);
+  const [unlinkFailure, setUnlinkFailure] = useState<string | null>(null);
+  async function changeMachine(next: string | null) {
+    if (!(await saveAll())) {
+      throw new ApiRequestError(409, {
+        error: 'conflict',
+        message: 'Your latest changes couldn’t be saved, so nothing was changed.',
+      });
+    }
+    const linked = await linkInspection(id, next, saver.etag());
+    // Saving carries on from the linked version, should opening it again fail.
+    saver.setEtag(linked.etag);
+    void queryClient.invalidateQueries({ queryKey: machineKeys.all });
+    markListStale();
+    await onReload();
+  }
+
   // What Print / Save PDF offers: an inspection's blank checklist or its report; a quality check's
   // entire report or only its deviations, to close them at the machine (it has no blank form).
   const printItems = quality
@@ -715,6 +750,30 @@ export function InspectionEditor({
                     label={quality ? 'Quality check actions' : 'Inspection actions'}
                     triggerData={{ 'data-inspection-menu': '' }}
                     items={[
+                      // Its own checklist, for its machine only (saved first, as any link).
+                      ...(machineRef && !finalised
+                        ? [
+                            {
+                              label: 'Edit checklist',
+                              icon: Pencil,
+                              onSelect: () => void navigate(checklistHref(kind, id)),
+                            },
+                          ]
+                        : []),
+                      machineRef
+                        ? {
+                            label: 'Unlink from the machine',
+                            icon: Unlink,
+                            onSelect: () => {
+                              setUnlinkFailure(null);
+                              setMachineDialog('unlink');
+                            },
+                          }
+                        : {
+                            label: 'Link to a machine…',
+                            icon: Link2,
+                            onSelect: () => setMachineDialog('link'),
+                          },
                       {
                         label: quality ? 'Delete quality check' : 'Delete inspection',
                         icon: Trash2,
@@ -779,6 +838,11 @@ export function InspectionEditor({
             {followUpFailure}
           </Callout>
         )}
+        {unlinkFailure && (
+          <Callout tone="error" role="alert" onDismiss={() => setUnlinkFailure(null)}>
+            It could not be unlinked. {unlinkFailure}
+          </Callout>
+        )}
         {notice && (
           <div ref={noticeRef} tabIndex={-1} className="outline-none">
             <Callout
@@ -821,6 +885,7 @@ export function InspectionEditor({
             errors={frontErrors}
             onChange={updateFront}
             pendingParticipant={pendingParticipant}
+            machineHref={machinePage}
           />
         ) : (
           <FrontPageCard
@@ -832,6 +897,7 @@ export function InspectionEditor({
             onChange={updateFront}
             onUpload={trackUpload}
             pendingParticipant={pendingParticipant}
+            machineHref={machinePage}
           />
         )}
         <section aria-labelledby={`${idPrefix}-checklist`} className="mt-10">
@@ -954,6 +1020,28 @@ export function InspectionEditor({
               document.querySelector<HTMLElement>('[data-inspection-menu]')?.focus();
             }
           }}
+        />
+      )}
+      {machineDialog === 'link' && (
+        <PickMachineDialog
+          noun={noun}
+          modelCode={inspection.front.modelCode}
+          onPick={changeMachine}
+          onClose={() => setMachineDialog(null)}
+        />
+      )}
+      {machineDialog === 'unlink' && (
+        <ConfirmDialog
+          title={`Unlink ${number} from ${inspection.front.machineName}?`}
+          message={`It no longer belongs to the machine: its page, status and Insights leave it out. The ${noun} itself stays as it is, its Machine ID and serial number too, and it can be linked again.`}
+          confirmLabel="Unlink"
+          onConfirm={() => {
+            setMachineDialog(null);
+            changeMachine(null).catch((failure: unknown) =>
+              setUnlinkFailure(errorMessage(failure)),
+            );
+          }}
+          onCancel={() => setMachineDialog(null)}
         />
       )}
       {reload.dialog}

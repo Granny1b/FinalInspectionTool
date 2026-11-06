@@ -3,7 +3,8 @@
  * Finalise and reopen are in inspection-state.ts. A quality check done on a machine is an
  * inspection of kind `quality`, made from a published quality check: every route takes both.
  *
- *   GET    /api/inspections       inspector  InspectionSummary[] (both kinds), newest number first
+ *   GET    /api/inspections       inspector  InspectionSummary[] (both kinds, started ones), newest
+ *                                            number first
  *   POST   /api/inspections       inspector  CreateInspectionRequest, or StartQualityCheckRequest
  *                                            for a quality check → 201 Inspection + ETag
  *   GET    /api/inspections/{id}  inspector  Inspection + ETag
@@ -41,8 +42,9 @@ import {
   deleteInspection as deleteStoredInspection,
   inspectionNotFound,
   loadInspection,
-  loadSummaries,
+  loadStartedSummaries,
   nextInspectionNumber,
+  notStartedMessage,
   syncSettled,
   writeInspection,
 } from '../lib/inspections';
@@ -51,8 +53,12 @@ import { loadLatestPublished, loadTemplate, templateNotFound } from '../lib/temp
 const finalisedMessage = (kind: InspectionKind) =>
   `This ${INSPECTION_NOUNS[kind]} is finalised – an admin must reopen it.`;
 
+/**
+ * Started inspections only: a machine's check that is not started has no number and nothing in
+ * it, and is shown on its machine's page (GET /api/machines/{id}).
+ */
 export const listInspections = endpoint({ role: 'inspector' }, async () =>
-  json(200, await loadSummaries()),
+  json(200, await loadStartedSummaries()),
 );
 
 /** What every create body has; the rest depends on the template's kind. */
@@ -163,6 +169,7 @@ export const saveInspection = endpoint({ role: 'inspector' }, async (req, contex
   if (current.data.state === 'finalised') {
     throw new ConflictError(finalisedMessage(current.data.kind));
   }
+  if (current.data.state === 'not_started') throw new ConflictError(notStartedMessage);
   checkIds(current.data, input);
 
   const inspection: Inspection = {
@@ -198,13 +205,17 @@ export const deleteInspection = endpoint({ role: 'admin' }, async (req, context)
 
 /**
  * The front page as saved: the model never changes, and a quality check never gets the fields its
- * front page doesn't have (location, photo), whatever is sent.
+ * front page doesn't have (location, photo), whatever is sent. A machine's check has its machine's
+ * Machine ID and serial number (they are edited on the machine), whatever is sent.
  */
 function savedFront(current: Inspection, input: InspectionDraftInput): InspectionFront {
   const { modelCode } = current.front;
-  if (current.kind !== 'quality') return { ...input.front, modelCode };
+  const machine = current.machineRef
+    ? { machineName: current.front.machineName, serialNumber: current.front.serialNumber }
+    : {};
+  if (current.kind !== 'quality') return { ...input.front, ...machine, modelCode };
   const { machineName, serialNumber, participants, date } = input.front;
-  return { machineName, modelCode, serialNumber, participants, location: '', date };
+  return { machineName, modelCode, serialNumber, participants, location: '', date, ...machine };
 }
 
 /**

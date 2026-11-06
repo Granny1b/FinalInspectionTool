@@ -22,15 +22,16 @@ export function LoadingShell() {
           <Logo className="h-10" />
         </div>
         <div className="flex-1 px-3 py-5">
-          {/* The sidebar's three groups (Final inspection and Quality check with their list and
-              Deviations, Setup with Templates), each a label over its links, spaced as they are
-              (Sidebar's GROUP_GAP and the links' 2 px). */}
+          {/* Machines, then the sidebar's three groups (Final inspection and Quality check with
+              their list and Deviations, Setup with Templates), each a label over its links,
+              spaced as they are (Sidebar's GROUP_GAP and the links' 2 px). */}
+          <Bone className={clsx(NAV_ITEM_HEIGHT, 'w-4/5')} />
           {[
             { label: 'w-28', links: ['w-11/12', 'w-3/4'] },
             { label: 'w-24', links: ['w-4/5', 'w-3/4'] },
             { label: 'w-12', links: ['w-full'] },
-          ].map(({ label, links }, index) => (
-            <div key={label} className={index > 0 ? 'mt-5' : undefined}>
+          ].map(({ label, links }) => (
+            <div key={label} className="mt-5">
               <div className="mb-2 flex h-4 items-center px-3">
                 <Bone className={clsx('h-2.5', label)} />
               </div>

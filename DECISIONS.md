@@ -3217,3 +3217,291 @@ an appendix.
 - **Final inspection reports are unchanged:** their "Closed · Sign · Date" line stays blank. They
   go to the customer as the record of the inspection, and showing later follow-up there was not
   asked for.
+
+## Machines (2026-11-06)
+
+The user does four to six quality checks on each machine and then its final inspection, and
+wanted the checks bound to the machine: make the machine (from a model, as templates are made per
+model), tick which of the model's quality checks and its final inspection it gets, each copied as
+its template is published at that moment, then change that machine's copies (add or delete rows)
+without the template, and later bring a copy up to the latest template. Insights and the
+deviation log should be able to bind to the machine.
+
+### Data model: a machine's check is an inspection
+
+- **A machine is a small document: `machines/{id}.json`** with `machineName` (the Machine ID as
+  in Monitor, "Magellan#1"; named as on the front page, where it is copied), `modelCode`,
+  `serialNumber` and the audit fields, saved with ETags like every document. Its fields are also in
+  the blob's metadata (`machine`), so the list is one blob listing, as for inspections. A new
+  `machines` container (Bicep, `ensureStorage` and the seed create it like `follow-ups`).
+- **Its checks are inspections that name it (`machineRef`)**, as the brief recommended. Copying a
+  template for a machine creates the inspection at once, in a new state **`not_started`**, with the
+  template's latest published revision as its `templateSnapshot` and `templateId` +
+  `templateRevision` as where it came from. That one field made everything else free: the
+  machine's copy is edited, merged, started, filled in, finalised, printed, linked to deviations
+  and counted exactly as any inspection, and there is one place a checklist lives. The other model
+  (the copy kept in the machine document until started, then copied into a new inspection) would
+  have needed every edit and merge twice, for a copy in two places.
+- **Unstarted checks use no number.** `number` is `''` until the check is started (the schema
+  takes `''` or an FI-/QC- number); **Start** takes the next number of its series then. The
+  counters, the list's sort and `parseInspectionNumber` already treated an unparseable number as
+  none.
+- **Stored inspections read exactly as before:** no `machineRef`, state `in_progress` or
+  `finalised`, a number. Nothing migrates. The list summary in the metadata gains `machineRef`
+  (optional); older summaries have none.
+- **Lists, Insights and the deviation log leave not-started checks out:** `GET /api/inspections`
+  returns started ones only (`loadStartedSummaries`), Insights' `inScope` and aggregation skip
+  them, the log only ever had their (no) deviation rows. The machine's page is where they are; the
+  Inspections and Quality checks lists didn't get a "Not started" filter (kept simple: they list
+  work done).
+- **A not-started check can't be saved, finalised or reopened (409, "start it first").** Its
+  checklist can be edited and updated (admins), and it can be deleted (admins, "Remove from
+  machine").
+
+### Making a machine and starting its checks
+
+- **New machine** (`/machines/new`, inspectors and admins): the model (radio cards, the models
+  with a final inspection template and something published to copy), Machine ID and serial number
+  (both required, as starting a check always needed them), then **Checks**: a checkbox per
+  published quality check of the model in their order, then its final inspection, all ticked, with
+  **Select none / Select all**. Each ticked one is copied from its **latest published revision**
+  (the draft's unpublished changes never). Everything is checked before anything is written (a
+  known model, a free Machine ID, each template published and of the model); then the machine,
+  then its checks. A copy that fails to be written is logged and left out: Add check makes it.
+- **Machine IDs are unique, trimmed and ignoring case** (`machineKey`): "magellan#1 " is
+  Magellan#1 to people, and two machines with one ID would split their checks. Two people making
+  the same Machine ID at the same instant could both get through (the check reads the list first),
+  as two admins making a template for one model could; with a handful of users that is accepted.
+- **A model is known when the settings have it or a final inspection template has it**: a model
+  removed from the settings since still has its templates (and the e2e tests' throwaway models
+  are never in the settings, so they don't touch the one shared settings document).
+- **Start** (`POST /api/inspections/{id}/start`) gives the check its number, today's date (the
+  browser's, as a new inspection's front page always had; the server's Swedish day when none is
+  sent) and Checked by / participants = the person starting it, and puts the machine's Machine ID
+  and serial number on its front page. It needs no If-Match: it changes nothing anyone typed, and
+  starting a check already started (someone was quicker, or a retry) answers with it as it is, so
+  both land on the same check. The write is conditional on the version read and retried
+  (`changeInspection`); the number is taken once before, so a retry never takes a second one (a
+  start that loses a race to another start does use up a number, as a refused create never did:
+  numbers have gaps already, from deleted inspections).
+- **The final inspection warns when quality checks are not finalised** ("2 of 5 quality checks of
+  Magellan#1 are not finalised: Frame, Covers. The final inspection can start anyway.") and starts
+  anyway if asked: a warning, not a block, as agreed.
+- **The next check stands out:** its Start is the primary button, the others secondary: the first
+  quality check not started (in their order), else the final inspection once no quality check is
+  in progress.
+- **Add check** offers the model's published checks the machine doesn't have (not ticked, or
+  published since), copied as published now; a second copy of one template is refused (409).
+- **The start pages go through machines.** `/inspections/new` and `/quality-checks/new` pick the
+  machine (searchable cards with their status, `?machine=` in the address) and then list that
+  machine's checks of the kind with Start / Open; **New machine** is on the page. The free-typed
+  forms (`NewInspectionForm`, `StartQualityCheckForm`, `TemplatePicker`) are gone from the app:
+  every new check now has a machine. **`POST /api/inspections` stays**, unchanged, making an
+  unlinked inspection: the e2e and API tests make their fixtures with it, and it does no harm.
+
+### The front page of a machine's check
+
+- **Machine ID, model and serial number are the machine's**: shown as text on the check's front
+  page ("From the machine. Change it there", a link to it), and kept by the server whatever a save
+  sends (`savedFront`). They are edited on the machine (**Edit**, inspectors and admins), and an
+  edit is put on every check of the machine that is not finalised (and their deviation rows);
+  finalised ones keep what they were finalised with, for their history and their printouts. Each
+  check is changed over the version read and retried; one that can't be is logged (it gets the
+  next edit). A check open in someone's browser then sees a conflict ("reload"), as for any change
+  made elsewhere: a real change, rare, and nothing they typed is lost but the last second.
+
+### A machine's own checklist (admins)
+
+- **"Edit checklist" is a page of its own**, `/quality-checks/{id}/checklist` (and
+  `/inspections/{id}/checklist`), from the check's ⋯ menu, the machine page's check menu, and a
+  not-started check's page. It is the template editor's document (`TemplateDocument`: the same
+  rows and sections, keys, drag and drop, Undo, pictures; a quality check's rows as cards) with an
+  autosave of its own (`PUT /api/inspections/{id}/checklist`, If-Match). **No false conflicts**
+  between the two editors: they are never open on the same check in one page. The check's page
+  saves before any link (the leave guard), the checklist page loads the check afresh and saves
+  before leaving (its **Done** is a link back), and the check's page loads afresh again. So each
+  starts from the other's last ETag without passing it along.
+- **Row ids:** copied rows keep their template ids (results, Insights and the merge key on them);
+  new and duplicated rows get new ones (the editor's `newId`). The server refuses duplicate
+  section or row ids and a row id equal to an extra deviation's (they share RowKeys).
+- **Deleting a row that has a result asks first** ("Delete row 1.a? It has a result in this check
+  …"), and has no Undo (its result goes with it at the next save, which drops the results of rows
+  no longer there). Deleting a section says how many of its rows have results. A row "has a
+  result" with a status, a comment, a responsible or a photo (`resultIdsOf`). Adding is always
+  fine.
+- **Empty rows and untitled sections are fine while editing;** leaving with some (Done) marks them
+  in red and says so once, with **Leave anyway**. A machine's copy isn't published, so they don't
+  block anything; but a check with an empty row would print one.
+- **Where it came from:** the machine page shows each check's "Based on Pre start up rev 3 · 2
+  rows added, 1 removed" (`checklistChanges` against the base revision: rows added, removed and
+  changed; moves are not changes), and the checklist page says the same in its heading.
+- **Finalised: locked like everything else** (409; Reopen first). Inspections without a machine
+  have no checklist of their own (409, "link it to a machine first"): the frozen copy of an
+  unlinked final inspection stays frozen.
+
+### Update to latest template: a three-way merge (shared/src/checklistMerge.ts)
+
+- **When:** the machine page shows "Rev 4 available · this machine has rev 3" on a check whose
+  template has a newer published revision, unless it is finalised (reopen first). Admins only.
+- **Preview first, in the browser:** the dialog loads the check, the base revision and the latest
+  (cached: revisions never change) and runs the same pure merge the server runs: "From the
+  template: 3 rows added, 1 reworded, 1 removed", then per section ("2 Tool arena · New section · 2
+  rows added", "Lubrication · 1 row removed", "Renamed", "Moved"); rows **changed here and in the
+  template** with both versions side by side and a choice per row (this machine's, the default, or
+  the template's); rows **removed in the template that this machine keeps** (they have a result, or
+  were changed here) with "Remove it from this machine too"; and what is **not brought in** (a row
+  the template changed that this machine removed; rows the template added to a section this
+  machine removed). Apply sends the revision and the choices
+  (`POST /api/inspections/{id}/template-update`, If-Match of the check previewed); the server
+  merges again from storage and refuses a revision not newer than the base (409), one that doesn't
+  exist (404), a finalised check or one without a machine (409).
+- **The merge** (base = the revision the copy is based on, theirs = the newer revision, ours = the
+  copy; matched by section and row ids):
+  - rows and sections the template added come in, after their neighbour in the template (the
+    nearest one before it that the copy still has), or first; past rows only the machine has at
+    that place, so both sides' additions at one place stay, the machine's first;
+  - fields (text, how, references, time, pictures) merge one by one: the side that changed one
+    wins; both changed differently is a conflict, the machine's by default, the template's when
+    picked (only the conflicting fields: the rest merge as usual);
+  - section titles merge the same way; the checklist's name and a quality check's front page
+    (title, department) take the template's (the machine never changes them);
+  - a row the template removed goes, unless it has a result or the machine changed it: then it is
+    flagged and kept unless picked to remove;
+  - a row the machine removed stays removed (reported when the template changed it);
+  - moves: a row or section the template moved (to another section, or out of order among the
+    rows both kept, found with a longest common subsequence) moves the same way unless the machine
+    moved it too, where the machine's place wins;
+  - a section the template removed goes once nothing in it has to stay (rows the machine added,
+    flagged rows); a section the machine removed stays removed with what the template added to it.
+- **Results stay on their rows** (keyed by row id); a row removed by the merge takes its result
+  with it (only one picked to remove can have one). Deviation rows follow (their refs and texts may
+  change). Afterwards the copy's base is the new revision, so its "changes" are counted from it and
+  the next update merges from it: a row the template removed but the machine kept counts as the
+  machine's own from then on.
+- **Tested** (`checklistMerge.test.ts`, 35 tests): adds at neighbours and both sides at one place;
+  field merges, conflicts and choices; removals with and without results; moved on one side and
+  edited on the other (both ways); deleted on one side and edited on the other; added on both sides
+  at the same place; a whole section deleted on one side while the other added rows to it (both
+  ways); section moves on one or both sides; renames; the front page; the change counts.
+
+### The order of a model's quality checks
+
+- **Admins drag them on the Quality checks tab** (by a handle, or Space and the arrow keys: dnd-kit
+  as in the template editor), and each card shows its number. Stored in
+  `config/quality-check-orders/{finalTemplateId}.json` (`{ order: [ids] }`), one small document per
+  model with its own ETag (`GET/PUT /api/templates/{id}/quality-check-order`; the first with
+  If-None-Match: *). Not in the final template's draft (its editor autosaves the draft, so
+  reordering there would conflict with an open editor, and revisions would freeze an order) and
+  not on each quality check (a move would write several drafts). A save must list each of the
+  model's quality checks once (400 otherwise: one added meanwhile makes the page reload).
+- **Everything else reads it as `position` on the template list's quality checks**
+  (`compareQualityChecks`: by place, then by title for one not ordered yet): the New machine
+  checkboxes, Add check, the Templates page's card names, and a machine's checks (the API sorts
+  them by its model's order, then the final inspection last). Deleting the final template deletes
+  the order.
+
+### Status at a glance
+
+- `machineProgress` counts each kind's checks (total, started, finalised) and the machine's open
+  and closed deviations (from the deviations table, as the log counts them: one table query for
+  the list, one partition for a machine's page). `machineStage` says where it is: **No checks
+  yet**, **In build · QC 3/5** (quality checks to finalise), **Ready for final inspection** (every
+  quality check finalised; the final inspection not started, or not added yet), **Final inspection
+  in progress** (" · QC 3/5" when it went ahead of quality checks), **Finalised · 2 open
+  deviations**, and **Done** (all finalised, nothing open). The list filters by it.
+
+### Linking older inspections
+
+- **"Create machines from existing inspections"** (admins, on the Machines page while there are
+  started inspections without a machine; it asks first): `planMachinesFromInspections` matches
+  each on its Machine ID (trimmed, ignoring case, as machines are unique) and model. A machine with
+  that Machine ID and model gets it; otherwise one machine is made per Machine ID and model, named
+  and with the serial number of its newest inspection. An inspection without a Machine ID, or
+  whose Machine ID is a machine's of another model, is left as it is. Since Machine IDs are unique,
+  a Machine ID used with two models gives the machine to the model with more inspections (then the
+  newer). Running it again only links what is new. It answers how many machines it made, how many
+  inspections it linked and how many matched none.
+- **Linking puts the machine's Machine ID and serial number on an inspection in progress** (as on
+  its checks); a finalised one keeps its front page. The deviation rows of one in progress follow.
+- **By hand (admins):** "Link to a machine…" on an inspection or quality check without one (its ⋯
+  menu; a machine of its model), "Unlink from the machine" on one with one, and "Link an
+  inspection…" on the machine's page. `PUT /api/inspections/{id}/machine` with If-Match; a
+  not-started check belongs to its machine and can't be moved (409); a machine of another model is
+  refused (400). The inspection's page saves first and opens again after.
+
+### Insights and the deviation log
+
+- **Insights has a Machine filter** (`?machine={id}`, both kinds, kept in the URL and on switching
+  kinds): only inspections linked to that machine count. Its choices are the machines with started
+  inspections of the kind (`Insights.machines`), narrowed to the model picked. Without the filter
+  every number is as before, unlinked inspections included. The CSV's file name and the report's
+  heading (a **Machine** line) say the machine.
+- **The deviation log groups by the machine record where linked:** a linked inspection's
+  deviations are under its machine, named as the machine is now (Machine ID, serial, model, a link
+  to its page), all its checks of the kind together, each named; unlinked ones are grouped as
+  before (Machine ID, serial, model and, for quality checks, which check). The log answer carries
+  `machineRef` per entry (from the inspection list, not the table: no new columns) and the
+  machines it names.
+- **Insights' "inspections whose checklist had the row"** still asks the template revision a
+  check was copied from: a row a machine added (unique to it) counts only where it failed, and
+  shows as "No longer in the checklist" in the top 10; a row a machine removed still counts that
+  machine's check as having had it. Rare, and only for machines' own changes; noted rather than
+  given a per-inspection checklist lookup.
+
+### The app
+
+- **Sidebar:** **Machines** first, on its own above the groups (an unlabelled list named
+  "Machines" for screen readers), and the app opens on `/machines` (it was `/inspections`).
+- **Machines** (`/machines`): a table (Machine ID, serial number, model, status, quality checks
+  finalised with a bar, final inspection, open deviations), one column summing up a machine on a
+  phone; searched by Machine ID, serial number or model and filtered by model and status in the
+  address.
+- **A machine's page** (`/machines/{id}`): its Machine ID, status, model, serial number and who
+  made it; **Edit**, **Add check**, and for admins ⋯ **Link an inspection…** and **Delete
+  machine** (only while no check is started: 409 otherwise, and the item is disabled). Then
+  **Quality checks** "2 / 5 finalised" and **Final inspection**, a card per check: its place, title
+  (a link), state, number, rows filled, deviations open and closed (a link to its Deviations tab),
+  "Based on …", **Start** or **Open**, and for admins ⋯ **Edit checklist** / **Remove from machine**
+  (not started) and the update banner. Cards lay out by their own width.
+- **A not-started check's page** shows what it will check (read-only), **Start**, and for admins
+  **Edit checklist**; its back link goes to its machine, as a started machine check's does.
+- **Roles, as agreed:** making machines, editing a machine's Machine ID and serial number, adding
+  checks and starting them: inspectors and admins. Editing a machine's checklist, updating it,
+  linking and unlinking, deleting a machine, removing a check not started, the one-time action and
+  reordering quality checks: admins (the API checks every one).
+
+### API
+
+Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (GET, POST),
+`machines/from-inspections` (POST), `machines/{id}` (GET, PUT, DELETE), `machines/{id}/checks`
+(POST), and on inspections `…/start`, `…/checklist`, `…/template-update`, `…/machine`; plus
+`templates/{id}/quality-check-order` (GET, PUT). Contracts in
+`shared/src/machines.ts`; tests in `api/src/functions/machines.test.ts`.
+
+### Tests
+
+- **shared:** `checklistMerge.test.ts` (35), `machines.test.ts` (17: status by stage, Machine IDs,
+  the requests, stored inspections reading as before, the order, the plan for older inspections).
+- **api:** `machines.test.ts` (24): registration; make a machine (copies of the latest published
+  revision, not of the draft; no numbers; refusals: Machine ID taken, unknown model, another
+  model's template, unpublished, unknown); the list's progress and not-started checks in no list;
+  start (numbers by kind, filled in from the machine, idempotent), a not-started check refused
+  save/finalise/reopen, a machine check's Machine ID kept whatever is sent; editing a machine
+  (propagated to checks not finalised and their deviation rows, 412, 409); delete (admins, refused
+  once a check started, 412); add check (409 for a second copy); the quality check order (roles,
+  first save, a wrong list, 412, positions, a machine's checks in order); the checklist (roles,
+  results of removed rows dropped, deviation rows follow, the template untouched, 412, duplicate
+  ids, unlinked and finalised refused); template update (merge, base moves on, conflicts and
+  choices, flagged rows, 404/412/409); linking and unlinking (roles, front page, another model);
+  the one-time action (made, linked, unmatched, idempotent); Insights' machine filter and the log's
+  machine. Changed: the registration list, Insights' empty answer (`machines: []`).
+- **app:** `features/machines/model.test.ts` (the list's filters, a check's words, what is next,
+  the choices and models), the log's grouping by machine record. The old start pages' tests went
+  with them.
+- **e2e:** `machines.spec.ts` (5 tests). Changed for the new start flows: the inspections spec's
+  create test (now on a new machine, plus one for an unlinked inspection's back link), the quality
+  check start, the smoke test (a machine of the seeded model, only its final inspection ticked),
+  "a new final inspection never offers a quality check" (a machine's final inspection only), the
+  landing page and sidebar in `auth-shell.spec.ts` and the sidebar test. The one-time action is
+  only offered and cancelled in e2e: run, it would link every other test's inspections (and change
+  their pages' ETags) in the shared Azurite; its effect is covered by the API tests.

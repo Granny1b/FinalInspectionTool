@@ -26,7 +26,8 @@ import {
 } from '@modig/shared';
 import { toCsv } from './csv';
 import { CSV_COLUMNS, TABLE_COLUMNS } from './deviations';
-import { loadSummaries } from './inspections';
+import { loadStartedSummaries } from './inspections';
+import { loadMachines } from './machines';
 import { deviationsTable, ensureTable } from './storage';
 import { listRevisions, loadRevision } from './templates';
 
@@ -35,15 +36,20 @@ export async function loadInsights(
   query: InsightsQuery,
   context: InvocationContext,
 ): Promise<Insights> {
-  const [inspections, { rows: deviations, unreadable }] = await Promise.all([
-    loadSummaries(),
+  const [inspections, { rows: deviations, unreadable }, machines] = await Promise.all([
+    loadStartedSummaries(),
     loadDeviationRows(query, context),
+    loadMachines().catch((error: unknown) => {
+      context.warn('Insights could not read the machines', error);
+      return [];
+    }),
   ]);
   const scope = inspections.filter((inspection) => inScope(inspection, query));
   const checklists = await loadChecklists(scope, deviations, context);
   return aggregateInsights({
     query,
     inspections,
+    machines: machines.map(({ id, machineName, modelCode }) => ({ id, machineName, modelCode })),
     deviations,
     checklists,
     unreadableRows: unreadable,
@@ -60,7 +66,7 @@ export async function loadExportRows(
   context: InvocationContext,
 ): Promise<DeviationRow[]> {
   const [inspections, { rows: deviations }] = await Promise.all([
-    loadSummaries(),
+    loadStartedSummaries(),
     loadDeviationRows(query, context),
   ]);
   const byId = new Map(
@@ -258,11 +264,13 @@ export function deviationsCsv(
  * checks' say so, and which one: "Quality check deviations 2026-01-01 to 2026-10-31, RMMG, Pre
  * start up.csv".
  */
-export function csvFileName(query: InsightsQuery, today: string): string {
+export function csvFileName(query: InsightsQuery, today: string, machineName?: string): string {
   const quality = queryKind(query) === 'quality';
   const range = `${query.from ?? 'start'} to ${query.to ?? today}`;
   const parts = [
     query.model,
+    // The machine's ID, without what a file name can't hold.
+    machineName?.replace(/[\\/:*?"<>|]+/g, '-'),
     quality && query.check ? qualityCheckShortName(query.check) : undefined,
     query.includeInProgress ? 'incl. in progress' : undefined,
   ];

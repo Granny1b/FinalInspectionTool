@@ -43,6 +43,7 @@ var containerNames = [
   'images'
   'config'
   'follow-ups'
+  'machines'
 ]
 var deviationsTableName = 'deviations'
 

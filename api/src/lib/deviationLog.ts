@@ -20,37 +20,57 @@ import {
   type DeviationLogQuery,
   type DeviationLogRow,
   type InspectionKind,
+  type LogMachine,
   type MachineModel,
 } from '@modig/shared';
 import { toCsv } from './csv';
 import { LOG_COLUMNS } from './deviations';
-import { loadSummaries } from './inspections';
+import { loadStartedSummaries } from './inspections';
+import { loadMachines } from './machines';
 import { deviationsTable, ensureTable } from './storage';
 
 /**
  * The deviations under the filters, oldest inspection first, each inspection's by number. Only
  * those of inspections that still exist: a delete removes its rows after the inspection, and a
  * row left behind must never show up. A row that can't be read (edited by hand, say) is left out,
- * logged and counted, as in Insights.
+ * logged and counted, as in Insights. Each entry names the machine its inspection is linked to,
+ * if any, and the answer has those machines as they are now.
  */
 export async function loadDeviationLog(
   query: DeviationLogQuery,
   context: InvocationContext,
 ): Promise<DeviationLog> {
-  const [summaries, { rows, unreadable }] = await Promise.all([
-    loadSummaries(),
+  const [summaries, { rows, unreadable }, machines] = await Promise.all([
+    loadStartedSummaries(),
     loadLogRows(query.kind, query.model),
+    loadMachines().catch((error: unknown) => {
+      context.warn('The deviation log could not read the machines', error);
+      return [];
+    }),
   ]);
   if (unreadable.count > 0) {
     context.warn(
       `The deviation log skipped ${unreadable.count} unreadable deviation rows; the first: ${unreadable.first}`,
     );
   }
-  const existing = new Set(summaries.map((summary) => summary.id));
-  const entries = logEntries(rows.filter((row) => existing.has(row.inspectionId)))
+  const machineOf = new Map(summaries.map((summary) => [summary.id, summary.machineRef]));
+  const entries = logEntries(rows.filter((row) => machineOf.has(row.inspectionId)))
+    .map((entry) => {
+      const machineRef = machineOf.get(entry.inspectionId);
+      return machineRef ? { ...entry, machineRef } : entry;
+    })
     .filter((entry) => matchesDeviationLog(entry, query))
     .sort(compareLogEntries);
-  return { entries, unreadableRows: unreadable.count };
+  const linked = new Set(entries.map((entry) => entry.machineRef));
+  const logMachines: LogMachine[] = machines
+    .filter((machine) => linked.has(machine.id))
+    .map(({ id, machineName, serialNumber, modelCode }) => ({
+      id,
+      machineName,
+      serialNumber,
+      modelCode,
+    }));
+  return { entries, machines: logMachines, unreadableRows: unreadable.count };
 }
 
 /**

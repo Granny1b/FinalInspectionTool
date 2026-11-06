@@ -56,6 +56,7 @@ function insights(patch: Partial<Insights> = {}): Insights {
   return {
     modelCodes: ['RMMG', 'RMHS'],
     checkNames: [],
+    machines: [],
     firstInspectionDate: '2026-09-02',
     inspections: { finalised: 4, inProgress: 0 },
     deviations: 10,

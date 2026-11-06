@@ -4,6 +4,7 @@ import { Navigate, useParams, useSearchParams } from 'react-router';
 import { LoadError, PageLoading } from '../components/PageStates';
 import { InspectionEditor } from '../features/inspections/InspectionEditor';
 import { InspectionNotFound } from '../features/inspections/InspectionNotFound';
+import { NotStartedCheck } from '../features/machines/NotStartedCheck';
 import { inspectionHref } from '../features/inspections/listFilter';
 import { useInspection } from '../features/inspections/queries';
 import { errorMessage, isMissing } from '../lib/api';
@@ -11,7 +12,7 @@ import { errorMessage, isMissing } from '../lib/api';
 /**
  * /inspections/:id — fill in, finalise and (admins) reopen one inspection; /quality-checks/:id
  * the same for a quality check done on a machine. Each is sent to its own address when opened at
- * the other's.
+ * the other's. A machine's check that is not started yet shows what it will check, and Start.
  */
 export function InspectionPage({ kind }: { kind: InspectionKind }) {
   const { id = '' } = useParams();
@@ -30,6 +31,10 @@ export function InspectionPage({ kind }: { kind: InspectionKind }) {
       const search = params.toString();
       const href = inspectionHref(actual, id);
       return <Navigate to={search ? `${href}?${search}` : href} replace />;
+    }
+    // A machine's check nobody has started: what it will check, and Start.
+    if (query.data.inspection.state === 'not_started') {
+      return <NotStartedCheck inspection={query.data.inspection} />;
     }
     return (
       <InspectionEditor

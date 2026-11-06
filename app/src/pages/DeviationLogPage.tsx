@@ -77,11 +77,14 @@ export function DeviationLogPage({ kind }: { kind: InspectionKind }) {
     setParams(filterToParams(next), { replace: true, flushSync: true });
   const today = localDate();
   const entries = log.data?.entries;
+  const logMachines = log.data?.machines;
   const search = params.toString();
   const view = useMemo(
     () =>
-      entries ? logView(entries, filterFromParams(new URLSearchParams(search), kind), today) : null,
-    [entries, search, kind, today],
+      entries
+        ? logView(entries, filterFromParams(new URLSearchParams(search), kind), today, logMachines)
+        : null,
+    [entries, search, kind, today, logMachines],
   );
 
   const setFollowUp = useSetFollowUp();

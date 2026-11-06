@@ -10,6 +10,7 @@ import {
   checklistIds,
   CONTAINERS,
   hasUnpublishedChanges,
+  QualityCheckOrderSchema,
   TemplateSchema,
   totalHours,
   type Section,
@@ -19,7 +20,14 @@ import {
   type TemplateSummary,
 } from '@modig/shared';
 import { NotFoundError, PreconditionFailedError } from './http';
-import { containerClient, ensureStorage, listBlobNames, readJson } from './storage';
+import {
+  containerClient,
+  ensureStorage,
+  listBlobNames,
+  readJson,
+  writeJson,
+  type WriteConditions,
+} from './storage';
 
 const { templates } = CONTAINERS;
 
@@ -87,9 +95,22 @@ const byName = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
 
 /** GET /api/templates: one summary per template, sorted by name. */
 export async function loadSummaries(): Promise<TemplateSummary[]> {
+  const all = await loadAllTemplates();
+  // Each machine model's quality check order, by its final inspection template.
+  const orders = new Map(
+    await Promise.all(
+      all
+        .filter((template) => template.draft.kind === 'final')
+        .map(async (template) => {
+          const order = (await loadQualityCheckOrder(template.id))?.data.order ?? [];
+          return [template.id, order] as const;
+        }),
+    ),
+  );
   const summaries = await Promise.all(
-    (await loadAllTemplates()).map(async (template): Promise<TemplateSummary | null> => {
+    all.map(async (template): Promise<TemplateSummary | null> => {
       const { id, draft } = template;
+      const position = draft.parentId ? orders.get(draft.parentId)?.indexOf(id) : undefined;
       const published = await loadLatestPublished(template).catch(unlessDeleted(id));
       if (published === DELETED) return null;
       const quality = draft.kind === 'quality';
@@ -111,6 +132,7 @@ export async function loadSummaries(): Promise<TemplateSummary[]> {
           ...(draft.quality && { quality: draft.quality }),
           sectionTitles: draft.sections.map((section) => section.title),
           totalHours: totalHours(draft.sections),
+          ...(position !== undefined && position >= 0 && { position }),
         }),
         updatedAt: draft.updatedAt,
         updatedBy: draft.updatedBy,
@@ -154,6 +176,37 @@ export async function findTemplateForModel(
       template.draft.modelCode === modelCode &&
       template.id !== exceptId,
   );
+}
+
+// ---------------------------------------------------------------------------------------------
+// The order of a machine model's quality checks
+// ---------------------------------------------------------------------------------------------
+
+/** The order of the quality checks under final inspection template `parentId`, if one was set. */
+export async function loadQualityCheckOrder(
+  parentId: string,
+): Promise<{ data: { order: string[] }; etag: string } | null> {
+  return readJson(
+    CONTAINERS.config,
+    blobNames.qualityCheckOrder(parentId),
+    QualityCheckOrderSchema,
+  );
+}
+
+export async function writeQualityCheckOrder(
+  parentId: string,
+  order: readonly string[],
+  conditions: WriteConditions,
+): Promise<string> {
+  return writeJson(CONTAINERS.config, blobNames.qualityCheckOrder(parentId), { order }, conditions);
+}
+
+/** Deletes a machine model's quality check order (its final inspection template was deleted). */
+export async function deleteQualityCheckOrder(parentId: string): Promise<void> {
+  await ensureStorage();
+  await containerClient(CONTAINERS.config)
+    .getBlobClient(blobNames.qualityCheckOrder(parentId))
+    .deleteIfExists();
 }
 
 /** The quality checks of the machine whose final inspection template is `parentId`. */

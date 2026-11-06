@@ -137,6 +137,51 @@ describe('filters in the address', () => {
 });
 
 describe('logView', () => {
+  it('groups the deviations of a machine’s checks under the machine, as it is named now', () => {
+    const machines = [
+      {
+        id: 'M000000000000001',
+        machineName: 'Magellan#1B',
+        serialNumber: 'MG-9',
+        modelCode: 'RMMG',
+      },
+    ];
+    const quality: LogFilter = { kind: 'quality', status: 'all', q: '' };
+    const linked = (patch: Partial<DeviationLogEntry>) =>
+      entry({ kind: 'quality', machineRef: 'M000000000000001', ...patch });
+    const view = logView(
+      [
+        linked({ key: 'a', checkName: 'Quality check – Pre start up' }),
+        linked({
+          key: 'b',
+          inspectionId: 'Q000000000000002',
+          inspectionNumber: 'QC-2026-0002',
+          checkName: 'Quality check – Frame',
+          // Done before the machine was renamed: under it all the same.
+          machineName: 'Magellan#1',
+        }),
+        // Not linked: grouped by its Machine ID and check, as before.
+        entry({ kind: 'quality', key: 'c', inspectionId: 'Q000000000000003' }),
+      ],
+      quality,
+      TODAY,
+      machines,
+    );
+    expect(view.groups).toHaveLength(2);
+    const machine = view.groups.find((group) => group.machineRef)!;
+    expect(machine).toMatchObject({
+      machineName: 'Magellan#1B',
+      serialNumber: 'MG-9',
+      checkName: '',
+    });
+    expect(machine.inspections.map((inspection) => inspection.checkName).sort()).toEqual([
+      'Quality check – Frame',
+      'Quality check – Pre start up',
+    ]);
+    const unlinked = view.groups.find((group) => !group.machineRef)!;
+    expect(unlinked.checkName).toBe('Final inspection – RigiMill MG');
+  });
+
   it('groups by machine, those with open deviations first, then the newest', () => {
     const view = logView(LOG, { ...OPEN, status: 'all' }, TODAY);
     expect(view.groups.map((group) => group.machineName)).toEqual([
@@ -149,7 +194,13 @@ describe('logView', () => {
     expect(magellan.entries.map((row) => row.deviationNumber)).toEqual(['D-01', 'D-02', 'D-10']);
     expect([magellan.open, magellan.closed]).toEqual([2, 1]);
     expect(magellan.inspections).toEqual([
-      { id: 'A000000000000001', number: 'FI-2026-0001', date: '2026-10-01', finalised: true },
+      {
+        id: 'A000000000000001',
+        number: 'FI-2026-0001',
+        date: '2026-10-01',
+        finalised: true,
+        checkName: '',
+      },
     ]);
     expect(view.groups[0]!.inspections[0]!.finalised).toBe(false);
     // The quality check is not one of them.

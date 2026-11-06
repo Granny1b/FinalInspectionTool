@@ -20,6 +20,11 @@ export type TemplateDocumentProps = {
   onEditorDirtyChange?: (dirty: boolean) => void;
   /** A final inspection's checklist (the default), or a quality check's rows as cards. */
   variant?: DocumentVariant;
+  /**
+   * Editable only, for a machine's own checklist: the rows with a result in the check. Deleting
+   * one asks first, as its result goes with it.
+   */
+  protectedRows?: ReadonlySet<string>;
 };
 
 /**
@@ -36,6 +41,7 @@ export function TemplateDocument({
   issues,
   onEditorDirtyChange,
   variant = 'final',
+  protectedRows,
 }: TemplateDocumentProps): JSX.Element {
   const issueIndex = useMemo(() => indexIssues(issues ?? []), [issues]);
   return (
@@ -49,6 +55,7 @@ export function TemplateDocument({
             issues={issueIndex}
             onEditorDirtyChange={onEditorDirtyChange}
             variant={variant}
+            protectedRows={protectedRows}
           />
         ) : variant === 'quality' ? (
           <QualityChecklistView sections={sections} issues={issueIndex} />

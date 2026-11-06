@@ -7,6 +7,7 @@
 import { readFile } from 'node:fs/promises';
 import {
   InspectionSchema,
+  MachineDetailSchema,
   QualityCheckExportSchema,
   TemplateDetailSchema,
   type Template,
@@ -18,8 +19,10 @@ import {
   createQualityCheck,
   createTemplate,
   deleteInspection,
+  deleteMachines,
   deleteQualityChecks,
   deleteTemplate,
+  uniqueMachineId,
 } from './support/storage';
 
 const ADMIN = 'anna.andersson@modig.se';
@@ -397,35 +400,51 @@ test.describe('an inspector', () => {
     expect((await page.request.get(`/api/templates/${check.id}/revisions/1`)).status()).toBe(200);
   });
 
-  test('a new final inspection never offers a quality check; the API starts one instead', async ({
+  test('a machine’s final inspection is its final inspection template; the API starts a quality check', async ({
     page,
     machine,
   }) => {
     const check = await createQualityCheck(machine, true);
-    // The new final inspection page offers the machine's final inspection template only.
-    await page.goto('/inspections/new');
-    await expect(page.getByText(machine.name).first()).toBeVisible();
-    await expect(page.getByText('Quality check – Pre start up')).toHaveCount(0);
-
-    // Sent a quality check, the API starts a quality check (QC- number), never a final inspection.
-    const response = await page.request.post('/api/inspections', {
+    // A machine with both: the new final inspection page offers its final inspection only.
+    const made = await page.request.post('/api/machines', {
       data: {
-        templateId: check.id,
-        front: {
-          machineName: 'Magellan#1',
-          serialNumber: 'SN-1',
-          participants: [],
-          date: '2026-11-05',
-        },
+        machineName: uniqueMachineId('E2E-QC'),
+        modelCode: machine.modelCode,
+        serialNumber: 'SN-1',
+        templateIds: [check.id, machine.id],
       },
     });
-    expect(response.status()).toBe(201);
-    const started = InspectionSchema.parse(await response.json());
+    expect(made.status()).toBe(201);
+    const { machine: created, checks } = MachineDetailSchema.parse(await made.json());
     try {
-      expect(started).toMatchObject({ kind: 'quality', templateId: check.id });
-      expect(started.number).toMatch(/^QC-\d{4}-\d{4,}$/);
+      await page.goto(`/inspections/new?machine=${created.id}`);
+      await expect(page.getByRole('heading', { level: 3, name: 'Final inspection' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 3, name: 'Pre start up' })).toHaveCount(0);
+
+      // Sent a quality check, the API starts a quality check (QC- number), never a final
+      // inspection.
+      const response = await page.request.post('/api/inspections', {
+        data: {
+          templateId: check.id,
+          front: {
+            machineName: 'Magellan#1',
+            serialNumber: 'SN-1',
+            participants: [],
+            date: '2026-11-05',
+          },
+        },
+      });
+      expect(response.status()).toBe(201);
+      const started = InspectionSchema.parse(await response.json());
+      try {
+        expect(started).toMatchObject({ kind: 'quality', templateId: check.id });
+        expect(started.number).toMatch(/^QC-\d{4}-\d{4,}$/);
+      } finally {
+        await deleteInspection(started.id);
+      }
     } finally {
-      await deleteInspection(started.id);
+      await Promise.all(checks.map((entry) => deleteInspection(entry.id)));
+      await deleteMachines([created.id]);
     }
   });
 });

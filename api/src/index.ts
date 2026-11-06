@@ -9,6 +9,8 @@ import './functions/images';
 import './functions/insights';
 import './functions/inspection-state';
 import './functions/inspections';
+import './functions/machine-checks';
+import './functions/machines';
 import './functions/me';
 import './functions/settings';
 import './functions/template-revisions';

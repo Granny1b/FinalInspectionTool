@@ -135,12 +135,28 @@ export const DeviationLogEntrySchema = DeviationLogRowSchema.extend({
   key: IdSchema,
   /** The day it was first recorded, in Swedish time. */
   foundOn: z.iso.date(),
+  /**
+   * The machine its inspection was done on, when it is linked to one (from the inspection list,
+   * not the table): the log groups its deviations under the machine.
+   */
+  machineRef: IdSchema.optional(),
 });
 export type DeviationLogEntry = z.infer<typeof DeviationLogEntrySchema>;
+
+/** A machine as the log names it: as it is now, whatever its inspections were done with. */
+export const LogMachineSchema = z.object({
+  id: IdSchema,
+  machineName: z.string(),
+  serialNumber: z.string(),
+  modelCode: z.string(),
+});
+export type LogMachine = z.infer<typeof LogMachineSchema>;
 
 /** GET /api/deviations */
 export const DeviationLogSchema = z.object({
   entries: z.array(DeviationLogEntrySchema),
+  /** The machines the entries' inspections are linked to. Defaulted for an API without it. */
+  machines: z.array(LogMachineSchema).default([]),
   /** Rows of the deviations table that could not be read (edited by hand, say). */
   unreadableRows: z.number().int().min(0),
 });

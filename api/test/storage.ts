@@ -33,17 +33,25 @@ export function useTestStorage(): void {
 }
 
 /**
- * Deletes every template, inspection, follow-up and deviation row, the settings, the people list and the
- * inspection and quality check counters. Safe only because the api project runs its test files one at a time
- * (vitest.config.ts): no other file is using them meanwhile.
+ * Deletes every template, inspection, follow-up, machine and deviation row, the settings, the people list,
+ * the quality check orders and the inspection and quality check counters. Safe only because the api project
+ * runs its test files one at a time (vitest.config.ts): no other file is using them meanwhile.
  */
 export async function resetStorage(): Promise<void> {
   await Promise.all([ensureStorage(), ensureTable()]);
-  for (const name of [CONTAINERS.templates, CONTAINERS.inspections, CONTAINERS.followUps]) {
+  for (const name of [
+    CONTAINERS.templates,
+    CONTAINERS.inspections,
+    CONTAINERS.followUps,
+    CONTAINERS.machines,
+  ]) {
     const container = containerClient(name);
     for await (const blob of container.listBlobsFlat()) await container.deleteBlob(blob.name);
   }
   const config = containerClient(CONTAINERS.config);
+  for await (const blob of config.listBlobsFlat({ prefix: 'quality-check-orders/' })) {
+    await config.deleteBlob(blob.name);
+  }
   await config.getBlobClient(blobNames.settings).deleteIfExists();
   await config.getBlobClient(blobNames.people).deleteIfExists();
   await config.getBlobClient(blobNames.inspectionCounter).deleteIfExists();

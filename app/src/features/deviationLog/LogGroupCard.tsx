@@ -12,6 +12,7 @@ import clsx from 'clsx';
 import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { modelName } from '../../lib/useSettings';
+import { machineHref } from '../machines/model';
 import { SeverityBadge } from '../inspections/DeviationCard';
 import { StateBadge } from '../inspections/StateBadge';
 import { FollowUpActions, StatusPill } from './FollowUpActions';
@@ -47,8 +48,15 @@ export function LogGroupCard({ kind, group, models, today, pending, onFollowUp }
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-ink-200 px-4 py-3.5 sm:px-5">
         <div className="min-w-0 flex-1">
           <h2 id={titleId} className="text-base font-semibold wrap-break-word text-ink-900">
-            {group.machineName.trim() || (
-              <span className="font-normal text-ink-500">No Machine ID</span>
+            {group.machineRef ? (
+              // The machine's page: all its checks, and where it is.
+              <Link to={machineHref(group.machineRef)} className="hover:underline">
+                {group.machineName}
+              </Link>
+            ) : (
+              group.machineName.trim() || (
+                <span className="font-normal text-ink-500">No Machine ID</span>
+              )
             )}
             {/* A space of its own: the heading names the region, "Magellan#1 S/N MG-0001". */}{' '}
             <span className="ml-1 text-sm font-normal whitespace-nowrap text-ink-500">
@@ -67,6 +75,9 @@ export function LogGroupCard({ kind, group, models, today, pending, onFollowUp }
                 >
                   {inspection.number}
                 </Link>
+                {inspection.checkName && (
+                  <span className="text-ink-700">{inspection.checkName}</span>
+                )}
                 <span className="tabular-nums">{inspection.date}</span>
                 {!inspection.finalised && <StateBadge state="in_progress" />}
               </span>

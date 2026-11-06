@@ -5,7 +5,7 @@ import { DateInput } from '../../../components/DateInput';
 import { Field, INPUT } from '../../../components/Field';
 import { FrontPageFrame } from '../../templates/FrontPage';
 import { formatCalendarDate } from '../dates';
-import { MachineIdField } from '../FrontPageFields';
+import { FixedValue, MachineIdField } from '../FrontPageFields';
 import { FRONT_FIELD_IDS } from '../issues';
 import { ParticipantsField, type PendingParticipant } from '../ParticipantsField';
 
@@ -31,13 +31,15 @@ type FieldsProps = {
   onChange: (patch: Partial<QualityCheckFrontInput>) => void;
   /** The check's page: a name typed under Checked by but not yet added counts as unsaved. */
   pendingParticipant?: PendingParticipant;
+  /** A machine's check: its Machine ID and serial number are the machine's, shown as text. */
+  machineHref?: string | undefined;
 };
 
 /**
  * A quality check's front page fields, in a final inspection's order: Machine ID, Machine model
  * (the quality check's, fixed), Serial number, Date and Checked by. Nothing about delivery: no
- * location or photo, as for a check along the build. Used by the start form and by the check's
- * front page.
+ * location or photo, as for a check along the build. A machine's check shows its machine's Machine
+ * ID and serial number as text.
  */
 export function QualityCheckFrontFields({
   front,
@@ -45,32 +47,41 @@ export function QualityCheckFrontFields({
   errors,
   onChange,
   pendingParticipant,
+  machineHref,
 }: FieldsProps) {
   return (
     <>
-      <MachineIdField
-        value={front.machineName}
-        error={errors.machineName}
-        onChange={(machineName) => onChange({ machineName })}
-      />
+      {machineHref ? (
+        <FixedValue label="Machine ID" value={front.machineName} machineHref={machineHref} />
+      ) : (
+        <MachineIdField
+          value={front.machineName}
+          error={errors.machineName}
+          onChange={(machineName) => onChange({ machineName })}
+        />
+      )}
       <div>
         <p className="text-sm font-medium text-ink-800">Machine model</p>
         {/* As high as the inputs beside it, so the row lines up. */}
         <p className="mt-1.5 flex h-9 items-center text-sm text-ink-900">{modelLabel}</p>
       </div>
-      <Field id={FRONT_FIELD_IDS.serialNumber} label="Serial number" error={errors.serialNumber}>
-        {(control) => (
-          <input
-            {...control}
-            maxLength={100}
-            autoComplete="off"
-            spellCheck={false}
-            value={front.serialNumber}
-            onChange={(event) => onChange({ serialNumber: event.target.value })}
-            className={clsx(INPUT, 'h-9')}
-          />
-        )}
-      </Field>
+      {machineHref ? (
+        <FixedValue label="Serial number" value={front.serialNumber} />
+      ) : (
+        <Field id={FRONT_FIELD_IDS.serialNumber} label="Serial number" error={errors.serialNumber}>
+          {(control) => (
+            <input
+              {...control}
+              maxLength={100}
+              autoComplete="off"
+              spellCheck={false}
+              value={front.serialNumber}
+              onChange={(event) => onChange({ serialNumber: event.target.value })}
+              className={clsx(INPUT, 'h-9')}
+            />
+          )}
+        </Field>
+      )}
       <Field label="Date">
         {(control) => (
           <DateInput
@@ -123,6 +134,7 @@ type CardProps = {
   errors: { machineName?: string; serialNumber?: string };
   onChange: (patch: Partial<InspectionFrontInput>) => void;
   pendingParticipant: PendingParticipant;
+  machineHref?: string | undefined;
 };
 
 /**
@@ -138,6 +150,7 @@ export const QualityCheckFrontCard = memo(function QualityCheckFrontCard({
   errors,
   onChange,
   pendingParticipant,
+  machineHref,
 }: CardProps) {
   return (
     <FrontPageFrame revisionLabel={`Rev: ${standard.revision}`} layout="fields">
@@ -160,6 +173,7 @@ export const QualityCheckFrontCard = memo(function QualityCheckFrontCard({
           errors={errors}
           onChange={onChange}
           pendingParticipant={pendingParticipant}
+          machineHref={machineHref}
         />
       )}
       <QualityStandardDetails standard={standard} />

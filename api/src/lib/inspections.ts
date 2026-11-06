@@ -19,6 +19,7 @@ import {
   InspectionSchema,
   InspectionSummarySchema,
   inspectionProgress,
+  isStarted,
   parseInspectionNumber,
   templateImageIds,
   type Inspection,
@@ -52,8 +53,42 @@ export function inspectionNotFound(): NotFoundError {
   return new NotFoundError('This inspection does not exist.');
 }
 
+/** A machine's check is filled in, finalised and reopened once it is started (it has a number). */
+export const notStartedMessage = 'This check is not started yet – start it first.';
+
 export async function loadInspection(id: string): Promise<StoredInspection | null> {
   return readJson(inspections, blobNames.inspection(id), InspectionSchema);
+}
+
+/** Retries after another write got in between; the first try is not counted. */
+const CHANGE_RETRIES = 5;
+
+/**
+ * Applies `change` to the latest version of an inspection and writes it over exactly that
+ * version, reading again when another write got in between: for changes the server makes on its
+ * own (a machine's new Machine ID on its checks, starting a check), which must never overwrite
+ * someone's save. `change` returns null to write nothing. Null when the inspection doesn't exist.
+ */
+export async function changeInspection(
+  id: string,
+  change: (current: Inspection) => Inspection | null,
+): Promise<StoredInspection | null> {
+  for (let retry = 0; ; retry++) {
+    const stored = await loadInspection(id);
+    if (!stored) return null;
+    const next = change(stored.data);
+    if (!next) return stored;
+    try {
+      return { data: next, etag: await writeInspection(next, { ifMatch: stored.etag }) };
+    } catch (error) {
+      if (!(error instanceof PreconditionFailedError)) throw error;
+      if (retry === CHANGE_RETRIES) {
+        throw new ServiceUnavailableError('This inspection is being changed. Try again.');
+      }
+      // Random, growing waits spread the writers out, so they don't collide again.
+      await sleep(Math.random() * 50 * 2 ** (retry + 1));
+    }
+  }
 }
 
 /** Writes the inspection with its list summary as metadata; returns the new ETag. */
@@ -208,6 +243,7 @@ export function inspectionSummary(inspection: Inspection): InspectionSummary {
     templateId: inspection.templateId,
     templateRevision: inspection.templateRevision,
     templateName: inspection.templateSnapshot.name,
+    ...(inspection.machineRef && { machineRef: inspection.machineRef }),
     updatedAt: inspection.updatedAt,
   };
 }
@@ -269,6 +305,14 @@ export async function loadSummaries(): Promise<InspectionSummary[]> {
   return summaries.sort(
     (a, b) => compareNumbersDescending(a.number, b.number) || a.id.localeCompare(b.id),
   );
+}
+
+/**
+ * The started inspections, as the lists, Insights and the deviation log know them: a machine's
+ * check that is not started yet has no number and nothing in it to show or count.
+ */
+export async function loadStartedSummaries(): Promise<InspectionSummary[]> {
+  return (await loadSummaries()).filter(isStarted);
 }
 
 /**

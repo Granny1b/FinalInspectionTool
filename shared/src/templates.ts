@@ -158,10 +158,37 @@ export const TemplateSummarySchema = z.object({
   quality: QualityFrontSchema.optional(),
   sectionTitles: z.array(z.string()).optional(),
   totalHours: z.number().min(0).optional(),
+  /**
+   * Quality checks only: its place among its machine model's quality checks (0 first), as an
+   * admin ordered them. Left out for one not ordered yet, which comes after them by title.
+   */
+  position: z.number().int().min(0).optional(),
   updatedAt: IsoDateTime,
   updatedBy: z.string(),
 });
 export type TemplateSummary = z.infer<typeof TemplateSummarySchema>;
+
+/**
+ * `config/quality-check-orders/{templateId}.json`, and GET/PUT
+ * /api/templates/{id}/quality-check-order: the order of a machine model's quality checks (their
+ * template ids), as admins drag them on its Quality checks tab. It is the order they are offered
+ * in when a machine is made, and the order of a machine's checks. One not in it comes after the
+ * ones that are, by title.
+ */
+export const QualityCheckOrderSchema = z.object({ order: z.array(IdSchema).max(500) });
+export type QualityCheckOrder = z.infer<typeof QualityCheckOrderSchema>;
+
+/** Quality checks by their place in their model's order, then by title. */
+export function compareQualityChecks(
+  a: Pick<TemplateSummary, 'position' | 'name' | 'id'>,
+  b: Pick<TemplateSummary, 'position' | 'name' | 'id'>,
+): number {
+  const position = (check: Pick<TemplateSummary, 'position'>) =>
+    check.position ?? Number.MAX_SAFE_INTEGER;
+  return position(a) - position(b) || byTitle.compare(a.name, b.name) || a.id.localeCompare(b.id);
+}
+
+const byTitle = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
 export const TemplateListSchema = z.array(TemplateSummarySchema);
 
 /** GET /api/templates/{id} (admin) and POST …/publish. The draft's ETag is in the ETag header. */

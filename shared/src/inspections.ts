@@ -38,8 +38,8 @@ export type InspectionFrontInput = z.infer<typeof InspectionFrontInputSchema>;
  * a final inspection and a quality check alike. Stored as `front.machineName`, the field's name
  * from before it was called Machine ID.
  */
-const MachineIdSchema = z.string().trim().min(1, 'Machine ID is required').max(200);
-const SerialNumberSchema = z.string().trim().min(1, 'Serial number is required').max(100);
+export const MachineIdSchema = z.string().trim().min(1, 'Machine ID is required').max(200);
+export const SerialNumberSchema = z.string().trim().min(1, 'Serial number is required').max(100);
 
 /** POST /api/inspections — start from the template's latest published revision. */
 export const CreateInspectionRequestSchema = z.object({
@@ -105,10 +105,20 @@ export const InspectionSummarySchema = z.object({
    * up". '' in summaries stored before it was kept (final inspections, which never show it).
    */
   templateName: z.string().default(''),
+  /** The machine it was done on, if any (summaries stored before machines existed have none). */
+  machineRef: IdSchema.optional(),
   updatedAt: IsoDateTime,
 });
 export type InspectionSummary = z.infer<typeof InspectionSummarySchema>;
 export const InspectionListSchema = z.array(InspectionSummarySchema);
+
+/**
+ * Started: in progress or finalised. A machine's check that is not started yet has no number and
+ * nothing filled in; the lists, Insights and the deviation log leave it out.
+ */
+export function isStarted(inspection: Pick<InspectionSummary, 'state'>): boolean {
+  return inspection.state !== 'not_started';
+}
 
 /** Each kind's own number series: FI- for final inspections, QC- for quality checks. */
 export const INSPECTION_NUMBER_PREFIXES: Record<InspectionKind, string> = {

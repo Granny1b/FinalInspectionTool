@@ -12,6 +12,7 @@ import {
   type DeviationLogEntry,
   type DeviationLogQuery,
   type InspectionKind,
+  type LogMachine,
   type LogStatus,
 } from '@modig/shared';
 import { inspectionHref } from '../inspections/listFilter';
@@ -94,13 +95,24 @@ export type LogSummary = {
 /** One machine: its deviations under the filters, and how many of them are open and closed. */
 export type LogGroup = {
   key: string;
+  /** The machine record, when its inspections are linked to one: the header names it as it is. */
+  machineRef?: string;
   machineName: string;
   serialNumber: string;
   modelCode: string;
-  /** A quality check's title ('' for a final inspection). */
+  /** A quality check's title ('' for a final inspection, and for a machine's quality checks). */
   checkName: string;
-  /** The inspections its deviations come from, newest first: usually one. */
-  inspections: { id: string; number: string; date: string; finalised: boolean }[];
+  /**
+   * The inspections its deviations come from, newest first: usually one. A machine's quality
+   * checks each say which check they are.
+   */
+  inspections: {
+    id: string;
+    number: string;
+    date: string;
+    finalised: boolean;
+    checkName: string;
+  }[];
   /** Under every filter, the status included: the rows shown, oldest inspection first. */
   entries: DeviationLogEntry[];
   /** Under every filter but the status: what its progress counts. */
@@ -122,7 +134,9 @@ export function logView(
   entries: readonly DeviationLogEntry[],
   filter: LogFilter,
   today: string,
+  machines: readonly LogMachine[] = [],
 ): LogView {
+  const machineById = new Map(machines.map((machine) => [machine.id, machine]));
   const query = queryOf(filter);
   const scope = entries.filter((entry) => matchesDeviationLog(entry, { ...query, status: 'all' }));
   const shownStatus = (entry: DeviationLogEntry) =>
@@ -143,15 +157,18 @@ export function logView(
 
   const groups = new Map<string, LogGroup>();
   for (const entry of [...scope].sort(compareLogEntries)) {
-    const key = groupKey(entry, filter.kind);
+    const machine = entry.machineRef ? machineById.get(entry.machineRef) : undefined;
+    const key = machine ? `machine\n${machine.id}` : groupKey(entry, filter.kind);
     let group = groups.get(key);
     if (!group) {
       group = {
         key,
+        ...(machine && { machineRef: machine.id }),
         machineName: entry.machineName,
         serialNumber: entry.serialNumber,
         modelCode: entry.modelCode,
-        checkName: filter.kind === 'quality' ? entry.checkName : '',
+        // A machine's quality checks are all under it; each inspection says which it is.
+        checkName: filter.kind === 'quality' && !machine ? entry.checkName : '',
         inspections: [],
         entries: [],
         open: 0,
@@ -166,9 +183,16 @@ export function logView(
         number: entry.inspectionNumber,
         date: entry.inspectionDate,
         finalised: entry.finalised,
+        checkName: filter.kind === 'quality' && machine ? entry.checkName : '',
       });
       group.machineName = entry.machineName;
       group.serialNumber = entry.serialNumber;
+    }
+    // A machine is named as it is now, whatever its inspections were done with.
+    if (machine) {
+      group.machineName = machine.machineName;
+      group.serialNumber = machine.serialNumber;
+      group.modelCode = machine.modelCode;
     }
     group[entry.status] += 1;
     if (shownStatus(entry)) group.entries.push(entry);
@@ -184,8 +208,9 @@ export function logView(
 }
 
 /**
- * Which machine a deviation belongs to: its Machine ID and serial number (ignoring case and
- * spaces), of its model; for a quality check also which check, since a machine has several.
+ * Which machine a deviation belongs to when its inspection is linked to no machine record: its
+ * Machine ID and serial number (ignoring case and spaces), of its model; for a quality check also
+ * which check, since a machine has several. A linked one is under its machine.
  */
 function groupKey(entry: DeviationLogEntry, kind: InspectionKind): string {
   return [

@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import {
   ChartColumn,
   ClipboardCheck,
+  Factory,
   LayoutTemplate,
   ListChecks,
   LogOut,
@@ -21,6 +22,9 @@ import { ThemeToggle } from './ThemeToggle';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 type NavGroupItems = { label: string; items: NavItem[] };
+
+/** First, without a group label: the machines being built, where their checks are started. */
+const MACHINES_NAV: NavItem[] = [{ to: '/machines', label: 'Machines', icon: Factory }];
 
 /**
  * What everyone sees, a group to a kind of work: final inspections before delivery, quality
@@ -80,13 +84,14 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
       </div>
 
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-5">
-        {NAV_GROUPS.map(({ label, items }, index) => (
+        <NavList items={MACHINES_NAV} onNavigate={onNavigate} label="Machines" />
+        {NAV_GROUPS.map(({ label, items }) => (
           <NavGroup
             key={label}
             label={label}
             items={items}
             onNavigate={onNavigate}
-            className={index > 0 ? GROUP_GAP : undefined}
+            className={GROUP_GAP}
           />
         ))}
         {hasRole(me.roles, 'admin') && (
@@ -126,11 +131,17 @@ function NavGroup({ label, items, onNavigate, className }: NavGroupProps) {
   );
 }
 
-type NavListProps = { items: NavItem[]; onNavigate?: () => void; labelledBy: string };
+type NavListProps = {
+  items: NavItem[];
+  onNavigate?: () => void;
+  /** The id of the group's label; or, for a list without one shown, its name. */
+  labelledBy?: string;
+  label?: string;
+};
 
-function NavList({ items, onNavigate, labelledBy }: NavListProps) {
+function NavList({ items, onNavigate, labelledBy, label }: NavListProps) {
   return (
-    <ul className="space-y-0.5" aria-labelledby={labelledBy}>
+    <ul className="space-y-0.5" aria-labelledby={labelledBy} aria-label={label}>
       {items.map(({ to, label, icon: Icon }) => (
         <li key={to}>
           {/* NavLink sets aria-current="page" on the active link. */}

@@ -3,9 +3,11 @@
  * CSV export and as JSON for the printed report, for admins. Of final inspections, or of quality
  * checks with `kind=quality` (and `check`, one quality check's title); never both together.
  *
- *   GET /api/insights?kind&from&to&model&check&includeInProgress             admin  Insights
- *   GET /api/insights/export.csv?kind&from&to&model&check&includeInProgress  admin  text/csv
- *   GET /api/insights/deviations?kind&from&to&model&check&includeInProgress  admin  rows (JSON)
+ *   GET /api/insights?kind&from&to&model&check&machine&includeInProgress             admin  Insights
+ *   GET /api/insights/export.csv?kind&from&to&model&check&machine&includeInProgress  admin  CSV
+ *   GET /api/insights/deviations?kind&from&to&model&check&machine&includeInProgress  admin  JSON
+ *
+ * `machine` is a machine's id: only the inspections linked to it count.
  */
 import { app, type HttpRequest } from '@azure/functions';
 import {
@@ -17,6 +19,7 @@ import {
 import { csvResponse } from '../lib/csv';
 import { BadRequestError, endpoint, json } from '../lib/http';
 import { csvFileName, deviationsCsv, loadExportRows, loadInsights } from '../lib/insights';
+import { loadMachine } from '../lib/machines';
 
 function readQuery(req: HttpRequest): InsightsQuery {
   const result = parseInsightsQuery(req.query);
@@ -35,8 +38,11 @@ const swedishDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockho
 
 export const exportInsightsCsv = endpoint({ role: 'admin' }, async (req, context) => {
   const query = readQuery(req);
-  const rows = await loadExportRows(query, context);
-  const fileName = csvFileName(query, swedishDate.format(new Date()));
+  const [rows, machine] = await Promise.all([
+    loadExportRows(query, context),
+    query.machine ? loadMachine(query.machine) : null,
+  ]);
+  const fileName = csvFileName(query, swedishDate.format(new Date()), machine?.data.machineName);
   return csvResponse(deviationsCsv(rows, queryKind(query)), fileName);
 });
 

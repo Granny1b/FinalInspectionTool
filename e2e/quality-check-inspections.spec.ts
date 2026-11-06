@@ -19,10 +19,12 @@ import {
   createQualityCheck,
   createTemplate,
   deleteInspectionsOf,
+  deleteMachinesOf,
   deleteQualityChecks,
   deleteTemplate,
   deviationRows,
   storeImage,
+  uniqueMachineId,
 } from './support/storage';
 
 const ADMIN = 'anna.andersson@modig.se';
@@ -56,6 +58,7 @@ const test = base.extend<{ machine: { model: string; template: Template; check: 
     });
     await use({ model, template, check });
     await deleteInspectionsOf([template.id, check.id]);
+    await deleteMachinesOf([model]);
     await deleteQualityChecks(template.id);
     await deleteTemplate(template.id);
   },
@@ -166,8 +169,9 @@ test('the sidebar has Final inspection, Quality check, Setup and, for admins, Ad
     const list = nav.getByRole('list', { name: label });
     await expect(list.getByRole('link')).toHaveText([...links]);
   }
-  // In this order.
-  await expect(nav.getByRole('list')).toHaveCount(4);
+  // In this order, under Machines, which has no label of its own.
+  await expect(nav.getByRole('list')).toHaveCount(5);
+  await expect(nav.getByRole('list').first()).toHaveAccessibleName('Machines');
   await expect(nav.locator('p')).toHaveText(groups.map(([label]) => label));
   await expect(nav.getByRole('link', { name: 'Quality checks' })).toHaveAttribute(
     'aria-current',
@@ -200,34 +204,38 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   await expect(page.getByRole('heading', { level: 1, name: 'Quality checks' })).toBeVisible();
   await page.getByRole('link', { name: 'Start a quality check' }).first().click();
 
-  // Machine → quality check → Machine ID, serial number and date.
+  // The machine first (a new one here), then its quality check.
   await expect(
     page.getByRole('heading', { level: 1, name: 'Start a quality check' }),
   ).toBeVisible();
-  await page.getByRole('radio', { name: machine.model }).check();
-  await page.getByRole('radio', { name: CHECK }).check();
-  const startButton = page.getByRole('button', { name: 'Start quality check' });
-  await startButton.click();
+  await page.getByRole('link', { name: 'New machine' }).click();
+  await page.getByRole('radio', { name: new RegExp(`^${machine.model}`) }).check();
+  await expect(page.getByRole('checkbox', { name: new RegExp(CHECK) })).toBeChecked();
+  const create = page.getByRole('button', { name: 'Create machine' });
+  await create.click();
   await expect(page.getByText('Machine ID is required')).toBeVisible();
   await expect(page.getByText('Serial number is required')).toBeVisible();
-  const machineId = page.getByLabel('Machine ID', { exact: true });
-  await expect(machineId).toBeFocused();
-  await expect(machineId).toHaveAccessibleDescription(
+  const machineIdField = page.getByLabel('Machine ID', { exact: true });
+  await expect(machineIdField).toBeFocused();
+  await expect(machineIdField).toHaveAccessibleDescription(
     'As in Monitor, e.g. Magellan#1 Machine ID is required',
   );
-  await machineId.fill('Magellan#16');
+  const machineId = uniqueMachineId('Magellan#16');
+  await machineIdField.fill(machineId);
   await page.getByLabel('Serial number').fill('RM-E2E-016');
-  await expect(page.getByLabel('Date')).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
-  // Checked by starts with the inspector; the quality check's front page is shown read-only.
-  const frontPage = page.getByRole('region', { name: 'Front page' });
-  await expect(frontPage.getByText('Sam Andersson', { exact: true })).toBeVisible();
-  await expect(frontPage.getByText('Quality check – Pre start up')).toBeVisible();
-  await startButton.click();
+  await create.click();
+  await page.waitForURL(/\/machines\/[A-Za-z0-9]{16}$/);
+  await page.getByRole('button', { name: 'Start Pre start up' }).click();
 
   await page.waitForURL(/\/quality-checks\/[A-Za-z0-9]{16}$/);
   const id = new URL(page.url()).pathname.split('/').pop()!;
   const title = page.getByRole('heading', { level: 1 });
-  await expect(title).toHaveText(/^QC-\d{4}-\d{4,} · Magellan#16$/);
+  await expect(title).toHaveText(new RegExp(`^QC-\\d{4}-\\d{4,} · ${machineId}$`));
+  // Filled in from the machine: the date today and the inspector as Checked by.
+  const frontPage = page.getByRole('region', { name: 'Front page' });
+  await expect(frontPage.getByText('Sam Andersson', { exact: true })).toBeVisible();
+  await expect(frontPage.getByText('Quality check – Pre start up')).toBeVisible();
+  await expect(frontPage.getByLabel('Date')).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
   const number = (await title.textContent())!.split(' · ')[0]!;
   await expect(page.locator('main header')).toContainText(`${CHECK} · Rev 1`);
   await expect(page.locator('main header')).toContainText('S/N RM-E2E-016');
@@ -297,7 +305,7 @@ test('an inspector starts a quality check, marks its rows on the cards and final
     front: {
       serialNumber: 'RM-E2E-016',
       participants: ['Sam Andersson'],
-      machineName: 'Magellan#16',
+      machineName: machineId,
     },
   });
   expect(stored.templateSnapshot.quality).toEqual({ name: 'Pre start up', department: 'Quality' });
@@ -320,11 +328,13 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   // Inspectors never reopen.
   await expect(page.getByRole('button', { name: 'Reopen' })).toHaveCount(0);
 
-  // Listed with the quality checks, never with the final inspections.
-  await page.getByRole('main').getByRole('link', { name: 'Quality checks' }).click();
+  // It leads back to its machine. Listed with the quality checks, never with the final
+  // inspections.
+  await expect(page.getByRole('main').getByRole('link', { name: machineId }).first()).toBeVisible();
+  await mainNav(page).getByRole('link', { name: 'Quality checks' }).click();
   await page.getByRole('searchbox', { name: 'Search quality checks' }).fill(number);
   const row = page.getByRole('row').filter({ hasText: number });
-  await expect(row).toContainText('Magellan#16');
+  await expect(row).toContainText(machineId);
   await expect(row).toContainText(machine.model);
   await expect(row).toContainText(CHECK);
   await expect(row).toContainText('RM-E2E-016');

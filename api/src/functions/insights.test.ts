@@ -158,6 +158,7 @@ describe('GET /api/insights', () => {
     expect(parsed(await insights())).toEqual({
       modelCodes: [],
       checkNames: [],
+      machines: [],
       firstInspectionDate: null,
       inspections: { finalised: 0, inProgress: 0 },
       deviations: 0,

@@ -328,7 +328,13 @@ export const InspectionFrontSchema = z.object({
 });
 export type InspectionFront = z.infer<typeof InspectionFrontSchema>;
 
-export const InspectionStateSchema = z.enum(['in_progress', 'finalised']);
+/**
+ * `not_started`: a machine's check, copied from its template when the machine was made (or the
+ * check added to it), that nobody has started yet. It has no number until it is started, and the
+ * lists, Insights and the deviation log leave it out. Inspections stored before machines existed
+ * are always in progress or finalised.
+ */
+export const InspectionStateSchema = z.enum(['not_started', 'in_progress', 'finalised']);
 export type InspectionState = z.infer<typeof InspectionStateSchema>;
 
 /**
@@ -342,18 +348,40 @@ export type InspectionKind = TemplateKind;
 /** "FI-2026-0042" for a final inspection, "QC-2026-0007" for a quality check. */
 export const INSPECTION_NUMBER_PATTERN = /^(FI|QC)-\d{4}-\d{4,}$/;
 
+/**
+ * A started inspection's number, or '' for a machine's check that is not started yet: numbers are
+ * taken when a check starts, so checks that are never done use none.
+ */
+export const InspectionNumberSchema = z.union([
+  z.literal(''),
+  z.string().regex(INSPECTION_NUMBER_PATTERN),
+]);
+
 export const InspectionSchema = z.object({
   id: IdSchema,
   /** Defaulted, so every inspection stored before quality checks could be done is final. */
   kind: InspectionKindSchema.default('final'),
-  number: z.string().regex(INSPECTION_NUMBER_PATTERN),
+  number: InspectionNumberSchema,
+  /**
+   * The template it was copied from and the published revision it was copied from. For a
+   * machine's check this is also where the copy stands: "Update to latest template" merges the
+   * template's changes since this revision and then moves it on to the revision merged.
+   */
   templateId: IdSchema,
   templateRevision: z.number().int().min(1),
+  /**
+   * The machine it was done on (`machines/{id}.json`): set for a machine's checks, and for an
+   * older inspection an admin linked to one. Inspections stored before machines existed have none
+   * and work as before.
+   */
+  machineRef: IdSchema.optional(),
   /**
    * FROZEN copy at creation – template edits never change existing inspections. Besides the
    * sections (a quality check's rows with their how, references, time and pictures) it keeps the
    * template's name and a quality check's front page, so showing or printing it never depends on
-   * the live template, which may since have changed or been deleted.
+   * the live template, which may since have changed or been deleted. A machine's check is the
+   * machine's own copy: admins may add, change, move and delete its rows and sections (for that
+   * machine only), and update it to a newer revision of its template.
    */
   templateSnapshot: z.object({
     name: z.string().max(200),

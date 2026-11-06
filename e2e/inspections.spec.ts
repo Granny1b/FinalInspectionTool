@@ -18,7 +18,13 @@ import {
   type Page,
 } from '@playwright/test';
 import { signIn } from './support/auth';
-import { createTemplate, deleteInspection, deleteTemplate, deviationRows } from './support/storage';
+import {
+  createTemplate,
+  deleteInspection,
+  deleteMachinesOf,
+  deleteTemplate,
+  deviationRows,
+} from './support/storage';
 
 const INSPECTOR = 'sam.andersson@modig.se';
 const ADMIN = 'anna.andersson@modig.se';
@@ -168,89 +174,131 @@ const calendarDate = (date: string) => date;
 test.describe('an inspector', () => {
   test.beforeEach(({ context }) => signIn(context, INSPECTOR, ['inspector']));
 
-  test('creates an inspection from the front page form and finds it in the list', async ({
+  test('starts a final inspection on a new machine, filled in from it, and finds it in the list', async ({
     page,
     published,
     inspections,
   }) => {
-    const machine = `Line 3 – ${published.id}`;
-    const settings = (await (await page.request.get('/api/settings')).json()) as {
-      defaultLocation: string;
-    };
-    await page.goto('/inspections/new');
-    await page.getByRole('radio', { name: published.name }).check();
-    await expect(page.getByText('Rev: 1', { exact: true })).toBeVisible();
-
-    // Nothing typed yet: Create says what is missing and goes there.
-    await page.getByRole('button', { name: 'Create inspection' }).click();
-    const machineName = page.getByLabel('Machine ID', { exact: true });
-    await expect(machineName).toBeFocused();
-    await expect(machineName).toHaveAccessibleDescription(
-      'As in Monitor, e.g. Magellan#1 Machine ID is required',
+    // A model of its own: other tests' templates have model E2E too.
+    const model = `FIN${published.id
+      .slice(0, 8)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, 'X')}`;
+    const own = await createTemplate(
+      `E2E inspections – own model ${published.id}`,
+      true,
+      undefined,
+      model,
     );
+    const machine = `Line 3 – ${own.id}`;
+    try {
+      const settings = (await (await page.request.get('/api/settings')).json()) as {
+        defaultLocation: string;
+      };
+      // New final inspection: pick the machine, or make it.
+      await page.goto('/inspections');
+      await page.getByRole('link', { name: 'New final inspection' }).first().click();
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'New final inspection' }),
+      ).toBeVisible();
+      await page.getByRole('link', { name: 'New machine' }).click();
+      await page.getByRole('radio', { name: new RegExp(`^${model}`) }).check();
+      await expect(page.getByRole('checkbox', { name: /Final inspection/ })).toBeChecked();
 
-    await machineName.fill(machine);
-    await page.getByLabel('Serial number', { exact: true }).fill('RMMG-1042');
-    const participants = page.getByLabel('Participants', { exact: true });
-    await participants.fill('Erik Lund');
-    await participants.press('Enter');
-    // A comma ends a name too; leaving the field adds the one still typed.
-    await participants.pressSequentially('Anna Berg, Lars Ek');
-    await expect(page.getByLabel('Location', { exact: true })).toHaveValue(
-      settings.defaultLocation,
-    );
-    await page.getByRole('button', { name: 'Create inspection' }).click();
+      // Nothing typed yet: Create says what is missing and goes there.
+      await page.getByRole('button', { name: 'Create machine' }).click();
+      const machineName = page.getByLabel('Machine ID', { exact: true });
+      await expect(machineName).toBeFocused();
+      await expect(machineName).toHaveAccessibleDescription(
+        'As in Monitor, e.g. Magellan#1 Machine ID is required',
+      );
+      await machineName.fill(machine);
+      await page.getByLabel('Serial number', { exact: true }).fill('RMMG-1042');
+      await page.getByRole('button', { name: 'Create machine' }).click();
+      await page.waitForURL(/\/machines\/[A-Za-z0-9]{16}$/);
+      await page.getByRole('button', { name: 'Start Final inspection' }).click();
 
-    await page.waitForURL(/\/inspections\/[A-Za-z0-9]{16}$/);
-    const id = new URL(page.url()).pathname.split('/').pop()!;
-    inspections.track(id);
-    // The keyboard starts at "Continue at 1.a": one Enter and transcribing begins.
-    await expect(page.getByRole('button', { name: 'Continue at 1.a' })).toBeFocused();
-    const { inspection } = await stored(page.request, id);
-    expect(inspection).toMatchObject({
-      templateId: published.id,
-      templateRevision: 1,
-      state: 'in_progress',
-      front: {
-        machineName: machine,
-        serialNumber: 'RMMG-1042',
-        modelCode: 'E2E',
-        participants: ['Erik Lund', 'Anna Berg', 'Lars Ek'],
-        location: settings.defaultLocation,
-      },
-      results: {},
-      extraDeviations: [],
-    });
-    expect(inspection.number).toMatch(/^FI-\d{4}-\d{4,}$/);
+      await page.waitForURL(/\/inspections\/[A-Za-z0-9]{16}$/);
+      const id = new URL(page.url()).pathname.split('/').pop()!;
+      inspections.track(id);
+      // The keyboard starts at "Continue at 1.a": one Enter and transcribing begins.
+      await expect(page.getByRole('button', { name: 'Continue at 1.a' })).toBeFocused();
+      const { inspection } = await stored(page.request, id);
+      expect(inspection).toMatchObject({
+        templateId: own.id,
+        templateRevision: 1,
+        state: 'in_progress',
+        front: {
+          machineName: machine,
+          serialNumber: 'RMMG-1042',
+          modelCode: model,
+          participants: ['Sam Andersson'],
+          location: settings.defaultLocation,
+        },
+        results: {},
+        extraDeviations: [],
+      });
+      expect(inspection.number).toMatch(/^FI-\d{4}-\d{4,}$/);
+      expect(inspection.machineRef).toMatch(/^[A-Za-z0-9]{16}$/);
 
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-      `${inspection.number} · ${machine}`,
-    );
-    const header = page.locator('main header');
-    await expect(header).toContainText('In progress');
-    await expect(header).toContainText('S/N RMMG-1042');
-    await expect(header).toContainText(`${published.name} · Rev 1`);
-    await expect(progress(page)).toHaveText('0 / 6 rows filled · 0 NOK');
-    await expect(
-      page.getByRole('list', { name: 'Added participants' }).getByRole('listitem'),
-    ).toHaveText(['Erik Lund', 'Anna Berg', 'Lars Ek']);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+        `${inspection.number} · ${machine}`,
+      );
+      const header = page.locator('main header');
+      await expect(header).toContainText('In progress');
+      await expect(header).toContainText('S/N RMMG-1042');
+      await expect(header).toContainText(`${own.name} · Rev 1`);
+      await expect(progress(page)).toHaveText('0 / 6 rows filled · 0 NOK');
+      // More participants are added on its front page.
+      const participants = page.getByLabel('Participants', { exact: true });
+      await participants.fill('Erik Lund');
+      await participants.press('Enter');
+      await expect(
+        page.getByRole('list', { name: 'Added participants' }).getByRole('listitem'),
+      ).toHaveText(['Sam Andersson', 'Erik Lund']);
 
-    await page.getByRole('main').getByRole('link', { name: 'Inspections' }).click();
+      await page
+        .getByRole('navigation', { name: 'Main' })
+        .getByRole('link', { name: 'Inspections' })
+        .click();
+      await page.getByRole('searchbox', { name: 'Search inspections' }).fill(own.id);
+      await page.getByRole('combobox', { name: 'State' }).selectOption('in_progress');
+      const listed = page.getByRole('row').filter({ hasText: machine });
+      await expect(listed.getByRole('cell')).toHaveText([
+        inspection.number,
+        machine,
+        'RMMG-1042',
+        model,
+        calendarDate(inspection.front.date),
+        /^In progress\s*0 \/ 6 rows$/,
+        '0',
+      ]);
+      await listed.getByRole('link', { name: inspection.number }).click();
+      await expect(page).toHaveURL(new RegExp(`/inspections/${id}$`));
+      await expect(page.getByRole('button', { name: 'Continue at 1.a' })).toBeFocused();
+      // A machine's inspection leads back to its machine.
+      await expect(
+        page.getByRole('main').getByRole('link', { name: machine }).first(),
+      ).toHaveAttribute('href', `/machines/${inspection.machineRef}`);
+    } finally {
+      await deleteMachinesOf([model]);
+      await deleteTemplate(own.id);
+    }
+  });
+
+  test('one without a machine leads back to the list as it was left', async ({
+    page,
+    published,
+    inspections,
+  }) => {
+    const machine = `Line 4 – ${published.id}`;
+    const { inspection } = await inspections.create(page.request, published, machine);
+    await page.goto('/inspections');
     await page.getByRole('searchbox', { name: 'Search inspections' }).fill(published.id);
     await page.getByRole('combobox', { name: 'State' }).selectOption('in_progress');
     const listed = page.getByRole('row').filter({ hasText: machine });
-    await expect(listed.getByRole('cell')).toHaveText([
-      inspection.number,
-      machine,
-      'RMMG-1042',
-      'E2E',
-      calendarDate(inspection.front.date),
-      /^In progress\s*0 \/ 6 rows$/,
-      '0',
-    ]);
     await listed.getByRole('link', { name: inspection.number }).click();
-    await expect(page).toHaveURL(new RegExp(`/inspections/${id}$`));
-    await expect(page.getByRole('button', { name: 'Continue at 1.a' })).toBeFocused();
+    await expect(page).toHaveURL(new RegExp(`/inspections/${inspection.id}$`));
 
     // The page's own link back returns to the list as it was left, search and filters included.
     await page.getByRole('main').getByRole('link', { name: 'Inspections' }).click();

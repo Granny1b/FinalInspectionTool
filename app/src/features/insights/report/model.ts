@@ -71,7 +71,7 @@ const RELATIVE_PERIODS = new Set<string>(['last12', 'thisYear', 'lastYear']);
  * 2026-10-31, RMMG", "Deviation report 2026-10, RMMG, incl. in progress"; an open end is "start",
  * or today. Quality checks': "Quality check deviation report 2026-10, RMMG, Pre start up".
  */
-export function reportFileName(query: InsightsQuery, today: string): string {
+export function reportFileName(query: InsightsQuery, today: string, machineName?: string): string {
   const quality = queryKind(query) === 'quality';
   const months = wholeMonths(query);
   const range = months
@@ -81,6 +81,7 @@ export function reportFileName(query: InsightsQuery, today: string): string {
     : `${query.from ?? 'start'} to ${query.to ?? today}`;
   const extras = [
     query.model,
+    machineName,
     quality && query.check ? qualityCheckShortName(query.check) : undefined,
     query.includeInProgress ? 'incl. in progress' : undefined,
   ].filter(Boolean);
@@ -212,10 +213,16 @@ export function buildReport(input: ReportInput): Report {
   const period = periodText(query);
   const model = query.model ? modelName(models, query.model) : 'All models';
   const check = quality ? (query.check ?? 'All quality checks') : null;
+  // One machine's: by its Machine ID ("This machine" if it is gone since).
+  const machine = query.machine
+    ? (insights.machines.find((candidate) => candidate.id === query.machine)?.machineName ??
+      'This machine')
+    : null;
   const subject = [
     words.reportTitle,
     period,
     model,
+    machine,
     quality && query.check ? qualityCheckShortName(query.check) : null,
     query.includeInProgress ? 'incl. in progress' : null,
   ]
@@ -228,13 +235,14 @@ export function buildReport(input: ReportInput): Report {
   return {
     words,
     title: words.reportTitle,
-    fileName: reportFileName(query, input.today),
+    fileName: reportFileName(query, input.today, machine ?? undefined),
     subject,
     period,
     companyName: input.companyName,
     facts: [
       { label: 'Period', value: `${period}${relative}` },
       { label: 'Model', value: model },
+      ...(machine ? [{ label: 'Machine', value: machine }] : []),
       ...(check ? [{ label: 'Quality check', value: check }] : []),
       {
         label: capitalised(words.many),
