@@ -34,8 +34,7 @@ const WORDS = {
     loading: 'Loading inspections…',
     loadError: "We couldn't load the inspections",
     emptyTitle: 'No inspections yet',
-    emptyHint:
-      'Start one from a machine model’s published checklist, print it for the walk-round, then enter the results here.',
+    emptyHint: 'Start one on a machine, print it for the walk-round, then enter the results here.',
     noMatch: 'No inspections match',
     one: 'inspection',
     many: 'inspections',
@@ -48,8 +47,7 @@ const WORDS = {
     loading: 'Loading quality checks…',
     loadError: "We couldn't load the quality checks",
     emptyTitle: 'No quality checks done yet',
-    emptyHint:
-      'Start one from a machine’s published quality check, then mark each row OK, NOK or N/A on a tablet or PC.',
+    emptyHint: 'Start one on a machine, then mark each row OK, NOK or N/A on a tablet or PC.',
     noMatch: 'No quality checks match',
     one: 'quality check',
     many: 'quality checks',

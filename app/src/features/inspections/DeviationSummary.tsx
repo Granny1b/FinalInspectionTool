@@ -1,4 +1,4 @@
-import type { AnnotatedImage, InspectionDeviation } from '@modig/shared';
+import type { AnnotatedImage, FollowUp, FollowUpRequest, InspectionDeviation } from '@modig/shared';
 import { Plus } from 'lucide-react';
 import { memo, useEffect, useId, useRef, useState } from 'react';
 import { Button } from '../../components/Button';
@@ -10,8 +10,6 @@ import type { ExtraDeviationPatch } from './extras';
 type Props = {
   /** NOK rows in checklist order, then extra deviations, numbered D-01… (deriveDeviations). */
   deviations: InspectionDeviation[];
-  /** A final inspection's deviations print on its report; a quality check's don't print yet. */
-  printed?: boolean;
   readOnly: boolean;
   /** Finalise problems of extra deviations ("needs a description"), by id. */
   issues: ReadonlyMap<string, string>;
@@ -26,6 +24,13 @@ type Props = {
   onPhotosChange: (deviation: InspectionDeviation, photos: AnnotatedImage[]) => void;
   /** The open photo editor holds marks not saved yet (for the page's leave guard). */
   onEditorDirtyChange: (dirty: boolean) => void;
+  /** "QC-2026-0004": each deviation's ID in the deviation log starts with it. */
+  inspectionNumber: string;
+  /** The deviations' follow-ups by key, null until they have loaded. */
+  followUps: Readonly<Record<string, FollowUp>> | null;
+  /** Keys of the deviations whose follow-up is being saved. */
+  pendingFollowUps: ReadonlySet<string>;
+  onFollowUp: (deviation: InspectionDeviation, request: FollowUpRequest) => void;
 };
 
 /**
@@ -36,7 +41,6 @@ type Props = {
  */
 export const DeviationSummary = memo(function DeviationSummary({
   deviations,
-  printed = true,
   readOnly,
   issues,
   responsibles,
@@ -47,6 +51,10 @@ export const DeviationSummary = memo(function DeviationSummary({
   onRemove,
   onPhotosChange,
   onEditorDirtyChange,
+  inspectionNumber,
+  followUps,
+  pendingFollowUps,
+  onFollowUp,
 }: Props) {
   const titleId = useId();
   const addRef = useRef<HTMLButtonElement>(null);
@@ -70,8 +78,8 @@ export const DeviationSummary = memo(function DeviationSummary({
         </p>
         {!readOnly && deviations.length > 0 && (
           <p className="w-full text-sm text-ink-500">
-            Add up to two photos to each and mark them up with arrows, boxes and text
-            {printed ? ': they print on the report’s deviation pages.' : '.'}
+            Add up to two photos to each and mark them up with arrows, boxes and text: they print on
+            the report’s deviation pages.
           </p>
         )}
       </div>
@@ -98,6 +106,10 @@ export const DeviationSummary = memo(function DeviationSummary({
                 }
                 onPhotosChange={onPhotosChange}
                 onEditorDirtyChange={onEditorDirtyChange}
+                followUp={followUps === null ? null : followUps[deviation.key]}
+                logId={`${inspectionNumber} · ${deviation.number}`}
+                followUpPending={pendingFollowUps.has(deviation.key)}
+                onFollowUp={onFollowUp}
               />
             </li>
           ))}

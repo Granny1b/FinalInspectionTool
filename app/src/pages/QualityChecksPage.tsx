@@ -1,4 +1,4 @@
-import { APP_NAME, hasRole, type QualityCheckExport } from '@modig/shared';
+import { APP_NAME, compareQualityChecks, hasRole, type QualityCheckExport } from '@modig/shared';
 import { ClipboardList, FileUp, Plus } from 'lucide-react';
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
@@ -6,6 +6,7 @@ import { Button } from '../components/Button';
 import { Callout } from '../components/Callout';
 import { EmptyState } from '../components/EmptyState';
 import { LoadError, PageLoading } from '../components/PageStates';
+import { useQualityCheckOrder, useSaveQualityCheckOrder } from '../features/machines/queries';
 import { CreateQualityCheckDialog } from '../features/qualityChecks/CreateQualityCheckDialog';
 import { ImportQualityCheckDialog } from '../features/qualityChecks/ImportQualityCheckDialog';
 import { QualityCheckCards } from '../features/qualityChecks/QualityCheckCards';
@@ -15,7 +16,7 @@ import { MachineHeader } from '../features/templates/MachineHeader';
 import { qualityChecksHref, qualityChecksOf, useTemplates } from '../features/templates/queries';
 import { TemplateNotFound } from '../features/templates/TemplateNotFound';
 import { TemplateFileError } from '../features/templates/transfer';
-import { errorMessage } from '../lib/api';
+import { errorMessage, isConflict } from '../lib/api';
 import { useCurrentUser } from '../lib/useMe';
 import { modelName, useSettings } from '../lib/useSettings';
 
@@ -40,10 +41,21 @@ export function QualityChecksPage() {
   const deleted = (location.state as TemplatesPageState | null)?.deleted;
 
   const machine = templates.data?.find((template) => template.id === id);
-  const checks = useMemo(
-    () => (templates.data ? qualityChecksOf(templates.data, id) : []),
-    [templates.data, id],
-  );
+  // In the order they are done on a machine, as admins drag them here.
+  const order = useQualityCheckOrder(id);
+  const saveOrder = useSaveQualityCheckOrder(id);
+  const savedOrder = order.data?.order;
+  const checks = useMemo(() => {
+    const all = templates.data ? qualityChecksOf(templates.data, id) : [];
+    const ids = savedOrder ?? [];
+    return all
+      .map((check) => {
+        const position = ids.indexOf(check.id);
+        const { position: _listed, ...rest } = check;
+        return position < 0 ? rest : { ...rest, position };
+      })
+      .sort(compareQualityChecks);
+  }, [templates.data, id, savedOrder]);
   const taken = useMemo(
     () => checks.map((check) => ({ name: check.quality?.name ?? '' })),
     [checks],
@@ -99,8 +111,9 @@ export function QualityChecksPage() {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <p className="max-w-prose text-sm text-ink-600">
-          In-process checks along the build, before the final inspection. Each one is a checklist of
-          its own, published in revisions.
+          In-process checks along the build, before the final inspection, in the order they are
+          done. Each one is a checklist of its own, published in revisions.
+          {isAdmin && checks.length > 1 && ' Drag a card by its handle to change the order.'}
         </p>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
@@ -123,8 +136,32 @@ export function QualityChecksPage() {
         )}
       </div>
 
-      {(deleted !== undefined || fileError) && (
+      {(deleted !== undefined || fileError || saveOrder.isError) && (
         <div className="mt-6 space-y-3">
+          {saveOrder.isError && (
+            <Callout
+              tone="error"
+              role="alert"
+              onDismiss={() => saveOrder.reset()}
+              actions={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    saveOrder.reset();
+                    void order.refetch();
+                    void templates.refetch();
+                  }}
+                >
+                  Reload
+                </Button>
+              }
+            >
+              The new order was not saved.{' '}
+              {isConflict(saveOrder.error)
+                ? 'Someone else changed it meanwhile.'
+                : errorMessage(saveOrder.error)}
+            </Callout>
+          )}
           {deleted !== undefined && (
             <Callout
               tone="success"
@@ -153,7 +190,16 @@ export function QualityChecksPage() {
             hint="Quality admins write the checks done along this machine's build. They will be listed here."
           />
         ) : (
-          <QualityCheckCards checks={checks} isAdmin={isAdmin} onNew={() => setCreating(true)} />
+          <QualityCheckCards
+            checks={checks}
+            isAdmin={isAdmin}
+            onNew={() => setCreating(true)}
+            onReorder={
+              isAdmin && order.isSuccess && checks.length > 1
+                ? (ids) => saveOrder.mutate({ order: ids, etag: order.data.etag })
+                : undefined
+            }
+          />
         )}
       </div>
 

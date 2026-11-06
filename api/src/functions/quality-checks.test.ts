@@ -127,9 +127,6 @@ async function newCheck(parentId: string, name = 'Pre start up') {
 const front: QualityFront = {
   name: 'Pre start up',
   department: 'Quality',
-  documentNumber: '1.22.2',
-  madeBy: 'Sam Andersson',
-  date: '2026-11-05',
 };
 
 /** A checklist with what a quality check's rows carry. */
@@ -165,9 +162,6 @@ describe('POST /api/templates with kind quality', () => {
     const { draft, revisions, hasUnpublishedChanges } = TemplateDetailSchema.parse(
       response.jsonBody,
     );
-    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' }).format(
-      new Date(),
-    );
     expect(draft).toEqual({
       id: expect.any(String),
       kind: 'quality',
@@ -176,13 +170,7 @@ describe('POST /api/templates with kind quality', () => {
       modelCode: 'RMMG',
       revision: 1,
       status: 'draft',
-      quality: {
-        name: 'Pre start up',
-        department: 'Quality',
-        documentNumber: '',
-        madeBy: 'Bo Ss',
-        date: today,
-      },
+      quality: { name: 'Pre start up', department: 'Quality' },
       sections: [],
       updatedAt: expect.any(String),
       updatedBy: 'boss@modig.se',
@@ -337,12 +325,11 @@ describe('PUT /api/templates/{id} of a quality check', () => {
     expect(saved).not.toHaveProperty('quality');
   });
 
-  it('400 for a date that is not one, a blank reference or a negative time', async () => {
+  it('400 for a blank reference or a negative time', async () => {
     const { template } = await machine();
     const { draft, etag } = await newCheck(template.id);
     const [section] = checklist();
     for (const body of [
-      { ...draft, quality: { ...front, date: '5 Nov' } },
       {
         ...draft,
         sections: [{ ...section, items: [{ id: newId(), text: 'x', references: [' '] }] }],

@@ -1,13 +1,18 @@
 import { InspectionSchema, TemplateListSchema } from '@modig/shared';
 import { expect, test } from '@playwright/test';
 import { signIn } from './support/auth';
-import { deleteInspection, findSeededRevision } from './support/storage';
+import {
+  deleteInspection,
+  deleteMachines,
+  findSeededRevision,
+  uniqueMachineId,
+} from './support/storage';
 
 /**
  * The smoke test of brief §9, literally: create an inspection from the seeded template in the
- * UI, mark its rows from the keyboard, finalise it and open the print route. Uses the seeded
- * RigiMill MG as it is (its latest published revision); the inspection and its deviation rows
- * are deleted afterwards.
+ * UI (on a new machine, as inspections start now), mark its rows from the keyboard, finalise it
+ * and open the print route. Uses the seeded RigiMill MG as it is (its latest published
+ * revision); the machine, the inspection and its deviation rows are deleted afterwards.
  */
 test('create from the seeded template → mark rows → finalise → print the report', async ({
   page,
@@ -29,13 +34,21 @@ test('create from the seeded template → mark rows → finalise → print the r
   const template = templates.find((candidate) => candidate.id === seeded?.revision.id);
   expect(template?.publishedName).toBeTruthy();
 
-  // Create: pick the checklist, fill in the front page.
+  // Create: a machine of the model, then its final inspection.
   await page.goto('/inspections');
   await page.getByRole('link', { name: 'New final inspection' }).click();
-  await page.getByRole('radio', { name: template!.publishedName! }).check();
-  await page.getByLabel('Machine name', { exact: true }).fill('RigiMill MG – smoke test');
+  await page.getByRole('link', { name: 'New machine' }).click();
+  await page.getByRole('radio', { name: /^RigiMill MG/ }).check();
+  // Only the final inspection (whatever quality checks the seeded model may have got since).
+  const all = page.getByRole('button', { name: 'Select none' });
+  if (await all.isVisible()) await all.click();
+  await page.getByRole('checkbox', { name: /Final inspection/ }).check();
+  await page.getByLabel('Machine ID', { exact: true }).fill(uniqueMachineId('RigiMill MG smoke'));
   await page.getByLabel('Serial number', { exact: true }).fill('RM-SMOKE-1');
-  await page.getByRole('button', { name: 'Create inspection' }).click();
+  await page.getByRole('button', { name: 'Create machine' }).click();
+  await page.waitForURL(/\/machines\/[A-Za-z0-9]{16}$/);
+  const machineId = new URL(page.url()).pathname.split('/').pop()!;
+  await page.getByRole('button', { name: 'Start Final inspection' }).click();
   await page.waitForURL(/\/inspections\/[A-Za-z0-9]{16}$/);
   const id = new URL(page.url()).pathname.split('/').pop()!;
   try {
@@ -91,5 +104,6 @@ test('create from the seeded template → mark rows → finalise → print the r
     );
   } finally {
     await deleteInspection(id);
+    await deleteMachines([machineId]);
   }
 });

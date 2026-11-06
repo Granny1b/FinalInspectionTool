@@ -56,6 +56,7 @@ function insights(patch: Partial<Insights> = {}): Insights {
   return {
     modelCodes: ['RMMG', 'RMHS'],
     checkNames: [],
+    machines: [],
     firstInspectionDate: '2026-09-02',
     inspections: { finalised: 4, inProgress: 0 },
     deviations: 10,
@@ -206,6 +207,14 @@ describe('buildReport', () => {
           row({
             kind: 'quality',
             inspectionNumber: 'QC-2026-0003',
+            machineName: 'Magellan#1',
+            checkName: 'Quality check – Pre start up',
+          }),
+          // Started before quality checks had a Machine ID.
+          row({
+            kind: 'quality',
+            inspectionId: 'older',
+            inspectionNumber: 'QC-2026-0001',
             machineName: '',
             checkName: 'Quality check – Pre start up',
           }),
@@ -230,11 +239,11 @@ describe('buildReport', () => {
       'First-pass rate',
     ]);
     expect(report.kpis[2]!.detail).toBe('Average per quality check');
-    // Each check's deviations under its number and title (it has no machine name).
-    expect(report.list?.groups[0]).toMatchObject({
-      number: 'QC-2026-0003',
-      machine: 'Quality check – Pre start up',
-    });
+    // Each check's deviations under its number, Machine ID and title.
+    expect(report.list?.groups.map(({ number, machine }) => ({ number, machine }))).toEqual([
+      { number: 'QC-2026-0003', machine: 'Magellan#1 · Quality check – Pre start up' },
+      { number: 'QC-2026-0001', machine: 'Quality check – Pre start up' },
+    ]);
     // Every quality check when none is picked.
     const all = buildReport(input({ query: { kind: 'quality', includeInProgress: true } }));
     expect(all.facts[2]).toEqual({ label: 'Quality check', value: 'All quality checks' });

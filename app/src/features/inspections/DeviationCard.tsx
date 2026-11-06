@@ -1,7 +1,10 @@
 import {
   MAX_PHOTOS_PER_DEVIATION,
+  refWithText,
   SEVERITY_LABELS,
   type AnnotatedImage,
+  type FollowUp,
+  type FollowUpRequest,
   type InspectionDeviation,
   type Severity,
 } from '@modig/shared';
@@ -9,9 +12,10 @@ import clsx from 'clsx';
 import { CornerDownRight, Trash2 } from 'lucide-react';
 import { useId } from 'react';
 import { AnnotatedPhotos } from '../annotate/AnnotatedPhotos';
+import { FollowUpActions, StatusPill } from '../deviationLog/FollowUpActions';
 import { ExtraDeviationFields } from './ExtraDeviationFields';
 import type { ExtraDeviationPatch } from './extras';
-import { deviationPhotosId } from './issues';
+import { deviationCardId, deviationPhotosId } from './issues';
 import { LINK_TEXT } from './linkText';
 
 type Props = {
@@ -27,6 +31,15 @@ type Props = {
   onRemove: (deviation: InspectionDeviation) => void;
   onPhotosChange: (deviation: InspectionDeviation, photos: AnnotatedImage[]) => void;
   onEditorDirtyChange: (dirty: boolean) => void;
+  /**
+   * Its follow-up in the deviation log, once loaded (undefined: open); null while it loads, when
+   * the card says nothing about it.
+   */
+  followUp: FollowUp | undefined | null;
+  /** "QC-2026-0004 · D-03", its ID in the log. */
+  logId: string;
+  followUpPending: boolean;
+  onFollowUp: (deviation: InspectionDeviation, request: FollowUpRequest) => void;
 };
 
 /**
@@ -47,16 +60,23 @@ export function DeviationCard({
   onRemove,
   onPhotosChange,
   onEditorDirtyChange,
+  followUp,
+  logId,
+  followUpPending,
+  onFollowUp,
 }: Props) {
   const titleId = useId();
   const { number, itemId } = deviation;
   const editable = deviation.kind === 'extra' && !readOnly;
   return (
     <article
+      id={deviationCardId(deviation.key)}
+      // Focusable from script: the deviation log's links open the tab at it.
+      tabIndex={-1}
       aria-labelledby={titleId}
       data-deviation={number}
       className={clsx(
-        '@container rounded-lg border bg-surface shadow-xs',
+        '@container rounded-lg border bg-surface shadow-xs outline-none focus-visible:outline-2',
         issue ? 'border-nok-fg' : 'border-ink-200',
       )}
     >
@@ -87,7 +107,7 @@ export function DeviationCard({
             <Trash2 size={16} aria-hidden="true" />
           </button>
         ) : (
-          <SeverityBadge severity={deviation.severity} />
+          <SeverityBadge severity={deviation.severity} className="mr-2" />
         )}
       </div>
 
@@ -112,7 +132,69 @@ export function DeviationCard({
           onEditorDirtyChange={onEditorDirtyChange}
         />
       </div>
+      {followUp !== null && (
+        <FollowUpBar
+          deviation={deviation}
+          followUp={followUp}
+          logId={logId}
+          pending={followUpPending}
+          onFollowUp={onFollowUp}
+        />
+      )}
     </article>
+  );
+}
+
+type FollowUpBarProps = {
+  deviation: InspectionDeviation;
+  followUp: FollowUp | undefined;
+  logId: string;
+  pending: boolean;
+  onFollowUp: Props['onFollowUp'];
+};
+
+/**
+ * Its follow-up, as in the deviation log: Open or Closed (when, by whom, what was done), and
+ * Close… or Edit and Reopen… Also on a finalised inspection: closing a deviation doesn't change
+ * what the inspection found.
+ */
+function FollowUpBar({ deviation, followUp, logId, pending, onFollowUp }: FollowUpBarProps) {
+  const status = followUp?.status ?? 'open';
+  const action = followUp?.action ?? '';
+  const closed = status === 'closed';
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-ink-200 px-4 py-2.5">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-600">
+        <span className="sr-only">Follow-up:</span>
+        <StatusPill status={status} />
+        {closed && (followUp?.closedOn || followUp?.closedBy) && (
+          <span>
+            Closed <span className="tabular-nums">{followUp.closedOn}</span>
+            {followUp.closedBy && ` by ${followUp.closedBy}`}
+          </span>
+        )}
+        {action && (
+          <span className="basis-full wrap-break-word whitespace-pre-line text-ink-700">
+            <span className="font-medium text-ink-500">Action: </span>
+            {action}
+          </span>
+        )}
+      </div>
+      <FollowUpActions
+        target={{
+          deviationId: logId,
+          description: deviation.itemId
+            ? refWithText(deviation.ref, deviation.text)
+            : deviation.text,
+          status,
+          action,
+          closedOn: followUp?.closedOn ?? '',
+          closedBy: followUp?.closedBy ?? '',
+        }}
+        pending={pending}
+        onChange={(request) => onFollowUp(deviation, request)}
+      />
+    </div>
   );
 }
 
@@ -148,13 +230,17 @@ const SEVERITY_TONES: Record<Severity, string> = {
   critical: 'bg-severity-critical text-on-severity-critical ring-severity-critical',
 };
 
-/** The severity in words, never by colour alone; critical is the one filled badge. */
-function SeverityBadge({ severity }: { severity: Severity }) {
+/**
+ * The severity in words, never by colour alone; critical is the one filled badge. Also in the
+ * deviation log.
+ */
+export function SeverityBadge({ severity, className }: { severity: Severity; className?: string }) {
   return (
     <span
       className={clsx(
-        'mr-2 inline-flex h-6 items-center rounded-full px-2.5 text-xs font-semibold ring-1 ring-inset',
+        'inline-flex h-6 items-center rounded-full px-2.5 text-xs font-semibold whitespace-nowrap ring-1 ring-inset',
         SEVERITY_TONES[severity],
+        className,
       )}
     >
       <span className="sr-only">Severity: </span>

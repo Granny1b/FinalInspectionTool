@@ -8,6 +8,7 @@
  * still show what they did.
  */
 import {
+  IdSchema,
   ModelCodeSchema,
   parseInsightsQuery,
   type InsightsQuery,
@@ -60,6 +61,8 @@ export type InsightsFilter = {
   model: string;
   /** Quality checks only: one quality check's title; '' or left out for every one. */
   check?: string;
+  /** One machine's id; '' or left out for every inspection, with a machine or without. */
+  machine?: string;
   includeInProgress: boolean;
 };
 
@@ -91,6 +94,9 @@ export function filterFromParams(params: URLSearchParams): InsightsFilter {
     const check = params.get('check')?.trim();
     if (check) filter.check = check.slice(0, 200);
   }
+  // Only a machine the URL names: a filter without one keeps the shape it had before machines.
+  const machine = IdSchema.safeParse(params.get('machine'));
+  if (machine.success) filter.machine = machine.data;
   // Only the months the URL names: a filter without them keeps the shape it had before months.
   for (const name of ['month', 'fromMonth', 'toMonth'] as const) {
     const value = monthParam(params, name);
@@ -116,13 +122,14 @@ export function filterToParams(filter: InsightsFilter): URLSearchParams {
   }
   if (filter.model) params.set('model', filter.model);
   if (quality && filter.check) params.set('check', filter.check);
+  if (filter.machine) params.set('machine', filter.machine);
   if (filter.includeInProgress) params.set('includeInProgress', 'true');
   return params;
 }
 
 /**
- * The filter for the other kind: the period, model and in-progress choice stay (they mean the
- * same for both); which quality check goes, as it means nothing to the other.
+ * The filter for the other kind: the period, model, machine and in-progress choice stay (they
+ * mean the same for both); which quality check goes, as it means nothing to the other.
  */
 export function withKind(filter: InsightsFilter, kind: InspectionKind): InsightsFilter {
   const { kind: _kind, check: _check, ...rest } = filter;
@@ -301,6 +308,7 @@ export function insightsQuery(
   if (range.to) params.set('to', range.to);
   if (filter.model) params.set('model', filter.model);
   if (quality && filter.check) params.set('check', filter.check);
+  if (filter.machine) params.set('machine', filter.machine);
   if (filter.includeInProgress) params.set('includeInProgress', 'true');
   const parsed = parseInsightsQuery(params);
   if (parsed.success) return { query: parsed.data };

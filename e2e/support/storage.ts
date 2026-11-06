@@ -12,6 +12,7 @@ import {
   CONTAINERS,
   DEVIATIONS_TABLE,
   InspectionSchema,
+  MachineSchema,
   newId,
   TemplateSchema,
   type Guide,
@@ -24,6 +25,9 @@ const storage = BlobServiceClient.fromConnectionString(LOCAL_STORAGE);
 const templates = storage.getContainerClient(CONTAINERS.templates);
 const images = storage.getContainerClient(CONTAINERS.images);
 const inspections = storage.getContainerClient(CONTAINERS.inspections);
+const followUps = storage.getContainerClient(CONTAINERS.followUps);
+const machines = storage.getContainerClient(CONTAINERS.machines);
+const config = storage.getContainerClient(CONTAINERS.config);
 const deviations = TableClient.fromConnectionString(LOCAL_STORAGE, DEVIATIONS_TABLE);
 
 async function readTemplate(blobName: string): Promise<Template> {
@@ -150,6 +154,8 @@ export async function deleteTemplate(id: string): Promise<void> {
   await Promise.all([
     ...names.map((name) => templates.deleteBlob(name)),
     deleteImages([...imageIds]),
+    // The order of its quality checks, if a test dragged them.
+    config.getBlobClient(blobNames.qualityCheckOrder(id)).deleteIfExists(),
   ]);
 }
 
@@ -172,13 +178,7 @@ export async function createQualityCheck(
     modelCode: parent.modelCode,
     revision: published ? 2 : 1,
     status: 'draft',
-    quality: {
-      name: 'Pre start up',
-      department: 'Quality',
-      documentNumber: '1.22.2',
-      madeBy: 'Sam Andersson',
-      date: '2026-11-05',
-    },
+    quality: { name: 'Pre start up', department: 'Quality' },
     sections: [
       {
         id: newId(),
@@ -264,6 +264,13 @@ export async function deleteInspectionsOf(templateIds: readonly string[]): Promi
   await Promise.all(ids.map((id) => deleteInspection(id)));
 }
 
+/** An inspection's follow-ups blob, or null when none was written (or it was deleted). */
+export async function storedFollowUps(inspectionId: string): Promise<unknown> {
+  const blob = followUps.getBlobClient(blobNames.followUps(inspectionId));
+  if (!(await followUps.exists()) || !(await blob.exists())) return null;
+  return JSON.parse((await blob.downloadToBuffer()).toString('utf8')) as unknown;
+}
+
 /** A deviation table row as stored: PartitionKey, RowKey and the brief's columns. */
 export type StoredDeviationRow = { partitionKey: string; rowKey: string } & Record<string, unknown>;
 
@@ -283,9 +290,9 @@ export async function deviationRows(inspectionId: string): Promise<StoredDeviati
 }
 
 /**
- * Deletes an inspection's blob, its deviation rows and its deviation photos (originals and
- * marked-up copies: nothing else uses them). The machine photo stays: it may be a template's
- * cover.
+ * Deletes an inspection's blob, its deviation rows, its deviations' follow-ups and its deviation
+ * photos (originals and marked-up copies: nothing else uses them). The machine photo stays: it
+ * may be a template's cover.
  */
 export async function deleteInspection(id: string): Promise<void> {
   const blob = inspections.getBlobClient(blobNames.inspection(id));
@@ -293,6 +300,11 @@ export async function deleteInspection(id: string): Promise<void> {
   const rows = await deviationRows(id);
   await Promise.all([
     blob.deleteIfExists(),
+    // The container appears with the first follow-up written.
+    followUps
+      .getBlobClient(blobNames.followUps(id))
+      .deleteIfExists()
+      .catch(() => undefined),
     deleteImages(photoIds),
     ...rows.map((row) => deviations.deleteEntity(row.partitionKey, row.rowKey)),
   ]);
@@ -313,5 +325,69 @@ function deviationPhotoIds(content: Buffer): string[] {
 export async function deleteImages(ids: readonly string[]): Promise<void> {
   await Promise.all(
     ids.map((imageId) => images.getBlobClient(blobNames.image(imageId)).deleteIfExists()),
+  );
+}
+
+/**
+ * A Machine ID of a test's own: Machine IDs are unique across every machine, those of tests that
+ * ran before included.
+ */
+export function uniqueMachineId(prefix: string): string {
+  const letters = Array.from({ length: 6 }, () =>
+    String.fromCharCode(65 + Math.floor(Math.random() * 26)),
+  );
+  return `${prefix}-${letters.join('')}`;
+}
+
+/**
+ * Deletes every machine of these models (a test's own model codes). Only the machines: their
+ * checks are inspections of the test's templates, deleted with deleteInspectionsOf.
+ */
+export async function deleteMachinesOf(modelCodes: readonly string[]): Promise<void> {
+  if (!(await machines.exists())) return;
+  const names: string[] = [];
+  for await (const blob of machines.listBlobsFlat()) {
+    const content = await machines
+      .getBlobClient(blob.name)
+      .downloadToBuffer()
+      .catch(() => null);
+    if (!content) continue;
+    const machine = MachineSchema.safeParse(JSON.parse(content.toString('utf8')));
+    if (machine.success && modelCodes.includes(machine.data.modelCode)) names.push(blob.name);
+  }
+  await Promise.all(names.map((name) => machines.getBlobClient(name).deleteIfExists()));
+}
+
+/**
+ * Writes `sections` as published revision `revision` of `template`, and the draft with them (the
+ * next revision's), as publishing in the editor would.
+ */
+export async function publishRevision(
+  template: Template,
+  revision: number,
+  sections: Section[],
+): Promise<Template> {
+  const published: Template = {
+    ...template,
+    sections,
+    revision,
+    status: 'published',
+    changeNote: `Revision ${revision}`,
+    updatedAt: new Date().toISOString(),
+  };
+  await writeTemplate(blobNames.templateRevision(template.id, revision), published);
+  await writeTemplate(blobNames.templateDraft(template.id), {
+    ...published,
+    status: 'draft',
+    revision: revision + 1,
+  });
+  return published;
+}
+
+/** Deletes these machines (their blobs only, as deleteMachinesOf). */
+export async function deleteMachines(ids: readonly string[]): Promise<void> {
+  if (!(await machines.exists())) return;
+  await Promise.all(
+    ids.map((id) => machines.getBlobClient(blobNames.machine(id)).deleteIfExists()),
   );
 }

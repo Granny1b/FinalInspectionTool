@@ -23,6 +23,8 @@ type Props = {
   issues: IssueIndex;
   onEditorDirtyChange?: (dirty: boolean) => void;
   variant: DocumentVariant;
+  /** Rows with a result in a machine's check: deleting one (or its section) asks first. */
+  protectedRows?: ReadonlySet<string> | undefined;
 };
 
 export function EditableDocument({
@@ -31,10 +33,12 @@ export function EditableDocument({
   issues,
   onEditorDirtyChange,
   variant,
+  protectedRows,
 }: Props) {
   const quality = variant === 'quality';
   const rootRef = useRef<HTMLDivElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [confirmingRow, setConfirmingRow] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<Deleted | null>(null);
   // The row whose guide is open in the guide editor.
   const [guideItemId, setGuideItemId] = useState<string | null>(null);
@@ -43,6 +47,8 @@ export function EditableDocument({
     onChange,
     rootRef,
     confirmDelete: setConfirmingDelete,
+    protectedRows,
+    confirmRowDelete: setConfirmingRow,
     onDeleted: setDeleted,
     onOpenGuide: setGuideItemId,
   });
@@ -53,6 +59,7 @@ export function EditableDocument({
 
   const deleting = confirmingDelete === null ? -1 : findSection(sections, confirmingDelete);
   const deletingSection = sections[deleting];
+  const rowAt = confirmingRow === null ? null : findRow(sections, confirmingRow);
   const guiding = guideItemId === null ? null : guideRow(sections, guideItemId);
 
   return (
@@ -116,9 +123,7 @@ export function EditableDocument({
       {deletingSection && (
         <ConfirmDialog
           title={`Delete section ${sectionNumber(deleting)}?`}
-          message={`“${deletingSection.title || 'Untitled section'}” and its ${
-            deletingSection.items.length === 1 ? 'row' : `${deletingSection.items.length} rows`
-          } will be removed from the draft. Published revisions are not affected.`}
+          message={sectionDeleteMessage(deletingSection, protectedRows)}
           confirmLabel="Delete section"
           onConfirm={() => {
             setConfirmingDelete(null);
@@ -127,6 +132,27 @@ export function EditableDocument({
           onCancel={() => {
             setConfirmingDelete(null);
             actions.focusSectionMenu(deletingSection.id);
+          }}
+        />
+      )}
+
+      {confirmingRow !== null && rowAt && (
+        <ConfirmDialog
+          title={`Delete row ${rowRef(rowAt.sectionIndex, rowAt.rowIndex)}?`}
+          message="It has a result in this check (a status, comment, responsible or photo), which is deleted with it."
+          confirmLabel="Delete row"
+          onConfirm={() => {
+            const itemId = confirmingRow;
+            setConfirmingRow(null);
+            actions.removeRow(itemId);
+          }}
+          onCancel={() => {
+            const itemId = confirmingRow;
+            setConfirmingRow(null);
+            // Back to the row's text, where the delete was asked for.
+            rootRef.current
+              ?.querySelector<HTMLElement>(`[data-item-text="${CSS.escape(itemId)}"]`)
+              ?.focus();
           }}
         />
       )}
@@ -156,6 +182,30 @@ export function EditableDocument({
       />
     </div>
   );
+}
+
+/**
+ * What deleting a section with rows removes: from a template's draft, or from a machine's own
+ * checklist, where rows with a result lose it.
+ */
+function sectionDeleteMessage(
+  section: Section,
+  protectedRows: ReadonlySet<string> | undefined,
+): string {
+  const what = `“${section.title || 'Untitled section'}” and its ${
+    section.items.length === 1 ? 'row' : `${section.items.length} rows`
+  }`;
+  if (!protectedRows) {
+    return `${what} will be removed from the draft. Published revisions are not affected.`;
+  }
+  const withResults = section.items.filter((item) => protectedRows.has(item.id)).length;
+  const results =
+    withResults === 0
+      ? ''
+      : withResults === 1
+        ? ' One row has a result, which is deleted with it.'
+        : ` ${withResults} rows have a result, which are deleted with them.`;
+  return `${what} will be removed from this machine’s checklist.${results} The template is not affected.`;
 }
 
 type UndoBarProps = {

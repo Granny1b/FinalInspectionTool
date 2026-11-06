@@ -19,6 +19,8 @@ type Props = {
   onUpload: (upload: Promise<void>) => void;
   /** A participant typed but not yet added counts as unsaved. */
   pendingParticipant: PendingParticipant;
+  /** A machine's check: its Machine ID and serial number are the machine's, shown as text. */
+  machineHref?: string | undefined;
 };
 
 /**
@@ -34,6 +36,7 @@ export const FrontPageCard = memo(function FrontPageCard({
   onChange,
   onUpload,
   pendingParticipant,
+  machineHref,
 }: Props) {
   return (
     <FrontPageFrame revisionLabel={`Rev: ${templateRevision}`}>
@@ -41,7 +44,7 @@ export const FrontPageCard = memo(function FrontPageCard({
         <>
           <MachinePhoto imageId={front.photoId} />
           <dl className="grid content-start gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-            <Detail label="Machine name" wide>
+            <Detail label="Machine ID" wide>
               {front.machineName}
             </Detail>
             <Detail label="Machine model">{modelLabel}</Detail>
@@ -66,6 +69,7 @@ export const FrontPageCard = memo(function FrontPageCard({
             errors={errors}
             onChange={onChange}
             pendingParticipant={pendingParticipant}
+            machineHref={machineHref}
           />
         </>
       )}

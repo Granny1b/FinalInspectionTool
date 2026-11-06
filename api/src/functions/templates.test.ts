@@ -129,6 +129,15 @@ describe('registration', () => {
         },
       ],
       [
+        'templateQualityCheckOrder',
+        {
+          methods: ['GET', 'PUT'],
+          authLevel: 'anonymous',
+          route: 'templates/{id}/quality-check-order',
+          handler: expect.any(Function),
+        },
+      ],
+      [
         'template',
         {
           methods: ['GET', 'PUT', 'DELETE'],

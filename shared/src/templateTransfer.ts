@@ -92,13 +92,7 @@ export function qualityCheckExport(
     version: 1,
     exportedAt,
     qualityCheck: {
-      quality: quality ?? {
-        name: '',
-        department: '',
-        documentNumber: '',
-        madeBy: '',
-        date: '',
-      },
+      quality: quality ?? { name: '', department: '' },
       modelCode,
       ...(modelName && { modelName }),
       sections,

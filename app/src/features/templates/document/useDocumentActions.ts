@@ -57,7 +57,10 @@ export type DocumentActions = {
   /** Enter in a row. */
   insertRowAfter: (itemId: string) => void;
   duplicateRow: (itemId: string) => void;
+  /** Asks first when the row is protected (it has a result in a machine's check). */
   deleteRow: (itemId: string) => void;
+  /** Deletes without asking (after the confirmation), without an undo. */
+  removeRow: (itemId: string) => void;
   moveRowTo: (itemId: string, position: RowPosition) => void;
   /** ArrowUp/ArrowDown at the edge of a line; false when there is nowhere to go. */
   moveFocus: (from: Field, direction: 'up' | 'down') => boolean;
@@ -87,6 +90,9 @@ type Options = {
   onChange: (sections: Section[]) => void;
   rootRef: RefObject<HTMLElement | null>;
   confirmDelete: (sectionId: string) => void;
+  /** Rows that ask before they are deleted (a machine's check: they have a result). */
+  protectedRows?: ReadonlySet<string> | undefined;
+  confirmRowDelete?: ((itemId: string) => void) | undefined;
   /** A delete that can be undone, or null once the structure changes otherwise. */
   onDeleted: (deleted: Deleted | null) => void;
   onOpenGuide: (itemId: string) => void;
@@ -102,14 +108,32 @@ export function useDocumentActions({
   onChange,
   rootRef,
   confirmDelete,
+  protectedRows,
+  confirmRowDelete,
   onDeleted,
   onOpenGuide,
 }: Options): DocumentActions {
-  const latest = useRef({ sections, onChange, confirmDelete, onDeleted, onOpenGuide });
+  const latest = useRef({
+    sections,
+    onChange,
+    confirmDelete,
+    protectedRows,
+    confirmRowDelete,
+    onDeleted,
+    onOpenGuide,
+  });
   const pendingFocus = useRef<FocusRequest | null>(null);
 
   useLayoutEffect(() => {
-    latest.current = { sections, onChange, confirmDelete, onDeleted, onOpenGuide };
+    latest.current = {
+      sections,
+      onChange,
+      confirmDelete,
+      protectedRows,
+      confirmRowDelete,
+      onDeleted,
+      onOpenGuide,
+    };
     const request = pendingFocus.current;
     if (request && focusElement(rootRef.current, request)) pendingFocus.current = null;
   });
@@ -151,6 +175,30 @@ export function useDocumentActions({
         focusAfterSectionDelete(sections, sectionId),
         deleted,
       );
+    };
+
+    /**
+     * Deletes a row; `undoable` offers it back (a protected row's delete was confirmed instead:
+     * its result goes with it).
+     */
+    const removeRow = (itemId: string, undoable: boolean) => {
+      const sections = current();
+      const at = findRow(sections, itemId);
+      const section = at && sections[at.sectionIndex];
+      const item = at && section?.items[at.rowIndex];
+      if (!at || !section || !item) return;
+      // An empty row (Enter, then Backspace) has nothing worth an undo.
+      const deleted: Deleted | null =
+        undoable && rowHasContent(item)
+          ? {
+              kind: 'row',
+              label: `Row ${rowRef(at.sectionIndex, at.rowIndex)}`,
+              sectionId: section.id,
+              index: at.rowIndex,
+              item,
+            }
+          : null;
+      restructure(deleteRow(sections, itemId), focusAfterRowDelete(sections, itemId), deleted);
     };
 
     return {
@@ -210,24 +258,13 @@ export function useDocumentActions({
         }
       },
       deleteRow: (itemId) => {
-        const sections = current();
-        const at = findRow(sections, itemId);
-        const section = at && sections[at.sectionIndex];
-        const item = at && section?.items[at.rowIndex];
-        if (!at || !section || !item) return;
-        // An empty row (Enter, then Backspace) has nothing worth an undo.
-        const deleted: Deleted | null = rowHasContent(item)
-          ? {
-              kind: 'row',
-              label: `Row ${rowRef(at.sectionIndex, at.rowIndex)}`,
-              sectionId: section.id,
-              index: at.rowIndex,
-              item,
-            }
-          : null;
-        restructure(deleteRow(sections, itemId), focusAfterRowDelete(sections, itemId), deleted);
+        const { protectedRows: guarded, confirmRowDelete: confirm } = latest.current;
+        if (guarded?.has(itemId) && confirm) return confirm(itemId);
+        removeRow(itemId, true);
       },
+      removeRow: (itemId) => removeRow(itemId, false),
       moveRowTo: (itemId, position) => restructure(moveRow(current(), itemId, position)),
+
       moveFocus: (from, direction) => {
         const next = adjacentField(current(), from, direction);
         if (!next) return false;

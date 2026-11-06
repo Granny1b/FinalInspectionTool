@@ -7,6 +7,8 @@ const TONES = {
   ok: 'bg-ok-bg text-ok-fg ring-ok-border',
   /** Something for an admin to act on, e.g. unpublished changes. */
   brand: 'bg-brand-50 text-brand-700 ring-brand-200',
+  /** Something still wrong, e.g. a machine's open deviations. */
+  nok: 'bg-nok-bg text-nok-fg ring-nok-border',
 } as const;
 
 export function Badge({

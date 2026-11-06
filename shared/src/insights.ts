@@ -4,9 +4,10 @@
  * without deviations) and the rows of the deviations table; the app only draws the result.
  */
 import { z } from 'zod';
-import type { InspectionSummary } from './inspections';
+import { isStarted, type InspectionSummary } from './inspections';
 import {
   DeviationRowSchema,
+  IdSchema,
   ModelCodeSchema,
   SEVERITIES,
   type DeviationRow,
@@ -38,6 +39,8 @@ const InsightsParamsSchema = z
     model: ModelCodeSchema.optional(),
     /** Quality checks only: the quality check's title, "Quality check – Pre start up". */
     check: z.string().trim().min(1).max(200).optional(),
+    /** One machine (its id): the inspections done on it. */
+    machine: IdSchema.optional(),
     /** Only finalised inspections count unless this is "true" (brief §4). */
     includeInProgress: z
       .enum(['true', 'false'])
@@ -60,10 +63,23 @@ export type InsightsQuery = {
    * filter narrows it to one machine).
    */
   check?: string;
+  /**
+   * One machine, by its id: only the inspections linked to it count. Inspections without a
+   * machine count only without this filter, as they always have.
+   */
+  machine?: string;
   includeInProgress: boolean;
 };
 
-const QUERY_KEYS = ['kind', 'from', 'to', 'model', 'check', 'includeInProgress'] as const;
+const QUERY_KEYS = [
+  'kind',
+  'from',
+  'to',
+  'model',
+  'check',
+  'machine',
+  'includeInProgress',
+] as const;
 
 /** The kind the filters are about: final inspections unless they say quality checks. */
 export function queryKind(query: Pick<InsightsQuery, 'kind'>): InspectionKind {
@@ -110,6 +126,7 @@ export function insightsQueryParams(query: InsightsQuery): Record<string, string
   if (query.to) params.to = query.to;
   if (query.model) params.model = query.model;
   if (quality && query.check) params.check = query.check;
+  if (query.machine) params.machine = query.machine;
   if (query.includeInProgress) params.includeInProgress = 'true';
   return params;
 }
@@ -141,6 +158,13 @@ export const InsightsSchema = z.object({
    * from an API without it still parses.
    */
   checkNames: z.array(z.string()).default([]),
+  /**
+   * The machines with inspections of the kind asked for, whatever the other filters, by Machine
+   * ID: the machine filter's choices. Defaulted, so an answer from an API without it still parses.
+   */
+  machines: z
+    .array(z.object({ id: IdSchema, machineName: z.string(), modelCode: z.string() }))
+    .default([]),
   /**
    * The earliest front-page date of any inspection, whatever the filters ("YYYY-MM-DD"); null
    * without inspections. The month filter offers the months from this one to the current one.
@@ -222,6 +246,7 @@ export type InsightsInspection = Pick<
   | 'nokCount'
   | 'templateId'
   | 'templateRevision'
+  | 'machineRef'
 >;
 
 /** Where a checkpoint is in a template's latest published revision. */
@@ -235,10 +260,15 @@ export type ChecklistLookup = {
   current(templateId: string, itemId: string): CurrentCheckpoint | undefined;
 };
 
+/** A machine as the machine filter offers it. */
+export type InsightsMachine = Insights['machines'][number];
+
 type AggregateInput = {
   query: InsightsQuery;
   /** Every inspection; the filters are applied here. */
   inspections: readonly InsightsInspection[];
+  /** Every machine, to offer those with inspections of the kind (none: no machine choices). */
+  machines?: readonly InsightsMachine[];
   /** Deviation rows; those of inspections out of scope are ignored. */
   deviations: readonly DeviationRow[];
   checklists: ChecklistLookup;
@@ -247,13 +277,15 @@ type AggregateInput = {
 };
 
 /**
- * Whether an inspection counts under the filters: its kind, the date and model of its front page
- * and, for a quality check, which one it is.
+ * Whether an inspection counts under the filters: its kind, the date and model of its front page,
+ * its machine and, for a quality check, which one it is. A machine's check that is not started
+ * never counts.
  */
 export function inScope(inspection: InsightsInspection, query: InsightsQuery): boolean {
   const kind = queryKind(query);
-  if (inspection.kind !== kind) return false;
+  if (inspection.kind !== kind || !isStarted(inspection)) return false;
   if (kind === 'quality' && query.check && inspection.templateName !== query.check) return false;
+  if (query.machine && inspection.machineRef !== query.machine) return false;
   if (query.from && inspection.date < query.from) return false;
   if (query.to && inspection.date > query.to) return false;
   if (query.model && inspection.modelCode !== query.model) return false;
@@ -270,12 +302,16 @@ export function inScope(inspection: InsightsInspection, query: InsightsQuery): b
 export function aggregateInsights({
   query,
   inspections: every,
+  machines = [],
   deviations,
   checklists,
   unreadableRows = 0,
 }: AggregateInput): Insights {
   const kind = queryKind(query);
-  const inspections = every.filter((inspection) => inspection.kind === kind);
+  const inspections = every.filter(
+    (inspection) => inspection.kind === kind && isStarted(inspection),
+  );
+  const withMachine = new Set(inspections.map((inspection) => inspection.machineRef));
   const scope = inspections.filter((inspection) => inScope(inspection, query));
   const byId = new Map(scope.map((inspection) => [inspection.id, inspection]));
   const rows = deviations.filter((row) => row.kind === kind && byId.has(row.inspectionId));
@@ -301,6 +337,9 @@ export function aggregateInsights({
             .filter(Boolean)
             .sort((a, b) => collator.compare(a, b))
         : [],
+    machines: machines
+      .filter((machine) => withMachine.has(machine.id))
+      .sort((a, b) => collator.compare(a.machineName, b.machineName) || a.id.localeCompare(b.id)),
     // Every inspection, in scope or not, like the model codes above.
     firstInspectionDate: inspections.reduce<string | null>(
       (first, { date }) => (date && (first === null || date < first) ? date : first),

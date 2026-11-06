@@ -16,6 +16,7 @@ import { validateForFinalise, type Inspection } from '@modig/shared';
 import { deleteDeviationRows, syncDeviations } from '../lib/deviations';
 import {
   BadRequestError,
+  ConflictError,
   endpoint,
   etagHeader,
   idParam,
@@ -27,6 +28,7 @@ import {
 import {
   inspectionNotFound,
   loadInspection,
+  notStartedMessage,
   syncSettled,
   writeInspection,
   type StoredInspection,
@@ -35,6 +37,7 @@ import {
 export const finaliseInspection = endpoint({ role: 'inspector' }, async (req, context, user) => {
   const { stored, ifMatch } = await loadCurrent(req);
   if (stored.data.state === 'finalised') return unchanged(stored, context);
+  if (stored.data.state === 'not_started') throw new ConflictError(notStartedMessage);
 
   const issues = validateForFinalise(stored.data);
   if (issues.length > 0) {
@@ -56,6 +59,7 @@ export const finaliseInspection = endpoint({ role: 'inspector' }, async (req, co
 export const reopenInspection = endpoint({ role: 'admin' }, async (req, context, user) => {
   const { stored, ifMatch } = await loadCurrent(req);
   if (stored.data.state === 'in_progress') return unchanged(stored, context);
+  if (stored.data.state === 'not_started') throw new ConflictError(notStartedMessage);
 
   const { finalisedAt: _at, finalisedBy: _by, ...rest } = stored.data;
   const reopened: Inspection = {
@@ -103,7 +107,7 @@ async function commit(changed: Inspection, ifMatch: string, context: InvocationC
   return json(200, changed, etagHeader(etag));
 }
 
-async function orUnavailable(sync: Promise<void>, id: string, context: InvocationContext) {
+async function orUnavailable(sync: Promise<unknown>, id: string, context: InvocationContext) {
   await sync.catch((error: unknown) => {
     context.error(`Syncing the deviations of inspection ${id} failed`, error);
     throw new ServiceUnavailableError(

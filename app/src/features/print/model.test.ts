@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { formatDateTime } from '../../lib/format';
 import {
   BLANK_DEVIATION_LINES,
+  closingFits,
   defaultDeviationsPerPage,
   inspectionPrint,
   isOversizedPage,
@@ -95,7 +96,7 @@ describe('a blank checklist', () => {
     expect(model.mode).toBe('blank');
     expect(model.front.number).toBe('FI-2026-0042');
     expect(model.front.fields).toEqual([
-      { label: 'Machine name', value: 'RigiMill MG – Volvo Skövde' },
+      { label: 'Machine ID', value: 'RigiMill MG – Volvo Skövde' },
       { label: 'Model', value: 'RigiMill MG' },
       { label: 'Serial number', value: 'RM-2026-031' },
       { label: 'Participants', value: 'Erik Lund, Anna Andersson' },
@@ -180,7 +181,7 @@ describe('a blank checklist', () => {
     expect(long.footer).toBe(
       `Modig Machine Tool · FI-2026-0042 · RigiMill MG ${'x'.repeat(47)}… · S/N RM-2026-031 · Rev 2`,
     );
-    expect(long.front.fields[0]).toEqual({ label: 'Machine name', value: name });
+    expect(long.front.fields[0]).toEqual({ label: 'Machine ID', value: name });
   });
 });
 
@@ -434,7 +435,7 @@ describe('a template preview', () => {
     expect(model.mode).toBe('blank');
     expect(model.front.number).toBeNull();
     expect(model.front.fields).toEqual([
-      { label: 'Machine name', value: '' },
+      { label: 'Machine ID', value: '' },
       { label: 'Model', value: 'RigiMill MG' },
       { label: 'Serial number', value: '' },
       { label: 'Participants', value: '' },
@@ -526,6 +527,27 @@ describe('deviation pages', () => {
 
   it('has no pages without cards', () => {
     expect(packCards([], [], { perPage: 2, room: 240 })).toEqual([]);
+  });
+
+  it('leaves the first page less room when a header stands above its cards', () => {
+    const heights = [70, 70, 70, 70, 70];
+    // 240 mm hold three cards; under a 60 mm header the first page holds two.
+    expect(packCards(five, heights, { perPage: 4, room: 240, first: 60 })).toEqual([
+      ['D-01', 'D-02'],
+      ['D-03', 'D-04', 'D-05'],
+    ]);
+    expect(packCards(five, heights, { perPage: 4, room: 240 })).toEqual([
+      ['D-01', 'D-02', 'D-03'],
+      ['D-04', 'D-05'],
+    ]);
+  });
+
+  it('puts a closing sign-off under the last cards only when it fits there', () => {
+    expect(closingFits([100, 80], 240, 40)).toBe(true);
+    // Exactly full still fits.
+    expect(closingFits([100, 100], 240, 40)).toBe(true);
+    expect(closingFits([100, 120], 240, 40)).toBe(false);
+    expect(closingFits([], 240, 40)).toBe(true);
   });
 
   it('knows a page whose one card is too tall to share it (printed full width, no empty slots)', () => {

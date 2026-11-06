@@ -22,12 +22,24 @@ export function LoadingShell() {
           <Logo className="h-10" />
         </div>
         <div className="flex-1 px-3 py-5">
-          {/* The sidebar's three groups (Final inspection, Quality check, Setup), each a label
-              over its link, spaced as they are (Sidebar's GROUP_GAP). */}
-          {['w-28', 'w-24', 'w-12'].map((label, index) => (
-            <div key={label} className={clsx('space-y-2', index > 0 && 'mt-5')}>
-              <Bone className={clsx('mx-3 mb-3 h-2.5', label)} />
-              <Bone className={clsx(NAV_ITEM_HEIGHT, index === 1 ? 'w-4/5' : undefined)} />
+          {/* Machines, then the sidebar's three groups (Final inspection and Quality check with
+              their list and Deviations, Setup with Templates), each a label over its links,
+              spaced as they are (Sidebar's GROUP_GAP and the links' 2 px). */}
+          <Bone className={clsx(NAV_ITEM_HEIGHT, 'w-4/5')} />
+          {[
+            { label: 'w-28', links: ['w-11/12', 'w-3/4'] },
+            { label: 'w-24', links: ['w-4/5', 'w-3/4'] },
+            { label: 'w-12', links: ['w-full'] },
+          ].map(({ label, links }) => (
+            <div key={label} className="mt-5">
+              <div className="mb-2 flex h-4 items-center px-3">
+                <Bone className={clsx('h-2.5', label)} />
+              </div>
+              <div className="space-y-0.5">
+                {links.map((width, link) => (
+                  <Bone key={link} className={clsx(NAV_ITEM_HEIGHT, width)} />
+                ))}
+              </div>
             </div>
           ))}
         </div>

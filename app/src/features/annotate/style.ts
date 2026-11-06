@@ -32,7 +32,8 @@ const TEXT_OUTLINE_SHARE = 0.12;
 /**
  * Yellow and white lines also get a thin dark outline: a black-and-white printer turns them into
  * greys of 77 % and 100 % luma, next to the 80–90 % of a light machine surface, where the soft
- * shadow alone fades. Red (36 %) and cyan (54 %) print clearly darker and keep the shadow only.
+ * shadow alone fades. Red (36 %), green (54 %) and cyan (54 %) print clearly darker and keep the
+ * shadow only.
  */
 const OUTLINED_COLORS: ReadonlySet<string> = new Set([
   ANNOTATION_COLORS.yellow,

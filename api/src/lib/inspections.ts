@@ -19,6 +19,7 @@ import {
   InspectionSchema,
   InspectionSummarySchema,
   inspectionProgress,
+  isStarted,
   parseInspectionNumber,
   templateImageIds,
   type Inspection,
@@ -27,6 +28,7 @@ import {
   type InspectionSummary,
 } from '@modig/shared';
 import { deleteDeviationRows, syncDeviations } from './deviations';
+import { deleteFollowUps, followUpsVersion } from './followUps';
 import {
   ConflictError,
   NotFoundError,
@@ -51,8 +53,42 @@ export function inspectionNotFound(): NotFoundError {
   return new NotFoundError('This inspection does not exist.');
 }
 
+/** A machine's check is filled in, finalised and reopened once it is started (it has a number). */
+export const notStartedMessage = 'This check is not started yet – start it first.';
+
 export async function loadInspection(id: string): Promise<StoredInspection | null> {
   return readJson(inspections, blobNames.inspection(id), InspectionSchema);
+}
+
+/** Retries after another write got in between; the first try is not counted. */
+const CHANGE_RETRIES = 5;
+
+/**
+ * Applies `change` to the latest version of an inspection and writes it over exactly that
+ * version, reading again when another write got in between: for changes the server makes on its
+ * own (a machine's new Machine ID on its checks, starting a check), which must never overwrite
+ * someone's save. `change` returns null to write nothing. Null when the inspection doesn't exist.
+ */
+export async function changeInspection(
+  id: string,
+  change: (current: Inspection) => Inspection | null,
+): Promise<StoredInspection | null> {
+  for (let retry = 0; ; retry++) {
+    const stored = await loadInspection(id);
+    if (!stored) return null;
+    const next = change(stored.data);
+    if (!next) return stored;
+    try {
+      return { data: next, etag: await writeInspection(next, { ifMatch: stored.etag }) };
+    } catch (error) {
+      if (!(error instanceof PreconditionFailedError)) throw error;
+      if (retry === CHANGE_RETRIES) {
+        throw new ServiceUnavailableError('This inspection is being changed. Try again.');
+      }
+      // Random, growing waits spread the writers out, so they don't collide again.
+      await sleep(Math.random() * 50 * 2 ** (retry + 1));
+    }
+  }
 }
 
 /** Writes the inspection with its list summary as metadata; returns the new ETag. */
@@ -70,25 +106,34 @@ export async function writeInspection(
 const SETTLE_ROUNDS = 3;
 
 /**
- * Syncs the deviation table from `synced`, stored as version `etag`, then checks the blob. Nothing
- * orders two writers' syncs, so a slow sync can land after a newer write's sync and leave the
- * table behind; whoever syncs last therefore checks that the blob is still the version it synced,
- * and syncs again from the latest version if not. A sync failure is thrown for the caller.
+ * Syncs the deviation table from `synced`, stored as version `etag`, and its follow-ups, then
+ * checks both blobs. Nothing orders two writers' syncs (an inspection's save, a deviation closed
+ * in the log), so a slow sync can land after a newer write's sync and leave the table behind;
+ * whoever syncs last therefore checks that both blobs are still the versions it synced, and syncs
+ * again from the latest if not. Every write syncs after it, so the last sync to land has seen
+ * every write before its check. A sync failure is thrown for the caller.
  */
 export async function syncSettled(
   synced: Inspection,
   etag: string,
   context: InvocationContext,
 ): Promise<void> {
-  await syncDeviations(synced);
+  let followUps = await syncDeviations(synced);
   let last = etag;
   for (let round = 0; round < SETTLE_ROUNDS; round++) {
-    const latest = await loadInspection(synced.id);
-    // Deleted meanwhile: the rows just written belong to nothing. The delete removes the rows
-    // after the blob, so whichever of the two finishes last leaves none behind.
-    if (!latest) return deleteDeviationRows(synced.front.modelCode, synced.id);
-    if (latest.etag === last) return;
-    await syncDeviations(latest.data);
+    const [latest, latestFollowUps] = await Promise.all([
+      loadInspection(synced.id),
+      followUpsVersion(synced.id),
+    ]);
+    // Deleted meanwhile: the rows just written belong to nothing, and so do follow-ups written
+    // since. The delete removes them after the blob, so whichever of the two finishes last leaves
+    // none behind.
+    if (!latest) {
+      await deleteDeviationRows(synced.front.modelCode, synced.id);
+      return deleteFollowUps(synced.id);
+    }
+    if (latest.etag === last && latestFollowUps === followUps) return;
+    followUps = await syncDeviations(latest.data);
     last = latest.etag;
   }
   context.warn(`The deviations of inspection ${synced.id} kept changing while being synced`);
@@ -100,9 +145,10 @@ export async function syncSettled(
 
 /**
  * Deletes an inspection for good: its blob, only while it is still version `ifMatch` (412
- * otherwise, 404 if it is gone already), then its deviation rows and the photos only it uses. The
- * blob goes first: without it the inspection no longer exists anywhere the app looks (the list,
- * its page, Insights, which counts only the rows of listed inspections). The rest is best effort:
+ * otherwise, 404 if it is gone already), then its deviation rows, its deviations' follow-ups and
+ * the photos only it uses. The blob goes first: without it the inspection no longer exists
+ * anywhere the app looks (the list, its page, Insights and the deviation log, which show only the
+ * rows of listed inspections). The rest is best effort:
  * whatever can't be deleted is logged and left behind, unused, and the delete still succeeds,
  * since a retry would only get a 404. Its number is never handed out again (the counter only
  * counts up, and a lost counter carries on from the highest number in use).
@@ -127,6 +173,9 @@ export async function deleteInspection(
   await Promise.all([
     deleteDeviationRows(inspection.front.modelCode, id).catch((error: unknown) => {
       context.warn(`Deleted inspection ${id}; deleting its deviation rows failed`, error);
+    }),
+    deleteFollowUps(id).catch((error: unknown) => {
+      context.warn(`Deleted inspection ${id}; deleting its follow-ups failed`, error);
     }),
     deletePhotos(inspection, context).catch((error: unknown) => {
       context.warn(`Deleted inspection ${id}; deleting its photos failed`, error);
@@ -194,6 +243,7 @@ export function inspectionSummary(inspection: Inspection): InspectionSummary {
     templateId: inspection.templateId,
     templateRevision: inspection.templateRevision,
     templateName: inspection.templateSnapshot.name,
+    ...(inspection.machineRef && { machineRef: inspection.machineRef }),
     updatedAt: inspection.updatedAt,
   };
 }
@@ -255,6 +305,14 @@ export async function loadSummaries(): Promise<InspectionSummary[]> {
   return summaries.sort(
     (a, b) => compareNumbersDescending(a.number, b.number) || a.id.localeCompare(b.id),
   );
+}
+
+/**
+ * The started inspections, as the lists, Insights and the deviation log know them: a machine's
+ * check that is not started yet has no number and nothing in it to show or count.
+ */
+export async function loadStartedSummaries(): Promise<InspectionSummary[]> {
+  return (await loadSummaries()).filter(isStarted);
 }
 
 /**

@@ -1,10 +1,9 @@
 import type { QualityFront, Template } from '@modig/shared';
 import clsx from 'clsx';
-import { memo, useId, useMemo, type ReactNode } from 'react';
-import { DateInput } from '../../components/DateInput';
+import { memo, useMemo, type ReactNode } from 'react';
 import { Field, INPUT } from '../../components/Field';
 import { formatDateTime } from '../../lib/format';
-import { nameSuggestions, usePeopleDirectory, usePersonName } from '../../lib/usePeople';
+import { usePersonName } from '../../lib/usePeople';
 import { Detail, FrontPageFrame } from '../templates/FrontPage';
 
 /** The name input; publish problems about the name jump here. */
@@ -23,7 +22,8 @@ type Props = {
 
 /**
  * A quality check's front page, edited in place: its Name (the in-process check, "Pre start up";
- * the check is called "Quality check – Pre start up"), Department, Document no., Made by and Date. Memoised: the editor re-renders on
+ * the check is called "Quality check – Pre start up") and Department. Its revision, who published it
+ * and when are the template's own, as for final inspections. Memoised: the editor re-renders on
  * every keystroke in the checklist.
  */
 export const QualityFrontCard = memo(function QualityFrontCard({
@@ -33,9 +33,6 @@ export const QualityFrontCard = memo(function QualityFrontCard({
   nameError,
   onChange,
 }: Props) {
-  const directory = usePeopleDirectory();
-  const peopleId = useId();
-  const people = useMemo(() => nameSuggestions(directory.data, []), [directory.data]);
   // A department stored before it left the list stays selectable, as on a deviation.
   const departmentOptions = useMemo(() => {
     const list = [...(departments ?? [])];
@@ -75,49 +72,6 @@ export const QualityFrontCard = memo(function QualityFrontCard({
           </select>
         )}
       </Field>
-      <Field label="Document no.">
-        {(control) => (
-          <input
-            {...control}
-            maxLength={100}
-            value={front.documentNumber}
-            onChange={(event) => onChange({ documentNumber: event.target.value })}
-            className={clsx(INPUT, 'h-9')}
-          />
-        )}
-      </Field>
-      <Field label="Made by">
-        {(control) => (
-          <>
-            <input
-              {...control}
-              maxLength={200}
-              autoComplete="off"
-              list={people.length > 0 ? peopleId : undefined}
-              value={front.madeBy}
-              onChange={(event) => onChange({ madeBy: event.target.value })}
-              className={clsx(INPUT, 'h-9')}
-            />
-            {people.length > 0 && (
-              <datalist id={peopleId}>
-                {people.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
-            )}
-          </>
-        )}
-      </Field>
-      <Field label="Date">
-        {(control) => (
-          <DateInput
-            {...control}
-            value={front.date}
-            clearable
-            onChange={(date) => onChange({ date })}
-          />
-        )}
-      </Field>
     </FrontPageFrame>
   );
 });
@@ -132,9 +86,6 @@ export function PublishedQualityFront({ template }: { template: Template }) {
     <FrontPageFrame revisionLabel={`Rev: ${template.revision}`} layout="fields" details>
       <Detail label="Name">{value(front?.name)}</Detail>
       <Detail label="Department">{value(front?.department)}</Detail>
-      <Detail label="Document no.">{value(front?.documentNumber)}</Detail>
-      <Detail label="Made by">{value(front?.madeBy)}</Detail>
-      <Detail label="Date">{value(front?.date)}</Detail>
       <Detail label="Published">
         {formatDateTime(template.updatedAt)}
         <span className="block truncate text-ink-500" title={template.updatedBy}>

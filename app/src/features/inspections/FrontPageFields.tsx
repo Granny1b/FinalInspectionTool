@@ -1,7 +1,9 @@
-import type { InspectionFrontInput } from '@modig/shared';
+import { hasRole, type InspectionFrontInput } from '@modig/shared';
 import clsx from 'clsx';
+import { Link } from 'react-router';
 import { DateInput } from '../../components/DateInput';
 import { Field, INPUT } from '../../components/Field';
+import { useCurrentUser } from '../../lib/useMe';
 import { FRONT_FIELD_IDS } from './issues';
 import { ParticipantsField, type PendingParticipant } from './ParticipantsField';
 
@@ -13,11 +15,16 @@ type Props = {
   onChange: (patch: Partial<InspectionFrontInput>) => void;
   /** The inspection page: a participant typed but not yet added counts as unsaved. */
   pendingParticipant?: PendingParticipant;
+  /**
+   * A machine's check: its Machine ID and serial number are the machine's (this is its page),
+   * shown as text; they are changed on the machine.
+   */
+  machineHref?: string | undefined;
 };
 
 /**
- * The front page's details (brief §2 `Main`): machine name, model, serial number, participants,
- * location and date. Used by the new-inspection form and the inspection's front page card.
+ * The front page's details (brief §2 `Main`): Machine ID, model, serial number, participants,
+ * location and date. Used by the inspection's front page card.
  */
 export function FrontPageFields({
   front,
@@ -25,41 +32,43 @@ export function FrontPageFields({
   errors,
   onChange,
   pendingParticipant,
+  machineHref,
 }: Props) {
   return (
     <div className="grid content-start gap-x-4 gap-y-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
-        <Field id={FRONT_FIELD_IDS.machineName} label="Machine name" error={errors.machineName}>
-          {(control) => (
-            <input
-              {...control}
-              maxLength={200}
-              autoComplete="off"
-              value={front.machineName}
-              onChange={(event) => onChange({ machineName: event.target.value })}
-              className={clsx(INPUT, 'h-9')}
-            />
-          )}
-        </Field>
+        {machineHref ? (
+          <FixedValue label="Machine ID" value={front.machineName} machineHref={machineHref} />
+        ) : (
+          <MachineIdField
+            value={front.machineName}
+            error={errors.machineName}
+            onChange={(machineName) => onChange({ machineName })}
+          />
+        )}
       </div>
       <div>
         <p className="text-sm font-medium text-ink-800">Machine model</p>
         {/* Same height as the inputs beside it, so the grid lines up. */}
         <p className="mt-1.5 flex h-9 items-center text-sm text-ink-900">{modelLabel}</p>
       </div>
-      <Field id={FRONT_FIELD_IDS.serialNumber} label="Serial number" error={errors.serialNumber}>
-        {(control) => (
-          <input
-            {...control}
-            maxLength={100}
-            autoComplete="off"
-            spellCheck={false}
-            value={front.serialNumber}
-            onChange={(event) => onChange({ serialNumber: event.target.value })}
-            className={clsx(INPUT, 'h-9')}
-          />
-        )}
-      </Field>
+      {machineHref ? (
+        <FixedValue label="Serial number" value={front.serialNumber} />
+      ) : (
+        <Field id={FRONT_FIELD_IDS.serialNumber} label="Serial number" error={errors.serialNumber}>
+          {(control) => (
+            <input
+              {...control}
+              maxLength={100}
+              autoComplete="off"
+              spellCheck={false}
+              value={front.serialNumber}
+              onChange={(event) => onChange({ serialNumber: event.target.value })}
+              className={clsx(INPUT, 'h-9')}
+            />
+          )}
+        </Field>
+      )}
       <div className="sm:col-span-2">
         <Field label="Participants">
           {(control) => (
@@ -85,6 +94,75 @@ export function FrontPageFields({
       </Field>
       <DateField value={front.date} onChange={(date) => onChange({ date })} />
     </div>
+  );
+}
+
+/**
+ * A machine's value on its check's front page: text as high as a field, so the grid lines up; the
+ * Machine ID's hint says where it is changed (by admins, on the machine).
+ */
+export function FixedValue({
+  label,
+  value,
+  machineHref,
+}: {
+  label: string;
+  value: string;
+  /** Shown under it: "From the machine. Change it there" (admins). */
+  machineHref?: string;
+}) {
+  const isAdmin = hasRole(useCurrentUser().roles, 'admin');
+  return (
+    <div>
+      <p className="text-sm font-medium text-ink-800">{label}</p>
+      <p className="mt-1.5 flex min-h-9 items-center text-sm wrap-anywhere text-ink-900">
+        {value || <span className="text-ink-500">—</span>}
+      </p>
+      {machineHref && (
+        <p className="mt-1.5 text-xs text-ink-500">
+          {isAdmin ? (
+            <>
+              From the machine.{' '}
+              <Link
+                to={machineHref}
+                className="font-medium text-brand-700 underline-offset-2 hover:underline"
+              >
+                Change it there
+              </Link>
+            </>
+          ) : (
+            'From the machine; an admin can change it there.'
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** What the hint under the Machine ID says, here and on a quality check. */
+export const MACHINE_ID_HINT = 'As in Monitor, e.g. Magellan#1';
+
+type MachineIdProps = { value: string; error?: string; onChange: (machineId: string) => void };
+
+/**
+ * The Machine ID: the machine as the ERP (Monitor) knows it, on a final inspection and a quality
+ * check alike. Stored as the front page's `machineName`.
+ */
+export function MachineIdField({ value, error, onChange }: MachineIdProps) {
+  return (
+    <Field id={FRONT_FIELD_IDS.machineName} label="Machine ID" hint={MACHINE_ID_HINT} error={error}>
+      {(control) => (
+        <input
+          {...control}
+          maxLength={200}
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={clsx(INPUT, 'h-9')}
+        />
+      )}
+    </Field>
   );
 }
 

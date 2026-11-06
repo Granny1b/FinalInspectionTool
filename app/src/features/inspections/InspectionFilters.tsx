@@ -31,7 +31,7 @@ export function InspectionFilters({ kind = 'final', filter, models, onChange }: 
         <input
           type="search"
           aria-label={quality ? 'Search quality checks' : 'Search inspections'}
-          placeholder={quality ? 'Number, check or S/N' : 'Number, machine or S/N'}
+          placeholder={quality ? 'Number, machine ID, check or S/N' : 'Number, machine ID or S/N'}
           autoComplete="off"
           spellCheck={false}
           value={filter.query}

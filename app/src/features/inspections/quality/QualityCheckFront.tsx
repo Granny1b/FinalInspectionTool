@@ -5,13 +5,14 @@ import { DateInput } from '../../../components/DateInput';
 import { Field, INPUT } from '../../../components/Field';
 import { FrontPageFrame } from '../../templates/FrontPage';
 import { formatCalendarDate } from '../dates';
+import { FixedValue, MachineIdField } from '../FrontPageFields';
 import { FRONT_FIELD_IDS } from '../issues';
 import { ParticipantsField, type PendingParticipant } from '../ParticipantsField';
 
 /** What a quality check's front page asks: which machine, when, and who checked it. */
 export type QualityCheckFrontInput = Pick<
   InspectionFrontInput,
-  'serialNumber' | 'participants' | 'date'
+  'machineName' | 'serialNumber' | 'participants' | 'date'
 >;
 
 /** The quality check it follows, as frozen in it (or as published, before it is started). */
@@ -24,18 +25,21 @@ export type QualityStandard = {
 
 type FieldsProps = {
   front: QualityCheckFrontInput;
-  /** "RigiMill MG": the machine is the quality check's model, never changed here. */
+  /** "RigiMill MG": the machine's model is the quality check's, never changed here. */
   modelLabel: string;
-  errors: { serialNumber?: string };
+  errors: { machineName?: string; serialNumber?: string };
   onChange: (patch: Partial<QualityCheckFrontInput>) => void;
   /** The check's page: a name typed under Checked by but not yet added counts as unsaved. */
   pendingParticipant?: PendingParticipant;
+  /** A machine's check: its Machine ID and serial number are the machine's, shown as text. */
+  machineHref?: string | undefined;
 };
 
 /**
- * A quality check's front page fields: Machine (its model, fixed), Serial number, Date and Checked
- * by. Nothing about delivery: no machine name, location or photo, as for a check along the build.
- * Used by the start form and by the check's front page.
+ * A quality check's front page fields, in a final inspection's order: Machine ID, Machine model
+ * (the quality check's, fixed), Serial number, Date and Checked by. Nothing about delivery: no
+ * location or photo, as for a check along the build. A machine's check shows its machine's Machine
+ * ID and serial number as text.
  */
 export function QualityCheckFrontFields({
   front,
@@ -43,27 +47,41 @@ export function QualityCheckFrontFields({
   errors,
   onChange,
   pendingParticipant,
+  machineHref,
 }: FieldsProps) {
   return (
     <>
+      {machineHref ? (
+        <FixedValue label="Machine ID" value={front.machineName} machineHref={machineHref} />
+      ) : (
+        <MachineIdField
+          value={front.machineName}
+          error={errors.machineName}
+          onChange={(machineName) => onChange({ machineName })}
+        />
+      )}
       <div>
-        <p className="text-sm font-medium text-ink-800">Machine</p>
+        <p className="text-sm font-medium text-ink-800">Machine model</p>
         {/* As high as the inputs beside it, so the row lines up. */}
         <p className="mt-1.5 flex h-9 items-center text-sm text-ink-900">{modelLabel}</p>
       </div>
-      <Field id={FRONT_FIELD_IDS.serialNumber} label="Serial number" error={errors.serialNumber}>
-        {(control) => (
-          <input
-            {...control}
-            maxLength={100}
-            autoComplete="off"
-            spellCheck={false}
-            value={front.serialNumber}
-            onChange={(event) => onChange({ serialNumber: event.target.value })}
-            className={clsx(INPUT, 'h-9')}
-          />
-        )}
-      </Field>
+      {machineHref ? (
+        <FixedValue label="Serial number" value={front.serialNumber} />
+      ) : (
+        <Field id={FRONT_FIELD_IDS.serialNumber} label="Serial number" error={errors.serialNumber}>
+          {(control) => (
+            <input
+              {...control}
+              maxLength={100}
+              autoComplete="off"
+              spellCheck={false}
+              value={front.serialNumber}
+              onChange={(event) => onChange({ serialNumber: event.target.value })}
+              className={clsx(INPUT, 'h-9')}
+            />
+          )}
+        </Field>
+      )}
       <Field label="Date">
         {(control) => (
           <DateInput
@@ -75,7 +93,8 @@ export function QualityCheckFrontFields({
           />
         )}
       </Field>
-      <div className="col-span-full">
+      {/* Beside the date when there are three columns: when, and who. */}
+      <div className="col-span-full @min-[44rem]:col-span-2">
         <Field label="Checked by">
           {(control) => (
             <ParticipantsField
@@ -92,8 +111,8 @@ export function QualityCheckFrontFields({
 }
 
 /**
- * The quality check it follows, read-only, under the fields: its title, department and document
- * number (the revision is in the frame's corner).
+ * The quality check it follows, read-only, under the fields: its title and department (the
+ * revision is in the frame's corner).
  */
 export function QualityStandardDetails({ standard }: { standard: QualityStandard }) {
   return (
@@ -101,7 +120,6 @@ export function QualityStandardDetails({ standard }: { standard: QualityStandard
       <dl className="grid grid-cols-1 gap-x-5 gap-y-4 text-sm @min-[28rem]:grid-cols-2 @min-[44rem]:grid-cols-3">
         <Detail label="Quality check">{standard.title}</Detail>
         <Detail label="Department">{standard.front?.department}</Detail>
-        <Detail label="Document no.">{standard.front?.documentNumber}</Detail>
       </dl>
     </div>
   );
@@ -113,9 +131,10 @@ type CardProps = {
   standard: QualityStandard;
   /** Finalised: shown as text, nothing can be changed. */
   readOnly: boolean;
-  errors: { serialNumber?: string };
+  errors: { machineName?: string; serialNumber?: string };
   onChange: (patch: Partial<InspectionFrontInput>) => void;
   pendingParticipant: PendingParticipant;
+  machineHref?: string | undefined;
 };
 
 /**
@@ -131,13 +150,15 @@ export const QualityCheckFrontCard = memo(function QualityCheckFrontCard({
   errors,
   onChange,
   pendingParticipant,
+  machineHref,
 }: CardProps) {
   return (
     <FrontPageFrame revisionLabel={`Rev: ${standard.revision}`} layout="fields">
       {readOnly ? (
         <div className="col-span-full">
           <dl className="grid grid-cols-1 gap-x-5 gap-y-4 text-sm @min-[28rem]:grid-cols-2 @min-[44rem]:grid-cols-3">
-            <Detail label="Machine">{modelLabel}</Detail>
+            <Detail label="Machine ID">{front.machineName}</Detail>
+            <Detail label="Machine model">{modelLabel}</Detail>
             <Detail label="Serial number">{front.serialNumber}</Detail>
             <Detail label="Date">{formatCalendarDate(front.date)}</Detail>
             <Detail label="Checked by" wide>
@@ -152,6 +173,7 @@ export const QualityCheckFrontCard = memo(function QualityCheckFrontCard({
           errors={errors}
           onChange={onChange}
           pendingParticipant={pendingParticipant}
+          machineHref={machineHref}
         />
       )}
       <QualityStandardDetails standard={standard} />
@@ -161,7 +183,7 @@ export const QualityCheckFrontCard = memo(function QualityCheckFrontCard({
 
 function Detail({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
   return (
-    <div className={wide ? 'col-span-full' : undefined}>
+    <div className={wide ? 'col-span-full @min-[44rem]:col-span-2' : undefined}>
       <dt className="text-xs font-medium text-ink-500">{label}</dt>
       <dd className="mt-1 wrap-break-word text-ink-900">
         {children || <span className="text-ink-500">—</span>}

@@ -48,20 +48,23 @@ test.describe('anonymous visitor', () => {
 });
 
 test.describe('signed in', () => {
-  test('an inspector sees inspections and templates, but no admin pages', async ({
+  test('an inspector sees machines, inspections and templates, but no admin pages', async ({
     page,
     context,
   }) => {
     await signIn(context, 'Sam.Andersson@modig.se', ['inspector']);
     await page.goto('/');
 
-    await expect(page).toHaveURL(/\/inspections$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Inspections' })).toBeVisible();
+    // The app opens on the machines, first in the sidebar.
+    await expect(page).toHaveURL(/\/machines$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Machines' })).toBeVisible();
     const nav = mainNav(page);
-    await expect(nav.getByRole('link', { name: 'Inspections' })).toHaveAttribute(
+    await expect(nav.getByRole('link').first()).toHaveText('Machines');
+    await expect(nav.getByRole('link', { name: 'Machines' })).toHaveAttribute(
       'aria-current',
       'page',
     );
+    await expect(nav.getByRole('link', { name: 'Inspections' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Quality checks' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Templates' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Insights' })).toHaveCount(0);
@@ -83,7 +86,14 @@ test.describe('signed in', () => {
     await page.goto('/');
 
     const nav = mainNav(page);
-    for (const name of ['Inspections', 'Quality checks', 'Templates', 'Insights', 'Settings']) {
+    for (const name of [
+      'Machines',
+      'Inspections',
+      'Quality checks',
+      'Templates',
+      'Insights',
+      'Settings',
+    ]) {
       await expect(nav.getByRole('link', { name })).toBeVisible();
     }
     await expect(userName(page, 'Asa Oberg')).toBeVisible();
@@ -202,14 +212,12 @@ test.describe('signed in', () => {
         await signIn(petra, personEmail, []);
         const petraPage = await petra.newPage();
         await petraPage.goto('/');
-        await expect(
-          petraPage.getByRole('heading', { level: 1, name: 'Inspections' }),
-        ).toBeVisible();
+        await expect(petraPage.getByRole('heading', { level: 1, name: 'Machines' })).toBeVisible();
         await expect(userName(petraPage, 'Petra Persson')).toBeVisible();
         await expect(mainNav(petraPage).getByRole('link', { name: 'Settings' })).toHaveCount(0);
         // The sign-in page, asked by someone the API lets in, goes straight into the app.
         await petraPage.goto('/login.html');
-        await expect(petraPage).toHaveURL(/\/inspections$/);
+        await expect(petraPage).toHaveURL(/\/machines$/);
 
         // An edit counts at once, without signing in again.
         await personRow.getByRole('button', { name: 'Edit Petra Persson' }).click();
@@ -269,7 +277,7 @@ test.describe('signed in', () => {
     // Once the API answers again, Try again goes back into the app.
     await page.unroute('**/api/me');
     await page.getByRole('button', { name: 'Try again' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Inspections' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Machines' })).toBeVisible();
   });
 
   test('signing out from the sidebar ends on the sign-in page', async ({ page, context }) => {

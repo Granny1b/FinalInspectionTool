@@ -7,6 +7,7 @@
 import { readFile } from 'node:fs/promises';
 import {
   InspectionSchema,
+  MachineDetailSchema,
   QualityCheckExportSchema,
   TemplateDetailSchema,
   type Template,
@@ -18,8 +19,10 @@ import {
   createQualityCheck,
   createTemplate,
   deleteInspection,
+  deleteMachines,
   deleteQualityChecks,
   deleteTemplate,
+  uniqueMachineId,
 } from './support/storage';
 
 const ADMIN = 'anna.andersson@modig.se';
@@ -84,16 +87,15 @@ test.describe('an admin', () => {
       ['Templates', 'E2E', 'Quality checks'],
     );
 
-    // The front page: the title follows the name.
+    // The front page: the title follows the name; the document control is the revision's own, so
+    // there is nothing else to type (no document number, made by or date).
     await expect(page.getByLabel('Department')).toHaveValue('Quality');
-    await expect(page.getByLabel('Made by')).toHaveValue('Anna Andersson');
+    await expect(page.getByLabel('Document no.')).toHaveCount(0);
+    await expect(page.getByLabel('Made by')).toHaveCount(0);
     await page.getByLabel('Name', { exact: true }).fill('Pre start-up');
     await expect(
       page.getByRole('heading', { level: 1, name: 'Quality check – Pre start-up' }),
     ).toBeVisible();
-    await page.getByLabel('Document no.').fill('1.22.2');
-    await page.getByLabel('Made by').fill('Sam Andersson');
-    await page.getByLabel('Date', { exact: true }).fill('2026-11-05');
 
     // A section, then its rows from the keyboard: Enter in the title starts them, Enter in What
     // adds the next.
@@ -166,13 +168,7 @@ test.describe('an admin', () => {
       parentId: machine.id,
       name: 'Quality check – Pre start-up',
       modelCode: 'E2E',
-      quality: {
-        name: 'Pre start-up',
-        department: 'Quality',
-        documentNumber: '1.22.2',
-        madeBy: 'Sam Andersson',
-        date: '2026-11-05',
-      },
+      quality: { name: 'Pre start-up', department: 'Quality' },
     });
     expect(draft.sections[0]!.items).toEqual([
       {
@@ -212,7 +208,8 @@ test.describe('an admin', () => {
     const card = page.getByRole('listitem').filter({
       has: page.getByRole('link', { name: 'Quality check – Pre start-up' }),
     });
-    await expect(card).toContainText('Quality · document 1.22.2 · made by Sam Andersson');
+    await expect(card).toContainText('Quality');
+    await expect(card).not.toContainText('document');
     await expect(card).toContainText('Rev 1');
     await expect(card.getByRole('list', { name: 'Sections' })).toHaveText('1Safety features');
     await expect(card).toContainText('0.3 h');
@@ -369,7 +366,8 @@ test.describe('an inspector', () => {
     ).toBeVisible();
     await expect(page.getByText('Rev 1', { exact: true })).toBeVisible();
     const main = page.locator('main');
-    await expect(main).toContainText('Document no.1.22.2');
+    await expect(main).toContainText('DepartmentQuality');
+    await expect(main).not.toContainText('Document no.');
     await expect(main.getByRole('heading', { level: 2, name: 'Safety features' })).toBeVisible();
     await expect(main).toContainText('Should be visible and not turned inward.');
     await expect(
@@ -402,30 +400,51 @@ test.describe('an inspector', () => {
     expect((await page.request.get(`/api/templates/${check.id}/revisions/1`)).status()).toBe(200);
   });
 
-  test('a new final inspection never offers a quality check; the API starts one instead', async ({
+  test('a machine’s final inspection is its final inspection template; the API starts a quality check', async ({
     page,
     machine,
   }) => {
     const check = await createQualityCheck(machine, true);
-    // The new final inspection page offers the machine's final inspection template only.
-    await page.goto('/inspections/new');
-    await expect(page.getByText(machine.name).first()).toBeVisible();
-    await expect(page.getByText('Quality check – Pre start up')).toHaveCount(0);
-
-    // Sent a quality check, the API starts a quality check (QC- number), never a final inspection.
-    const response = await page.request.post('/api/inspections', {
+    // A machine with both: the new final inspection page offers its final inspection only.
+    const made = await page.request.post('/api/machines', {
       data: {
-        templateId: check.id,
-        front: { serialNumber: 'SN-1', participants: [], date: '2026-11-05' },
+        machineName: uniqueMachineId('E2E-QC'),
+        modelCode: machine.modelCode,
+        serialNumber: 'SN-1',
+        templateIds: [check.id, machine.id],
       },
     });
-    expect(response.status()).toBe(201);
-    const started = InspectionSchema.parse(await response.json());
+    expect(made.status()).toBe(201);
+    const { machine: created, checks } = MachineDetailSchema.parse(await made.json());
     try {
-      expect(started).toMatchObject({ kind: 'quality', templateId: check.id });
-      expect(started.number).toMatch(/^QC-\d{4}-\d{4,}$/);
+      await page.goto(`/inspections/new?machine=${created.id}`);
+      await expect(page.getByRole('heading', { level: 3, name: 'Final inspection' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 3, name: 'Pre start up' })).toHaveCount(0);
+
+      // Sent a quality check, the API starts a quality check (QC- number), never a final
+      // inspection.
+      const response = await page.request.post('/api/inspections', {
+        data: {
+          templateId: check.id,
+          front: {
+            machineName: 'Magellan#1',
+            serialNumber: 'SN-1',
+            participants: [],
+            date: '2026-11-05',
+          },
+        },
+      });
+      expect(response.status()).toBe(201);
+      const started = InspectionSchema.parse(await response.json());
+      try {
+        expect(started).toMatchObject({ kind: 'quality', templateId: check.id });
+        expect(started.number).toMatch(/^QC-\d{4}-\d{4,}$/);
+      } finally {
+        await deleteInspection(started.id);
+      }
     } finally {
-      await deleteInspection(started.id);
+      await Promise.all(checks.map((entry) => deleteInspection(entry.id)));
+      await deleteMachines([created.id]);
     }
   });
 });

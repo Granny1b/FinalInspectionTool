@@ -8,6 +8,7 @@ import {
   validateForFinalise,
   type AnnotatedImage,
   type FinaliseIssue,
+  type FollowUpRequest,
   type Inspection,
   type InspectionDeviation,
   type InspectionDraftInput,
@@ -20,11 +21,15 @@ import {
   ChevronDown,
   ClipboardCheck,
   ClipboardList,
+  ClipboardX,
   Eye,
+  Link2,
   Lock,
   LockOpen,
+  Pencil,
   Printer,
   Trash2,
+  Unlink,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -33,6 +38,7 @@ import { ActionMenu } from '../../components/ActionMenu';
 import { BackLink } from '../../components/BackLink';
 import { Button } from '../../components/Button';
 import { Callout } from '../../components/Callout';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ApiRequestError, errorMessage, isConflict } from '../../lib/api';
 import type { AutosaveState } from '../../lib/autosave/autosave';
 import { AutosaveAlerts } from '../../lib/autosave/AutosaveAlerts';
@@ -46,10 +52,15 @@ import { formatDateTime } from '../../lib/format';
 import { useCurrentUser } from '../../lib/useMe';
 import { usePersonName } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
+import { useFollowUps, usePendingFollowUps, useSetFollowUp } from '../deviationLog/queries';
+import { PickMachineDialog } from '../machines/MachineDialogs';
+import { checklistHref, machineHref } from '../machines/model';
+import { linkInspection, machineKeys } from '../machines/queries';
 import { InspectionPreview } from '../print/InspectionPreview';
-import { inspectionPrintHref } from '../print/links';
-import type { PrintMode } from '../print/model';
+import { inspectionPrintHref, qualityCheckPrintHref } from '../print/links';
 import { inspectionOnScreen } from '../print/preview';
+import { QUALITY_PRINT_MODE_LABELS } from '../print/quality/model';
+import { QualityCheckPreview } from '../print/quality/QualityCheckPreview';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
 import { withPhotos } from './checklist/results';
 import { DeleteInspectionDialog } from './DeleteInspectionDialog';
@@ -59,6 +70,7 @@ import { newExtraDeviation, removeExtra, updateExtra, type ExtraDeviationPatch }
 import { FrontPageCard } from './FrontPageCard';
 import { ProgressSummary, TabBar } from './HeaderParts';
 import {
+  deviationCardId,
   deviationPhotosId,
   extraDescriptionId,
   extraIssues,
@@ -94,6 +106,10 @@ type Props = {
   loaded: LoadedInspection;
   /** Loads the inspection again and reopens the page on it; false if loading failed. */
   onReload: () => Promise<boolean>;
+  /** The tab it opens on (the deviation log links to the Deviations tab). */
+  initialTab?: InspectionTab;
+  /** A deviation's key: the Deviations tab opens at its card. */
+  initialDeviation?: string;
 };
 
 /** What only the server changes: whether it is locked, and by whom. */
@@ -116,9 +132,15 @@ const QUALITY_SHORTCUT_HINTS = <ShortcutHints guide="Pictures" />;
  *
  * A quality check done on a machine (kind `quality`) is the same page in a quality mode: its
  * shorter front page with the quality check it follows, each row a card with its pictures and
- * large OK / NOK / N/A buttons (QualityCheckSheet), and no printing yet.
+ * large OK / NOK / N/A buttons (QualityCheckSheet), and a report that prints whole or only its
+ * deviations.
  */
-export function InspectionEditor({ loaded, onReload }: Props) {
+export function InspectionEditor({
+  loaded,
+  onReload,
+  initialTab = 'checklist',
+  initialDeviation,
+}: Props) {
   const { inspection } = loaded;
   const { id, kind, number, templateSnapshot, templateRevision } = inspection;
   const quality = kind === 'quality';
@@ -134,10 +156,19 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const categories = settings.data?.deviationCategories ?? NO_CHOICES;
   const personName = usePersonName();
   const idPrefix = useId();
-  // Back to the list as it was left (search and filters); one element for the page's lifetime.
-  const [backLink] = useState(() => (
-    <BackLink to={inspectionsListHref(kind)} label={quality ? 'Quality checks' : 'Inspections'} />
-  ));
+  // A machine's check: its Machine ID and serial number are the machine's, and it leads back
+  // there. Linking or unlinking opens the page again, so this holds for the page's lifetime.
+  const machineRef = inspection.machineRef;
+  const machinePage = machineRef ? machineHref(machineRef) : undefined;
+  // Back to its machine, or to the list as it was left (search and filters); one element for the
+  // page's lifetime.
+  const [backLink] = useState(() =>
+    machinePage ? (
+      <BackLink to={machinePage} label={inspection.front.machineName || 'Machine'} />
+    ) : (
+      <BackLink to={inspectionsListHref(kind)} label={quality ? 'Quality checks' : 'Inspections'} />
+    ),
+  );
   // What a quality check follows, as frozen in it; the same object for the page's lifetime.
   const [standard] = useState<QualityStandard>(() => ({
     title: templateSnapshot.name,
@@ -268,10 +299,10 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     [nextItemId, nextRef],
   );
   // Tabs keep their own scroll position, so going back to the checklist returns to the row.
-  const [tab, setTab] = useState<InspectionTab>('checklist');
+  const [tab, setTab] = useState<InspectionTab>(initialTab);
   // The Deviations tab is rendered when first shown, then kept: opening an inspection doesn't
   // download every deviation photo for a tab that may not be looked at.
-  const [deviationsShown, setDeviationsShown] = useState(false);
+  const [deviationsShown, setDeviationsShown] = useState(initialTab === 'deviations');
   const tabRef = useRef(tab);
   const scrollByTab = useRef<Record<InspectionTab, number>>({ checklist: 0, deviations: 0 });
   /** Shows the tab at once (so its elements can take the focus); false if it was showing. */
@@ -318,6 +349,44 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     [switchTab],
   );
 
+  // Each deviation's follow-up (open or closed) on the Deviations tab, as in the deviation log,
+  // read once the tab is shown. Closing one saves pending edits first, so a deviation just marked
+  // is on the server; once finalised there is nothing to save.
+  const followUps = useFollowUps(id, deviationsShown);
+  const { mutate: sendFollowUp } = useSetFollowUp();
+  const pendingAll = usePendingFollowUps();
+  const pendingFollowUps = useMemo(
+    () =>
+      new Set(
+        [...pendingAll]
+          .filter((pending) => pending.startsWith(`${id}/`))
+          .map((pending) => pending.slice(id.length + 1)),
+      ),
+    [pendingAll, id],
+  );
+  const [followUpFailure, setFollowUpFailure] = useState<string | null>(null);
+  const followUp = useCallback(
+    (deviation: InspectionDeviation, request: FollowUpRequest) => {
+      setFollowUpFailure(null);
+      const what = request.status === 'open' ? 'reopened' : 'closed';
+      sendFollowUp(
+        {
+          inspectionId: id,
+          kind,
+          key: deviation.key,
+          request,
+          prepare: server.state === 'finalised' ? undefined : saveAll,
+        },
+        {
+          onError: (failure) =>
+            setFollowUpFailure(
+              `${number} · ${deviation.number} could not be ${what}. ${errorMessage(failure)}`,
+            ),
+        },
+      );
+    },
+    [id, kind, number, sendFollowUp, saveAll, server.state],
+  );
   const addExtraDeviation = useCallback(() => {
     const extra = newExtraDeviation();
     // Rendered at once, so its description can take the focus.
@@ -347,6 +416,12 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     () => (previewing ? inspectionOnScreen(inspection, draft, server) : null),
     [previewing, inspection, draft, server],
   );
+  const closePreview = () => {
+    setPreviewing(false);
+    // The dialog hands the focus back to what had it, but Safari doesn't focus a button that is
+    // clicked or tapped: back to Preview in any case.
+    previewRef.current?.focus();
+  };
   const continueId = `${idPrefix}-continue`;
 
   // Finalise and Reopen swap places under the keyboard focus: the notice takes it instead.
@@ -355,22 +430,32 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   }, [notice]);
 
   // On open the keyboard starts at "Continue at 3.b" (when there is one), so a single Enter
-  // resumes transcribing. Without a row to continue at, the focus stays where it was. The id never
-  // changes, so this runs once, when the page opens.
+  // resumes transcribing. Without a row to continue at, the focus stays where it was. Opened from
+  // the deviation log at one deviation, it starts at that deviation's card instead; opened on the
+  // Deviations tab otherwise, where it is. None of these change, so this runs once, when the page
+  // opens.
   useEffect(() => {
-    document.getElementById(continueId)?.focus({ preventScroll: true });
-  }, [continueId]);
+    if (initialDeviation) {
+      const card = document.getElementById(deviationCardId(initialDeviation));
+      card?.focus({ preventScroll: true });
+      card?.scrollIntoView({ block: 'center' });
+      return;
+    }
+    if (initialTab === 'checklist') {
+      document.getElementById(continueId)?.focus({ preventScroll: true });
+    }
+  }, [continueId, initialDeviation, initialTab]);
 
   const conflict = saveState.status === 'conflict' || stateConflict;
 
   /**
-   * The print route loads the inspection from the server, so pending changes are saved first; if
-   * that fails, the save status and its alert say why and nothing opens. It opens in a new tab,
-   * which prints as soon as it has loaded.
+   * The print route (`href`, which prints as soon as it has loaded) loads the inspection from the
+   * server, so pending changes are saved first; if that fails, the save status and its alert say
+   * why and nothing opens. It opens in a new tab.
    */
-  async function openPrint(mode: PrintMode) {
+  async function openPrint(href: string) {
     if (!(await saveAll())) return;
-    window.open(inspectionPrintHref(id, mode, true), '_blank', 'noopener');
+    window.open(href, '_blank', 'noopener');
   }
 
   function openFinalise() {
@@ -478,9 +563,57 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     void navigate(inspectionsListHref(kind), { replace: true, state });
   }, [deleted, navigate, number, kind]);
 
+  // Admins: which machine it belongs to. Pending edits are saved first, so the link is made on
+  // the version on screen; then the page opens again on what was stored.
+  const [machineDialog, setMachineDialog] = useState<'link' | 'unlink' | null>(null);
+  const [unlinkFailure, setUnlinkFailure] = useState<string | null>(null);
+  async function changeMachine(next: string | null) {
+    if (!(await saveAll())) {
+      throw new ApiRequestError(409, {
+        error: 'conflict',
+        message: 'Your latest changes couldn’t be saved, so nothing was changed.',
+      });
+    }
+    const linked = await linkInspection(id, next, saver.etag());
+    // Saving carries on from the linked version, should opening it again fail.
+    saver.setEtag(linked.etag);
+    void queryClient.invalidateQueries({ queryKey: machineKeys.all });
+    markListStale();
+    await onReload();
+  }
+
+  // What Print / Save PDF offers: an inspection's blank checklist or its report; a quality check's
+  // entire report or only its deviations, to close them at the machine (it has no blank form).
+  const printItems = quality
+    ? [
+        {
+          label: QUALITY_PRINT_MODE_LABELS.report,
+          icon: ClipboardCheck,
+          onSelect: () => void openPrint(qualityCheckPrintHref(id, { mode: 'report' }, true)),
+        },
+        {
+          label: QUALITY_PRINT_MODE_LABELS.deviations,
+          icon: ClipboardX,
+          onSelect: () => void openPrint(qualityCheckPrintHref(id, { mode: 'deviations' }, true)),
+        },
+      ]
+    : [
+        {
+          label: 'Blank checklist',
+          icon: ClipboardList,
+          onSelect: () => void openPrint(inspectionPrintHref(id, 'blank', true)),
+        },
+        {
+          label: 'Report',
+          icon: ClipboardCheck,
+          onSelect: () => void openPrint(inspectionPrintHref(id, 'report', true)),
+        },
+      ];
+
   const modelLabel = modelName(settings.data?.machineModels, inspection.front.modelCode);
-  // A quality check's machine is its model; it has no machine name.
-  const machine = quality ? modelLabel : draft.front.machineName.trim();
+  // Its Machine ID, on a quality check as on a final inspection (one started before quality checks
+  // had one has none until it is filled in).
+  const machine = draft.front.machineName.trim();
   // Once finalised there is nothing left to save: the header says so only if saving failed.
   const showSaveStatus = !finalised || saveState.status !== 'saved';
 
@@ -504,7 +637,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
           under the actions, until 52rem (a desktop), where it fits before them. The details keep
           room for its longest text, so a change in it (Saved, Unsaved changes) never re-wraps
           anything and the header never changes height while typing. Narrower (a phone), the
-          status and then the actions go under the details, so a machine name is never cut to "R…".
+          status and then the actions go under the details, so a Machine ID is never cut to "R…".
         */}
         <div className="@container">
           <div className="grid grid-cols-[minmax(0,1fr)] @min-[42rem]:grid-cols-[minmax(0,1fr)_auto] @min-[42rem]:gap-x-6 @min-[52rem]:grid-cols-[minmax(0,1fr)_auto_auto]">
@@ -516,7 +649,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             >
               {number}
               <span className="font-normal text-ink-500"> · </span>
-              {machine || <span className="font-normal text-ink-500">No machine name</span>}
+              {machine || <span className="font-normal text-ink-500">No Machine ID</span>}
             </h1>
             {/*
               Spaced, not separated by dots: on a narrow screen a dot would dangle at a line end.
@@ -529,7 +662,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
               )}
             >
               <StateBadge state={server.state} />
-              {!quality && <span>{modelLabel}</span>}
+              <span>{modelLabel}</span>
               {quality && (
                 <span>
                   {templateSnapshot.name} · Rev {templateRevision}
@@ -567,40 +700,24 @@ export function InspectionEditor({ loaded, onReload }: Props) {
                 showSaveStatus ? 'mt-2' : 'mt-3',
               )}
             >
-              {/* A quality check doesn't print yet (nor export to Word, which is in the print view). */}
-              {!quality && (
-                <>
-                  <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
-                    <Eye size={16} aria-hidden="true" />
-                    Preview
-                  </Button>
-                  <ActionMenu
-                    label="Print / Save PDF"
-                    trigger={
-                      <>
-                        <Printer size={16} aria-hidden="true" />
-                        {/* "Print" on a phone, so the three buttons share a line; the name stays whole. */}
-                        <span>
-                          Print<span className="@max-[36rem]:sr-only"> / Save PDF</span>
-                        </span>
-                        <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
-                      </>
-                    }
-                    items={[
-                      {
-                        label: 'Blank checklist',
-                        icon: ClipboardList,
-                        onSelect: () => void openPrint('blank'),
-                      },
-                      {
-                        label: 'Report',
-                        icon: ClipboardCheck,
-                        onSelect: () => void openPrint('report'),
-                      },
-                    ]}
-                  />
-                </>
-              )}
+              <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
+                <Eye size={16} aria-hidden="true" />
+                Preview
+              </Button>
+              <ActionMenu
+                label="Print / Save PDF"
+                trigger={
+                  <>
+                    <Printer size={16} aria-hidden="true" />
+                    {/* "Print" on a phone, so the three buttons share a line; the name stays whole. */}
+                    <span>
+                      Print<span className="@max-[36rem]:sr-only"> / Save PDF</span>
+                    </span>
+                    <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
+                  </>
+                }
+                items={printItems}
+              />
               {!finalised ? (
                 <Button onClick={openFinalise} disabled={conflict}>
                   <Lock size={16} aria-hidden="true" />
@@ -633,6 +750,30 @@ export function InspectionEditor({ loaded, onReload }: Props) {
                     label={quality ? 'Quality check actions' : 'Inspection actions'}
                     triggerData={{ 'data-inspection-menu': '' }}
                     items={[
+                      // Its own checklist, for its machine only (saved first, as any link).
+                      ...(machineRef && !finalised
+                        ? [
+                            {
+                              label: 'Edit checklist',
+                              icon: Pencil,
+                              onSelect: () => void navigate(checklistHref(kind, id)),
+                            },
+                          ]
+                        : []),
+                      machineRef
+                        ? {
+                            label: 'Unlink from the machine',
+                            icon: Unlink,
+                            onSelect: () => {
+                              setUnlinkFailure(null);
+                              setMachineDialog('unlink');
+                            },
+                          }
+                        : {
+                            label: 'Link to a machine…',
+                            icon: Link2,
+                            onSelect: () => setMachineDialog('link'),
+                          },
                       {
                         label: quality ? 'Delete quality check' : 'Delete inspection',
                         icon: Trash2,
@@ -692,6 +833,16 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             finalising. They are marked in red.
           </Callout>
         )}
+        {followUpFailure && (
+          <Callout tone="error" role="alert" onDismiss={() => setFollowUpFailure(null)}>
+            {followUpFailure}
+          </Callout>
+        )}
+        {unlinkFailure && (
+          <Callout tone="error" role="alert" onDismiss={() => setUnlinkFailure(null)}>
+            It could not be unlinked. {unlinkFailure}
+          </Callout>
+        )}
         {notice && (
           <div ref={noticeRef} tabIndex={-1} className="outline-none">
             <Callout
@@ -734,6 +885,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             errors={frontErrors}
             onChange={updateFront}
             pendingParticipant={pendingParticipant}
+            machineHref={machinePage}
           />
         ) : (
           <FrontPageCard
@@ -745,6 +897,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             onChange={updateFront}
             onUpload={trackUpload}
             pendingParticipant={pendingParticipant}
+            machineHref={machinePage}
           />
         )}
         <section aria-labelledby={`${idPrefix}-checklist`} className="mt-10">
@@ -787,7 +940,6 @@ export function InspectionEditor({ loaded, onReload }: Props) {
         {deviationsShown && (
           <DeviationSummary
             deviations={deviations}
-            printed={!quality}
             readOnly={finalised}
             issues={extraErrors}
             responsibles={responsibles}
@@ -798,6 +950,10 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             onRemove={removeExtraDeviation}
             onPhotosChange={updateDeviationPhotos}
             onEditorDirtyChange={setEditorDirty}
+            inspectionNumber={number}
+            followUps={followUps.data?.followUps ?? null}
+            pendingFollowUps={pendingFollowUps}
+            onFollowUp={followUp}
           />
         )}
       </div>
@@ -831,23 +987,27 @@ export function InspectionEditor({ loaded, onReload }: Props) {
           onClose={() => setDialog(null)}
         />
       )}
-      {previewed && (
-        <InspectionPreview
-          inspection={previewed}
-          onPrint={(mode) => void openPrint(mode)}
-          onClose={() => {
-            setPreviewing(false);
-            // The dialog hands the focus back to what had it, but Safari doesn't focus a button
-            // that is clicked or tapped: back to Preview in any case.
-            previewRef.current?.focus();
-          }}
-        />
-      )}
+      {previewed &&
+        (quality ? (
+          <QualityCheckPreview
+            inspection={previewed}
+            onPrint={(mode, deviationsPerPage) =>
+              void openPrint(qualityCheckPrintHref(id, { mode, deviationsPerPage }, true))
+            }
+            onClose={closePreview}
+          />
+        ) : (
+          <InspectionPreview
+            inspection={previewed}
+            onPrint={(mode) => void openPrint(inspectionPrintHref(id, mode, true))}
+            onClose={closePreview}
+          />
+        ))}
       {confirmingDelete && (
         <DeleteInspectionDialog
           kind={kind}
           number={number}
-          machine={quality ? '' : machine}
+          machine={machine}
           finalised={finalised}
           busy={remove.isPending || deleted}
           error={remove.error}
@@ -860,6 +1020,28 @@ export function InspectionEditor({ loaded, onReload }: Props) {
               document.querySelector<HTMLElement>('[data-inspection-menu]')?.focus();
             }
           }}
+        />
+      )}
+      {machineDialog === 'link' && (
+        <PickMachineDialog
+          noun={noun}
+          modelCode={inspection.front.modelCode}
+          onPick={changeMachine}
+          onClose={() => setMachineDialog(null)}
+        />
+      )}
+      {machineDialog === 'unlink' && (
+        <ConfirmDialog
+          title={`Unlink ${number} from ${inspection.front.machineName}?`}
+          message={`It no longer belongs to the machine: its page, status and Insights leave it out. The ${noun} itself stays as it is, its Machine ID and serial number too, and it can be linked again.`}
+          confirmLabel="Unlink"
+          onConfirm={() => {
+            setMachineDialog(null);
+            changeMachine(null).catch((failure: unknown) =>
+              setUnlinkFailure(errorMessage(failure)),
+            );
+          }}
+          onCancel={() => setMachineDialog(null)}
         />
       )}
       {reload.dialog}

@@ -104,8 +104,8 @@ describe('shapeSpecs', () => {
     color,
   });
 
-  it('draws red and cyan marks as they are, with their soft shadow only', () => {
-    for (const color of [RED, ANNOTATION_COLORS.cyan]) {
+  it('draws red, green and cyan marks as they are, with their soft shadow only', () => {
+    for (const color of [RED, ANNOTATION_COLORS.green, ANNOTATION_COLORS.cyan]) {
       expect(shapeSpecs(arrow(color), PHOTO)).toEqual([shapeSpec(arrow(color), PHOTO)]);
     }
   });

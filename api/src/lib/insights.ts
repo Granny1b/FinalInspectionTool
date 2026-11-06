@@ -24,8 +24,10 @@ import {
   queryKind,
   qualityCheckShortName,
 } from '@modig/shared';
+import { toCsv } from './csv';
 import { CSV_COLUMNS, TABLE_COLUMNS } from './deviations';
-import { loadSummaries } from './inspections';
+import { loadStartedSummaries } from './inspections';
+import { loadMachines } from './machines';
 import { deviationsTable, ensureTable } from './storage';
 import { listRevisions, loadRevision } from './templates';
 
@@ -34,15 +36,20 @@ export async function loadInsights(
   query: InsightsQuery,
   context: InvocationContext,
 ): Promise<Insights> {
-  const [inspections, { rows: deviations, unreadable }] = await Promise.all([
-    loadSummaries(),
+  const [inspections, { rows: deviations, unreadable }, machines] = await Promise.all([
+    loadStartedSummaries(),
     loadDeviationRows(query, context),
+    loadMachines().catch((error: unknown) => {
+      context.warn('Insights could not read the machines', error);
+      return [];
+    }),
   ]);
   const scope = inspections.filter((inspection) => inScope(inspection, query));
   const checklists = await loadChecklists(scope, deviations, context);
   return aggregateInsights({
     query,
     inspections,
+    machines: machines.map(({ id, machineName, modelCode }) => ({ id, machineName, modelCode })),
     deviations,
     checklists,
     unreadableRows: unreadable,
@@ -59,7 +66,7 @@ export async function loadExportRows(
   context: InvocationContext,
 ): Promise<DeviationRow[]> {
   const [inspections, { rows: deviations }] = await Promise.all([
-    loadSummaries(),
+    loadStartedSummaries(),
     loadDeviationRows(query, context),
   ]);
   const byId = new Map(
@@ -238,31 +245,18 @@ async function loadChecklists(
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Semicolons, because Excel with Swedish regional settings expects them when it opens a CSV
- * (Power BI detects either); a UTF-8 byte order mark, so Excel reads å, ä and ö; CRLF line ends.
- * The columns are the table's, in the brief's order; a quality check's has the check's title
- * where a final inspection's has the machine name (CSV_COLUMNS).
+ * The rows as a CSV file (lib/csv.ts): the table's columns, in the brief's order; a quality
+ * check's also has the check's title after the machine's ID (CSV_COLUMNS).
  */
-const SEPARATOR = ';';
-const BOM = '\uFEFF';
-
 export function deviationsCsv(
   rows: readonly DeviationRow[],
   kind: InspectionKind = 'final',
 ): string {
   const columns = CSV_COLUMNS[kind];
-  const lines = [
-    columns.join(SEPARATOR),
-    ...rows.map((row) => columns.map((column) => csvField(row[column])).join(SEPARATOR)),
-  ];
-  return `${BOM}${lines.join('\r\n')}\r\n`;
-}
-
-function csvField(value: string | number | boolean): string {
-  let text = String(value);
-  // A cell starting like a formula would run as one in Excel: keep it text (OWASP's advice).
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return /[";\r\n]|^\s|\s$/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  return toCsv(
+    columns,
+    rows.map((row) => columns.map((column) => row[column])),
+  );
 }
 
 /**
@@ -270,11 +264,13 @@ function csvField(value: string | number | boolean): string {
  * checks' say so, and which one: "Quality check deviations 2026-01-01 to 2026-10-31, RMMG, Pre
  * start up.csv".
  */
-export function csvFileName(query: InsightsQuery, today: string): string {
+export function csvFileName(query: InsightsQuery, today: string, machineName?: string): string {
   const quality = queryKind(query) === 'quality';
   const range = `${query.from ?? 'start'} to ${query.to ?? today}`;
   const parts = [
     query.model,
+    // The machine's ID, without what a file name can't hold.
+    machineName?.replace(/[\\/:*?"<>|]+/g, '-'),
     quality && query.check ? qualityCheckShortName(query.check) : undefined,
     query.includeInProgress ? 'incl. in progress' : undefined,
   ];

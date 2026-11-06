@@ -1,4 +1,4 @@
-import type { MachineModel } from '@modig/shared';
+import type { InsightsMachine, MachineModel } from '@modig/shared';
 import clsx from 'clsx';
 import { LoaderCircle } from 'lucide-react';
 import { useId } from 'react';
@@ -24,6 +24,8 @@ type Props = {
   models: MachineModel[];
   /** Quality checks: the quality checks to choose from, by title. */
   checks?: readonly string[];
+  /** The machines with inspections of the kind shown, by Machine ID. */
+  machines?: readonly InsightsMachine[];
   /** The earliest inspection's date (any, whatever the filters): where the month menus start. */
   firstInspectionDate: string | null;
   /** Why the chosen range can't be used, shown under it. */
@@ -59,6 +61,7 @@ export function InsightsFilters({
   filter,
   models,
   checks = [],
+  machines = [],
   firstInspectionDate,
   error,
   updating = false,
@@ -80,6 +83,16 @@ export function InsightsFilters({
   // A check from a shared link stays selectable even when none of it was done.
   const checkOptions =
     filter.check && !checks.includes(filter.check) ? [...checks, filter.check] : checks;
+  // The machines of the model picked; one from a shared link stays selectable as its id.
+  const machineOptions = machines.filter(
+    (machine) => !filter.model || machine.modelCode === filter.model,
+  );
+  if (filter.machine && !machineOptions.some((machine) => machine.id === filter.machine)) {
+    const known = machines.find((machine) => machine.id === filter.machine);
+    machineOptions.push(
+      known ?? { id: filter.machine, machineName: 'This machine', modelCode: filter.model },
+    );
+  }
 
   return (
     <div role="search" aria-label="Filters" className="flex flex-wrap items-center gap-2">
@@ -186,6 +199,24 @@ export function InsightsFilters({
           ))}
         </select>
       </div>
+      {(machineOptions.length > 0 || filter.machine) && (
+        // One machine's inspections; the model narrows the choices.
+        <div className="w-full sm:w-44">
+          <select
+            aria-label="Machine"
+            value={filter.machine ?? ''}
+            onChange={(event) => onChange({ ...filter, machine: event.target.value })}
+            className={SELECT}
+          >
+            <option value="">All machines</option>
+            {machineOptions.map((machine) => (
+              <option key={machine.id} value={machine.id}>
+                {machine.machineName}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {quality && (
         // Which quality check: by its title, on every machine that has it (the model narrows it).
         <div className="w-full sm:w-64">

@@ -19,7 +19,8 @@ afterEach(() => {
 
 /**
  * The brief's 17 columns (§4), in its order, plus `category` after `severity`, then which kind of
- * inspection it is from and its checklist's name.
+ * inspection it is from and its checklist's name, then the deviation log's: the deviation's
+ * number and its follow-up.
  */
 const COLUMNS = [
   'inspectionId',
@@ -42,6 +43,11 @@ const COLUMNS = [
   'createdAt',
   'kind',
   'checkName',
+  'deviationNumber',
+  'status',
+  'action',
+  'closedOn',
+  'closedBy',
 ];
 
 type Row = Record<string, unknown> & { partitionKey: string; rowKey: string };
@@ -74,7 +80,7 @@ function withResults(inspection: Inspection, results: Record<string, RowResult>)
 }
 
 describe('syncDeviations', () => {
-  it('writes one row per NOK row and extra deviation, with exactly the 20 columns', async () => {
+  it('writes one row per NOK row and extra deviation, with exactly the 25 columns', async () => {
     const base = sampleInspection();
     const [a, b, c] = itemIds(base);
     const extraId = newId();
@@ -116,6 +122,11 @@ describe('syncDeviations', () => {
       inspectionDate: '2026-10-07',
       finalised: false,
       createdAt: expect.any(String),
+      // Nobody has followed them up yet.
+      status: 'open',
+      action: '',
+      closedOn: '',
+      closedBy: '',
     };
     expect(await rowOf(inspection, a!)).toEqual({
       ...common,
@@ -128,6 +139,7 @@ describe('syncDeviations', () => {
       resp: 'Mechanics',
       severity: 'major',
       category: '',
+      deviationNumber: 'D-01',
     });
     expect(await rowOf(inspection, c!)).toMatchObject({
       itemId: c,
@@ -148,6 +160,7 @@ describe('syncDeviations', () => {
       resp: 'Paint shop',
       severity: 'minor',
       category: '',
+      deviationNumber: 'D-03',
     });
   });
 
@@ -288,13 +301,14 @@ describe('syncDeviations', () => {
     expect(await rows()).toHaveLength(180);
     expect(await rowOf(base, items[149]!.id)).toMatchObject({ displayRef: '1.et' });
 
-    // 140 rows back to OK and 25 extras removed: 165 deletes.
+    // 140 rows back to OK and 25 extras removed: 165 deletes, and the 5 extras left take the
+    // numbers after the 10 rows (D-11 to D-15): 5 upserts.
     submit.mockClear();
     const tenNok = Object.fromEntries(
       items.slice(0, 10).map((item) => [item.id, allNok[item.id]!]),
     );
     await syncDeviations({ ...base, results: tenNok, extraDeviations: extras.slice(0, 5) });
-    expect(submit.mock.calls.map(([actions]) => actions.length)).toEqual([100, 65]);
+    expect(submit.mock.calls.map(([actions]) => actions.length)).toEqual([100, 70]);
     expect(await rows()).toHaveLength(15);
   });
 

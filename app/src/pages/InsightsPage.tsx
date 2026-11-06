@@ -1,4 +1,4 @@
-import { SEVERITIES, type Insights, type MachineModel } from '@modig/shared';
+import { SEVERITIES, type Insights, type InsightsMachine, type MachineModel } from '@modig/shared';
 import clsx from 'clsx';
 import { ChartColumn, SearchX } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
@@ -122,6 +122,7 @@ export function InsightsPage() {
           filter={filter}
           models={modelOptions(data?.modelCodes ?? [], filter.model, models)}
           checks={data?.checkNames}
+          machines={data?.machines}
           firstInspectionDate={data?.firstInspectionDate ?? null}
           error={'error' in target ? target.error : undefined}
           updating={insights.isPlaceholderData && insights.isFetching}
@@ -185,7 +186,7 @@ function Dashboard({ insights, models, filter, words, onShowAllTime }: Dashboard
       <EmptyState
         icon={SearchX}
         title={`No ${words.many} in this selection`}
-        hint={emptyHint(filter, models, words)}
+        hint={emptyHint(filter, models, words, insights.machines)}
         action={
           filter.period !== 'all' && (
             <Button variant="secondary" onClick={onShowAllTime}>
@@ -308,11 +309,16 @@ function emptyHint(
   filter: InsightsFilter,
   models: MachineModel[] | undefined,
   words: InsightsWords,
+  machines: readonly InsightsMachine[] = [],
 ): string {
+  const machine = filter.machine
+    ? (machines.find((candidate) => candidate.id === filter.machine)?.machineName ?? 'this machine')
+    : '';
   const what = [
     filter.includeInProgress ? '' : 'finalised',
     filter.model ? modelName(models, filter.model) : '',
     words.many,
+    machine ? `of ${machine}` : '',
     words.kind === 'quality' && filter.check ? `of “${filter.check}”` : '',
     describePeriod(filter),
   ]

@@ -90,7 +90,7 @@ test.describe('an inspector', () => {
     });
     await openInspection(page, inspection);
     const renamed = `Renamed, not saved – ${published.id}`;
-    await page.getByLabel('Machine name', { exact: true }).fill(renamed);
+    await page.getByLabel('Machine ID', { exact: true }).fill(renamed);
     await markNok(page, a1!.id, 'Seal torn at the hinge');
     await expect(page.locator('main header [role="status"]').first()).not.toHaveText('Saved');
 
@@ -158,7 +158,7 @@ test.describe('an inspector', () => {
     await expect(previewButton(page)).toBeFocused();
 
     const renamed = `Printed from the preview – ${published.id}`;
-    await page.getByLabel('Machine name', { exact: true }).fill(renamed);
+    await page.getByLabel('Machine ID', { exact: true }).fill(renamed);
     await previewButton(page).click();
     const dialog = previewDialog(page);
     await expect(dialog.locator('[data-print-root]')).toHaveAttribute('data-print-ready', 'true', {

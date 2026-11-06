@@ -2,8 +2,9 @@ import type { Inspection, PeopleDirectory } from '@modig/shared';
 import { useMemo, useState } from 'react';
 import { personName, usePeopleDirectory } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
-import { inspectionPrint, type PrintMode } from './model';
+import { inspectionPrint, PRINT_MODE_LABELS, PRINT_MODES, type PrintMode } from './model';
 import { PrintPreviewDialog } from './PrintPreviewDialog';
+import { Segmented } from './PrintToolbar';
 
 /** One empty directory, so the model isn't rebuilt on every render after a failed load. */
 const NO_PEOPLE: PeopleDirectory = [];
@@ -46,7 +47,14 @@ export function InspectionPreview({ inspection, onPrint, onClose }: Props) {
       subject={`${inspection.number}${machine ? ` · ${machine}` : ''}`}
       model={model}
       logoImageId={settings.data?.logoImageId}
-      mode={{ value: mode, onChange: setMode }}
+      choices={
+        <Segmented
+          label="What to show"
+          options={PRINT_MODES.map((value) => ({ value, label: PRINT_MODE_LABELS[value] }))}
+          value={mode}
+          onChange={setMode}
+        />
+      }
       failed={settings.isError ? settings : null}
       onPrint={() => onPrint(mode)}
       onClose={onClose}

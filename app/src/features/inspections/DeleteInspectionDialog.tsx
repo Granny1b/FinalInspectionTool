@@ -10,7 +10,7 @@ type Props = {
   kind?: InspectionKind;
   /** "FI-2026-0012" */
   number: string;
-  /** The machine name as the page shows it; may be empty. */
+  /** The Machine ID as the page shows it; may be empty. */
   machine: string;
   finalised: boolean;
   busy: boolean;

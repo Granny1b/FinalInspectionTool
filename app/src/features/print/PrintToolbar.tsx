@@ -10,6 +10,11 @@ import {
   type DeviationsPerPage,
   type PrintMode,
 } from './model';
+import {
+  QUALITY_PRINT_MODE_LABELS,
+  QUALITY_PRINT_MODES,
+  type QualityPrintMode,
+} from './quality/model';
 
 export type Choice<T> = { value: T; onChange: (value: T) => void };
 
@@ -21,6 +26,8 @@ type Props = {
   back: { to: string; label: string };
   /** Inspections switch between the blank checklist and the report. */
   mode?: Choice<PrintMode>;
+  /** Quality checks switch between the entire report and only its deviations. */
+  qualityMode?: Choice<QualityPrintMode>;
   /** A report's deviation cards: 2 or 4 to a page. */
   deviationsPerPage?: Choice<DeviationsPerPage>;
   /** "Include reference images"; `available` is false when no row has any. */
@@ -52,6 +59,7 @@ export function PrintToolbar({
   revision,
   back,
   mode,
+  qualityMode,
   deviationsPerPage,
   appendix,
   choices,
@@ -87,6 +95,16 @@ export function PrintToolbar({
               label="What to print"
               options={PRINT_MODES.map((value) => ({ value, label: PRINT_MODE_LABELS[value] }))}
               {...mode}
+            />
+          )}
+          {qualityMode && (
+            <Segmented
+              label="What to print"
+              options={QUALITY_PRINT_MODES.map((value) => ({
+                value,
+                label: QUALITY_PRINT_MODE_LABELS[value],
+              }))}
+              {...qualityMode}
             />
           )}
           {deviationsPerPage && (
