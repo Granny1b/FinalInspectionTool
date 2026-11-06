@@ -3514,3 +3514,25 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
   landing page and sidebar in `auth-shell.spec.ts` and the sidebar test. The one-time action is
   only offered and cancelled in e2e: run, it would link every other test's inspections (and change
   their pages' ETags) in the shared Azurite; its effect is covered by the API tests.
+
+## Search boxes: pick a machine (2026-11-06)
+
+- **Asked for:** the search boxes of the lists (the deviation logs, Inspections and Quality checks)
+  should search every existing machine, as a drop-down of machines you can search in.
+- **One box, two ways** (`MachineSearch`): typing still searches words as before (numbers,
+  Machine IDs, deviation text), and the drop-down under it lists the machines whose Machine ID,
+  serial number or model hold every word typed (all of them in an empty box). Picking one filters
+  by that machine exactly (`?machine={id}`: the inspections linked to it, `machineRef`), and the
+  box then names it; editing the name, or ×, goes back to searching words. Replacing the search
+  with a machine menu would have lost finding a deviation by its text or an inspection by its
+  number, and a separate menu would have been a fifth control in the row.
+- **Exact, not by name:** a machine is matched by its link, not by the Machine ID typed on the
+  front page, so "Magellan#1" never brings in "Magellan#10", and an inspection not linked to a
+  machine (older ones, until "Create machines from existing inspections" runs) is found by the
+  words only.
+- **Which machines:** every machine (`GET /api/machines`), only those of the model picked when
+  one is. The drop-down is an ARIA combobox: the arrow keys, Home and End move, Enter picks (the
+  best match is ready once something is typed), Escape closes it; a press on it keeps the focus
+  in the box. Without machines (or when they can't be loaded) the box is the plain search it was.
+- **The CSV export** takes the machine too (`machine` in `GET /api/deviations/export.csv`), and
+  its file is named after the machine's Machine ID.

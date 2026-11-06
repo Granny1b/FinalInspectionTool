@@ -1,6 +1,6 @@
 /**
- * The deviation log page's model: its filters, kept in the address (?status=&model=&resp=
- * &category=&q=; the kind is the page's own, /deviations/final or /deviations/quality), and what
+ * The deviation log page's model: its filters, kept in the address (?status=&model=&machine=
+ * &resp=&category=&q=; the kind is the page's own, /deviations/final or /deviations/quality), and what
  * it shows from the log under them: the summary and the deviations grouped by machine.
  */
 import {
@@ -36,7 +36,7 @@ export function deviationsTabHref(kind: InspectionKind, inspectionId: string, ke
 /** What the page's filters hold: the search as typed (the matching trims it). */
 export type LogFilter = Omit<DeviationLogQuery, 'q'> & { q: string };
 
-const FILTER_KEYS = ['status', 'model', 'resp', 'category'] as const;
+const FILTER_KEYS = ['status', 'model', 'machine', 'resp', 'category'] as const;
 
 /**
  * The filters in the address. One that can't be read (an old or edited link) is left out rather
@@ -58,6 +58,7 @@ export function filterToParams(filter: LogFilter): URLSearchParams {
   const params = new URLSearchParams();
   if (filter.status !== 'open') params.set('status', filter.status);
   if (filter.model) params.set('model', filter.model);
+  if (filter.machine) params.set('machine', filter.machine);
   if (filter.resp) params.set('resp', filter.resp);
   if (filter.category) params.set('category', filter.category);
   if (filter.q) params.set('q', filter.q);
@@ -71,7 +72,9 @@ export function queryOf(filter: LogFilter): DeviationLogQuery {
 }
 
 export function isFiltered(filter: LogFilter): boolean {
-  return Boolean(filter.model || filter.resp || filter.category || filter.q.trim());
+  return Boolean(
+    filter.model || filter.machine || filter.resp || filter.category || filter.q.trim(),
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

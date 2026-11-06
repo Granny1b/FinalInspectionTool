@@ -511,7 +511,7 @@ test('leaving with unsaved marks asks first; a transparent PNG is flattened on w
 
   // Opened from the list, so Back stays in the app.
   await page.goto('/inspections');
-  await page.getByRole('searchbox', { name: 'Search inspections' }).fill(number);
+  await page.getByRole('combobox', { name: 'Search inspections' }).fill(number);
   await page.getByRole('link', { name: number }).click();
   await page.getByRole('tab', { name: /^Deviations/ }).click();
   const card = page.locator('article[data-deviation="D-01"]');

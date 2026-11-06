@@ -229,8 +229,8 @@ export function isOverdue(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Filters: GET /api/deviations?kind&status&model&resp&category&q (and …/export.csv), and the
-// log page's address
+// Filters: GET /api/deviations?kind&status&model&machine&resp&category&q (and …/export.csv), and
+// the log page's address
 // ---------------------------------------------------------------------------------------------
 
 export const LOG_STATUSES = ['open', 'closed', 'all'] as const;
@@ -247,6 +247,8 @@ const DeviationLogParamsSchema = z.object({
   /** Open (the default), closed or all. */
   status: z.enum(LOG_STATUSES).optional(),
   model: ModelCodeSchema.optional(),
+  /** One machine (its id): the deviations of the inspections linked to it. */
+  machine: IdSchema.optional(),
   resp: z.string().trim().min(1).max(200).optional(),
   category: z.string().trim().min(1).max(200).optional(),
   /** Words that must all appear in the deviation, its machine or its inspection. */
@@ -258,6 +260,8 @@ export type DeviationLogQuery = {
   kind: InspectionKind;
   status: LogStatus;
   model?: string;
+  /** A machine's id: the deviations of the inspections linked to it. */
+  machine?: string;
   /** A responsible, or NOT_SET for deviations without one. Matched ignoring case. */
   resp?: string;
   /** A category, or NOT_SET. Matched ignoring case. */
@@ -265,7 +269,7 @@ export type DeviationLogQuery = {
   q?: string;
 };
 
-const LOG_QUERY_KEYS = ['kind', 'status', 'model', 'resp', 'category', 'q'] as const;
+const LOG_QUERY_KEYS = ['kind', 'status', 'model', 'machine', 'resp', 'category', 'q'] as const;
 
 /** What the filters are read from: a URLSearchParams, in the browser or in the API. */
 type QueryParams = { get(name: string): string | null };
@@ -298,6 +302,7 @@ export function deviationLogParams(
   if (withKind) params.kind = query.kind;
   if (query.status !== 'open') params.status = query.status;
   if (query.model) params.model = query.model;
+  if (query.machine) params.machine = query.machine;
   if (query.resp) params.resp = query.resp;
   if (query.category) params.category = query.category;
   if (query.q?.trim()) params.q = query.q.trim();
@@ -342,6 +347,7 @@ export function matchesDeviationLog(entry: DeviationLogEntry, query: DeviationLo
   if (entry.kind !== query.kind) return false;
   if (query.status !== 'all' && entry.status !== query.status) return false;
   if (query.model && entry.modelCode !== query.model) return false;
+  if (query.machine && entry.machineRef !== query.machine) return false;
   if (query.resp && !sameEntry(entry.resp, query.resp)) return false;
   if (query.category && !sameEntry(entry.category, query.category)) return false;
   const words = folded(query.q ?? '')

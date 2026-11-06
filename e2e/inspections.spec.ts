@@ -261,7 +261,7 @@ test.describe('an inspector', () => {
         .getByRole('navigation', { name: 'Main' })
         .getByRole('link', { name: 'Inspections' })
         .click();
-      await page.getByRole('searchbox', { name: 'Search inspections' }).fill(own.id);
+      await page.getByRole('combobox', { name: 'Search inspections' }).fill(own.id);
       await page.getByRole('combobox', { name: 'State' }).selectOption('in_progress');
       const listed = page.getByRole('row').filter({ hasText: machine });
       await expect(listed.getByRole('cell')).toHaveText([
@@ -294,7 +294,7 @@ test.describe('an inspector', () => {
     const machine = `Line 4 – ${published.id}`;
     const { inspection } = await inspections.create(page.request, published, machine);
     await page.goto('/inspections');
-    await page.getByRole('searchbox', { name: 'Search inspections' }).fill(published.id);
+    await page.getByRole('combobox', { name: 'Search inspections' }).fill(published.id);
     await page.getByRole('combobox', { name: 'State' }).selectOption('in_progress');
     const listed = page.getByRole('row').filter({ hasText: machine });
     await listed.getByRole('link', { name: inspection.number }).click();
@@ -303,7 +303,7 @@ test.describe('an inspector', () => {
     // The page's own link back returns to the list as it was left, search and filters included.
     await page.getByRole('main').getByRole('link', { name: 'Inspections' }).click();
     await expect(page).toHaveURL(new RegExp(`/inspections\\?q=${published.id}&state=in_progress$`));
-    await expect(page.getByRole('searchbox', { name: 'Search inspections' })).toHaveValue(
+    await expect(page.getByRole('combobox', { name: 'Search inspections' })).toHaveValue(
       published.id,
     );
     await expect(page.getByRole('combobox', { name: 'State' })).toHaveValue('in_progress');
@@ -452,9 +452,7 @@ test.describe('an inspector', () => {
 
     // The list's summary follows the saves.
     await page.getByRole('main').getByRole('link', { name: 'Inspections' }).click();
-    await page
-      .getByRole('searchbox', { name: 'Search inspections' })
-      .fill(loaded.inspection.number);
+    await page.getByRole('combobox', { name: 'Search inspections' }).fill(loaded.inspection.number);
     const listed = page.getByRole('row').filter({ hasText: loaded.inspection.number });
     await expect(listed.getByRole('cell').nth(5)).toHaveText(/^In progress\s*6 \/ 6 rows$/);
     await expect(listed.getByRole('cell').nth(6)).toHaveText('2');
@@ -686,7 +684,7 @@ test.describe('an inspector', () => {
     const loaded = await inspections.create(page.request, published, `People – ${published.id}`);
     const { id, number } = loaded.inspection;
     await page.goto('/inspections');
-    await page.getByRole('searchbox', { name: 'Search inspections' }).fill(number);
+    await page.getByRole('combobox', { name: 'Search inspections' }).fill(number);
     await page.getByRole('link', { name: number }).click();
     await expect(saveStatus(page)).toHaveText('Saved');
 
@@ -923,7 +921,7 @@ test('Finalise lists what is missing, then locks the inspection until an admin r
     expect(refusedReopen.status()).toBe(403);
 
     // The admin opens it from the list (the page reads it afresh) and reopens it.
-    await adminPage.getByRole('searchbox', { name: 'Search inspections' }).fill(number);
+    await adminPage.getByRole('combobox', { name: 'Search inspections' }).fill(number);
     await adminPage.getByRole('link', { name: number }).click();
     await adminPage.getByRole('button', { name: 'Reopen', exact: true }).click();
     await adminPage

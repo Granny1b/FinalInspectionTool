@@ -1,7 +1,8 @@
 import type { MachineModel } from '@modig/shared';
 import clsx from 'clsx';
-import { Search } from 'lucide-react';
 import { INPUT } from '../../components/Field';
+import { MachineSearch } from '../machines/MachineSearch';
+import type { MachineChoice } from '../machines/model';
 import { STATUS_CHOICES, type LogFilter } from './model';
 
 type Choice = { value: string; label: string };
@@ -10,6 +11,10 @@ type Props = {
   filter: LogFilter;
   /** Models with deviations of this kind, by name. */
   models: MachineModel[];
+  /** The machines the search box offers (those of the model picked), by Machine ID. */
+  machines: readonly MachineChoice[];
+  /** Every model, to name each machine's. */
+  machineModels: readonly MachineModel[] | undefined;
   responsibles: Choice[];
   categories: Choice[];
   onChange: (filter: LogFilter) => void;
@@ -19,10 +24,19 @@ type Props = {
 const SELECT = clsx(INPUT, 'h-9');
 
 /**
- * Open | Closed | All, then the search and the model, responsible and category menus, in one row
- * above what they filter (as the inspections list's), kept in the address.
+ * Open | Closed | All, then the search (with the machines to pick from) and the model, responsible
+ * and category menus, in one row above what they filter (as the inspections list's), kept in the
+ * address.
  */
-export function LogFilters({ filter, models, responsibles, categories, onChange }: Props) {
+export function LogFilters({
+  filter,
+  models,
+  machines,
+  machineModels,
+  responsibles,
+  categories,
+  onChange,
+}: Props) {
   // A value from the address in another case ("electrical") shows as the menu's own entry.
   const selected = (choices: Choice[], value: string | undefined) =>
     choices.find(
@@ -57,21 +71,16 @@ export function LogFilters({ filter, models, responsibles, categories, onChange 
             );
           })}
         </div>
-        <div className="relative w-full @min-[34rem]:w-auto @min-[34rem]:min-w-56 @min-[34rem]:flex-1">
-          <Search
-            size={16}
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-500"
-          />
-          <input
-            type="search"
-            aria-label="Search deviations"
+        <div className="w-full @min-[34rem]:w-auto @min-[34rem]:min-w-56 @min-[34rem]:flex-1">
+          <MachineSearch
+            label="Search deviations"
             placeholder="Machine ID, S/N, number or text"
-            autoComplete="off"
-            spellCheck={false}
-            value={filter.q}
-            onChange={(event) => onChange({ ...filter, q: event.target.value })}
-            className={clsx(INPUT, 'h-9 pl-9')}
+            machines={machines}
+            models={machineModels}
+            value={{ query: filter.q, machine: filter.machine ?? '' }}
+            onChange={({ query, machine }) =>
+              onChange({ ...filter, q: query, machine: machine || undefined })
+            }
           />
         </div>
         {/* The menus share a line under the search on a tablet, beside it on a desktop. */}

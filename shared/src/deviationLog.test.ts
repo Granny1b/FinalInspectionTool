@@ -256,18 +256,21 @@ describe('filters', () => {
   it('reads the address: open final inspection deviations by default', () => {
     expect(parse('')).toEqual({ kind: 'final', status: 'open' });
     expect(
-      parse('kind=quality&status=all&model=RMMG&resp=Electrical&category=-&q=%20magellan%20&x=1'),
+      parse(
+        'kind=quality&status=all&model=RMMG&machine=Mach000000000001&resp=Electrical&category=-&q=%20magellan%20&x=1',
+      ),
     ).toEqual({
       kind: 'quality',
       status: 'all',
       model: 'RMMG',
+      machine: 'Mach000000000001',
       resp: 'Electrical',
       category: NOT_SET,
       q: 'magellan',
     });
     // Empty values are not filters.
     expect(parse('status=&model=&q=%20')).toEqual({ kind: 'final', status: 'open' });
-    for (const bad of ['status=done', 'kind=other', 'model=RM%20MG']) {
+    for (const bad of ['status=done', 'kind=other', 'model=RM%20MG', 'machine=Magellan%231']) {
       expect(parseDeviationLogQuery(params(bad)).success).toBe(false);
     }
   });
@@ -275,8 +278,14 @@ describe('filters', () => {
   it('writes only the filters in use', () => {
     const query: DeviationLogQuery = { kind: 'quality', status: 'open', resp: 'Electrical' };
     expect(deviationLogParams(query)).toEqual({ kind: 'quality', resp: 'Electrical' });
-    expect(deviationLogParams({ ...query, status: 'all', q: ' x ' }, { withKind: false })).toEqual({
+    expect(
+      deviationLogParams(
+        { ...query, status: 'all', machine: 'Mach000000000001', q: ' x ' },
+        { withKind: false },
+      ),
+    ).toEqual({
       status: 'all',
+      machine: 'Mach000000000001',
       resp: 'Electrical',
       q: 'x',
     });
@@ -298,6 +307,13 @@ describe('filters', () => {
     expect(matchesDeviationLog({ ...entry, resp: ' ' }, { ...all, resp: NOT_SET })).toBe(true);
     expect(matchesDeviationLog(entry, { ...all, category: 'MARKINGS & LABELS' })).toBe(true);
     expect(matchesDeviationLog(entry, { ...all, category: 'Safety' })).toBe(false);
+  });
+
+  it('matches one machine by its link, not by the Machine ID typed', () => {
+    const linked = { ...entry, machineRef: 'Mach000000000001' };
+    expect(matchesDeviationLog(linked, { ...all, machine: 'Mach000000000001' })).toBe(true);
+    expect(matchesDeviationLog(linked, { ...all, machine: 'Mach000000000002' })).toBe(false);
+    expect(matchesDeviationLog(entry, { ...all, machine: 'Mach000000000001' })).toBe(false);
   });
 
   it('finds every word anywhere: machine, ID, text, comment, action', () => {

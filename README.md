@@ -427,8 +427,8 @@ the deviation fields and photos, extra deviations, Finalise and Reopen, Delete a
 - **The list.** _Quality checks_ in the sidebar (`/quality-checks`): number, Machine ID (with the
   model under it; "—" for a quality check started before they had one), the quality check's
   title, serial number, date, state (with rows filled while in progress) and NOK, newest first;
-  searched by number, Machine ID, title or serial number and filtered by model and state, as the
-  inspections list. Final inspections are never listed here, nor quality checks under
+  searched by number, Machine ID, title or serial number, or one machine picked from the search
+  box's drop-down, and filtered by model and state, as the inspections list. Final inspections are never listed here, nor quality checks under
   _Inspections_. A machine's checks are listed once they are started: before, they are on the
   machine's page.
 - **Start a quality check** (`/quality-checks/new`): quality checks are done on a machine (see
@@ -495,9 +495,12 @@ delete one.
   machines existed have no machine and work as before.
 - **The list.** Number, Machine ID, serial number, model, date, state (with rows filled while in
   progress) and the number of NOK rows, newest first; started ones (a machine's final inspection
-  not started yet is on the machine's page). Search by number, Machine ID or serial number,
-  and filter by model and state; the filters are kept in the address, so they survive opening an
-  inspection and coming back (with the browser's Back or the page's _← Inspections_).
+  not started yet is on the machine's page). Search by number, Machine ID or serial number, or
+  pick a machine: the search box drops down every machine (of the model picked), narrowed as you
+  type; picking one (click, or the arrow keys and Enter) lists only the inspections linked to it,
+  and × goes back to all. Filter by model and state; the filters are kept in the address
+  (`?q=&model=&machine=&state=`), so they survive opening an inspection and coming back (with
+  the browser's Back or the page's _← Inspections_).
 - **The page.** A sticky header with the number, machine, state, revision, save status,
   **Preview** (the printout at once, unsaved edits included, see [Printing](#printing)), **Print /
   Save PDF** (see [Printing](#printing)), **Finalise** (or **Reopen**), the tabs _Checklist_ and
@@ -864,8 +867,9 @@ and per responsible. The two kinds are never shown together.
   chips: a chip picks that responsible, and again shows all of them.
 - **Filters**, kept in the address so a view can be shared: **Open | Closed | All** (Open to start
   with), a search (every word must appear somewhere: Machine ID, serial number, number, deviation
-  ID, checkpoint, comment, action…), the model, the responsible ("Not assigned" for none) and the
-  category ("No category").
+  ID, checkpoint, comment, action…) whose drop-down lists every machine to pick one (only the
+  deviations of the inspections linked to it), the model, the responsible ("Not assigned" for
+  none) and the category ("No category").
 - **By machine.** A card per machine: its Machine ID and serial number, the model, the inspection
   and its date (a link to its Deviations tab), "In progress" while it is, and "3 open · 9 closed"
   with a bar. A machine record's checks are under it, named as the machine is now (its Machine ID a
@@ -1080,7 +1084,8 @@ can't be saved, finalised or reopened (409). `GET /api/inspections` lists starte
 Insights takes `machine` too.
 
 The deviation log (see [Deviation log](#deviation-log)) takes `kind` (final when left out),
-`status` (`open` when left out, `closed` or `all`), `model`, `resp` and `category` (matched
+`status` (`open` when left out, `closed` or `all`), `model`, `machine` (a machine's id: the
+deviations of the inspections linked to it), `resp` and `category` (matched
 ignoring case; `-` for none) and `q` (words that must all appear). A follow-up is `PUT` as
 `{ status: "closed", action?, closedOn?, closedBy? }` (left out: the action as it was, today in
 Sweden, the signed-in person's name; an edit keeps an earlier close's date and name) or
@@ -1126,7 +1131,7 @@ it was stored but the log's table could not be updated: sending the same request
 | `PUT /api/inspections/{id}/checklist`         | admin     | A machine's check's own checklist (`If-Match`)                           |
 | `POST /api/inspections/{id}/template-update`  | admin     | Merge its template's newer revision into it (`If-Match`, choices)        |
 | `PUT /api/inspections/{id}/machine`           | admin     | Link it to a machine of its model, or unlink it (`If-Match`)             |
-| `GET /api/deviations`                         | inspector | The deviation log for `?kind&status&model&resp&category&q`               |
+| `GET /api/deviations`                         | inspector | The deviation log for `?kind&status&model&machine&resp&category&q`       |
 | `GET /api/deviations/export.csv`              | inspector | The same deviations as a CSV file, the Excel log's columns               |
 | `GET /api/insights`                           | admin     | KPIs for `?kind&from&to&model&check&machine&includeInProgress`           |
 | `GET /api/insights/export.csv`                | admin     | The deviation rows under the same filters, as a CSV file                 |

@@ -12,6 +12,7 @@ import {
   filterToParams,
   isFiltered,
   machineModels,
+  matchingMachines,
   nextCheck,
   updateAvailable,
   updateText,
@@ -106,6 +107,16 @@ describe('the machines list', () => {
       'M000000000000001',
     ]);
     expect(filterMachines(list, { ...filter, query: 'im8' }, MODELS)).toHaveLength(1);
+  });
+
+  it('offers the machines that match the words typed in a search box, all for none', () => {
+    const names = (query: string) =>
+      matchingMachines(list, query, MODELS).map((entry) => entry.machineName);
+    expect(names('')).toEqual(list.map((entry) => entry.machineName));
+    expect(names('  MAGELLAN  ')).toEqual(['Magellan#1']);
+    expect(names('rigimill 016')).toEqual(['Magellan#1', 'Airbus#3']);
+    expect(names('im-77')).toEqual(['Boeing#2']);
+    expect(names('volvo')).toEqual([]);
   });
 
   it('filters by model and by status', () => {
