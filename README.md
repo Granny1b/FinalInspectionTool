@@ -16,8 +16,9 @@ Working now:
   earlier through Static Web Apps roles keep their access. A signed-in user who is neither on the
   list nor invited sees a "You don't have access yet" page. The API checks the role on every
   request.
-- **App shell.** Sidebar with Inspections and Templates under _Quality_, plus Insights and Settings
-  under _Admin_ for admins; a drawer on tablets. Settings manages users and access, and admins edit the machine models, the
+- **App shell.** A sidebar in four groups: _Final inspection_ (Inspections), _Quality check_
+  (Quality checks, the checks done on machines), _Setup_ (Templates, where both are set up) and,
+  for admins, _Admin_ (Insights and Settings); a drawer on tablets. Settings manages users and access, and admins edit the machine models, the
   Responsible and deviation category lists, the default location and the company name and logo
   there (see [Settings](#settings)).
 - **Templates (phase 2).** The template list; a new template for a machine model that has none;
@@ -76,8 +77,12 @@ Added after the six phases:
 - **Quality checks (set-up).** In-process checks along a machine's build, such as "Quality
   check – Pre start up", several per machine, kept in the machine's template under a tab of their own.
   Admins write them as rows with pictures of how it should and should not look; they are
-  published in revisions and exported and imported as JSON. Doing a check comes later. See
-  [Quality checks](#quality-checks).
+  published in revisions and exported and imported as JSON. See [Quality checks](#quality-checks).
+- **Quality checks (doing them).** Inspectors and admins start a quality check on a machine from
+  _Quality checks_ in the sidebar, numbered QC-2026-0001, and fill it in on a tablet or a PC: each
+  row a card with its pictures and large OK / NOK / N/A buttons, then finalise it. Insights counts
+  them apart from final inspections, with a report of their own. See
+  [Doing a quality check](#doing-a-quality-check).
 
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
@@ -245,9 +250,10 @@ identity, which is what later phases key results and statistics on.
 ## Quality checks
 
 In-process checks along a machine's build, before the final inspection: "Quality check – Pre
-start up", several per machine. They live in the machine's template. This is their set-up: doing a
-check on a tablet or PC, printing one, importing one from Excel, approvals, and protective
-equipment and tools per section come later.
+start up", several per machine. They live in the machine's template (their set-up, below) and are
+done on a machine from _Quality checks_ in the sidebar (see
+[Doing a quality check](#doing-a-quality-check)). Printing one, importing one from Excel,
+approvals, and protective equipment and tools per section come later.
 
 - **The machine's page.** A template opens as its machine: "← Templates", the model's name and two
   tabs, **Final inspection** (the template editor above) and **Quality checks (n)**. The Templates
@@ -295,9 +301,10 @@ equipment and tools per section come later.
 - **Delete.** **⋯ → Delete quality check** asks first and goes back to the Quality checks tab.
   Deleting a machine's final inspection template deletes its quality checks too: its dialog names
   them.
-- **Not for inspections.** A new inspection offers final inspection templates only, and the API
-  refuses to make one from a quality check. A quality check's print preview says it doesn't print
-  yet.
+- **Not for final inspections.** A new final inspection offers final inspection templates only; a
+  quality check is started from _Quality checks_ (see below). A quality check's print preview says
+  it doesn't print yet. Deleting a quality check (or its machine's template) never deletes the
+  checks already done with it: each keeps its own copy.
 - **Addresses:** `/templates/{id}` (Final inspection), `/templates/{id}/quality-checks`,
   `/templates/{id}/quality-checks/{qcId}` and `…/{qcId}/revisions/{n}`. Older addresses of a
   quality check (`/templates/{qcId}`) lead to these.
@@ -310,12 +317,62 @@ front page in `quality` (`name`, `department`, `documentNumber`, `madeBy`, `date
 are its `guide`. Templates stored before quality checks existed have no `kind` and are final
 inspection templates.
 
+### Doing a quality check
+
+Inspectors and admins do quality checks; only admins reopen a finalised one or delete one, as
+for inspections. Everything an inspection does, a quality check does too: autosave, conflicts,
+the deviation fields and photos, extra deviations, Finalise and Reopen, Delete and the keys.
+
+- **The list.** _Quality checks_ in the sidebar (`/quality-checks`): number, machine, the quality
+  check's title, serial number, date, state (with rows filled while in progress) and NOK, newest
+  first; searched by number, title or serial number and filtered by model and state, as the
+  inspections list. Final inspections are never listed here, nor quality checks under
+  _Inspections_.
+- **Start a quality check** (`/quality-checks/new`): pick the machine (the models with at least one
+  published quality check; one machine is picked for you), then which of its quality checks (by
+  title, with the revision it will copy), then the serial number (required), the date (today) and
+  _Checked by_ (the signed-in person to start with; `Enter`, a comma or a semicolon adds a name).
+  The quality check's title, department and document number are shown under them. **Start
+  quality check** gives it the next number of its own series, `QC-2026-0001` (counted like the
+  inspections' FI- series, restarting every year), and opens it.
+- **A frozen copy.** It keeps its own copy of the quality check's latest published revision: the
+  rows with their how, references, time and pictures, and the front page's title, department and
+  document number. Later revisions, or deleting the quality check, never change it.
+- **The page** (`/quality-checks/{id}`): the header with the number and machine, the quality
+  check and its revision, the serial number, the save status, **Finalise** (or **Reopen**), the
+  tabs _Checklist_ and _Deviations (n)_, the progress (`3 / 10 rows filled · 1 NOK`) and _Continue
+  at 1.d_. There is no Print or Preview yet: its print address says quality checks don't print yet.
+  The front page has the machine (the model, fixed), Serial number, Date and Checked by, and the
+  quality check it follows, read-only; nothing about delivery (no machine name, location or photo).
+- **The rows.** Each section is a header with its number, title, rows and time ("5 rows · 0.6 h"),
+  how many are done and **Set remaining to OK**. Each row is a card: its first picture on the
+  left (✓ or ✗, "+1" for more), the ref and what to check, how, the references and the time, and
+  **Pictures and information**; on the right (under the text on an upright tablet or a phone) large
+  **OK**, **NOK** and **N/A** buttons, 52 px high on a touch screen, and the comment. A click on
+  the picture, or **Pictures and information**, opens them read-only: _Should look like this_,
+  _Should not look like this_ and _Info_ with their captions, and _More information_.
+- **NOK** opens the deviation's fields on the card: Responsible, Category, Severity and up to two
+  photos, added right there (file, camera, paste or drop) and marked up as on any deviation. The
+  card gets a red bar. The _Deviations_ tab lists them as for an inspection, with extra deviations.
+- **Keys**, as on an inspection's checklist, on a focused card: `1`/`O`, `2`/`N`, `3`/`A`, `0`,
+  `R`, the arrows, `J`/`K`, `C` for the comment, `G` for the pictures, `Tab` into the card's
+  fields, `Enter` on to the next row and `Esc` back to the card.
+- **Finalise** needs every row's status and the serial number; problems are listed with links, as
+  for an inspection.
+
+**How they are stored.** A quality check done is an inspection (`inspections/{id}.json`) with
+`kind: "quality"`, a `QC-` number from `config/quality-check-counter.json`, the quality check's
+template id and revision, and its copy in `templateSnapshot` with the front page in
+`templateSnapshot.quality`. Its front page keeps `machineName` and `location` empty. Inspections
+stored before quality checks could be done have no `kind` and are final inspections. Its
+deviations go into the `deviations` table with `kind: "quality"`, so Insights counts them apart.
+
 ## Inspections
 
 Inspectors and admins create and fill in inspections; only admins reopen a finalised one or
 delete one.
 
-- **New inspection.** **New inspection** on the list: pick the machine model's checklist (only
+- **New final inspection.** **New final inspection** on the list: pick the machine model's checklist (only
   templates with a published revision are offered) and fill in the front page: machine name and
   serial number (both required), participants (`Enter`, a comma or a semicolon adds a name),
   location (the default from the settings), date (today) and a photo (the template's cover photo
@@ -414,7 +471,10 @@ Every inspection's deviations are copied into the table `deviations`, the source
 (brief §4): one row per deviation, PartitionKey = model code, RowKey =
 `{inspectionId}_{itemId or extraId}`, with the inspection's number, machine, serial number,
 template revision, the row's section, ref and text, comment, resp, severity, category, date,
-`finalised` and `createdAt` (when the deviation was first recorded). Each write brings the table
+`finalised` and `createdAt` (when the deviation was first recorded), then `kind` (`final`, or
+`quality` for a quality check's) and `checkName` (the checklist's name, "Quality check – Pre start
+up"); rows written before these two were added have neither, are a final inspection's, and get
+them at the inspection's next write. Each write brings the table
 in line with the inspection: new and changed rows are written, rows of deviations that are gone
 (a NOK set back to OK, a removed extra deviation) are deleted, unchanged rows are left alone.
 
@@ -631,6 +691,19 @@ logo has a white wordmark (`app/public/modig-logo-dark.png`).
 Admins only (Insights in the sidebar). The numbers come from the inspection list and the
 `deviations` table, so the page needs one blob listing and one table query.
 
+**Final inspections | Quality checks**, at the top of the page, says which it shows: the two are
+never counted together. Final inspections are the default (`/insights`, so every link made before
+keeps showing what it did); quality checks are `/insights?kind=quality`. Everything below follows
+the choice in its own words: the headline numbers ("Quality checks finalised", "Deviations per
+check"), the panels, the top 10 ("Of checks"), the CSV export and the report. For quality checks
+a **Quality check** menu next to the model picks one quality check by its title (`&check=Quality
+check – Pre start up`), on every machine that has it; with a model, on that machine. Switching
+keeps the period, the model and in-progress, and drops the quality check. A quality check's CSV
+has the same columns with `checkName` (its title) where a final inspection's has `machineName`,
+and is named `Quality check deviations 2026-01-01 to 2026-10-31, RMMG, Pre start up.csv`; its
+report is the **Quality check deviation report**, which also states the quality check, and its
+PDF is named the same way.
+
 - **Filters**, in one row above everything they scope, and in the URL, so a view can be shared:
   the period, the model, and **Include inspections in progress** (off: only finalised inspections
   count, as the brief asks). Dates are the inspection's front-page date. The periods:
@@ -760,8 +833,15 @@ A quality check goes through the template routes. `POST /api/templates` with `{ 
 parentId, name }` makes one under the final inspection template `parentId` (404
 if there is none, 400 if it is a quality check); `POST /api/templates/import` with `{ kind:
 "quality", parentId, name, file }` imports a quality check file. The list gives each
-quality check its front page, section titles and total time. Inspections refuse a quality check
-with 400.
+quality check its front page, section titles and total time.
+
+A quality check done on a machine goes through the inspection routes. `POST /api/inspections`
+with a published quality check's id and `{ front: { serialNumber, participants, date } }` starts
+one: `kind: "quality"`, the next `QC-` number (409 when the quality check was never published,
+400 without a serial number); a final inspection template still makes a final inspection, with
+its own front page. `GET /api/inspections` lists both, each with its `kind` and `templateName`;
+read, save, finalise, reopen and delete work the same for both. Insights takes `kind=quality` (and
+`check`) on all three of its routes; without it, it counts final inspections only.
 
 | Method and route                        | Role      | What                                                                     |
 | --------------------------------------- | --------- | ------------------------------------------------------------------------ |
@@ -779,14 +859,14 @@ with 400.
 | `POST /api/templates/import`            | admin     | New draft from a template file (model, name, new model) or quality check |
 | `POST /api/templates/{id}/publish`      | admin     | Publish the draft as the next revision (`If-Match`, change note)         |
 | `GET /api/templates/{id}/revisions/{n}` | inspector | A published revision (cached by the browser: it never changes)           |
-| `GET /api/inspections`                  | inspector | All inspections as list rows, newest number first                        |
-| `POST /api/inspections`                 | inspector | New inspection from a template's latest revision (not a quality check)   |
+| `GET /api/inspections`                  | inspector | All inspections and quality checks done (`kind`), newest number first    |
+| `POST /api/inspections`                 | inspector | New inspection, or quality check done, from a template's latest revision |
 | `GET /api/inspections/{id}`             | inspector | One inspection and its `ETag`                                            |
 | `PUT /api/inspections/{id}`             | inspector | Save front page, results and extra deviations (`If-Match`)               |
 | `DELETE /api/inspections/{id}`          | admin     | Delete it, its deviation rows and deviation photos (`If-Match`)          |
 | `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                         |
 | `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                               |
-| `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)               |
+| `GET /api/insights`                     | admin     | KPIs for `?kind&from&to&model&check&includeInProgress` (all optional)    |
 | `GET /api/insights/export.csv`          | admin     | The deviation rows under the same filters, as a CSV file                 |
 | `GET /api/insights/deviations`          | admin     | The same rows as JSON, for the printed report's deviation list           |
 | `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                           |
@@ -869,8 +949,20 @@ because it usually means the command that produced it failed.
   Export JSON (unsaved changes included, the file name) and Import JSON on the same machine as a
   new draft with fresh ids, a template file refused with its reason; deleting the machine's
   template names its quality check and deletes it too; an inspector sees one read-only (the API
-  refuses their reads of the draft and every write with 403); and a new inspection neither offers
-  nor accepts one (400). For inspections: creating one from the front page form and
+  refuses their reads of the draft and every write with 403); and a new final inspection never
+  offers one, while the API starts a quality check (QC- number) from it. Doing quality checks
+  (`e2e/quality-check-inspections.spec.ts`): the sidebar's four groups (three for an inspector);
+  an inspector starts one from Quality checks (machine, quality check, the serial number it needs,
+  Checked by filled in), sees the rows as cards with how and references, opens a row's pictures
+  from its button and its picture (Should look like this, More information, Escape), is stopped by
+  Finalise while rows lack a status, marks a NOK with comment, severity and responsible and an OK
+  with the keyboard, finalises (stored as a quality check, its frozen front page, its deviation row
+  of kind quality), finds it read-only after a reload, listed under Quality checks and not under
+  Inspections, its inspection address leading to it and its print address saying it doesn't print
+  yet; an admin sees it only under Quality checks in Insights (the API's numbers by kind, the
+  switch, the quality check menu, the CSV's name and rows, the report's title and deviation list)
+  while the final inspection's numbers and report leave it out; and an admin reopens and deletes
+  one while an inspector has no Delete and gets 403. For inspections: creating one from the front page form and
   finding it in the list; a whole checklist filled in from the keyboard (status keys, moving between
   rows, the comment, the Tab order, Escape, Enter, clearing, Set remaining to OK, the progress) and
   still there after a reload; the Deviation Summary's order and an extra deviation; the deviation table, read straight from Azurite (every column, the
@@ -978,12 +1070,14 @@ latest version."
 ```text
 templates/{templateId}/draft.json        draft being edited (a quality check is one too)
 templates/{templateId}/rev-{n}.json      published revisions, never changed
-inspections/{inspectionId}.json          with its list row in the blob's metadata
+inspections/{inspectionId}.json          with its list row in the blob's metadata (quality
+                                         checks done too, kind "quality")
 images/{imageId}.jpg                     photos, and flattened copies of marked-up photos
 config/settings.json                     machine models, default location, company name and
                                          logo, Responsible and category lists
 config/people.json                       who may use the app: email, name, role, added by/when
-config/inspection-counter.json           counter for FI-YYYY-NNNN numbers
+config/inspection-counter.json           counter for FI-YYYY-NNNN numbers (final inspections)
+config/quality-check-counter.json        counter for QC-YYYY-NNNN numbers (quality checks done)
 table deviations                         one row per deviation, the source for KPIs
 ```
 
@@ -1006,7 +1100,7 @@ and 5173) on its first storage call; in Azure the rule comes from the Bicep file
 
 - Static Web Apps built-in authentication with Microsoft Entra ID (`/.auth/login/aad`). There are
   no passwords. Other providers (GitHub, X) are switched off.
-- Two roles: **`inspector`** creates and fills in inspections; **`admin`** can also edit
+- Two roles: **`inspector`** creates and fills in inspections and quality checks; **`admin`** can also edit
   templates, see insights, change settings, reopen inspections and delete them.
 - **Who has which role is decided by the API.** A person's role and the name shown for them come
   from the people list (`config/people.json`), which admins manage in Settings → Users & access.

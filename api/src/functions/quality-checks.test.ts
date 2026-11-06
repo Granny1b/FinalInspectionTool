@@ -1,6 +1,7 @@
 /**
  * Quality checks through the template endpoints: a quality check is a template of kind `quality`
- * under its machine's final inspection template.
+ * under its machine's final inspection template. Doing one on a machine is in
+ * quality-check-inspections.test.ts.
  */
 import type * as AzureFunctions from '@azure/functions';
 import type { HttpResponseInit } from '@azure/functions';
@@ -32,7 +33,6 @@ import {
   writeSettings,
 } from '../../test/storage';
 import { containerClient, readJson } from '../lib/storage';
-import { createInspection } from './inspections';
 import { getRevision, publishTemplate } from './template-revisions';
 import {
   createTemplate,
@@ -537,37 +537,6 @@ describe('POST /api/templates/import with kind quality', () => {
     const { template } = await machine();
     expect((await post(importTemplate, { ...body, parentId: template.id }, inspector)).status).toBe(
       403,
-    );
-  });
-});
-
-describe('inspections', () => {
-  it('refuse a quality check: an inspection needs the final inspection template', async () => {
-    const { template } = await machine();
-    const { draft, etag } = await newCheck(template.id);
-    const fixed = await put(draft.id, { ...draft, quality: front, sections: checklist() }, etag);
-    expect((await publish(draft.id, etagOf(fixed))).status).toBe(200);
-
-    const response = await createInspection(
-      request({
-        principal: inspector,
-        method: 'POST',
-        body: JSON.stringify({
-          templateId: draft.id,
-          front: {
-            machineName: 'RigiMill MG #7',
-            serialNumber: 'SN-1',
-            participants: [],
-            location: 'Kalmar',
-            date: '2026-11-05',
-          },
-        }),
-      }),
-      context(),
-    );
-    expect(response.status).toBe(400);
-    expect(errorOf(response).message).toBe(
-      'A quality check can’t be used for an inspection. Choose the machine’s final inspection template.',
     );
   });
 });

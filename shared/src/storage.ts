@@ -7,7 +7,8 @@
  *   images/{imageId}.jpg                     photos, and flattened copies of marked-up photos
  *   config/settings.json                     machine models, default location, company info, lists
  *   config/people.json                       who may use the app: name, email, role
- *   config/inspection-counter.json           counter for FI-YYYY-NNNN numbers
+ *   config/inspection-counter.json           counter for FI-YYYY-NNNN numbers (final inspections)
+ *   config/quality-check-counter.json        counter for QC-YYYY-NNNN numbers (quality checks)
  *
  * Table `deviations`: one row per deviation (KPI source).
  */
@@ -35,6 +36,8 @@ export const blobNames = {
   /** Who may use the app, with their names and roles (admin-managed in Settings). */
   people: 'people.json',
   inspectionCounter: 'inspection-counter.json',
+  /** The quality checks' own series, QC-YYYY-NNNN, counted like the inspections'. */
+  qualityCheckCounter: 'quality-check-counter.json',
 } as const;
 
 /** Table Storage keys for a deviation row (brief §4). */

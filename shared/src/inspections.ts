@@ -10,16 +10,24 @@ import {
   ExtraDeviationSchema,
   IdSchema,
   InspectionFrontSchema,
+  InspectionKindSchema,
   InspectionStateSchema,
   ModelCodeSchema,
   RowResultSchema,
   type AnnotatedImage,
   type Inspection,
+  type InspectionKind,
   type Severity,
   type Template,
 } from './schemas';
 
 const IsoDateTime = z.iso.datetime({ offset: true });
+
+/** What people call one of each kind: "Finalise the inspection", "Delete this quality check". */
+export const INSPECTION_NOUNS: Record<InspectionKind, string> = {
+  final: 'inspection',
+  quality: 'quality check',
+};
 
 /** Front-page fields people fill in. The model comes from the template and never changes. */
 export const InspectionFrontInputSchema = InspectionFrontSchema.omit({ modelCode: true });
@@ -36,6 +44,22 @@ export const CreateInspectionRequestSchema = z.object({
 export type CreateInspectionRequest = z.infer<typeof CreateInspectionRequestSchema>;
 
 /**
+ * POST /api/inspections from a quality check: a check along the build has a shorter front page
+ * (no machine name, location or photo). The machine is the quality check's model; the serial
+ * number says which one it is. The template's kind decides which of the two requests applies.
+ */
+export const StartQualityCheckRequestSchema = z.object({
+  templateId: IdSchema,
+  front: z.object({
+    serialNumber: z.string().trim().min(1, 'Serial number is required').max(100),
+    /** Who did the check ("Checked by"), as participants are on a final inspection. */
+    participants: InspectionFrontSchema.shape.participants,
+    date: InspectionFrontSchema.shape.date,
+  }),
+});
+export type StartQualityCheckRequest = z.infer<typeof StartQualityCheckRequestSchema>;
+
+/**
  * PUT /api/inspections/{id} — the only fields a client may change. Number, template snapshot,
  * state and audit fields are owned by the server.
  */
@@ -49,6 +73,8 @@ export type InspectionDraftInput = z.infer<typeof InspectionDraftInputSchema>;
 /** GET /api/inspections — one entry per inspection (brief §5.1 table). */
 export const InspectionSummarySchema = z.object({
   id: IdSchema,
+  /** Summaries stored before quality checks could be done have none: final inspections. */
+  kind: InspectionKindSchema.default('final'),
   number: z.string(),
   machineName: z.string(),
   serialNumber: z.string(),
@@ -65,24 +91,57 @@ export const InspectionSummarySchema = z.object({
   /** The template and published revision it was made from (which rows its checklist has). */
   templateId: IdSchema,
   templateRevision: z.number().int().min(1),
+  /**
+   * The checklist's name as frozen in it: a quality check's title, "Quality check – Pre start
+   * up". '' in summaries stored before it was kept (final inspections, which never show it).
+   */
+  templateName: z.string().default(''),
   updatedAt: IsoDateTime,
 });
 export type InspectionSummary = z.infer<typeof InspectionSummarySchema>;
 export const InspectionListSchema = z.array(InspectionSummarySchema);
 
-/** "FI-2026-0042" (brief §4). The sequence restarts every year. */
-export function formatInspectionNumber(year: number, sequence: number): string {
-  return `FI-${year}-${String(sequence).padStart(4, '0')}`;
+/** Each kind's own number series: FI- for final inspections, QC- for quality checks. */
+export const INSPECTION_NUMBER_PREFIXES: Record<InspectionKind, string> = {
+  final: 'FI',
+  quality: 'QC',
+};
+
+/**
+ * "FI-2026-0042" (brief §4), or "QC-2026-0007" for a quality check. Each series restarts every
+ * year.
+ */
+export function formatInspectionNumber(
+  year: number,
+  sequence: number,
+  kind: InspectionKind = 'final',
+): string {
+  return `${INSPECTION_NUMBER_PREFIXES[kind]}-${year}-${String(sequence).padStart(4, '0')}`;
+}
+
+/** "QC-2026-0007" → its kind, year and sequence; null for anything else. */
+export function parseInspectionNumber(
+  number: string,
+): { kind: InspectionKind; year: number; sequence: number } | null {
+  const match = /^(FI|QC)-(\d{4})-(\d+)$/.exec(number);
+  if (!match) return null;
+  return {
+    kind: match[1] === 'QC' ? 'quality' : 'final',
+    year: Number(match[2]),
+    sequence: Number(match[3]),
+  };
 }
 
 /**
- * The frozen copy an inspection keeps of its template revision. A deep copy, so later edits to
- * the template — or to this object — never leak between the two.
+ * The frozen copy an inspection keeps of its template revision: the name and checklist, and a
+ * quality check's front page. A deep copy, so later edits to the template — or to this object —
+ * never leak between the two.
  */
 export function snapshotTemplate(revision: Template): Inspection['templateSnapshot'] {
   const snapshot: Inspection['templateSnapshot'] = {
     name: revision.name,
     sections: revision.sections,
+    ...(revision.kind === 'quality' && revision.quality && { quality: revision.quality }),
   };
   // Plain JSON data, so a JSON round trip is a complete deep copy.
   return JSON.parse(JSON.stringify(snapshot)) as Inspection['templateSnapshot'];
@@ -208,13 +267,16 @@ export type FinaliseIssue = z.infer<typeof FinaliseIssueSchema>;
 
 /**
  * What must hold before an inspection is locked (brief §5.3: every row has a status). A report
- * also needs to say which machine it is about, and every extra deviation needs a description.
+ * also needs to say which machine it is about, and every extra deviation needs a description. A
+ * quality check has no machine name (its machine is the model): it needs the serial number only.
  */
 export function validateForFinalise(
-  inspection: Pick<Inspection, 'front' | 'templateSnapshot' | 'results' | 'extraDeviations'>,
+  inspection: Pick<Inspection, 'front' | 'templateSnapshot' | 'results' | 'extraDeviations'> & {
+    kind?: InspectionKind;
+  },
 ): FinaliseIssue[] {
   const issues: FinaliseIssue[] = [];
-  if (!inspection.front.machineName.trim()) {
+  if (inspection.kind !== 'quality' && !inspection.front.machineName.trim()) {
     issues.push({
       target: { kind: 'front', field: 'machineName' },
       message: 'The front page needs a machine name.',

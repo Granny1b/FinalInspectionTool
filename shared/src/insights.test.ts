@@ -21,6 +21,8 @@ const FINALISED: InsightsQuery = { includeInProgress: false };
 function inspection(id: string, patch: Partial<InsightsInspection> = {}): InsightsInspection {
   return {
     id,
+    kind: 'final',
+    templateName: 'Final inspection – RigiMill MG',
     number: `FI-2026-${id.padStart(4, '0')}`,
     modelCode: 'RMMG',
     date: '2026-10-07',
@@ -36,6 +38,7 @@ function inspection(id: string, patch: Partial<InsightsInspection> = {}): Insigh
 
 function row(inspectionId: string, patch: Partial<DeviationRow> = {}): DeviationRow {
   return {
+    kind: 'final',
     inspectionId,
     inspectionNumber: `FI-2026-${inspectionId.padStart(4, '0')}`,
     serialNumber: 'SN-1',
@@ -54,6 +57,7 @@ function row(inspectionId: string, patch: Partial<DeviationRow> = {}): Deviation
     inspectionDate: '2026-10-07',
     finalised: true,
     createdAt: '2026-10-07T08:00:00.000Z',
+    checkName: 'Final inspection – RigiMill MG',
     ...patch,
   };
 }
@@ -127,6 +131,31 @@ describe('parseInsightsQuery', () => {
     expect(parse(insightsQueryParams(query))).toEqual({ success: true, data: query });
     expect(insightsQueryParams(ALL)).toEqual({ includeInProgress: 'true' });
   });
+
+  it('reads quality checks and which one, and leaves final inspections as they were', () => {
+    expect(parse({ kind: 'quality', check: ' Quality check – Pre start up ' })).toEqual({
+      success: true,
+      data: { kind: 'quality', check: 'Quality check – Pre start up', includeInProgress: false },
+    });
+    // Final is the default: said or not, the filters are the same; a check means nothing there.
+    expect(parse({ kind: 'final', check: 'Quality check – Pre start up' })).toEqual({
+      success: true,
+      data: { includeInProgress: false },
+    });
+    expect(parse({ kind: 'other' }).success).toBe(false);
+    const query: InsightsQuery = {
+      kind: 'quality',
+      model: 'RMMG',
+      check: 'Quality check – Pre start up',
+      includeInProgress: false,
+    };
+    expect(insightsQueryParams(query)).toEqual({
+      kind: 'quality',
+      model: 'RMMG',
+      check: 'Quality check – Pre start up',
+    });
+    expect(parse(insightsQueryParams(query))).toEqual({ success: true, data: query });
+  });
 });
 
 describe('monthsBetween', () => {
@@ -150,6 +179,106 @@ describe('compareRefs', () => {
 });
 
 describe('aggregateInsights', () => {
+  /** A quality check done on RigiMill MG, with its own template, title and rows. */
+  const check = (id: string, patch: Partial<InsightsInspection> = {}) =>
+    inspection(id, {
+      kind: 'quality',
+      number: `QC-2026-${id.padStart(4, '0')}`,
+      templateId: 'qcPre',
+      templateRevision: 1,
+      templateName: 'Quality check – Pre start up',
+      filled: 4,
+      okCount: 1,
+      nokCount: 3,
+      ...patch,
+    });
+  const checkRow = (inspectionId: string, patch: Partial<DeviationRow> = {}) =>
+    row(inspectionId, {
+      kind: 'quality',
+      inspectionNumber: `QC-2026-${inspectionId.padStart(4, '0')}`,
+      machineName: '',
+      templateId: 'qcPre',
+      templateRevision: 1,
+      itemId: 'q1',
+      sectionTitle: 'Safety features',
+      checkName: 'Quality check – Pre start up',
+      ...patch,
+    });
+
+  it('counts final inspections only, whatever quality checks were done', () => {
+    const finals = [inspection('1'), inspection('2', { date: '2026-09-01' })];
+    const finalRows = [row('1'), row('2', { itemId: 'i2' })];
+    const before = aggregate(FINALISED, finals, finalRows);
+
+    const withChecks = aggregate(
+      FINALISED,
+      [
+        ...finals,
+        check('3', { date: '2025-01-01', modelCode: 'IM' }),
+        check('4', { templateName: 'Quality check – Run in' }),
+      ],
+      [
+        ...finalRows,
+        checkRow('3', { modelCode: 'IM' }),
+        checkRow('4'),
+        checkRow('4', { itemId: 'q2' }),
+      ],
+    );
+    expect(withChecks).toEqual(before);
+    expect(withChecks.checkNames).toEqual([]);
+    // A row is counted only as its own kind, even under a final inspection's id.
+    expect(aggregate(FINALISED, finals, [row('1'), checkRow('1')]).deviations).toBe(1);
+  });
+
+  it('counts quality checks apart, by which one and machine, with their own choices', () => {
+    const inspections = [
+      inspection('1', { date: '2024-05-01' }),
+      check('2'),
+      check('3', { modelCode: 'RMMT', templateId: 'qcPreMT', date: '2026-03-01' }),
+      check('4', { templateName: 'Quality check – Run in', templateId: 'qcRun' }),
+    ];
+    const deviations = [
+      row('1'),
+      checkRow('2'),
+      checkRow('2', { itemId: 'q2', sectionTitle: 'Markings' }),
+      checkRow('3', { modelCode: 'RMMT', templateId: 'qcPreMT' }),
+      checkRow('4', { templateId: 'qcRun', checkName: 'Quality check – Run in' }),
+    ];
+    const quality = { ...FINALISED, kind: 'quality' as const };
+
+    const all = aggregate(quality, inspections, deviations);
+    expect(all.inspections).toEqual({ finalised: 3, inProgress: 0 });
+    expect(all.deviations).toBe(4);
+    expect(all.rows).toEqual({ ok: 3, nok: 9, na: 0 });
+    expect(all.modelCodes).toEqual(['RMMG', 'RMMT']);
+    expect(all.checkNames).toEqual(['Quality check – Pre start up', 'Quality check – Run in']);
+    // The final inspection's date is not a quality check's.
+    expect(all.firstInspectionDate).toBe('2026-03-01');
+
+    const pre = aggregate({ ...quality, check: 'Quality check – Pre start up' }, inspections, [
+      ...deviations,
+    ]);
+    expect(pre.inspections.finalised).toBe(2);
+    expect(pre.deviations).toBe(3);
+    expect(pre.perModel.map(({ modelCode, deviations: count }) => [modelCode, count])).toEqual([
+      ['RMMG', 2],
+      ['RMMT', 1],
+    ]);
+    // The choices never depend on the filters.
+    expect(pre.checkNames).toEqual(all.checkNames);
+
+    const preOnMG = aggregate(
+      { ...quality, check: 'Quality check – Pre start up', model: 'RMMG' },
+      inspections,
+      deviations,
+    );
+    expect(preOnMG.inspections.finalised).toBe(1);
+    expect(preOnMG.perSection.map((section) => section.title)).toEqual([
+      'Markings',
+      'Safety features',
+    ]);
+  });
+
   it('counts only finalised inspections unless in-progress ones are included', () => {
     const inspections = [
       inspection('1'),

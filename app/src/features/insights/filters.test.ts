@@ -6,6 +6,7 @@ import {
   insightsQuery,
   monthOptions,
   periodRange,
+  withKind,
   withPeriod,
   type InsightsFilter,
 } from './filters';
@@ -44,6 +45,44 @@ describe('filters in the URL', () => {
       'period=all',
     );
     expect(filterFromParams(new URLSearchParams('period=decade&model=a/b'))).toEqual(DEFAULT);
+  });
+
+  it('keeps quality checks and which one, and says nothing of them for final inspections', () => {
+    const quality: InsightsFilter = {
+      ...DEFAULT,
+      kind: 'quality',
+      model: 'RMMG',
+      check: 'Quality check – Pre start up',
+    };
+    const params = filterToParams(quality);
+    expect(params.toString()).toBe(
+      'kind=quality&model=RMMG&check=Quality+check+%E2%80%93+Pre+start+up',
+    );
+    expect(filterFromParams(params)).toEqual(quality);
+    // A check means nothing to final inspections, said or not.
+    expect(filterFromParams(new URLSearchParams('kind=final&check=x'))).toEqual(DEFAULT);
+    expect(filterToParams({ ...DEFAULT, check: 'x' }).toString()).toBe('');
+  });
+
+  it('switches kind keeping the period, model and in-progress, but not the check', () => {
+    const quality: InsightsFilter = {
+      ...DEFAULT,
+      period: 'all',
+      kind: 'quality',
+      model: 'RMMG',
+      check: 'Quality check – Pre start up',
+      includeInProgress: true,
+    };
+    expect(withKind(quality, 'final')).toEqual({
+      ...DEFAULT,
+      period: 'all',
+      model: 'RMMG',
+      includeInProgress: true,
+    });
+    expect(withKind(withKind(quality, 'final'), 'quality')).toEqual({
+      ...quality,
+      check: undefined,
+    });
   });
 
   it('keeps a single month and a range of months', () => {
@@ -194,6 +233,17 @@ describe('insightsQuery', () => {
     });
     expect(insightsQuery({ ...DEFAULT, period: 'all', includeInProgress: true })).toEqual({
       query: { includeInProgress: true },
+    });
+  });
+
+  it('asks for quality checks, and which one', () => {
+    expect(
+      insightsQuery(
+        { ...DEFAULT, period: 'all', kind: 'quality', check: 'Quality check – Pre start up' },
+        '2026-11-03',
+      ),
+    ).toEqual({
+      query: { kind: 'quality', check: 'Quality check – Pre start up', includeInProgress: false },
     });
   });
 

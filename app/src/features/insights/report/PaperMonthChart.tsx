@@ -1,6 +1,7 @@
 import type { Insights } from '@modig/shared';
 import { useFitScale } from '../../print/fitScale';
 import { formatCount, formatMonthLong, formatMonthShort } from '../format';
+import { INSIGHTS_WORDS, type InsightsWords } from '../words';
 import { CHART_GUTTER_MM, MM, monthChart, monthRows, PT } from './chart';
 
 type Month = Insights['perMonth'][number];
@@ -11,7 +12,14 @@ type Month = Insights['perMonth'][number];
  * columns with their count on top (a line needs three points to show a trend), and from three
  * months on a line with dots. Under it, the numbers: deviations and inspections for each month.
  */
-export function PaperMonthChart({ months }: { months: Month[] }) {
+export function PaperMonthChart({
+  months,
+  words = INSIGHTS_WORDS.final,
+}: {
+  months: Month[];
+  /** Inspections or quality checks: what the second line of numbers counts. */
+  words?: InsightsWords;
+}) {
   const chart = monthChart(months);
   const { plot } = chart;
   // Drawn afresh at each scale the sheets are fitted to: Chrome kept the text laid out for the
@@ -105,14 +113,14 @@ export function PaperMonthChart({ months }: { months: Month[] }) {
           ))}
       </svg>
       {monthRows(months).map((row, index) => (
-        <MonthTable key={row[0]?.month ?? index} months={row} />
+        <MonthTable key={row[0]?.month ?? index} months={row} label={words.shortMany} />
       ))}
     </>
   );
 }
 
 /** A row of months under the chart, its label column as wide as the chart's axis gutter. */
-function MonthTable({ months }: { months: (Month | null)[] }) {
+function MonthTable({ months, label }: { months: (Month | null)[]; label: string }) {
   return (
     <table className="report-months">
       <colgroup>
@@ -147,7 +155,7 @@ function MonthTable({ months }: { months: (Month | null)[] }) {
           )}
         </tr>
         <tr>
-          <th scope="row">Inspections</th>
+          <th scope="row">{label}</th>
           {months.map((month, index) =>
             month ? (
               <td key={month.month}>{formatCount(month.inspections)}</td>

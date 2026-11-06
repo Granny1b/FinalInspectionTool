@@ -3,12 +3,15 @@ import clsx from 'clsx';
 import { modelName } from '../../lib/useSettings';
 import { formatCount, formatPercent, plural } from './format';
 import { PanelEmpty } from './Panel';
+import { INSIGHTS_WORDS, type InsightsWords } from './words';
 
 type Props = {
   checkpoints: Insights['topCheckpoints'];
   models: MachineModel[] | undefined;
   /** Shown when more than one model is in the selection: refs repeat across models. */
   showModel: boolean;
+  /** Inspections or quality checks: what a checkpoint failed in. */
+  words?: InsightsWords;
 };
 
 /**
@@ -27,7 +30,12 @@ const NUMBER = 'text-right max-sm:hidden';
  * The checkpoints that fail most often (brief §5.5, "the most important table"): where each one
  * is in the checklist now, how often it failed, and in what share of the inspections that had it.
  */
-export function TopCheckpoints({ checkpoints, models, showModel }: Props) {
+export function TopCheckpoints({
+  checkpoints,
+  models,
+  showModel,
+  words = INSIGHTS_WORDS.final,
+}: Props) {
   if (checkpoints.length === 0) {
     return <PanelEmpty>No checkpoint failed in this selection.</PanelEmpty>;
   }
@@ -51,7 +59,7 @@ export function TopCheckpoints({ checkpoints, models, showModel }: Props) {
               Failed
             </th>
             <th scope="col" className={clsx(HEAD, NUMBER)}>
-              Of inspections
+              Of {words.shortMany.toLowerCase()}
             </th>
           </tr>
         </thead>
@@ -75,7 +83,7 @@ export function TopCheckpoints({ checkpoints, models, showModel }: Props) {
                     <span className="font-semibold text-ink-900">
                       {formatCount(checkpoint.failed)} failed
                     </span>{' '}
-                    · {share} of {plural(checkpoint.inspections, 'inspection')}
+                    · {share} of {plural(checkpoint.inspections, words.shortOne)}
                   </p>
                 </td>
                 {showModel && (

@@ -1,18 +1,24 @@
-import type { InspectionState, MachineModel } from '@modig/shared';
+import type { InspectionKind, InspectionState, MachineModel } from '@modig/shared';
 import clsx from 'clsx';
 import { Search } from 'lucide-react';
 import { INPUT } from '../../components/Field';
 import type { InspectionFilter } from './listFilter';
 
 type Props = {
+  /** Which list: the search box says what it searches. */
+  kind?: InspectionKind;
   filter: InspectionFilter;
   /** Models that have inspections, by name. */
   models: MachineModel[];
   onChange: (filter: InspectionFilter) => void;
 };
 
-/** Search box plus model and state filters above the inspections table (brief §5.1). */
-export function InspectionFilters({ filter, models, onChange }: Props) {
+/**
+ * Search box plus model and state filters above the inspections table (brief §5.1), and above the
+ * quality checks done.
+ */
+export function InspectionFilters({ kind = 'final', filter, models, onChange }: Props) {
+  const quality = kind === 'quality';
   return (
     <div role="search" className="flex flex-wrap items-center gap-2">
       <div className="relative w-full sm:w-auto sm:min-w-64 sm:flex-1">
@@ -24,8 +30,8 @@ export function InspectionFilters({ filter, models, onChange }: Props) {
         {/* Short enough for a 320 px phone; the icon and the name already say it is a search. */}
         <input
           type="search"
-          aria-label="Search inspections"
-          placeholder="Number, machine or S/N"
+          aria-label={quality ? 'Search quality checks' : 'Search inspections'}
+          placeholder={quality ? 'Number, check or S/N' : 'Number, machine or S/N'}
           autoComplete="off"
           spellCheck={false}
           value={filter.query}

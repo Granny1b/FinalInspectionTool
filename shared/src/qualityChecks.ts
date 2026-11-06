@@ -23,6 +23,15 @@ export function qualityCheckTitle(front: Pick<QualityFront, 'name'>): string {
     : `${TITLE_PREFIX} – ${name}`;
 }
 
+/**
+ * "Pre start up" for "Quality check – Pre start up": a quality check's title without the words
+ * every title starts with, where space is short (a file name). Any other title stays as it is.
+ */
+export function qualityCheckShortName(title: string): string {
+  const short = title.replace(/^\s*quality check\s*[–-]\s*/i, '').trim();
+  return short || title.trim();
+}
+
 /** A new quality check's front page. */
 export function newQualityFront(fields: {
   name: string;

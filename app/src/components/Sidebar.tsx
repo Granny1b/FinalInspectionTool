@@ -6,6 +6,7 @@ import {
   LayoutTemplate,
   LogOut,
   Settings,
+  ShieldCheck,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -18,11 +19,23 @@ import { RoleBadge } from './RoleBadge';
 import { ThemeToggle } from './ThemeToggle';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
+type NavGroupItems = { label: string; items: NavItem[] };
 
-/** Final inspections and quality checks: both kinds of checks live under Templates. */
-const QUALITY_NAV: NavItem[] = [
-  { to: '/inspections', label: 'Inspections', icon: ClipboardCheck },
-  { to: '/templates', label: 'Templates', icon: LayoutTemplate },
+/**
+ * What everyone sees, a group to a kind of work: final inspections before delivery, quality
+ * checks along the build, and the templates both are made from (a machine's final inspection
+ * template and its quality checks).
+ */
+const NAV_GROUPS: NavGroupItems[] = [
+  {
+    label: 'Final inspection',
+    items: [{ to: '/inspections', label: 'Inspections', icon: ClipboardCheck }],
+  },
+  {
+    label: 'Quality check',
+    items: [{ to: '/quality-checks', label: 'Quality checks', icon: ShieldCheck }],
+  },
+  { label: 'Setup', items: [{ to: '/templates', label: 'Templates', icon: LayoutTemplate }] },
 ];
 const ADMIN_NAV: NavItem[] = [
   { to: '/insights', label: 'Insights', icon: ChartColumn },
@@ -60,9 +73,17 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
       </div>
 
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-5">
-        <NavGroup label="Quality" items={QUALITY_NAV} onNavigate={onNavigate} />
+        {NAV_GROUPS.map(({ label, items }, index) => (
+          <NavGroup
+            key={label}
+            label={label}
+            items={items}
+            onNavigate={onNavigate}
+            className={index > 0 ? GROUP_GAP : undefined}
+          />
+        ))}
         {hasRole(me.roles, 'admin') && (
-          <NavGroup label="Admin" items={ADMIN_NAV} onNavigate={onNavigate} className="mt-7" />
+          <NavGroup label="Admin" items={ADMIN_NAV} onNavigate={onNavigate} className={GROUP_GAP} />
         )}
       </nav>
 
@@ -71,6 +92,9 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
   );
 }
 
+/** Between two groups: less than a group's own height, so four groups fit a 720 px laptop. */
+const GROUP_GAP = 'mt-5';
+
 type NavGroupProps = {
   label: string;
   items: NavItem[];
@@ -78,7 +102,7 @@ type NavGroupProps = {
   className?: string;
 };
 
-/** Links under a small label ("Quality", "Admin"), which names the list for screen readers. */
+/** Links under a small label ("Final inspection", "Admin"), which names the list for screen readers. */
 function NavGroup({ label, items, onNavigate, className }: NavGroupProps) {
   const labelId = useId();
   return (

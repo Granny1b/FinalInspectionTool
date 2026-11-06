@@ -500,6 +500,9 @@ test.describe('an inspector', () => {
       inspectionDate: '2026-10-07',
       finalised: false,
       createdAt: expect.stringMatching(ISO_DATE_TIME),
+      // A final inspection's, with its checklist's name.
+      kind: 'final',
+      checkName: published.name,
     };
     const expectedRows = [
       {

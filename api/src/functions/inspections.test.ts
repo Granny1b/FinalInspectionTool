@@ -272,6 +272,7 @@ describe('POST /api/inspections', () => {
     const inspection = inspectionOf(response);
     expect(inspection).toEqual({
       id: expect.any(String),
+      kind: 'final',
       number: `FI-${year}-0001`,
       templateId: template.id,
       templateRevision: 2,
@@ -521,6 +522,7 @@ describe('GET /api/inspections', () => {
     expect(InspectionListSchema.parse(response.jsonBody)).toEqual([
       {
         id: second.id,
+        kind: 'final',
         number: `FI-${year}-0002`,
         machineName: 'Fräs Åsa',
         serialNumber: 'ÖÄ-1',
@@ -533,6 +535,7 @@ describe('GET /api/inspections', () => {
         total: 3,
         templateId: template.id,
         templateRevision: second.templateRevision,
+        templateName: template.name,
         updatedAt: inspectionOf(saved).updatedAt,
       },
       expect.objectContaining({ id: first.id, number: `FI-${year}-0001`, filled: 0, total: 3 }),

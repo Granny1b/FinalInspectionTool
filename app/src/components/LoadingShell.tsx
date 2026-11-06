@@ -21,11 +21,15 @@ export function LoadingShell() {
         <div className="flex h-16 shrink-0 items-center border-b border-ink-100 px-5">
           <Logo className="h-10" />
         </div>
-        <div className="flex-1 space-y-2 px-3 py-5">
-          {/* The "Quality" label over its two links. */}
-          <Bone className="mx-3 mb-3 h-2.5 w-16" />
-          <Bone className={NAV_ITEM_HEIGHT} />
-          <Bone className={clsx(NAV_ITEM_HEIGHT, 'w-4/5')} />
+        <div className="flex-1 px-3 py-5">
+          {/* The sidebar's three groups (Final inspection, Quality check, Setup), each a label
+              over its link, spaced as they are (Sidebar's GROUP_GAP). */}
+          {['w-28', 'w-24', 'w-12'].map((label, index) => (
+            <div key={label} className={clsx('space-y-2', index > 0 && 'mt-5')}>
+              <Bone className={clsx('mx-3 mb-3 h-2.5', label)} />
+              <Bone className={clsx(NAV_ITEM_HEIGHT, index === 1 ? 'w-4/5' : undefined)} />
+            </div>
+          ))}
         </div>
         {/* The user panel's rows at their real heights (Sidebar's UserPanel), so nothing moves
             when it loads: the user, their role and Sign out, and the theme control. */}

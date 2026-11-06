@@ -1,11 +1,18 @@
 import { deviationsPerInspection, firstPassRate, type Insights } from '@modig/shared';
 import { formatCount, formatDecimal, formatPercent, plural } from './format';
+import { capitalised, INSIGHTS_WORDS, type InsightsWords } from './words';
 
 /**
  * The headline numbers (brief §5.5): inspections, deviations, deviations per machine and the
- * first-pass rate, each with a line saying what it counts.
+ * first-pass rate, each with a line saying what it counts. Quality checks in their own words.
  */
-export function KpiTiles({ insights }: { insights: Insights }) {
+export function KpiTiles({
+  insights,
+  words = INSIGHTS_WORDS.final,
+}: {
+  insights: Insights;
+  words?: InsightsWords;
+}) {
   const { finalised, inProgress } = insights.inspections;
   const perInspection = deviationsPerInspection(insights);
   const rate = firstPassRate(insights.rows);
@@ -18,15 +25,15 @@ export function KpiTiles({ insights }: { insights: Insights }) {
     <dl className="grid grid-cols-2 gap-3 sm:gap-6 xl:grid-cols-4">
       {inProgress > 0 ? (
         <Tile
-          label="Inspections"
+          label={capitalised(words.many)}
           value={formatCount(finalised + inProgress)}
           detail={`${formatCount(finalised)} finalised · ${formatCount(inProgress)} in progress`}
         />
       ) : (
         <Tile
-          label="Inspections finalised"
+          label={`${capitalised(words.many)} finalised`}
           value={formatCount(finalised)}
-          detail="Machines inspected in the period"
+          detail={words.doneInPeriod}
         />
       )}
       <Tile
@@ -35,9 +42,9 @@ export function KpiTiles({ insights }: { insights: Insights }) {
         detail="NOK rows and extra deviations"
       />
       <Tile
-        label="Deviations per machine"
+        label={words.perOneLabel}
         value={perInspection === null ? '–' : formatDecimal(perInspection)}
-        detail="Average per inspection"
+        detail={`Average per ${words.one}`}
       />
       <Tile
         label="First-pass rate"

@@ -62,6 +62,7 @@ test.describe('signed in', () => {
       'aria-current',
       'page',
     );
+    await expect(nav.getByRole('link', { name: 'Quality checks' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Templates' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Insights' })).toHaveCount(0);
     await expect(nav.getByRole('link', { name: 'Settings' })).toHaveCount(0);
@@ -82,7 +83,7 @@ test.describe('signed in', () => {
     await page.goto('/');
 
     const nav = mainNav(page);
-    for (const name of ['Inspections', 'Templates', 'Insights', 'Settings']) {
+    for (const name of ['Inspections', 'Quality checks', 'Templates', 'Insights', 'Settings']) {
       await expect(nav.getByRole('link', { name })).toBeVisible();
     }
     await expect(userName(page, 'Asa Oberg')).toBeVisible();

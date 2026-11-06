@@ -1,5 +1,5 @@
-import type { MachineModel } from '@modig/shared';
-import { ClipboardCheck, Plus, SearchX } from 'lucide-react';
+import type { InspectionKind, MachineModel } from '@modig/shared';
+import { ClipboardCheck, Plus, SearchX, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { Button, ButtonLink } from '../components/Button';
@@ -24,8 +24,45 @@ import { modelName, useSettings } from '../lib/useSettings';
 
 const BY_NAME = new Intl.Collator('sv', { numeric: true });
 
-export function InspectionsPage() {
-  const inspections = useInspections();
+/** What each list says. */
+const WORDS = {
+  final: {
+    title: 'Inspections',
+    description: 'Final inspections of machines before delivery, newest first.',
+    create: { to: '/inspections/new', label: 'New final inspection' },
+    icon: ClipboardCheck,
+    loading: 'Loading inspections…',
+    loadError: "We couldn't load the inspections",
+    emptyTitle: 'No inspections yet',
+    emptyHint:
+      'Start one from a machine model’s published checklist, print it for the walk-round, then enter the results here.',
+    noMatch: 'No inspections match',
+    one: 'inspection',
+    many: 'inspections',
+  },
+  quality: {
+    title: 'Quality checks',
+    description: 'Quality checks done on machines along the build, newest first.',
+    create: { to: '/quality-checks/new', label: 'Start a quality check' },
+    icon: ShieldCheck,
+    loading: 'Loading quality checks…',
+    loadError: "We couldn't load the quality checks",
+    emptyTitle: 'No quality checks done yet',
+    emptyHint:
+      'Start one from a machine’s published quality check, then mark each row OK, NOK or N/A on a tablet or PC.',
+    noMatch: 'No quality checks match',
+    one: 'quality check',
+    many: 'quality checks',
+  },
+} as const;
+
+/**
+ * `/inspections`, the final inspections, or `/quality-checks`, the quality checks done on
+ * machines: one list of each kind, searched and filtered alike.
+ */
+export function InspectionsPage({ kind = 'final' }: { kind?: InspectionKind }) {
+  const words = WORDS[kind];
+  const inspections = useInspections(kind);
   const settings = useSettings();
   const [params, setParams] = useSearchParams();
   const filter = filterFromParams(params);
@@ -36,7 +73,7 @@ export function InspectionsPage() {
     setParams(filterToParams(next), { replace: true, flushSync: true });
   // The inspection pages' "← Inspections" links come back to the same search and filters.
   const search = filterToParams(filter).toString();
-  useEffect(() => rememberListSearch(search), [search]);
+  useEffect(() => rememberListSearch(search, kind), [search, kind]);
   // An admin just deleted an inspection on its page, which brought them here.
   const location = useLocation();
   const navigate = useNavigate();
@@ -58,17 +95,18 @@ export function InspectionsPage() {
       : models;
 
   const newInspection = (
-    <ButtonLink to="/inspections/new">
+    <ButtonLink to={words.create.to}>
       <Plus size={16} aria-hidden="true" />
-      New inspection
+      {words.create.label}
     </ButtonLink>
   );
+  const plural = (count: number) => `${count} ${count === 1 ? words.one : words.many}`;
 
   return (
     <>
       <PageHeader
-        title="Inspections"
-        description="Final inspections of machines before delivery, newest first."
+        title={words.title}
+        description={words.description}
         actions={all?.length ? newInspection : undefined}
       />
       {deleted && (
@@ -90,24 +128,29 @@ export function InspectionsPage() {
         </div>
       )}
       {inspections.isPending ? (
-        <PageLoading label="Loading inspections…" header={false} />
+        <PageLoading label={words.loading} header={false} />
       ) : inspections.isError ? (
         <LoadError
-          title="We couldn't load the inspections"
+          title={words.loadError}
           message={errorMessage(inspections.error)}
           onRetry={() => void inspections.refetch()}
           retrying={inspections.isFetching}
         />
       ) : inspections.data.length === 0 ? (
         <EmptyState
-          icon={ClipboardCheck}
-          title="No inspections yet"
-          hint="Start one from a machine model’s published checklist, print it for the walk-round, then enter the results here."
+          icon={words.icon}
+          title={words.emptyTitle}
+          hint={words.emptyHint}
           action={newInspection}
         />
       ) : (
         <div className="space-y-4">
-          <InspectionFilters filter={filter} models={modelOptions} onChange={setFilter} />
+          <InspectionFilters
+            kind={kind}
+            filter={filter}
+            models={modelOptions}
+            onChange={setFilter}
+          />
           {/* Announced, so a screen reader hears what a search or filter left. */}
           <p role="status" className="text-xs text-ink-500">
             {isFiltered(filter)
@@ -115,11 +158,11 @@ export function InspectionsPage() {
               : plural(inspections.data.length)}
           </p>
           {shown.length > 0 ? (
-            <InspectionList inspections={shown} models={settings.data?.machineModels} />
+            <InspectionList kind={kind} inspections={shown} models={settings.data?.machineModels} />
           ) : (
             <EmptyState
               icon={SearchX}
-              title="No inspections match"
+              title={words.noMatch}
               hint="Try other words, or another model or state."
               action={
                 <Button
@@ -146,8 +189,4 @@ function modelsIn(
   return [...codes]
     .map((code) => ({ code, name: modelName(known, code) }))
     .sort((a, b) => BY_NAME.compare(a.name, b.name));
-}
-
-function plural(count: number): string {
-  return `${count} ${count === 1 ? 'inspection' : 'inspections'}`;
 }

@@ -24,6 +24,8 @@ type Props = {
   run: () => Promise<StateOutcome>;
   onGoTo?: (issue: FinaliseIssue) => void;
   onClose: () => void;
+  /** "inspection" (default), "quality check": what is finalised. */
+  noun?: string;
 };
 
 /**
@@ -39,6 +41,7 @@ export function StateChangeDialog({
   run,
   onGoTo,
   onClose,
+  noun = 'inspection',
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [issues, setIssues] = useState(initialIssues);
@@ -69,7 +72,7 @@ export function StateChangeDialog({
       <Dialog
         dialogRef={dialogRef}
         title={`Fix ${issues.length === 1 ? 'one problem' : `${issues.length} problems`} before finalising`}
-        description="A finalised inspection can’t be changed, so fix these first. They are marked in red."
+        description={`A finalised ${noun} can’t be changed, so fix these first. They are marked in red.`}
         onClose={onClose}
       >
         <ul ref={listRef} className="mt-4 max-h-80 space-y-0.5 overflow-y-auto">

@@ -6,6 +6,7 @@ import { DateInput } from '../../components/DateInput';
 import { INPUT } from '../../components/Field';
 import { formatCalendarDate, localDate } from '../inspections/dates';
 import {
+  filterKind,
   monthOptions,
   PERIOD_LABELS,
   periodRange,
@@ -15,11 +16,14 @@ import {
   type Period,
 } from './filters';
 import { formatMonthLong } from './format';
+import { INSIGHTS_WORDS } from './words';
 
 type Props = {
   filter: InsightsFilter;
   /** Models to choose from, by name. */
   models: MachineModel[];
+  /** Quality checks: the quality checks to choose from, by title. */
+  checks?: readonly string[];
   /** The earliest inspection's date (any, whatever the filters): where the month menus start. */
   firstInspectionDate: string | null;
   /** Why the chosen range can't be used, shown under it. */
@@ -54,6 +58,7 @@ const DASH = (
 export function InsightsFilters({
   filter,
   models,
+  checks = [],
   firstInspectionDate,
   error,
   updating = false,
@@ -71,6 +76,10 @@ export function InsightsFilters({
   const invalid = error
     ? ({ 'aria-invalid': true, 'aria-describedby': ERROR_ID } as const)
     : ({} as const);
+  const quality = filterKind(filter) === 'quality';
+  // A check from a shared link stays selectable even when none of it was done.
+  const checkOptions =
+    filter.check && !checks.includes(filter.check) ? [...checks, filter.check] : checks;
 
   return (
     <div role="search" aria-label="Filters" className="flex flex-wrap items-center gap-2">
@@ -177,6 +186,24 @@ export function InsightsFilters({
           ))}
         </select>
       </div>
+      {quality && (
+        // Which quality check: by its title, on every machine that has it (the model narrows it).
+        <div className="w-full sm:w-64">
+          <select
+            aria-label="Quality check"
+            value={filter.check ?? ''}
+            onChange={(event) => onChange({ ...filter, check: event.target.value })}
+            className={SELECT}
+          >
+            <option value="">All quality checks</option>
+            {checkOptions.map((check) => (
+              <option key={check} value={check}>
+                {check}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <label className="flex h-9 items-center gap-2 px-1 text-sm whitespace-nowrap text-ink-800">
         <input
           type="checkbox"
@@ -184,7 +211,7 @@ export function InsightsFilters({
           checked={filter.includeInProgress}
           onChange={(event) => onChange({ ...filter, includeInProgress: event.target.checked })}
         />
-        Include inspections in progress
+        Include {INSIGHTS_WORDS[filterKind(filter)].many} in progress
       </label>
       {/* Always in the page, so a screen reader hears it start; seen from sm, where the row
             has room for it (on a phone the dimmed numbers say as much). */}

@@ -13,19 +13,23 @@ import { ExportCsvButton } from '../features/insights/ExportCsvButton';
 import {
   describePeriod,
   filterFromParams,
+  filterKind,
   filterToParams,
   insightsQuery,
+  withKind,
   type InsightsFilter,
 } from '../features/insights/filters';
 import { plural } from '../features/insights/format';
 import { InsightsFilters } from '../features/insights/InsightsFilters';
 import { InsightsSkeleton } from '../features/insights/InsightsSkeleton';
+import { KindSwitch } from '../features/insights/KindSwitch';
 import { KpiTiles } from '../features/insights/KpiTiles';
 import { Panel } from '../features/insights/Panel';
 import { useInsights } from '../features/insights/queries';
 import { ReportActions } from '../features/insights/report/ReportActions';
 import { SeverityBar } from '../features/insights/SeverityBar';
 import { TopCheckpoints } from '../features/insights/TopCheckpoints';
+import { capitalised, INSIGHTS_WORDS, type InsightsWords } from '../features/insights/words';
 import { errorMessage } from '../lib/api';
 import { modelName, useSettings } from '../lib/useSettings';
 
@@ -34,7 +38,10 @@ const MonthlyChart = lazy(() => import('../features/insights/MonthlyChart'));
 
 const BY_NAME = new Intl.Collator('sv', { numeric: true });
 
-/** Brief §5.5: KPIs from the deviation table, for admins. */
+/**
+ * Brief §5.5: KPIs from the deviation table, for admins: of final inspections or, switched at the
+ * top, of the quality checks done on machines. The two are never counted together.
+ */
 export function InsightsPage() {
   const settings = useSettings();
   const models = settings.data?.machineModels;
@@ -48,21 +55,29 @@ export function InsightsPage() {
   const query = 'query' in target ? target.query : null;
   const insights = useInsights(query);
   const [exportError, setExportError] = useState<string | null>(null);
+  const kind = filterKind(filter);
+  const words = INSIGHTS_WORDS[kind];
+  // While the other kind's numbers load, the kept ones are not this kind's: no actions on them.
   const data = insights.data;
 
   const header = (
-    <PageHeader
-      title="Insights"
-      description="Deviation KPIs across finalised inspections, per checkpoint, section and model."
-      actions={
-        data?.modelCodes.length ? (
-          <>
-            <ReportActions filter={filter} disabled={!query} />
-            <ExportCsvButton query={query} onError={setExportError} />
-          </>
-        ) : undefined
-      }
-    />
+    <>
+      <PageHeader
+        title="Insights"
+        description={`Deviation KPIs across finalised ${words.many}, per checkpoint, section and model.`}
+        actions={
+          data?.modelCodes.length ? (
+            <>
+              <ReportActions filter={filter} disabled={!query} />
+              <ExportCsvButton query={query} onError={setExportError} />
+            </>
+          ) : undefined
+        }
+      />
+      <div className="mb-6">
+        <KindSwitch kind={kind} onChange={(next) => setFilter(withKind(filter, next))} />
+      </div>
+    </>
   );
 
   if (insights.isError && !data) {
@@ -93,7 +108,7 @@ export function InsightsPage() {
         <EmptyState
           icon={ChartColumn}
           title="No insights yet"
-          hint="Deviations from finalised inspections will show up here, led by the checkpoints that fail most often."
+          hint={`Deviations from finalised ${words.many} will show up here, led by the checkpoints that fail most often.`}
         />
       </>
     );
@@ -106,6 +121,7 @@ export function InsightsPage() {
         <InsightsFilters
           filter={filter}
           models={modelOptions(data?.modelCodes ?? [], filter.model, models)}
+          checks={data?.checkNames}
           firstInspectionDate={data?.firstInspectionDate ?? null}
           error={'error' in target ? target.error : undefined}
           updating={insights.isPlaceholderData && insights.isFetching}
@@ -142,6 +158,7 @@ export function InsightsPage() {
               insights={data}
               models={models}
               filter={filter}
+              words={words}
               onShowAllTime={() => setFilter({ ...filter, period: 'all' })}
             />
           </div>
@@ -154,19 +171,21 @@ export function InsightsPage() {
 type DashboardProps = {
   insights: Insights;
   models: MachineModel[] | undefined;
+  /** Inspections or quality checks. */
+  words: InsightsWords;
   /** The filters the numbers are for: an empty selection says which. */
   filter: InsightsFilter;
   onShowAllTime: () => void;
 };
 
-function Dashboard({ insights, models, filter, onShowAllTime }: DashboardProps) {
+function Dashboard({ insights, models, filter, words, onShowAllTime }: DashboardProps) {
   const { finalised, inProgress } = insights.inspections;
   if (finalised + inProgress === 0) {
     return (
       <EmptyState
         icon={SearchX}
-        title="No inspections in this selection"
-        hint={emptyHint(filter, models)}
+        title={`No ${words.many} in this selection`}
+        hint={emptyHint(filter, models, words)}
         action={
           filter.period !== 'all' && (
             <Button variant="secondary" onClick={onShowAllTime}>
@@ -183,7 +202,7 @@ function Dashboard({ insights, models, filter, onShowAllTime }: DashboardProps) 
 
   return (
     <>
-      <KpiTiles insights={insights} />
+      <KpiTiles insights={insights} words={words} />
 
       <Panel
         title="Top 10 recurring checkpoints"
@@ -193,6 +212,7 @@ function Dashboard({ insights, models, filter, onShowAllTime }: DashboardProps) 
           checkpoints={insights.topCheckpoints}
           models={models}
           showModel={showModel}
+          words={words}
         />
       </Panel>
 
@@ -201,10 +221,10 @@ function Dashboard({ insights, models, filter, onShowAllTime }: DashboardProps) 
       <div className="grid gap-6 md:grid-cols-2">
         <Panel
           title="Deviations per month"
-          description="By the date on the inspection’s front page."
+          description={`By the date on the ${words.one}’s front page.`}
         >
           <Suspense fallback={<div className="h-60" aria-hidden="true" />}>
-            <MonthlyChart months={insights.perMonth} />
+            <MonthlyChart months={insights.perMonth} words={words} />
           </Suspense>
         </Panel>
         {/* As tall as its bar and legend: stretched to the chart beside it, it was mostly empty. */}
@@ -227,8 +247,8 @@ function Dashboard({ insights, models, filter, onShowAllTime }: DashboardProps) 
         >
           <BarList items={sectionBars(insights)} limit={10} />
         </Panel>
-        <Panel title="Per model" description="Deviations, with the inspections they come from.">
-          <BarList items={modelBars(insights, models)} limit={10} />
+        <Panel title="Per model" description={`Deviations, with the ${words.many} they come from.`}>
+          <BarList items={modelBars(insights, models, words)} limit={10} />
         </Panel>
         <Panel title="By responsible" description="Who is responsible for fixing them.">
           <BarList items={respBars(insights)} limit={10} />
@@ -250,11 +270,15 @@ function sectionBars(insights: Insights): BarItem[] {
   }));
 }
 
-function modelBars(insights: Insights, models: MachineModel[] | undefined): BarItem[] {
+function modelBars(
+  insights: Insights,
+  models: MachineModel[] | undefined,
+  words: InsightsWords,
+): BarItem[] {
   return insights.perModel.map(({ modelCode, inspections, deviations }) => ({
     key: modelCode,
     label: modelName(models, modelCode),
-    note: `in ${plural(inspections, 'inspection')}`,
+    note: `in ${plural(inspections, words.one)}`,
     value: deviations,
   }));
 }
@@ -277,20 +301,26 @@ function categoryBars(insights: Insights): BarItem[] {
 
 /**
  * "There are no finalised RigiMill MG inspections in 2025-08.": what the selection is, so an empty
- * month reads as one, and what else counts.
+ * month reads as one, and what else counts. Quality checks say which one when one is picked
+ * ("…RigiMill MG quality checks of Quality check – Pre start up…").
  */
-function emptyHint(filter: InsightsFilter, models: MachineModel[] | undefined): string {
+function emptyHint(
+  filter: InsightsFilter,
+  models: MachineModel[] | undefined,
+  words: InsightsWords,
+): string {
   const what = [
     filter.includeInProgress ? '' : 'finalised',
     filter.model ? modelName(models, filter.model) : '',
-    'inspections',
+    words.many,
+    words.kind === 'quality' && filter.check ? `of “${filter.check}”` : '',
     describePeriod(filter),
   ]
     .filter(Boolean)
     .join(' ');
   return filter.includeInProgress
     ? `There are no ${what}.`
-    : `There are no ${what}. Inspections in progress count only when you include them.`;
+    : `There are no ${what}. ${capitalised(words.many)} in progress count only when you include them.`;
 }
 
 /**

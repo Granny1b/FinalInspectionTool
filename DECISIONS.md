@@ -2769,3 +2769,169 @@ section are left for later; nothing of them is stubbed.
   each test): set up and publish from the tab, export and import, delete with the machine,
   inspectors read-only and refused, and no inspection from a quality check. The template list
   test expects the Quality checks column, and the editor title is an h2 on the machine's page.
+
+## Quality checks: doing them (2026-11-06)
+
+The user wanted final inspections and quality checks apart in the sidebar and when creating one,
+and then (a scope change during the work) Insights apart for the two as well, with the same
+report. Templates stay as they were: a machine's final inspection template and its quality checks
+are still set up under Templates.
+
+### Data model
+
+- **A quality check done on a machine is an inspection with `kind: 'quality'`.** It reuses the
+  whole inspection machinery (blob, list metadata, autosave with ETags, results, deviation photos,
+  extra deviations, finalise, reopen, delete, conflicts, keys). `InspectionSchema.kind` defaults
+  to `final` (zod `.default`), so every stored inspection parses as a final one; nothing migrates.
+  `InspectionSummarySchema` has the same default. The kind is the template's kind, decided by the
+  server when it is created, and never changes.
+- **The frozen copy keeps the quality check's front page:** `templateSnapshot.quality` (name,
+  department, document no., made by, date) next to the name and sections, whose rows already
+  carry how, references, time and pictures. `snapshotTemplate` adds it only for a quality check.
+  The check never reads the live template again, so deleting the quality check (or its machine's
+  template) leaves every check done intact, as for inspections.
+- **The front page is the inspection's, with what a check along the build has:** Machine (the
+  model, fixed from the template), Serial number (required), Date and Checked by (the
+  participants list, under that label). Machine name, location and the machine photo are dropped:
+  an in-process check has no customer or delivery yet, and the machine is the model plus its
+  serial number. They stay in the schema (one front page shape for both kinds) and are kept empty:
+  the server sets `machineName` and `location` to '' and drops a photo on every create and save of
+  a quality check, whatever is sent. Finalise asks a quality check for its serial number only
+  (`validateForFinalise` takes the kind).
+- **Numbers: `QC-2026-0001`, a series of its own,** counted in `config/quality-check-counter.json`
+  by the same race-safe code as `FI-` (conditional write on the version read, retries with growing
+  random waits, a lost counter carrying on from the highest number of its own series, the year in
+  Swedish time). `INSPECTION_NUMBER_PATTERN` takes both prefixes; `parseInspectionNumber` reads
+  either. The list sorts both series by year and sequence.
+- **The summary gains `templateName`** (the frozen checklist's name): the quality checks list
+  shows and searches the check's title without reading each blob. Older summaries default it to
+  '' (final inspections, which never show it).
+
+### API
+
+- **`POST /api/inspections` takes both kinds.** The body is read as `{ templateId, front }` first;
+  once the template is known, the front is checked against its kind's request:
+  `CreateInspectionRequestSchema` for a final template, `StartQualityCheckRequestSchema`
+  (`serialNumber`, `participants`, `date`) for a quality check. Problems are still a 400 with the
+  zod issues under `details`. One change of order: an unknown template is now a 404 even when the
+  front is invalid too. An unpublished quality check is a 409, "Publish the quality check first.",
+  before a number is taken. The old 400 refusal is gone.
+- **The list returns both kinds** with `kind` and `templateName`; the app filters (one request,
+  shared by both lists through TanStack Query's `select`). Read, save, finalise, reopen and delete
+  are unchanged apart from their messages ("This quality check is finalised – …").
+
+### Insights: final inspections and quality checks apart
+
+The brief first said to keep quality checks out of Insights; the user then asked for Insights of
+quality checks too, "separate … similar report functionality". So they are counted, never mixed.
+
+- **Each deviation row says its kind** (`kind`, plus `checkName`, the checklist's name). Rows
+  written before have neither; `DeviationRowSchema` defaults them to `final` and '', and the next
+  write of their inspection adds them (the sync compares the new columns too). No migration.
+- **Every Insights query has a kind** (`?kind=quality`; final when absent, so every link and test
+  from before is unchanged). The aggregation takes only the summaries of that kind and only rows of
+  that kind belonging to them: the model choices, the first date, the counts, the first-pass rate,
+  the charts, the top 10, the CSV and the report's list. For quality checks the table is queried
+  with `kind eq 'quality'`; for final inspections it can't be (the table leaves out rows without
+  the property under any condition on it), so their rows are filtered after reading.
+- **Which quality check: by title, on every machine that has it** (`?check=Quality check – Pre
+start up`). "Pre start up" is the same step on every machine, so its numbers across machines are
+  what Quality wants to compare; the model filter narrows it to one machine, which is the same as
+  one template. The title is the one frozen in each check, so a renamed quality check shows under
+  its old and new titles until the old checks age out of the period. The choices
+  (`checkNames`) are every title done, whatever the other filters, as the model choices are.
+- **The page:** a segmented **Final inspections | Quality checks** switch above the filters
+  (`aria-pressed` buttons, kept in the URL). Switching keeps the period, model and in-progress and
+  drops the check. The previous numbers are kept on screen (dimmed) while the next load, but not
+  across a switch: they would stand under the other kind's words. All wording comes from one
+  table (`features/insights/words.ts`): "Quality checks finalised", "Deviations per check",
+  "Of checks", "in 2 quality checks"…
+- **CSV:** a final inspection's file is byte for byte as before (18 columns). A quality check's has
+  the same columns with `checkName` where `machineName` was (a quality check has no machine name)
+  and is named `Quality check deviations … , RMMG, Pre start up.csv` (the title without "Quality
+  check –"). A title may hold characters a header can't carry, so the API sends an ASCII
+  `filename` and the real name in `filename*` (RFC 6266), which the app now reads first.
+- **Report:** "Quality check deviation report", with a Quality check line in what it covers
+  ("All quality checks" or the title), the kind's words throughout, and the deviation list naming
+  each check by its title where an inspection has its machine. The PDF is named like the CSV.
+
+### App
+
+- **Sidebar in four groups:** _Final inspection_ (Inspections), _Quality check_ (Quality checks,
+  a ShieldCheck icon), _Setup_ (Templates) and _Admin_ (Insights, Settings). The gaps between
+  groups are a little smaller (20 px) so four groups and the user panel fit a 720 px laptop; the
+  loading skeleton draws the three groups everyone has.
+- **The lists are one page with a kind** (`InspectionsPage kind="quality"`): the same search,
+  filters, remembered search (a key per list), empty state and deleted notice, in each kind's
+  words; the quality checks table has Machine (the model) and Quality check (the title) where the
+  inspections table has Machine and Model. The inspections page keeps its heading "Inspections"
+  (the group above it says Final inspection) but its button and new page say **New final
+  inspection**. The template side keeps "New quality check" for creating one; doing one is
+  **Start a quality check**, so the two never share a name.
+- **Start a quality check** offers machines grouped by the quality checks' own model code (the
+  code each check copied from its machine, which the check records), only quality checks that are
+  published and whose machine's template still exists (a delete that stopped half way leaves
+  checks no page lists), one machine or one check picked for you, and Checked by starting with the
+  signed-in person. The check's department and document number come from its published revision.
+- **One editor, a quality mode.** `/quality-checks/:id` is `InspectionPage kind="quality"`, and
+  each address sends the other kind to its own (`/inspections/{id}` of a quality check lands on
+  `/quality-checks/{id}`). `InspectionEditor` reads the kind: the header names the machine (the
+  model) and the check, Print and Preview are hidden, the front page is `QualityCheckFrontCard`,
+  the checklist `QualityCheckSheet`, and the dialogs, notices and leave warning say "quality
+  check". The Deviations tab is the inspection's (its "they print on the report" hint left out).
+- **Row cards, as the approved mockup, in the app's parts.** Each section is a grey band (number,
+  title, "5 rows · 0.6 h", "3 / 5 done", Set remaining to OK) over white cards. A card: the first
+  picture (the template editor's `PictureTile`: ✓/✗, "+1"), then ref and What, How, references,
+  time and the start of More information, and **Pictures and information**; on the right OK / NOK
+  / N/A and the comment. The mockup's in-card expansion of the pictures became the existing
+  read-only pictures dialog (`GuideViewer` in the quality wording), as the brief asked; its
+  section chips in the tablet header and the protective-equipment icons were left out (the app's
+  sticky header, progress and Continue at do that job; equipment per section is for later).
+- **Laid out by the sheet's width** (container queries): ≥ 52rem (a PC, a tablet on its side
+  beside the sidebar) picture | text | buttons and comment; ≥ 34rem (a tablet upright) the buttons
+  and comment under the text; a phone a small picture beside the text and the rest across. Each
+  cell is placed with `grid-column: start / span n` at every width: a `col-span-*` at a larger
+  width would otherwise reset a `col-start-*` from a smaller one (the shorthand wins), which first
+  dropped a NOK card's picture to its bottom. The picture spans only the rows a card has, so an OK
+  card has no empty band under it.
+- **The status buttons are large toggles:** 44 px high, 52 px on a touch screen; the chosen one in
+  its status colours, a NOK filled red (`nok-solid`, white text in both themes). As in a final
+  inspection they are not Tab stops: the focused card takes the keys (`rowCommand`, the same
+  actions via `useChecklistActions`), and Tab goes from the card into its comment and NOK fields.
+  `G` opens the pictures (the hint bar says "Pictures" there).
+- **A NOK card opens the deviation's fields on the card:** Responsible, Category, Severity and up
+  to two photos with `AnnotatedPhotos`, added there (camera, file, paste, drop) rather than only on
+  the Deviations tab, because on a tablet the photo is taken at the machine right after NOK.
+  Responsible is shown on NOK cards only (a final inspection has it on every row): on a card it
+  belongs to the deviation, as in the mockup.
+- **Read-only (finalised):** the same cards with the status as a mark, the comment and the NOK
+  fields as text, photos in the viewer.
+
+### Printing, Excel and approvals
+
+Not this round, as the brief says: no Print / Save PDF, Preview or Word export on a quality
+check, and `/quality-checks/{id}/print` (or `/inspections/{id}/print` of one) says "Quality checks
+don't print yet" with a link back.
+
+### Tests
+
+- **shared:** old inspections, summaries and deviation rows parse as final; a quality check
+  (QC number, frozen front page and row fields); the snapshot of a quality check and of a final
+  template; QC numbering and `parseInspectionNumber`; the start request; finalise rules by kind;
+  the Insights query's kind and check, and the aggregation keeping the kinds apart (final numbers
+  unchanged by quality checks, quality numbers by check and machine); `qualityCheckShortName`.
+- **api** (`quality-check-inspections.test.ts`, plus numbering in `lib/inspections.test.ts` and
+  rows in `lib/deviations.test.ts`): create from a quality check (kind, QC number, frozen copy,
+  no photo), the two series side by side, four at once, unpublished refused without a number,
+  the start request's rules, a final template unchanged; list with kind and title; save keeping a
+  quality check's front page; finalise without a machine name, locked in its words, reopen by an
+  admin only; delete with its rows; kept when its quality check is deleted; Insights, CSV and the
+  report rows apart by kind and check, with the encoded file name. The old refusal test is gone.
+- **app:** the list filter and its remembered search per kind, the Insights filter's kind and
+  check, the report model in a quality check's words, the start page's choices, and the download
+  file name.
+- **e2e** (`quality-check-inspections.spec.ts`, 4 tests; each test's machine, quality check and
+  everything done with them deleted afterwards): the sidebar's groups; an inspector starting,
+  filling in and finalising one; Insights and its report by kind; reopen and delete. Changed: the
+  quality-checks spec's last test (the API now starts a quality check), the smoke test's "New
+  final inspection", the deviation table's two new columns, and the sidebar checks.

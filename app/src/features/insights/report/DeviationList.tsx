@@ -2,12 +2,15 @@ import { SEVERITY_LABELS } from '@modig/shared';
 import { useId } from 'react';
 import { PRINTS_MARGIN_BOXES } from '../../print/usePageFooter';
 import { plural } from '../format';
+import { INSIGHTS_WORDS, type InsightsWords } from '../words';
 import type { ListGroup, Report } from './model';
 
 type Props = {
   list: NonNullable<Report['list']>;
   /** The page footer's text, repeated at the foot of each page where margin boxes don't print. */
   footer: string;
+  /** Inspections or quality checks: what the deviations are grouped by. */
+  words?: InsightsWords;
 };
 
 const COLUMNS = 5;
@@ -27,7 +30,7 @@ function machine({ machine, model, serialNumber }: ListGroup): string {
  * rows starts with that line again. The column labels head the first table only: with them in
  * every one, the labels would come round again for each inspection of a row or two.
  */
-export function DeviationList({ list, footer }: Props) {
+export function DeviationList({ list, footer, words = INSIGHTS_WORDS.final }: Props) {
   const titleId = useId();
   // Margin boxes print the footer in Chromium; elsewhere the table repeats it at its foot.
   const fallbackFooter = PRINTS_MARGIN_BOXES ? null : footer;
@@ -36,7 +39,7 @@ export function DeviationList({ list, footer }: Props) {
       <div className="paper-heading report-list-heading">
         <h2 id={titleId}>Deviation list</h2>
         <p>
-          {plural(list.count, 'deviation')} in {plural(list.groups.length, 'inspection')}
+          {plural(list.count, 'deviation')} in {plural(list.groups.length, words.one)}
         </p>
       </div>
       {list.count === 0 ? (

@@ -130,9 +130,24 @@ export async function apiDownload(
       apiError.success ? apiError.data : fallbackError(res.status),
     );
   }
-  const disposition = res.headers.get('Content-Disposition') ?? '';
-  const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? null;
+  const fileName = dispositionFileName(res.headers.get('Content-Disposition') ?? '');
   return { blob: await res.blob(), fileName };
+}
+
+/**
+ * The file name a Content-Disposition gives: its `filename*` (UTF-8, percent-encoded, for names
+ * such as "Quality check deviations …, Före start.csv") when it has one, else its `filename`.
+ */
+export function dispositionFileName(disposition: string): string | null {
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded.trim());
+    } catch {
+      // Not valid percent-encoding: the plain name below.
+    }
+  }
+  return /filename="([^"]+)"/.exec(disposition)?.[1] ?? null;
 }
 
 /** `undefined` for an empty body (e.g. 204), INVALID_JSON for anything that isn't JSON. */

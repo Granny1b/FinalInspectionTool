@@ -6,7 +6,9 @@ import {
   deriveDeviations,
   formatInspectionNumber,
   inspectionProgress,
+  parseInspectionNumber,
   snapshotTemplate,
+  StartQualityCheckRequestSchema,
   validateForFinalise,
 } from './inspections';
 import type { Inspection, Template } from './schemas';
@@ -43,6 +45,7 @@ const template: Template = {
 function inspection(overrides: Partial<Inspection> = {}): Inspection {
   return {
     id: 'insp1',
+    kind: 'final',
     number: 'FI-2026-0001',
     templateId: template.id,
     templateRevision: 2,
@@ -71,12 +74,80 @@ describe('formatInspectionNumber', () => {
     expect(formatInspectionNumber(2026, 42)).toBe('FI-2026-0042');
     expect(formatInspectionNumber(2026, 12345)).toBe('FI-2026-12345');
   });
+
+  it('numbers quality checks in a series of their own, QC-', () => {
+    expect(formatInspectionNumber(2026, 7, 'quality')).toBe('QC-2026-0007');
+    expect(formatInspectionNumber(2026, 7, 'final')).toBe('FI-2026-0007');
+  });
+
+  it('reads a number back, either series', () => {
+    expect(parseInspectionNumber('QC-2026-0007')).toEqual({
+      kind: 'quality',
+      year: 2026,
+      sequence: 7,
+    });
+    expect(parseInspectionNumber('FI-2027-12345')).toEqual({
+      kind: 'final',
+      year: 2027,
+      sequence: 12345,
+    });
+    expect(parseInspectionNumber('XX-2026-0001')).toBeNull();
+  });
 });
 
 describe('snapshotTemplate', () => {
   it('freezes name and sections', () => {
     const snap = snapshotTemplate(template);
     expect(snap).toEqual({ name: template.name, sections: template.sections });
+  });
+
+  it('keeps a quality check’s front page and its rows’ how, references, time and pictures', () => {
+    const qualityCheck: Template = {
+      ...template,
+      id: 'qc1',
+      kind: 'quality',
+      parentId: template.id,
+      name: 'Quality check – Pre start up',
+      quality: {
+        name: 'Pre start up',
+        department: 'Quality',
+        documentNumber: '1.22.2',
+        madeBy: 'Sam Andersson',
+        date: '2026-11-05',
+      },
+      sections: [
+        {
+          id: 'q1',
+          title: 'Safety features',
+          items: [
+            {
+              id: 'r1',
+              text: 'Safety decals on balancing tubes',
+              how: 'Visible, not turned inward.',
+              references: ['ISO 12100'],
+              timeHours: 0.2,
+              guide: {
+                description: 'Both tubes.',
+                images: [{ imageId: 'img1', annotations: [], verdict: 'bad' }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const snap = snapshotTemplate(qualityCheck);
+    expect(snap).toEqual({
+      name: 'Quality check – Pre start up',
+      quality: qualityCheck.quality,
+      sections: qualityCheck.sections,
+    });
+    // A copy: changing the template's front page later changes nothing in the check.
+    qualityCheck.quality!.documentNumber = '9.9';
+    expect(snap.quality?.documentNumber).toBe('1.22.2');
+  });
+
+  it('gives a final inspection no quality front page', () => {
+    expect('quality' in snapshotTemplate(template)).toBe(false);
   });
 
   it('is a deep copy: later template edits never reach the inspection', () => {
@@ -183,6 +254,22 @@ describe('validateForFinalise', () => {
     expect(issues[1]!.target).toEqual({ kind: 'row', sectionId: 's1', itemId: 'i2' });
     expect(issues[3]!.target).toEqual({ kind: 'extra', extraId: 'x1' });
   });
+
+  it('asks a quality check for its serial number but no machine name', () => {
+    const check = inspection({
+      kind: 'quality',
+      front: { ...inspection().front, machineName: '', serialNumber: '' },
+      results: { i1: { status: 'OK' }, i2: { status: 'OK' }, i3: { status: 'OK' } },
+    });
+    expect(validateForFinalise(check).map((issue) => issue.message)).toEqual([
+      'The front page needs a serial number.',
+      'Row 2.b has no status.',
+    ]);
+    // The same front page on a final inspection also needs the machine name.
+    expect(validateForFinalise({ ...check, kind: 'final' })[0]?.message).toBe(
+      'The front page needs a machine name.',
+    );
+  });
 });
 
 describe('request schemas', () => {
@@ -203,6 +290,26 @@ describe('request schemas', () => {
         front: { ...front, machineName: ' RM #7 ' },
       }).front.machineName,
     ).toBe('RM #7');
+  });
+
+  it('starting a quality check needs a serial number, and nothing about the machine’s name', () => {
+    const front = { serialNumber: ' RM-016 ', participants: ['Sam'], date: '2026-11-06' };
+    expect(StartQualityCheckRequestSchema.parse({ templateId: 'qc1', front }).front).toEqual({
+      ...front,
+      serialNumber: 'RM-016',
+    });
+    expect(
+      StartQualityCheckRequestSchema.safeParse({
+        templateId: 'qc1',
+        front: { ...front, serialNumber: ' ' },
+      }).success,
+    ).toBe(false);
+    expect(
+      StartQualityCheckRequestSchema.safeParse({
+        templateId: 'qc1',
+        front: { ...front, date: '6 Nov' },
+      }).success,
+    ).toBe(false);
   });
 
   it('draft input keeps only client-owned fields', () => {

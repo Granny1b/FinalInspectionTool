@@ -1,13 +1,14 @@
 /**
  * Quality checks: set up by admins under a machine's final inspection template (its Quality
  * checks tab), edited as row cards with pictures, published, exported and imported; read-only for
- * inspectors, and never the source of an inspection.
+ * inspectors, and never offered for a final inspection. Doing one is in
+ * quality-check-inspections.spec.ts.
  */
 import { readFile } from 'node:fs/promises';
 import {
+  InspectionSchema,
   QualityCheckExportSchema,
   TemplateDetailSchema,
-  TemplateListSchema,
   type Template,
 } from '@modig/shared';
 import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
@@ -16,6 +17,7 @@ import { testPhoto } from './support/photos';
 import {
   createQualityCheck,
   createTemplate,
+  deleteInspection,
   deleteQualityChecks,
   deleteTemplate,
 } from './support/storage';
@@ -400,35 +402,31 @@ test.describe('an inspector', () => {
     expect((await page.request.get(`/api/templates/${check.id}/revisions/1`)).status()).toBe(200);
   });
 
-  test('cannot create an inspection from a quality check', async ({ page, machine }) => {
+  test('a new final inspection never offers a quality check; the API starts one instead', async ({
+    page,
+    machine,
+  }) => {
     const check = await createQualityCheck(machine, true);
-    // The new inspection page offers the machine's final inspection template only.
+    // The new final inspection page offers the machine's final inspection template only.
     await page.goto('/inspections/new');
     await expect(page.getByText(machine.name).first()).toBeVisible();
     await expect(page.getByText('Quality check – Pre start up')).toHaveCount(0);
 
+    // Sent a quality check, the API starts a quality check (QC- number), never a final inspection.
     const response = await page.request.post('/api/inspections', {
       data: {
         templateId: check.id,
-        front: {
-          machineName: 'RigiMill MG #7',
-          serialNumber: 'SN-1',
-          participants: [],
-          location: 'Kalmar, Sweden',
-          date: '2026-11-05',
-        },
+        front: { serialNumber: 'SN-1', participants: [], date: '2026-11-05' },
       },
     });
-    expect(response.status()).toBe(400);
-    expect(((await response.json()) as { message: string }).message).toBe(
-      'A quality check can’t be used for an inspection. Choose the machine’s final inspection template.',
-    );
-    // Nothing is listed as a quality check's inspection.
-    const list = TemplateListSchema.parse(await (await page.request.get('/api/templates')).json());
-    expect(list.find((summary) => summary.id === check.id)).toMatchObject({
-      kind: 'quality',
-      parentId: machine.id,
-    });
+    expect(response.status()).toBe(201);
+    const started = InspectionSchema.parse(await response.json());
+    try {
+      expect(started).toMatchObject({ kind: 'quality', templateId: check.id });
+      expect(started.number).toMatch(/^QC-\d{4}-\d{4,}$/);
+    } finally {
+      await deleteInspection(started.id);
+    }
   });
 });
 

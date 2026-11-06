@@ -1,6 +1,8 @@
 /**
  * Inspection storage (brief §3, §4): one JSON blob per inspection, `inspections/{id}.json`, and
- * the yearly FI-YYYY-NNNN counter in `config/inspection-counter.json`.
+ * the yearly FI-YYYY-NNNN counter in `config/inspection-counter.json`. A quality check done on a
+ * machine is an inspection of kind `quality`, stored the same way, with its own QC-YYYY-NNNN
+ * series counted in `config/quality-check-counter.json`.
  *
  * Every write also stores the inspection's list summary in the blob's metadata, so the list is
  * one blob listing instead of one read per inspection.
@@ -17,9 +19,11 @@ import {
   InspectionSchema,
   InspectionSummarySchema,
   inspectionProgress,
+  parseInspectionNumber,
   templateImageIds,
   type Inspection,
   type InspectionCounter,
+  type InspectionKind,
   type InspectionSummary,
 } from '@modig/shared';
 import { deleteDeviationRows, syncDeviations } from './deviations';
@@ -176,6 +180,7 @@ export function inspectionSummary(inspection: Inspection): InspectionSummary {
   const { machineName, serialNumber, modelCode, date } = inspection.front;
   return {
     id: inspection.id,
+    kind: inspection.kind,
     number: inspection.number,
     machineName,
     serialNumber,
@@ -188,6 +193,7 @@ export function inspectionSummary(inspection: Inspection): InspectionSummary {
     total,
     templateId: inspection.templateId,
     templateRevision: inspection.templateRevision,
+    templateName: inspection.templateSnapshot.name,
     updatedAt: inspection.updatedAt,
   };
 }
@@ -227,8 +233,10 @@ function idFromBlobName(name: string): string | null {
 }
 
 /**
- * GET /api/inspections: newest number first. One listing with metadata; a blob without a usable
- * summary (written by something other than this API, or by an older one) is read in full.
+ * GET /api/inspections: final inspections and quality checks, each with its kind, newest number
+ * first. One listing with metadata; a blob without a usable summary (written by something other
+ * than this API, or by an older one) is read in full. A summary stored before quality checks
+ * could be done has no kind: it is a final inspection's.
  */
 export async function loadSummaries(): Promise<InspectionSummary[]> {
   await ensureStorage();
@@ -249,21 +257,31 @@ export async function loadSummaries(): Promise<InspectionSummary[]> {
   );
 }
 
-/** "FI-2027-0001" before "FI-2026-0100" before "FI-2026-0099". */
+/**
+ * "FI-2027-0001" before "FI-2026-0100" before "FI-2026-0099"; the two series by the same rule,
+ * final inspections first on a tie ("FI-2026-0003" before "QC-2026-0003").
+ */
 function compareNumbersDescending(a: string, b: string): number {
   const [yearA, seqA] = numberParts(a);
   const [yearB, seqB] = numberParts(b);
-  return yearB - yearA || seqB - seqA;
+  return yearB - yearA || seqB - seqA || a.localeCompare(b);
 }
 
 function numberParts(number: string): [year: number, sequence: number] {
-  const match = /^FI-(\d{4})-(\d+)$/.exec(number);
-  return match ? [Number(match[1]), Number(match[2])] : [0, 0];
+  const parsed = parseInspectionNumber(number);
+  return parsed ? [parsed.year, parsed.sequence] : [0, 0];
 }
 
 // ---------------------------------------------------------------------------------------------
-// Numbering (brief §4: "FI-2026-0042", counter kept in a small blob)
+// Numbering (brief §4: "FI-2026-0042", counter kept in a small blob; quality checks
+// "QC-2026-0007", in a counter of their own)
 // ---------------------------------------------------------------------------------------------
+
+/** Each series' counter blob in `config/`. */
+const COUNTERS: Record<InspectionKind, string> = {
+  final: blobNames.inspectionCounter,
+  quality: blobNames.qualityCheckCounter,
+};
 
 /** Retries after losing a race for the counter; the first try is not counted. */
 const COUNTER_RETRIES = 5;
@@ -274,24 +292,30 @@ const stockholmYearFormat = new Intl.DateTimeFormat('en', {
 });
 
 /**
- * Takes the next number from the counter. The counter is written conditionally on the version
- * just read, so two creates at the same moment can never get the same number: the loser reads
- * again and takes the next one. The year is Swedish local time; the sequence restarts each year.
- * A missing counter is created from the highest number in use (ifNoneMatch '*').
+ * Takes the next number of the kind's series from its counter: FI- for final inspections, QC-
+ * for quality checks, each counted on its own. The counter is written conditionally on the
+ * version just read, so two creates at the same moment can never get the same number: the loser
+ * reads again and takes the next one. The year is Swedish local time; the sequence restarts each
+ * year. A missing counter is created from the highest number of its series in use
+ * (ifNoneMatch '*').
  */
-export async function nextInspectionNumber(now = new Date()): Promise<string> {
+export async function nextInspectionNumber(
+  kind: InspectionKind = 'final',
+  now = new Date(),
+): Promise<string> {
   const year = Number(stockholmYearFormat.format(now));
+  const blobName = COUNTERS[kind];
   for (let retry = 0; ; retry++) {
-    const stored = await readJson(config, blobNames.inspectionCounter, InspectionCounterSchema);
-    const counter = advance(stored ? stored.data : await highestExistingNumber(), year);
+    const stored = await readJson(config, blobName, InspectionCounterSchema);
+    const counter = advance(stored ? stored.data : await highestExistingNumber(kind), year);
     try {
       await writeJson(
         config,
-        blobNames.inspectionCounter,
+        blobName,
         counter,
         stored ? { ifMatch: stored.etag } : { ifNoneMatch: '*' },
       );
-      return formatInspectionNumber(counter.year, counter.last);
+      return formatInspectionNumber(counter.year, counter.last, kind);
     } catch (error) {
       const lostRace = error instanceof PreconditionFailedError || error instanceof ConflictError;
       if (!lostRace) throw error;
@@ -307,15 +331,16 @@ export async function nextInspectionNumber(now = new Date()): Promise<string> {
 }
 
 /**
- * What a missing counter starts from: the newest inspection's number, so a counter blob that was
- * lost (deleted by hand, a cleared container, a migration without config/) never hands out a
- * number again. Null when there are no inspections, as on a first run.
+ * What a missing counter starts from: the newest number of its series, so a counter blob that
+ * was lost (deleted by hand, a cleared container, a migration without config/) never hands out a
+ * number again. Null when there are none, as on a first run.
  */
-async function highestExistingNumber(): Promise<InspectionCounter | null> {
-  const [newest] = await loadSummaries(); // year, then sequence, descending; unparseable last
-  if (!newest) return null;
-  const [year, last] = numberParts(newest.number);
-  return year ? { year, last } : null;
+async function highestExistingNumber(kind: InspectionKind): Promise<InspectionCounter | null> {
+  // Year, then sequence, descending; unparseable last.
+  const newest = (await loadSummaries())
+    .map((summary) => parseInspectionNumber(summary.number))
+    .find((parsed) => parsed?.kind === kind);
+  return newest ? { year: newest.year, last: newest.sequence } : null;
 }
 
 /**

@@ -55,6 +55,7 @@ describe('reportFileName', () => {
 function insights(patch: Partial<Insights> = {}): Insights {
   return {
     modelCodes: ['RMMG', 'RMHS'],
+    checkNames: [],
     firstInspectionDate: '2026-09-02',
     inspections: { finalised: 4, inProgress: 0 },
     deviations: 10,
@@ -110,6 +111,7 @@ function insights(patch: Partial<Insights> = {}): Insights {
 
 function row(patch: Partial<DeviationRow>): DeviationRow {
   return {
+    kind: 'final',
     inspectionId: 'i1',
     inspectionNumber: 'FI-2026-0001',
     serialNumber: ' SN-1 ',
@@ -128,6 +130,7 @@ function row(patch: Partial<DeviationRow>): DeviationRow {
     inspectionDate: '2026-10-07',
     finalised: true,
     createdAt: '2026-10-07T08:00:00.000Z',
+    checkName: 'Final inspection – RigiMill MG',
     ...patch,
   };
 }
@@ -185,6 +188,57 @@ describe('buildReport', () => {
       'Finalised and in progress',
     ]);
     expect(report.fileName).toBe('Deviation report 2026-10, RMMG, incl. in progress');
+  });
+
+  it('says a quality checks’ report is one, which check it covers, and counts checks', () => {
+    const report = buildReport(
+      input({
+        query: {
+          kind: 'quality',
+          from: '2026-10-01',
+          to: '2026-10-31',
+          model: 'RMMG',
+          check: 'Quality check – Pre start up',
+          includeInProgress: false,
+        },
+        period: 'month',
+        deviations: [
+          row({
+            kind: 'quality',
+            inspectionNumber: 'QC-2026-0003',
+            machineName: '',
+            checkName: 'Quality check – Pre start up',
+          }),
+        ],
+      }),
+    );
+    expect(report.title).toBe('Quality check deviation report');
+    expect(report.subject).toBe(
+      'Quality check deviation report · 2026-10 · RigiMill MG · Pre start up',
+    );
+    expect(report.fileName).toBe('Quality check deviation report 2026-10, RMMG, Pre start up');
+    expect(report.facts.map(({ label, value }) => [label, value]).slice(0, 4)).toEqual([
+      ['Period', '2026-10'],
+      ['Model', 'RigiMill MG'],
+      ['Quality check', 'Quality check – Pre start up'],
+      ['Quality checks', 'Finalised only'],
+    ]);
+    expect(report.kpis.map(({ label }) => label)).toEqual([
+      'Quality checks finalised',
+      'Deviations',
+      'Deviations per check',
+      'First-pass rate',
+    ]);
+    expect(report.kpis[2]!.detail).toBe('Average per quality check');
+    // Each check's deviations under its number and title (it has no machine name).
+    expect(report.list?.groups[0]).toMatchObject({
+      number: 'QC-2026-0003',
+      machine: 'Quality check – Pre start up',
+    });
+    // Every quality check when none is picked.
+    const all = buildReport(input({ query: { kind: 'quality', includeInProgress: true } }));
+    expect(all.facts[2]).toEqual({ label: 'Quality check', value: 'All quality checks' });
+    expect(all.facts[3]).toEqual({ label: 'Quality checks', value: 'Finalised and in progress' });
   });
 
   it('has the KPI tiles’ figures and words', () => {

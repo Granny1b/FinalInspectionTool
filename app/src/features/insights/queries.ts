@@ -3,10 +3,12 @@ import {
   InsightsDeviationsSchema,
   insightsQueryParams,
   InsightsSchema,
+  queryKind,
   type InsightsQuery,
 } from '@modig/shared';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiDownload, apiFetch } from '../../lib/api';
+import { INSIGHTS_WORDS } from './words';
 
 const withQuery = (path: string, query: InsightsQuery) => {
   const search = new URLSearchParams(insightsQueryParams(query)).toString();
@@ -20,8 +22,13 @@ export function useInsights(query: InsightsQuery | null) {
     queryFn: async ({ signal }) =>
       (await apiFetch(withQuery('/api/insights', query!), { schema: InsightsSchema, signal })).data,
     enabled: query !== null,
-    // Changing a filter keeps the previous numbers on screen (dimmed) until the new ones arrive.
-    placeholderData: keepPreviousData,
+    // Changing a filter keeps the previous numbers on screen (dimmed) until the new ones arrive;
+    // not when switching between final inspections and quality checks, whose numbers would
+    // stand under the other's words meanwhile.
+    placeholderData: (previous, previousQuery) => {
+      const before = previousQuery?.queryKey[1] as InsightsQuery | null | undefined;
+      return before && query && queryKind(before) === queryKind(query) ? previous : undefined;
+    },
   });
 }
 
@@ -49,7 +56,7 @@ export async function downloadCsv(query: InsightsQuery): Promise<void> {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = fileName ?? 'Deviations.csv';
+  link.download = fileName ?? `${INSIGHTS_WORDS[queryKind(query)].csvTitle}.csv`;
   document.body.append(link);
   link.click();
   link.remove();

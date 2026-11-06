@@ -34,7 +34,7 @@ export function useTestStorage(): void {
 
 /**
  * Deletes every template, inspection and deviation row, the settings, the people list and the
- * inspection counter. Safe only because the api project runs its test files one at a time
+ * inspection and quality check counters. Safe only because the api project runs its test files one at a time
  * (vitest.config.ts): no other file is using them meanwhile.
  */
 export async function resetStorage(): Promise<void> {
@@ -47,6 +47,7 @@ export async function resetStorage(): Promise<void> {
   await config.getBlobClient(blobNames.settings).deleteIfExists();
   await config.getBlobClient(blobNames.people).deleteIfExists();
   await config.getBlobClient(blobNames.inspectionCounter).deleteIfExists();
+  await config.getBlobClient(blobNames.qualityCheckCounter).deleteIfExists();
   forgetCachedPeople();
   const table = deviationsTable();
   for await (const { partitionKey, rowKey } of table.listEntities()) {
@@ -169,6 +170,7 @@ export function sampleInspection(
 ): Inspection {
   return {
     id: newId(),
+    kind: 'final',
     number: 'FI-2026-0007',
     templateId: template.id,
     templateRevision: template.revision,

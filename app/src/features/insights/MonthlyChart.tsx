@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 import { countTicks, monthTicks } from './axis';
 import { formatCount, formatMonthLong, formatMonthShort, plural } from './format';
+import { INSIGHTS_WORDS, type InsightsWords } from './words';
 
 type Month = Insights['perMonth'][number];
 
@@ -56,7 +57,16 @@ const CHART = [
 const MARGIN = { top: 8, right: 26, bottom: 0, left: -12 };
 const Y_AXIS_WIDTH = 48;
 
-export default function MonthlyChart({ months }: { months: Month[] }) {
+export default function MonthlyChart({
+  months,
+  words = INSIGHTS_WORDS.final,
+}: {
+  months: Month[];
+  /** Inspections or quality checks: what the month's count counts. */
+  words?: InsightsWords;
+}) {
+  const tooltip = (props: TooltipContentProps<TooltipValueType, number | string>) =>
+    monthTooltip(props, words);
   // The chart's width, for the month labels that fit it; 0 until the container is measured.
   const [width, setWidth] = useState(0);
   const ticks = countTicks(Math.max(0, ...months.map((month) => month.deviations)));
@@ -94,7 +104,7 @@ export default function MonthlyChart({ months }: { months: Month[] }) {
               <CartesianGrid vertical={false} />
               <XAxis {...xAxis} />
               <YAxis {...yAxis} />
-              <Tooltip content={MonthTooltip} isAnimationActive={false} />
+              <Tooltip content={tooltip} isAnimationActive={false} />
               {/* Thin, rounded at the end that carries the value, square at the baseline. */}
               <Bar
                 dataKey="deviations"
@@ -111,7 +121,7 @@ export default function MonthlyChart({ months }: { months: Month[] }) {
               <CartesianGrid vertical={false} />
               <XAxis {...xAxis} />
               <YAxis {...yAxis} />
-              <Tooltip content={MonthTooltip} isAnimationActive={false} />
+              <Tooltip content={tooltip} isAnimationActive={false} />
               <Line
                 type="linear"
                 dataKey="deviations"
@@ -132,7 +142,7 @@ export default function MonthlyChart({ months }: { months: Month[] }) {
           <tr>
             <th scope="col">Month</th>
             <th scope="col">Deviations</th>
-            <th scope="col">Inspections</th>
+            <th scope="col">{words.shortMany}</th>
           </tr>
         </thead>
         <tbody>
@@ -150,10 +160,13 @@ export default function MonthlyChart({ months }: { months: Month[] }) {
 }
 
 /**
- * The value leads; the month and the number of inspections follow. An overlay, lifted off the
- * card like a menu.
+ * The value leads; the month and the number of inspections (or checks) follow. An overlay, lifted
+ * off the card like a menu.
  */
-function MonthTooltip({ active, payload }: TooltipContentProps<TooltipValueType, number | string>) {
+function monthTooltip(
+  { active, payload }: TooltipContentProps<TooltipValueType, number | string>,
+  words: InsightsWords,
+) {
   const month = payload?.[0]?.payload as Month | undefined;
   if (!active || !month) return null;
   return (
@@ -161,7 +174,7 @@ function MonthTooltip({ active, payload }: TooltipContentProps<TooltipValueType,
       <p className="text-sm font-semibold text-ink-900">{plural(month.deviations, 'deviation')}</p>
       <p className="mt-0.5 text-ink-500">
         {formatMonthLong(month.month)} · {formatCount(month.inspections)}{' '}
-        {month.inspections === 1 ? 'inspection' : 'inspections'}
+        {month.inspections === 1 ? words.shortOne : `${words.shortOne}s`}
       </p>
     </div>
   );

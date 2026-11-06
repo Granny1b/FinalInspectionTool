@@ -5,6 +5,7 @@ import { fitScale, inspectionOnScreen, isPrintShortcut, SHEET_WIDTH_PX } from '.
 
 const stored: Inspection = {
   id: 'Insp000000000001',
+  kind: 'final',
   number: 'FI-2026-0042',
   templateId: 'Tmpl000000000001',
   templateRevision: 2,
