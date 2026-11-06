@@ -209,6 +209,31 @@
   grid-column: 2;
 }
 
+/* Closed in the app: the written action, day and who sit on the lines instead of empty ones. */
+.paper-card-filled {
+  min-height: 7mm;
+  padding: 1.2mm 0 0.8mm;
+  border-bottom: 0.25mm solid var(--paper-ink);
+  color: var(--paper-ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.paper-card-action > .paper-card-filled {
+  grid-column: 2;
+}
+
+/* "CLOSED" next to the severity: outlined like it, so it reads in black and white. */
+.paper-card-status {
+  padding: 0.3mm 1.6mm;
+  border: 0.3mm dashed var(--paper-ink);
+  border-radius: 0.6mm;
+  font-size: 6.5pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .paper-card-action-signed {
   display: grid;
   grid-column: 1 / -1;

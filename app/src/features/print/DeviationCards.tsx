@@ -2,6 +2,7 @@ import { SEVERITY_LABELS } from '@modig/shared';
 import { useId, type ReactNode } from 'react';
 import {
   isOversizedPage,
+  type ClosedDeviation,
   type DeviationCard as DeviationCardModel,
   type DeviationPhoto,
   type DeviationsPerPage,
@@ -197,6 +198,7 @@ function DeviationCard({
           <span className="paper-card-severity" data-severity={card.severity}>
             {SEVERITY_LABELS[card.severity]}
           </span>
+          {card.closed && <span className="paper-card-status">Closed</span>}
         </h3>
         <p className="paper-card-section">
           {card.ref ? card.sectionTitle : 'Not on the checklist'}
@@ -232,7 +234,11 @@ function DeviationCard({
       </div>
 
       {signOff === 'action' ? (
-        <ActionTaken />
+        card.closed ? (
+          <ActionDone closed={card.closed} />
+        ) : (
+          <ActionTaken />
+        )
       ) : (
         <div className="paper-card-closed">
           <span className="paper-card-label">Closed</span>
@@ -261,6 +267,25 @@ function ActionTaken() {
         <span className="paper-card-line" />
         <span className="paper-card-label">Signature</span>
         <span className="paper-card-line" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Closed in the app before printing (the deviation log): what was done, the day and who, where the
+ * lines to write them would be.
+ */
+function ActionDone({ closed }: { closed: ClosedDeviation }) {
+  return (
+    <div className="paper-card-closed paper-card-action" data-closed>
+      <span className="paper-card-label">Action taken</span>
+      <p className="paper-card-filled">{closed.action || '—'}</p>
+      <div className="paper-card-action-signed">
+        <span className="paper-card-label">Closed on</span>
+        <span className="paper-card-filled">{closed.closedOn}</span>
+        <span className="paper-card-label">Closed by</span>
+        <span className="paper-card-filled">{closed.closedBy || '—'}</span>
       </div>
     </div>
   );

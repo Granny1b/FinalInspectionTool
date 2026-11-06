@@ -1,4 +1,4 @@
-import type { Inspection, Section } from '@modig/shared';
+import { deriveDeviations, type FollowUp, type Inspection, type Section } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
 import { formatDateTime } from '../../../lib/format';
 import { defaultDeviationsPerPage, NOT_FINALISED_MARKER } from '../model';
@@ -303,6 +303,44 @@ describe('only the deviations', () => {
     expect(
       qualityCheckPrint(check({ state: 'in_progress' }), 'deviations', CONTEXT).fileName,
     ).toMatch(/ – Draft deviations$/);
+  });
+});
+
+describe('deviations closed in the app', () => {
+  const [first, , extra] = deriveDeviations(check());
+  const closed = (patch: Partial<FollowUp> = {}): FollowUp => ({
+    status: 'closed',
+    action: ' New decal, turned outward ',
+    closedOn: '2026-11-08',
+    closedBy: 'Sam Andersson',
+    updatedAt: '2026-11-08T09:00:00.000Z',
+    updatedBy: 'sam@modig.se',
+    ...patch,
+  });
+  const model = qualityCheckPrint(check(), 'deviations', {
+    ...CONTEXT,
+    followUps: {
+      [first!.key]: closed(),
+      [extra!.key]: closed({ status: 'open', closedOn: '', closedBy: '' }),
+    },
+  });
+
+  it('print how they were closed instead of empty lines; open ones keep the lines', () => {
+    const [d1, d2, d3] = model.deviations.cards;
+    expect(d1!.closed).toEqual({
+      action: 'New decal, turned outward',
+      closedOn: '2026-11-08',
+      closedBy: 'Sam Andersson',
+    });
+    expect(d2!.closed).toBeUndefined();
+    expect(d3!.closed).toBeUndefined();
+  });
+
+  it('count what is still open in the header', () => {
+    expect(values(model.header)['Deviations']).toBe('3 · 2 open');
+    expect(values(qualityCheckPrint(check(), 'deviations', CONTEXT).header)['Deviations']).toBe(
+      '3',
+    );
   });
 });
 

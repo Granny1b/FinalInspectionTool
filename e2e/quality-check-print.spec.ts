@@ -385,6 +385,36 @@ test('Print / Save PDF saves and prints the entire report or only the deviations
   await expect(tab).not.toHaveURL(/autoprint/);
 });
 
+test('a deviation closed in the deviation log prints how it was closed', async ({
+  page,
+  machine,
+}) => {
+  const check = await doneCheck(page.request, machine.check, {
+    serialNumber: 'RM-E2E-P05',
+    extras: [EXTRA],
+  });
+  const key = check.templateSnapshot.sections[0]!.items[0]!.id;
+  const closed = await page.request.put(`/api/inspections/${check.id}/follow-ups/${key}`, {
+    data: { status: 'closed', action: 'New decal, turned outward', closedOn: '2026-11-06' },
+  });
+  expect(closed.status()).toBe(200);
+
+  await page.goto(`/quality-checks/${check.id}/print?mode=deviations`);
+  const root = page.locator('[data-print-root]');
+  await expectReady(root);
+  // The header says what is left; the closed card has its closing instead of empty lines.
+  await expect(root.locator('.paper-qc-lead')).toContainText('2 · 1 open');
+  const d1 = root.locator('[data-deviation-card="D-01"]');
+  await expect(d1.locator('.paper-card-status')).toHaveText('Closed');
+  await expect(d1.locator('[data-closed]')).toContainText('New decal, turned outward');
+  await expect(d1.locator('[data-closed]')).toContainText('2026-11-06');
+  await expect(d1).not.toContainText('Signature');
+  // The open one still has its lines to fill in at the machine.
+  const d2 = root.locator('[data-deviation-card="D-02"]');
+  await expect(d2.locator('.paper-card-status')).toHaveCount(0);
+  await expect(d2).toContainText('Signature');
+});
+
 test('a quality check without deviations says so', async ({ page, machine }) => {
   const check = await doneCheck(page.request, machine.check, {
     serialNumber: 'RM-E2E-P04',

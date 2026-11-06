@@ -100,6 +100,19 @@ export type DeviationCard = {
   /** One of the settings' deviation categories; empty when none was chosen. */
   category: string;
   photos: DeviationPhoto[];
+  /**
+   * Closed in the app (the deviation log): what was done, the day and who, printed where a
+   * quality check's card leaves room to write them by hand. Absent while it is open.
+   */
+  closed?: ClosedDeviation;
+};
+
+export type ClosedDeviation = {
+  /** '' when nothing was written. */
+  action: string;
+  /** "YYYY-MM-DD" */
+  closedOn: string;
+  closedBy: string;
 };
 
 /**

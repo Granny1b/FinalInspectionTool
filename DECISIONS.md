@@ -3206,3 +3206,14 @@ an appendix.
   carry them are read and imported with them dropped. Nothing is migrated.
 - **Who wrote it is who published it.** A separate typed author was dropped with the rest; the
   revision history already names who published each revision.
+
+## Quality checks: closed deviations on the printout (2026-11-06)
+
+- **A deviation closed in the deviation log prints how it was closed:** a dashed "Closed" next to
+  its severity, the action taken, the day and who closed it on the card, where an open one has
+  lines to write them by hand and a signature. The only-deviations header says what is left
+  ("3 · 1 open"). The print page and the preview wait for the follow-ups, so the cards are laid
+  out once; if they can't be read, every card prints its empty lines, as before.
+- **Final inspection reports are unchanged:** their "Closed · Sign · Date" line stays blank. They
+  go to the customer as the record of the inspection, and showing later follow-up there was not
+  asked for.

@@ -1,6 +1,7 @@
 import type { Inspection, PeopleDirectory } from '@modig/shared';
 import { useMemo, useState } from 'react';
 import { personName, usePeopleDirectory } from '../../../lib/usePeople';
+import { useFollowUps } from '../../deviationLog/queries';
 import { modelName, useSettings } from '../../../lib/useSettings';
 import {
   DEFAULT_DEVIATIONS_PER_PAGE,
@@ -42,16 +43,19 @@ export function QualityCheckPreview({ inspection, onPrint, onClose }: Props) {
   // laid out twice, but not needed (a failed load shows the email).
   const people = usePeopleDirectory();
   const directory = people.isPending ? null : (people.data ?? NO_PEOPLE);
+  // Closed deviations show how they were closed, as on the print route.
+  const followUps = useFollowUps(inspection.id);
   const model = useMemo(
     () =>
-      settings.data && directory
+      settings.data && directory && !followUps.isPending
         ? qualityCheckPrint(inspection, mode, {
             companyName: settings.data.companyName,
             modelLabel: modelName(settings.data.machineModels, inspection.front.modelCode),
             personName: (email) => personName(directory, email),
+            followUps: followUps.data?.followUps,
           })
         : null,
-    [inspection, settings.data, mode, directory],
+    [inspection, settings.data, mode, directory, followUps.isPending, followUps.data],
   );
   const shownPerPage =
     perPage ?? (model ? defaultDeviationsPerPage(model) : DEFAULT_DEVIATIONS_PER_PAGE);

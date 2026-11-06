@@ -1,6 +1,7 @@
 import type { Inspection, InspectionKind, PeopleDirectory } from '@modig/shared';
 import { useCallback, useMemo } from 'react';
 import { Navigate, useLocation, useParams, useSearchParams } from 'react-router';
+import { useFollowUps } from '../features/deviationLog/queries';
 import { InspectionNotFound } from '../features/inspections/InspectionNotFound';
 import { inspectionHref } from '../features/inspections/listFilter';
 import { useInspection } from '../features/inspections/queries';
@@ -136,17 +137,21 @@ function QualityCheckPrint({ inspection, directory }: PrintProps) {
   const settings = useSettings();
   const { params, setParam, dropAutoprint } = useAddressChoices();
   const mode = parseQualityMode(params.get('mode')) ?? 'report';
+  // Closed deviations print how they were closed. Waited for, so the cards are laid out once,
+  // but not needed: if they can't be read, every card has its lines to fill in.
+  const followUps = useFollowUps(inspection.id);
 
   const model = useMemo(
     () =>
-      settings.data
+      settings.data && !followUps.isPending
         ? qualityCheckPrint(inspection, mode, {
             companyName: settings.data.companyName,
             modelLabel: modelName(settings.data.machineModels, inspection.front.modelCode),
             personName: (email) => personName(directory, email),
+            followUps: followUps.data?.followUps,
           })
         : null,
-    [inspection, settings.data, mode, directory],
+    [inspection, settings.data, mode, directory, followUps.isPending, followUps.data],
   );
   const images = usePrintImages(model, settings.data?.logoImageId, { appendix: false });
   if (!model || images.loading) return <PrintLoading />;

@@ -14,6 +14,7 @@ import {
   rowRef,
   sectionNumber,
   totalHours,
+  type FollowUp,
   type Inspection,
   type RowResult,
   type Section,
@@ -123,11 +124,20 @@ export type QualityPrintModel = {
   fileName: string;
 };
 
+/** What a quality check's printout needs besides the check: also how its deviations stand. */
+export type QualityPrintContext = PrintContext & {
+  /**
+   * The check's follow-ups by deviation key (the deviation log): a closed deviation prints its
+   * action, day and who instead of empty lines. Left out, every card has the lines.
+   */
+  followUps?: Readonly<Record<string, FollowUp>>;
+};
+
 /** The entire report, or only its deviations, of a quality check, from its frozen copy. */
 export function qualityCheckPrint(
   inspection: Inspection,
   mode: QualityPrintMode,
-  context: PrintContext,
+  context: QualityPrintContext,
 ): QualityPrintModel {
   const { front, number, templateSnapshot, templateRevision } = inspection;
   const title = templateSnapshot.name.trim() || 'Quality check';
@@ -139,7 +149,10 @@ export function qualityCheckPrint(
   const date = formatCalendarDate(front.date);
   const finalised = inspection.state === 'finalised';
   const deviations = deriveDeviations(inspection);
-  const cards = deviations.map(deviationCard);
+  const cards = deviations.map((deviation) =>
+    withFollowUp(deviationCard(deviation), context.followUps?.[deviation.key]),
+  );
+  const openCount = cards.filter((card) => !card.closed).length;
   const progress = inspectionProgress(inspection);
   const open = progress.total - progress.filled;
   const sections = templateSnapshot.sections;
@@ -183,7 +196,14 @@ export function qualityCheckPrint(
       { label: 'Serial number', value: serialNumber || '—' },
       { label: 'Date', value: date || '—' },
       { label: 'Checked by', value: checkedBy || '—' },
-      { label: 'Deviations', value: String(deviations.length) },
+      {
+        label: 'Deviations',
+        // "4 · 1 open" once some are closed: the paper at the machine shows what is left.
+        value:
+          openCount === cards.length
+            ? String(cards.length)
+            : `${cards.length}${SEPARATOR}${openCount} open`,
+      },
     ],
     checklistTitle: `${title}${SEPARATOR}${revisionLabel}`,
     revisionLabel,
@@ -261,4 +281,17 @@ function printSections(
 export function qualityImageIds(model: QualityPrintModel): string[] {
   const ids = model.deviations.cards.flatMap((card) => card.photos.map((photo) => photo.imageId));
   return [...new Set(ids)];
+}
+
+/** The card with its closing when the deviation is closed in the app; else as it is. */
+function withFollowUp(card: DeviationCard, followUp: FollowUp | undefined): DeviationCard {
+  if (followUp?.status !== 'closed') return card;
+  return {
+    ...card,
+    closed: {
+      action: followUp.action.trim(),
+      closedOn: followUp.closedOn,
+      closedBy: followUp.closedBy.trim(),
+    },
+  };
 }
