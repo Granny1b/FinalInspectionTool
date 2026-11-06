@@ -176,7 +176,7 @@ describe('the Word export of a report', () => {
       'FI-2026-0042',
       'Final Inspection',
       'Modig Machine Tool',
-      'Machine name',
+      'Machine ID',
       'RigiMill MG – Volvo Skövde',
       'Serial number',
       'RM-2026-031',

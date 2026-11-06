@@ -1,10 +1,6 @@
 import { useRef } from 'react';
-import {
-  printedImageIds,
-  type DeviationCard,
-  type DeviationsPerPage,
-  type PrintModel,
-} from './model';
+import type { DeviationCard, DeviationsPerPage } from './model';
+import { appendixCount, printoutImageIds, type Printout } from './printout';
 import { useAssetsReady } from './useAssetsReady';
 import { useCardPages } from './useCardPages';
 import type { PrintImages } from './usePrintImages';
@@ -18,7 +14,7 @@ const NO_CARDS: DeviationCard[] = [];
  * has loaded (images, fonts, the cards measured and the appendix's images, when asked for).
  */
 export function usePrintDocument(
-  model: PrintModel,
+  model: Printout,
   images: PrintImages,
   { perPage, appendix }: { perPage: DeviationsPerPage; appendix: boolean },
 ) {
@@ -28,7 +24,7 @@ export function usePrintDocument(
     perPage,
   );
   // Asked for and there is something to show: the appendix (in print and Word alike).
-  const withAppendix = appendix && model.appendix.length > 0;
+  const withAppendix = appendix && appendixCount(model) > 0;
   // Its images' addresses arrive a moment after it is turned on.
   const appendixShown = withAppendix && !images.appendixLoading;
   // What is laid out and every image address in it: when any changes, readiness waits again.
@@ -38,7 +34,7 @@ export function usePrintDocument(
     appendixShown,
     cards.pages?.map((page) => page.map((card) => card.number).join()).join('|'),
     images.logoUrl,
-    ...printedImageIds(model, { appendix: appendixShown }).map((id) => images.urls.get(id) ?? ''),
+    ...printoutImageIds(model, { appendix: appendixShown }).map((id) => images.urls.get(id) ?? ''),
   ].join(' ');
   // Not while the cards are being measured onto pages, nor before the appendix is in.
   const ready =

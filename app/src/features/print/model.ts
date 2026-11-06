@@ -123,7 +123,7 @@ export type FrontPage = {
   companyName: string;
   /** "FI-2026-0042" when printing an inspection. */
   number: string | null;
-  /** Machine name, Model, Serial number, Participants, Location, Date (brief §6). */
+  /** Machine ID, Model, Serial number, Participants, Location, Date (brief §6). */
   fields: FrontField[];
   photoId: string | undefined;
   /** Bottom right, like the workbook's "Rev: 2"; "Draft – Rev 3" for a template's draft. */
@@ -133,6 +133,8 @@ export type FrontPage = {
 };
 
 export type PrintModel = {
+  /** A final inspection's (or a template's) checklist; a quality check's report is another. */
+  document: 'checklist';
   mode: PrintMode;
   front: FrontPage;
   /** Above the first section: "Final inspection – RigiMill MG · Rev 2". */
@@ -164,15 +166,15 @@ export type PrintContext = {
   personName?: (email: string) => string;
 };
 
-const SEPARATOR = ' · ';
+export const SEPARATOR = ' · ';
 
 /**
  * The machine as the footer names it: a long name is cut (the front page has it whole), so the
  * footer stays clear of "Page X of Y" and the paper's edge.
  */
-const FOOTER_MACHINE_LENGTH = 60;
+export const FOOTER_MACHINE_LENGTH = 60;
 
-function clip(text: string, length: number): string {
+export function clip(text: string, length: number): string {
   return text.length > length ? `${text.slice(0, length - 1).trimEnd()}…` : text;
 }
 
@@ -191,6 +193,7 @@ export function inspectionPrint(
   const revisionLabel = `Rev ${templateRevision}`;
 
   return {
+    document: 'checklist',
     mode,
     front: {
       companyName,
@@ -243,6 +246,7 @@ export function templatePrint(
   const name = template.name.trim() || 'Untitled template';
   const revision = draft ? `Draft – Rev ${template.revision}` : `Rev ${template.revision}`;
   return {
+    document: 'checklist',
     mode: 'blank',
     front: {
       companyName,
@@ -272,7 +276,7 @@ export function templatePrint(
   };
 }
 
-function company({ companyName }: PrintContext): string {
+export function company({ companyName }: PrintContext): string {
   return companyName.trim() || DEFAULT_COMPANY_NAME;
 }
 
@@ -285,7 +289,8 @@ function frontFields(values: {
   date: string;
 }): FrontField[] {
   return [
-    { label: 'Machine name', value: values.machineName },
+    // The machine's ID in the ERP (Monitor), "Magellan#1"; stored as `machineName`.
+    { label: 'Machine ID', value: values.machineName },
     { label: 'Model', value: values.model },
     { label: 'Serial number', value: values.serialNumber },
     { label: 'Participants', value: values.participants },
@@ -344,7 +349,7 @@ function printSections(
   }));
 }
 
-function plural(count: number, noun: string): string {
+export function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
@@ -355,7 +360,7 @@ function blankDeviationLines(): PrintDeviations {
   };
 }
 
-function deviationCard(deviation: InspectionDeviation): DeviationCard {
+export function deviationCard(deviation: InspectionDeviation): DeviationCard {
   return {
     number: deviation.number,
     ref: deviation.kind === 'row' ? deviation.ref : null,
@@ -378,7 +383,7 @@ function printedPhoto(photo: AnnotatedImage): DeviationPhoto {
  * (DEFAULT_DEVIATIONS_PER_PAGE); four when no deviation has a photo, because two cards without
  * one left three quarters of every page to empty sketch frames.
  */
-export function defaultDeviationsPerPage(model: PrintModel): DeviationsPerPage {
+export function defaultDeviationsPerPage(model: Pick<PrintModel, 'deviations'>): DeviationsPerPage {
   const { deviations } = model;
   const photos = deviations.kind === 'cards' && deviations.cards.some((card) => card.photos.length);
   return photos ? DEFAULT_DEVIATIONS_PER_PAGE : 4;
@@ -388,11 +393,14 @@ export function defaultDeviationsPerPage(model: PrintModel): DeviationsPerPage {
  * The report's cards on pages: `perPage` to a page while they fit, fewer when the cards' natural
  * heights (in mm, from the laid-out page) add up to more than `room`, the page height left for
  * cards. A card taller than that gets a page of its own. Never splits or reorders a card.
+ *
+ * `first` is what a block above the first page's cards takes of its room (a quality check's
+ * deviations printed on their own start under a short header); 0 for none.
  */
 export function packCards<T>(
   cards: readonly T[],
   heights: readonly number[],
-  { perPage, room }: { perPage: DeviationsPerPage; room: number },
+  { perPage, room, first = 0 }: { perPage: DeviationsPerPage; room: number; first?: number },
 ): T[][] {
   const pages: T[][] = [];
   let used = 0;
@@ -404,10 +412,19 @@ export function packCards<T>(
       used += height;
     } else {
       pages.push([card]);
-      used = height;
+      used = (pages.length === 1 ? first : 0) + height;
     }
   });
   return pages;
+}
+
+/**
+ * Whether a block `closing` mm tall (its gap included) fits under the cards of the last page,
+ * whose heights are `heights`, in the `room` that page has: a quality check's "All deviations
+ * closed" sign-off. When it doesn't, it takes a page of its own rather than push a card off.
+ */
+export function closingFits(heights: readonly number[], room: number, closing: number): boolean {
+  return heights.reduce((sum, height) => sum + height, 0) + closing <= room;
 }
 
 /**

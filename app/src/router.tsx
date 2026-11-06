@@ -60,9 +60,9 @@ export const router = createBrowserRouter([
     element: <PrintShell />,
     errorElement: <RouteError />,
     children: [
-      { path: 'inspections/:id/print', element: <InspectionPrintPage /> },
-      // A quality check doesn't print yet: the page says so.
-      { path: 'quality-checks/:id/print', element: <InspectionPrintPage /> },
+      { path: 'inspections/:id/print', element: <InspectionPrintPage kind="final" /> },
+      // A quality check's report: entire, or only its deviations.
+      { path: 'quality-checks/:id/print', element: <InspectionPrintPage kind="quality" /> },
       { path: 'templates/:id/print', element: <TemplatePrintPage /> },
       // The Insights report, admins only like Insights.
       {

@@ -83,6 +83,9 @@ Added after the six phases:
   row a card with its pictures and large OK / NOK / N/A buttons, then finalise it. Insights counts
   them apart from final inspections, with a report of their own. See
   [Doing a quality check](#doing-a-quality-check).
+- **Quality checks (printing).** **Preview** and **Print / Save PDF** on a quality check print its
+  entire report or only its deviations, each with places to sign it off at the machine. See
+  [Printing a quality check](#printing-a-quality-check).
 
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
@@ -252,8 +255,9 @@ identity, which is what later phases key results and statistics on.
 In-process checks along a machine's build, before the final inspection: "Quality check – Pre
 start up", several per machine. They live in the machine's template (their set-up, below) and are
 done on a machine from _Quality checks_ in the sidebar (see
-[Doing a quality check](#doing-a-quality-check)). Printing one, importing one from Excel,
-approvals, and protective equipment and tools per section come later.
+[Doing a quality check](#doing-a-quality-check)), and a check done prints (see
+[Printing a quality check](#printing-a-quality-check)). Printing a quality check's blank form,
+importing one from Excel, approvals, and protective equipment and tools per section come later.
 
 - **The machine's page.** A template opens as its machine: "← Templates", the model's name and two
   tabs, **Final inspection** (the template editor above) and **Quality checks (n)**. The Templates
@@ -339,9 +343,11 @@ the deviation fields and photos, extra deviations, Finalise and Reopen, Delete a
   rows with their how, references, time and pictures, and the front page's title, department and
   document number. Later revisions, or deleting the quality check, never change it.
 - **The page** (`/quality-checks/{id}`): the header with the number and machine, the quality
-  check and its revision, the serial number, the save status, **Finalise** (or **Reopen**), the
+  check and its revision, the serial number, the save status, **Preview** and **Print / Save
+  PDF** (_Entire report_ or _Only deviations_, see
+  [Printing a quality check](#printing-a-quality-check)), **Finalise** (or **Reopen**), the
   tabs _Checklist_ and _Deviations (n)_, the progress (`3 / 10 rows filled · 1 NOK`) and _Continue
-  at 1.d_. There is no Print or Preview yet: its print address says quality checks don't print yet.
+  at 1.d_.
   The front page has the machine (the model, fixed), Serial number, Date and Checked by, and the
   quality check it follows, read-only; nothing about delivery (no machine name, location or photo).
 - **The rows.** Each section is a header with its number, title, rows and time ("5 rows · 0.6 h"),
@@ -652,6 +658,56 @@ printed 1:1.
 Everything is laid out for black and white: statuses and severities in words, light grey fills
 only, thin rules. Inter is bundled with the app, so a printout looks the same offline.
 
+### Printing a quality check
+
+A quality check done on a machine prints on the same A4 paper as a final report, black and white
+throughout, to be filed at the machine and signed there. No guide pictures (they are for the app)
+and no Word export or reference images.
+
+- **Preview** on the quality check's page shows it at once, unsaved edits included, as on an
+  inspection (Escape or **Close** go back, **Print / Save PDF** or Ctrl+P prints what is shown).
+  Its header has **Entire report | Only deviations** and **Deviations: 2 per page | 4 per page**;
+  it opens on the entire report.
+- **Print / Save PDF** → _Entire report_ or _Only deviations_ saves pending changes and opens the
+  print page in a new tab, which prints once everything has loaded. Its toolbar has the same two
+  choices, kept in the address, and **Rev N** after what is printed.
+- Address: `/quality-checks/{id}/print?mode=report|deviations[&deviationsPerPage=2|4]`; the
+  entire report without a mode. `/inspections/{id}/print` of a quality check leads there (and the
+  other way round for a final inspection), with the same choices.
+
+**Entire report.**
+
+- **Front page:** the logo and the number (`QC-2026-0004`), the check's title ("Quality check –
+  Pre start up"), the company name, "Finalised 2026-11-06 14:32 by Anna Andersson" (or "NOT
+  FINALISED – DRAFT REPORT" in a box), then Machine ID, Machine model, Serial number, Date,
+  Checked by and Department; a summary in numbers (Rows, OK, NOK, N/A, Not filled while some are,
+  Deviations) with "5 sections · 20 rows · 2.6 h"; and at the foot of the page the sign-off lines,
+  _Checked by · Signature · Date_ and _Deviations closed / approved by · Signature · Date_, with
+  "Rev: 2" bottom right. A field without a value keeps its line to write on.
+- **Checklist:** a table per section, its heading with the number, title, rows and time ("5 rows ·
+  0.6 h"), and the columns Ref | What to check | Result | Comment. Under what to check, how (smaller)
+  and the references (smaller, grey). The result as a mark and a word, ✓ OK, ✗ NOK (boxed) and –
+  N/A, or "Not filled"; a NOK row's comment starts with its card, "D-02 · Major". Headings repeat
+  on every page a section runs onto and rows never split, as on a final report.
+- **Deviations:** the final report's cards ("D-03 · 4.c · MAJOR", the section, the checkpoint or
+  "Not on the checklist", comment, Category, Responsible, photos), 2 or 4 to a page, each with
+  lines to fill in at the machine: _Action taken_ (two lines), _Closed on_ and _Signature_. With
+  4 to a page the lines run across the whole card. "No deviations recorded." when there are none.
+
+**Only deviations.** The first page starts with a short header: logo and number, the title, "NOT
+FINALISED – DRAFT REPORT" while it is in progress, then Machine ID, Machine model, Serial number,
+Date, Checked by and how many deviations there are. The same cards follow, and after the last one
+_All deviations closed_ with _Name · Signature · Date_, under the last card or, when it doesn't fit
+there, on a page of its own. The first page holds fewer cards for the header. Without deviations
+the page says "No deviations recorded." and has nothing to sign.
+
+**Footer.** Every page: "QC-2026-0004 · Quality check – Pre start up · Magellan#1 · RigiMill MG ·
+S/N RM-2026-016" bottom left (the Machine ID left out when there is none, "Not finalised" added
+while in progress) and "Page X of Y" bottom right, in Chrome and Edge.
+
+The PDF is named like `QC-2026-0004 Magellan#1 RigiMill MG – Pre start up – Quality check report`
+(`– Draft report`, `– Deviations`, `– Draft deviations`).
+
 ### Reference images (appendix)
 
 **Include reference images** in the print toolbar (kept in the address as `appendix=1`) adds the
@@ -958,8 +1014,8 @@ because it usually means the command that produced it failed.
   Finalise while rows lack a status, marks a NOK with comment, severity and responsible and an OK
   with the keyboard, finalises (stored as a quality check, its frozen front page, its deviation row
   of kind quality), finds it read-only after a reload, listed under Quality checks and not under
-  Inspections, its inspection address leading to it and its print address saying it doesn't print
-  yet; an admin sees it only under Quality checks in Insights (the API's numbers by kind, the
+  Inspections, its inspection address leading to it and its inspection print address leading to
+  its own print page; an admin sees it only under Quality checks in Insights (the API's numbers by kind, the
   switch, the quality check menu, the CSV's name and rows, the report's title and deviation list)
   while the final inspection's numbers and report leave it out; and an admin reopens and deletes
   one while an inspector has no Delete and gets 403. For inspections: creating one from the front page form and
@@ -999,6 +1055,16 @@ because it usually means the command that produced it failed.
   (`e2e/insights-report.spec.ts`): previewed from Insights with the deviation list added and
   printed, A4 pages with the footer and the list on pages of its own, a single month stated as the
   month and an empty selection saying so, and admins only.
+- **Quality check printing** (`e2e/quality-check-print.spec.ts`, each test with a throwaway
+  machine and quality check): Preview from a quality check showing the entire report (front page
+  with Machine ID, Department and "Rev: 1" and no document number, the summary, the checklist rows
+  with how, references and "D-01 · Major", the cards with Action taken, Closed on and Signature, no
+  Word export), switched to Only deviations (the header, the cards and All deviations closed) and
+  to 4 per page, and Escape back to Preview; the print page reached from the inspection print
+  address, without Word export or reference images, printed to PDFs in both modes (A4, the
+  quality check's footer and "Page X of Y" on every page, the deviations on pages of their own);
+  Print / Save PDF → Only deviations opening the print tab and printing once; and a check without
+  deviations saying so.
 - **Print tests** (`e2e/print.spec.ts`) print real PDFs with Chromium's `page.pdf` (A4, the
   page's own `@page` rule, background graphics on) and measure them with `pdfjs-dist`: a blank
   checklist of the 90-row RigiMill MG, a finalised report in both deviation layouts (long

@@ -1,5 +1,5 @@
 import { SEVERITY_LABELS } from '@modig/shared';
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import {
   isOversizedPage,
   type DeviationCard as DeviationCardModel,
@@ -8,6 +8,13 @@ import {
 } from './model';
 import { PaperPhoto } from './PaperPhoto';
 import type { CardPages } from './useCardPages';
+
+/**
+ * How a card is signed off by hand: `closed`, a final report's "Closed · Sign · Date" line;
+ * `action`, a quality check's "Action taken" lines over "Closed on" and "Signature", for the
+ * printout kept at the machine.
+ */
+export type SignOff = 'closed' | 'action';
 
 type Props = {
   cards: DeviationCardModel[];
@@ -18,6 +25,13 @@ type Props = {
   subject: string;
   /** Read URLs by image id; a photo without one prints as "couldn't be loaded". */
   imageUrls: ReadonlyMap<string, string>;
+  /** Each page's heading. */
+  title?: string;
+  signOff?: SignOff;
+  /** Above the first page's heading (and above "No deviations recorded."): a short header. */
+  lead?: ReactNode;
+  /** After the last card: a sign-off for all of them, under it or on a page of its own. */
+  closing?: ReactNode;
 };
 
 /**
@@ -26,67 +40,116 @@ type Props = {
  * it from the others, and the page holds fewer cards when not all of them fit (useCardPages).
  * Every slot has the same size, also on a page with fewer cards; only a card too tall to share a
  * page has its page to itself, full width.
+ *
+ * A quality check's cards add a lead (its short header, when only the deviations print), a
+ * closing sign-off after the last card, and room on each card to sign it off at the machine.
  */
-export function DeviationCards({ cards, cardPages, perPage, subject, imageUrls }: Props) {
+export function DeviationCards({
+  cards,
+  cardPages,
+  perPage,
+  subject,
+  imageUrls,
+  title = 'Deviation Summary',
+  signOff = 'closed',
+  lead,
+  closing,
+}: Props) {
   const titleId = useId();
-  const { pages, heights, room, measureRef } = cardPages;
+  const { pages, heights, room, first, closingAlone, measureRef } = cardPages;
   const card = (model: DeviationCardModel, wide = false) => (
-    <DeviationCard key={model.number} card={model} wide={wide} imageUrls={imageUrls} />
+    <DeviationCard
+      key={model.number}
+      card={model}
+      wide={wide}
+      signOff={signOff}
+      imageUrls={imageUrls}
+    />
   );
+  // Marked, so useCardPages measures them with the cards.
+  const leadBlock = lead && <div data-card-lead="">{lead}</div>;
+  const closingBlock = closing && <div data-card-closing="">{closing}</div>;
 
   return (
     <section
       className="paper-deviations"
       aria-labelledby={titleId}
       data-deviations-per-page={perPage}
+      data-sign-off={signOff}
     >
       {cards.length === 0 ? (
         <div className="paper-sheet">
-          <Heading titleId={titleId} subject={subject} />
+          {leadBlock}
+          <Heading titleId={titleId} title={title} subject={subject} />
           <p className="paper-empty">No deviations recorded.</p>
         </div>
       ) : pages === null ? (
         // Laid out once, hidden, to be measured: each card at its natural height.
         <div className="paper-sheet paper-measure" aria-hidden="true">
           <div ref={measureRef} className="paper-card-page">
-            <Heading subject={subject} />
+            {leadBlock}
+            <Heading title={title} subject={subject} />
             <div className="paper-cards" data-card-list="">
               {cards.map((model) => card(model))}
             </div>
+            {closingBlock}
           </div>
         </div>
       ) : (
-        pages.map((page, index) => {
-          const oversized = isOversizedPage(page, heights, room);
-          return (
-            <div key={page[0]!.number} className="paper-sheet">
-              <div className="paper-card-page">
-                <Heading
-                  // Repeated on every page for the reader of the paper; once for a screen reader.
-                  titleId={index === 0 ? titleId : undefined}
-                  subject={`${subject} · ${range(page)}`}
-                />
-                <div className="paper-cards">
-                  {page.map((model) => card(model, oversized))}
-                  {/* A page with fewer cards keeps their size. */}
-                  {!oversized &&
-                    Array.from({ length: perPage - page.length }, (_, slot) => (
-                      <div key={slot} aria-hidden="true" />
-                    ))}
+        <>
+          {pages.map((page, index) => {
+            // The first page's room is less what the lead takes of it.
+            const oversized = isOversizedPage(page, heights, index === 0 ? room - first : room);
+            const last = index === pages.length - 1;
+            return (
+              <div key={page[0]!.number} className="paper-sheet">
+                <div className="paper-card-page">
+                  {index === 0 && leadBlock}
+                  <Heading
+                    // Repeated on every page for the reader of the paper; once for a screen reader.
+                    titleId={index === 0 ? titleId : undefined}
+                    title={title}
+                    subject={`${subject} · ${range(page)}`}
+                  />
+                  <div className="paper-cards">
+                    {page.map((model) => card(model, oversized))}
+                    {last && !closingAlone && closingBlock}
+                    {/* A page with fewer cards keeps their size. */}
+                    {!oversized &&
+                      Array.from({ length: perPage - page.length }, (_, slot) => (
+                        <div key={slot} aria-hidden="true" />
+                      ))}
+                  </div>
                 </div>
               </div>
+            );
+          })}
+          {closingAlone && closingBlock && (
+            <div className="paper-sheet">
+              <div className="paper-card-page">
+                <Heading title={title} subject={subject} />
+                {closingBlock}
+              </div>
             </div>
-          );
-        })
+          )}
+        </>
       )}
     </section>
   );
 }
 
-function Heading({ titleId, subject }: { titleId?: string; subject: string }) {
+function Heading({
+  titleId,
+  title,
+  subject,
+}: {
+  titleId?: string;
+  title: string;
+  subject: string;
+}) {
   return (
     <div className="paper-heading" aria-hidden={titleId ? undefined : true}>
-      <h2 id={titleId}>Deviation Summary</h2>
+      <h2 id={titleId}>{title}</h2>
       <p>{subject}</p>
     </div>
   );
@@ -102,11 +165,13 @@ function range(page: DeviationCardModel[]): string {
 function DeviationCard({
   card,
   wide,
+  signOff,
   imageUrls,
 }: {
   card: DeviationCardModel;
   /** Alone on its page: full width in either layout (print.css). */
   wide: boolean;
+  signOff: SignOff;
   imageUrls: ReadonlyMap<string, string>;
 }) {
   const titleId = useId();
@@ -166,14 +231,38 @@ function DeviationCard({
         )}
       </div>
 
-      <div className="paper-card-closed">
-        <span className="paper-card-label">Closed</span>
-        <span>Sign</span>
+      {signOff === 'action' ? (
+        <ActionTaken />
+      ) : (
+        <div className="paper-card-closed">
+          <span className="paper-card-label">Closed</span>
+          <span>Sign</span>
+          <span className="paper-card-line" />
+          <span>Date</span>
+          <span className="paper-card-line" />
+        </div>
+      )}
+    </article>
+  );
+}
+
+/**
+ * Filled in by hand at the machine once the deviation is dealt with: what was done, on two lines,
+ * then when it was closed and by whom. Lines high enough to write on (print.css).
+ */
+function ActionTaken() {
+  return (
+    <div className="paper-card-closed paper-card-action">
+      <span className="paper-card-label">Action taken</span>
+      <span className="paper-card-line" />
+      <span className="paper-card-line paper-card-action-more" />
+      <div className="paper-card-action-signed">
+        <span className="paper-card-label">Closed on</span>
         <span className="paper-card-line" />
-        <span>Date</span>
+        <span className="paper-card-label">Signature</span>
         <span className="paper-card-line" />
       </div>
-    </article>
+    </div>
   );
 }
 
