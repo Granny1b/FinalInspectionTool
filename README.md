@@ -211,7 +211,7 @@ where the app opens.
   Each ticked check is copied from its template's **latest published revision**; a draft's
   unpublished changes are not. **Create machine** opens its page.
 - **The machine's page** (`/machines/{id}`): its status, model, serial number and who made it;
-  **Edit** (its Machine ID and serial number), **Add check** (a check of its model it doesn't
+  **Edit** (its Machine ID and serial number; admins), **Add check** (a check of its model it doesn't
   have: not ticked when it was made, or published since, copied as published now) and, for
   admins, ⋯ **Link an inspection…** and **Delete machine** (only while none of its checks is
   started). Then its **Quality checks** in the order they are done ("2 / 5 finalised") and its
@@ -1110,7 +1110,7 @@ it was stored but the log's table could not be updated: sending the same request
 | `POST /api/machines`                          | inspector | New machine with not-started copies of the templates ticked              |
 | `POST /api/machines/from-inspections`         | admin     | Machines for the inspections without one, and links them                 |
 | `GET /api/machines/{id}`                      | inspector | One machine, its checks in order (update available, changes) and `ETag`  |
-| `PUT /api/machines/{id}`                      | inspector | Its Machine ID and serial number (`If-Match`), onto its open checks      |
+| `PUT /api/machines/{id}`                      | admin     | Its Machine ID and serial number (`If-Match`), onto its open checks      |
 | `DELETE /api/machines/{id}`                   | admin     | Delete it and its checks while none is started (`If-Match`; 409 after)   |
 | `POST /api/machines/{id}/checks`              | inspector | Another check, copied from its template's latest published revision      |
 | `GET /api/inspections`                        | inspector | All inspections and quality checks done (`kind`), newest number first    |
@@ -1413,10 +1413,9 @@ and 5173) on its first storage call; in Azure the rule comes from the Bicep file
 
 - Static Web Apps built-in authentication with Microsoft Entra ID (`/.auth/login/aad`). There are
   no passwords. Other providers (GitHub, X) are switched off.
-- Two roles: **`inspector`** makes machines (and edits their Machine ID and serial number), adds
-  and starts their checks, fills in inspections and quality checks and follows up their deviations
-  in the deviation log; **`admin`** can also edit templates and the order of quality checks, edit
-  a machine's own checklist and update it to a newer template, link and unlink inspections and
+- Two roles: **`inspector`** makes machines, adds and starts their checks, fills in inspections and quality checks and follows up their deviations
+  in the deviation log; **`admin`** can also edit templates and the order of quality checks, change
+  a machine's Machine ID and serial number, edit a machine's own checklist and update it to a newer template, link and unlink inspections and
   machines, delete a machine nobody has started a check on, see insights, change settings, reopen
   inspections and delete them.
 - **Who has which role is decided by the API.** A person's role and the name shown for them come

@@ -152,8 +152,9 @@ test('an inspector makes a machine with the checks ticked and starts one, filled
   await expect(preStart).toContainText('Based on Pre start up rev 1');
   await expect(checkCard(page, 'Final inspection')).toContainText('Not started');
   await expect(page.getByRole('heading', { level: 3, name: 'Frame' })).toHaveCount(0);
-  // An inspector has no admin menus.
+  // An inspector has no admin menus, and can't change the Machine ID or serial number.
   await expect(page.getByRole('button', { name: 'Machine actions' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Pre start up actions' })).toHaveCount(0);
 
   // The final inspection warns while a quality check is not finalised.
@@ -177,6 +178,7 @@ test('an inspector makes a machine with the checks ticked and starts one, filled
   // The machine's: no fields for them here.
   await expect(front.getByLabel('Machine ID', { exact: true })).toHaveCount(0);
   await expect(front.getByLabel('Serial number')).toHaveCount(0);
+  await expect(front).toContainText('From the machine; an admin can change it there.');
   await expect(front.getByText('Sam Andersson', { exact: true })).toBeVisible();
   // It leads back to its machine, where it is in progress.
   await page.getByRole('link', { name: machineId }).first().click();
@@ -377,7 +379,7 @@ test('an admin orders a model’s quality checks; machines get them in that orde
   );
 });
 
-test('only admins edit checklists, update, link and delete machines', async ({
+test('only admins edit checklists, update, link, rename and delete machines', async ({
   page,
   context,
   model,
@@ -433,8 +435,12 @@ test('only admins edit checklists, update, link and delete machines', async ({
       headers: { 'If-Match': '"x"' },
     }),
     await inspector.post('/api/machines/from-inspections'),
+    await inspector.put(`/api/machines/${machine.machine.id}`, {
+      headers: { 'If-Match': '"x"' },
+      data: { machineName: 'Renamed', serialNumber: 'S/N' },
+    }),
   ];
-  expect(refused.map((response) => response.status())).toEqual([403, 403, 403, 403, 403]);
+  expect(refused.map((response) => response.status())).toEqual([403, 403, 403, 403, 403, 403]);
   await inspector.dispose();
 
   // An admin deletes a machine nobody has started a check on, with its checks.

@@ -3021,6 +3021,10 @@ work, a Machine ID on quality checks too ("Standardize it to make sense").
   the inspection's date: a quality check done over a few days finds its deviations on different
   days, and that is what "open for more than 30 days" should count from. A table rebuilt from the
   blobs would date them to the rebuild, as Insights' `createdAt` already would.
+- **Settled with the user (2026-11-06):** Found is filled in on its own with the day the
+  deviation was recorded; Closed on is filled in with today when a deviation is closed and can be
+  changed to the day it was really done (not a later day than today). The Excel log
+  ("Avvikelselogg QC") is not imported for now.
 
 ### The log page
 
@@ -3303,7 +3307,7 @@ deviation log should be able to bind to the machine.
 
 - **Machine ID, model and serial number are the machine's**: shown as text on the check's front
   page ("From the machine. Change it there", a link to it), and kept by the server whatever a save
-  sends (`savedFront`). They are edited on the machine (**Edit**, inspectors and admins), and an
+  sends (`savedFront`). They are edited on the machine (**Edit**, admins only), and an
   edit is put on every check of the machine that is not finalised (and their deviation rows);
   finalised ones keep what they were finalised with, for their history and their printouts. Each
   check is changed over the version read and retried; one that can't be is logged (it gets the
@@ -3465,10 +3469,15 @@ deviation log should be able to bind to the machine.
   (not started) and the update banner. Cards lay out by their own width.
 - **A not-started check's page** shows what it will check (read-only), **Start**, and for admins
   **Edit checklist**; its back link goes to its machine, as a started machine check's does.
-- **Roles, as agreed:** making machines, editing a machine's Machine ID and serial number, adding
-  checks and starting them: inspectors and admins. Editing a machine's checklist, updating it,
-  linking and unlinking, deleting a machine, removing a check not started, the one-time action and
-  reordering quality checks: admins (the API checks every one).
+- **Roles, as agreed:** making machines, adding checks and starting them: inspectors and admins.
+  Changing a machine's Machine ID and serial number, editing its checklist, updating it, linking
+  and unlinking, deleting a machine, removing a check not started, the one-time action and
+  reordering quality checks: admins (the API checks every one). An inspector sees "From the
+  machine; an admin can change it there" under the Machine ID on a check's front page.
+- **Settled with the user (2026-11-06):** the serial number stays required when a machine is made
+  and can be changed afterwards (by an admin); a machine gets at most one copy of each check (no
+  second copy to redo one, for now); no archive for machines; Insights' approximation for rows a
+  machine added or removed is fine.
 
 ### API
 

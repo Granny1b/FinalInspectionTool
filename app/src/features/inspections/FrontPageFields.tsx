@@ -1,8 +1,9 @@
-import type { InspectionFrontInput } from '@modig/shared';
+import { hasRole, type InspectionFrontInput } from '@modig/shared';
 import clsx from 'clsx';
 import { Link } from 'react-router';
 import { DateInput } from '../../components/DateInput';
 import { Field, INPUT } from '../../components/Field';
+import { useCurrentUser } from '../../lib/useMe';
 import { FRONT_FIELD_IDS } from './issues';
 import { ParticipantsField, type PendingParticipant } from './ParticipantsField';
 
@@ -98,7 +99,7 @@ export function FrontPageFields({
 
 /**
  * A machine's value on its check's front page: text as high as a field, so the grid lines up; the
- * Machine ID's hint says where it is changed.
+ * Machine ID's hint says where it is changed (by admins, on the machine).
  */
 export function FixedValue({
   label,
@@ -107,9 +108,10 @@ export function FixedValue({
 }: {
   label: string;
   value: string;
-  /** Shown under it: "From the machine · Change it there". */
+  /** Shown under it: "From the machine. Change it there" (admins). */
   machineHref?: string;
 }) {
+  const isAdmin = hasRole(useCurrentUser().roles, 'admin');
   return (
     <div>
       <p className="text-sm font-medium text-ink-800">{label}</p>
@@ -118,13 +120,19 @@ export function FixedValue({
       </p>
       {machineHref && (
         <p className="mt-1.5 text-xs text-ink-500">
-          From the machine.{' '}
-          <Link
-            to={machineHref}
-            className="font-medium text-brand-700 underline-offset-2 hover:underline"
-          >
-            Change it there
-          </Link>
+          {isAdmin ? (
+            <>
+              From the machine.{' '}
+              <Link
+                to={machineHref}
+                className="font-medium text-brand-700 underline-offset-2 hover:underline"
+              >
+                Change it there
+              </Link>
+            </>
+          ) : (
+            'From the machine; an admin can change it there.'
+          )}
         </p>
       )}
     </div>

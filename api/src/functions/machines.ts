@@ -7,7 +7,7 @@
  *                                                     → 201 MachineDetail + ETag
  *   POST   /api/machines/from-inspections  admin      → MachinesFromInspectionsResult
  *   GET    /api/machines/{id}              inspector  MachineDetail + ETag
- *   PUT    /api/machines/{id}              inspector  If-Match, UpdateMachineRequest
+ *   PUT    /api/machines/{id}              admin      If-Match, UpdateMachineRequest
  *                                                     → MachineDetail + ETag
  *   DELETE /api/machines/{id}              admin      If-Match → 204 (409 once a check started)
  *   POST   /api/machines/{id}/checks       inspector  AddMachineCheckRequest
@@ -160,10 +160,10 @@ export const getMachine = endpoint({ role: 'inspector' }, async (req, context) =
 });
 
 /**
- * A new Machine ID or serial number. Its checks that are not finalised get them on their front
+ * A new Machine ID or serial number (admins). Its checks that are not finalised get them on their front
  * pages (and their deviation rows); finalised ones keep what they were finalised with.
  */
-export const updateMachine = endpoint({ role: 'inspector' }, async (req, context, user) => {
+export const updateMachine = endpoint({ role: 'admin' }, async (req, context, user) => {
   const id = idParam(req);
   const ifMatch = requireIfMatch(req);
   const body = await readJsonBody(req, UpdateMachineRequestSchema);

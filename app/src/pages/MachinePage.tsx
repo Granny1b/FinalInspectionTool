@@ -135,10 +135,12 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => setDialog({ kind: 'edit' })}>
-            <Pencil size={16} aria-hidden="true" />
-            Edit
-          </Button>
+          {isAdmin && (
+            <Button variant="secondary" onClick={() => setDialog({ kind: 'edit' })}>
+              <Pencil size={16} aria-hidden="true" />
+              Edit
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setDialog({ kind: 'add' })}>
             <Plus size={16} aria-hidden="true" />
             Add check

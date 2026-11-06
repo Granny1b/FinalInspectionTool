@@ -446,7 +446,7 @@ describe('POST /api/inspections/{id}/start', () => {
 });
 
 describe('PUT /api/machines/{id}', () => {
-  it('puts a new Machine ID and serial number on its checks that are not finalised', async () => {
+  it('puts a new Machine ID and serial number on its checks that are not finalised; admins only', async () => {
     const { preStart, frame, final } = await model();
     const { detail, etag } = await newMachine([preStart.id, frame.id, final.id]);
     // One finalised, one in progress with a deviation, one not started.
@@ -464,7 +464,16 @@ describe('PUT /api/machines/{id}', () => {
       results: { [rowIds(busy.inspection)[0]!]: { status: 'NOK', comment: 'Loose' } },
     });
 
+    const byInspector = await call(updateMachine, {
+      method: 'PUT',
+      id: detail.machine.id,
+      body: { machineName: 'Magellan#1B', serialNumber: 'RM-2026-099' },
+      ifMatch: etag,
+    });
+    expect(byInspector.status).toBe(403);
+
     const response = await call(updateMachine, {
+      who: admin,
       method: 'PUT',
       id: detail.machine.id,
       body: { machineName: 'Magellan#1B', serialNumber: 'RM-2026-099' },
@@ -488,6 +497,7 @@ describe('PUT /api/machines/{id}', () => {
 
     // An outdated page gets the conflict; a Machine ID in use is refused.
     const stale = await call(updateMachine, {
+      who: admin,
       method: 'PUT',
       id: detail.machine.id,
       body: { machineName: 'X', serialNumber: 'Y' },
@@ -496,6 +506,7 @@ describe('PUT /api/machines/{id}', () => {
     expect(stale.status).toBe(412);
     await newMachine([], { machineName: 'Magellan#2' });
     const taken = await call(updateMachine, {
+      who: admin,
       method: 'PUT',
       id: detail.machine.id,
       body: { machineName: 'MAGELLAN#2', serialNumber: 'Y' },
