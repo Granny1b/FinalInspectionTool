@@ -84,13 +84,13 @@ describe('filterInspections', () => {
     expect(filterInspections(list, { query: 'mill', model: 'HHVDUO', state: '' })).toEqual([]);
   });
 
-  it('searches a quality check by its title instead of a machine name', () => {
+  it('searches a quality check by its Machine ID and its title', () => {
     const checks = [
       summary({
         id: 'Q000000000000001',
         kind: 'quality',
         number: 'QC-2026-0001',
-        machineName: '',
+        machineName: 'Magellan#1',
         serialNumber: 'RM-016',
         templateName: 'Quality check – Pre start up',
       }),
@@ -106,6 +106,9 @@ describe('filterInspections', () => {
       'Q000000000000001',
     ]);
     expect(ids(filterInspections(checks, { ...all, query: 'qc-2026' }))).toHaveLength(2);
+    expect(ids(filterInspections(checks, { ...all, query: 'magellan pre' }))).toEqual([
+      'Q000000000000001',
+    ]);
     // A final inspection is never found by its template's name.
     expect(filterInspections(list, { ...all, query: 'final inspection' })).toEqual([]);
   });

@@ -23,8 +23,8 @@ export function inspectionHref(kind: InspectionKind, id: string): string {
 
 export type InspectionFilter = {
   /**
-   * Words that must all appear in the number, machine name or serial number (a quality check's
-   * title instead of the machine name).
+   * Words that must all appear in the number, Machine ID or serial number (or a quality check's
+   * title).
    */
   query: string;
   /** Model code, or '' for every model. */
@@ -96,7 +96,7 @@ const lower = (text: string) => text.toLocaleLowerCase('sv');
 
 /**
  * The inspections that match, in the order given (the API's: newest first). Search is
- * case-insensitive; "rigimill 1042" finds machine "RigiMill MG" with serial "1042-7", and "pre
+ * case-insensitive; "magellan 1042" finds Machine ID "Magellan#1" with serial "1042-7", and "pre
  * 016" a quality check "Quality check – Pre start up" of serial "RM-016".
  */
 export function filterInspections(
@@ -107,9 +107,11 @@ export function filterInspections(
   return inspections.filter((inspection) => {
     if (model && inspection.modelCode !== model) return false;
     if (state && inspection.state !== state) return false;
-    // A quality check has no machine name; its title says which check it is.
-    const name = inspection.kind === 'quality' ? inspection.templateName : inspection.machineName;
-    const haystack = lower(`${inspection.number} ${name} ${inspection.serialNumber}`);
+    // A quality check's title says which check it is.
+    const check = inspection.kind === 'quality' ? inspection.templateName : '';
+    const haystack = lower(
+      `${inspection.number} ${inspection.machineName} ${check} ${inspection.serialNumber}`,
+    );
     return words.every((word) => haystack.includes(word));
   });
 }

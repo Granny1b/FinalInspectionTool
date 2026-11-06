@@ -24,6 +24,7 @@ const storage = BlobServiceClient.fromConnectionString(LOCAL_STORAGE);
 const templates = storage.getContainerClient(CONTAINERS.templates);
 const images = storage.getContainerClient(CONTAINERS.images);
 const inspections = storage.getContainerClient(CONTAINERS.inspections);
+const followUps = storage.getContainerClient(CONTAINERS.followUps);
 const deviations = TableClient.fromConnectionString(LOCAL_STORAGE, DEVIATIONS_TABLE);
 
 async function readTemplate(blobName: string): Promise<Template> {
@@ -264,6 +265,13 @@ export async function deleteInspectionsOf(templateIds: readonly string[]): Promi
   await Promise.all(ids.map((id) => deleteInspection(id)));
 }
 
+/** An inspection's follow-ups blob, or null when none was written (or it was deleted). */
+export async function storedFollowUps(inspectionId: string): Promise<unknown> {
+  const blob = followUps.getBlobClient(blobNames.followUps(inspectionId));
+  if (!(await followUps.exists()) || !(await blob.exists())) return null;
+  return JSON.parse((await blob.downloadToBuffer()).toString('utf8')) as unknown;
+}
+
 /** A deviation table row as stored: PartitionKey, RowKey and the brief's columns. */
 export type StoredDeviationRow = { partitionKey: string; rowKey: string } & Record<string, unknown>;
 
@@ -283,9 +291,9 @@ export async function deviationRows(inspectionId: string): Promise<StoredDeviati
 }
 
 /**
- * Deletes an inspection's blob, its deviation rows and its deviation photos (originals and
- * marked-up copies: nothing else uses them). The machine photo stays: it may be a template's
- * cover.
+ * Deletes an inspection's blob, its deviation rows, its deviations' follow-ups and its deviation
+ * photos (originals and marked-up copies: nothing else uses them). The machine photo stays: it
+ * may be a template's cover.
  */
 export async function deleteInspection(id: string): Promise<void> {
   const blob = inspections.getBlobClient(blobNames.inspection(id));
@@ -293,6 +301,11 @@ export async function deleteInspection(id: string): Promise<void> {
   const rows = await deviationRows(id);
   await Promise.all([
     blob.deleteIfExists(),
+    // The container appears with the first follow-up written.
+    followUps
+      .getBlobClient(blobNames.followUps(id))
+      .deleteIfExists()
+      .catch(() => undefined),
     deleteImages(photoIds),
     ...rows.map((row) => deviations.deleteEntity(row.partitionKey, row.rowKey)),
   ]);

@@ -119,6 +119,7 @@ async function qualityCheck(
 }
 
 const checkFront = {
+  machineName: 'Magellan#1',
   serialNumber: 'RM-2026-016',
   participants: ['Sam Andersson'],
   date: '2026-11-06',
@@ -225,7 +226,7 @@ describe('POST /api/inspections from a quality check', () => {
       templateId: check.id,
       templateRevision: 2,
       front: {
-        machineName: '',
+        machineName: 'Magellan#1',
         modelCode: 'RMMG',
         serialNumber: 'RM-2026-016',
         participants: ['Sam Andersson'],
@@ -292,21 +293,25 @@ describe('POST /api/inspections from a quality check', () => {
     ).toBeNull();
   });
 
-  it('needs a serial number and a date, but no machine name or location', async () => {
+  it('needs a Machine ID, a serial number and a date, but no location', async () => {
     const check = await qualityCheck(await machine());
     const missing = await create({
       templateId: check.id,
-      front: { ...checkFront, serialNumber: ' ' },
+      front: { ...checkFront, machineName: ' ', serialNumber: ' ' },
     });
     expect(missing.status).toBe(400);
     expect(errorOf(missing).details).toEqual([
+      expect.objectContaining({
+        path: ['front', 'machineName'],
+        message: 'Machine ID is required',
+      }),
       expect.objectContaining({ path: ['front', 'serialNumber'] }),
     ]);
     const badDate = await create({ templateId: check.id, front: { ...checkFront, date: '' } });
     expect(badDate.status).toBe(400);
     // A final inspection's front page sent with it: what a quality check doesn't have is dropped.
     const { inspection } = await created(check.id, { ...finalFront, photoId: newId() });
-    expect(inspection.front).toMatchObject({ machineName: '', location: '' });
+    expect(inspection.front).toMatchObject({ machineName: 'RigiMill MG #7', location: '' });
     expect(inspection.front.photoId).toBeUndefined();
   });
 
@@ -360,7 +365,12 @@ describe('a quality check through the inspection routes', () => {
     const response = await put(
       inspection.id,
       {
-        front: { ...draftOf(inspection).front, machineName: 'X', location: 'Y', photoId: newId() },
+        front: {
+          ...draftOf(inspection).front,
+          machineName: 'Boeing#2',
+          location: 'Y',
+          photoId: newId(),
+        },
         results: { [a!]: { status: 'NOK', comment: 'Inward', category: 'Markings & labels' } },
         extraDeviations: [{ id: newId(), description: 'Loose cover', severity: 'minor' }],
       },
@@ -368,7 +378,8 @@ describe('a quality check through the inspection routes', () => {
     );
     expect(response.status).toBe(200);
     const saved = inspectionOf(response);
-    expect(saved.front).toEqual({ ...inspection.front });
+    // The Machine ID is saved; what a quality check doesn't have is not.
+    expect(saved.front).toEqual({ ...inspection.front, machineName: 'Boeing#2' });
     expect(saved.results[a!]).toEqual({
       status: 'NOK',
       comment: 'Inward',
@@ -379,15 +390,23 @@ describe('a quality check through the inspection routes', () => {
     expect(rows).toHaveLength(2);
     expect(rows.every((row) => row.kind === 'quality')).toBe(true);
     expect(rows.every((row) => row.checkName === 'Quality check – Pre start up')).toBe(true);
+    expect(rows.every((row) => row.machineName === 'Boeing#2')).toBe(true);
   });
 
-  it('is finalised once every row has a status (no machine name needed), and reopened', async () => {
+  it('is finalised once every row has a status and it has a Machine ID, and reopened', async () => {
     const check = await qualityCheck(await machine());
     const { inspection, etag } = await created(check.id);
     const [a, b] = itemIds(inspection);
-    const refused = await post(finaliseInspection, inspection.id, etag);
+    // One started before quality checks had a Machine ID: it must get one before finalising.
+    const older = await put(
+      inspection.id,
+      { ...draftOf(inspection), front: { ...draftOf(inspection).front, machineName: '' } },
+      etag,
+    );
+    const refused = await post(finaliseInspection, inspection.id, etagOf(older));
     expect(refused.status).toBe(400);
     expect((errorOf(refused).details as { message: string }[]).map((i) => i.message)).toEqual([
+      'The front page needs a Machine ID.',
       'Row 1.a has no status.',
       'Row 1.b has no status.',
     ]);
@@ -395,7 +414,7 @@ describe('a quality check through the inspection routes', () => {
     const saved = await put(
       inspection.id,
       { ...draftOf(inspection), results: { [a!]: { status: 'OK' }, [b!]: { status: 'NA' } } },
-      etag,
+      etagOf(older),
     );
     const finalised = await post(finaliseInspection, inspection.id, etagOf(saved));
     expect(finalised.status).toBe(200);
@@ -502,7 +521,7 @@ describe('Insights, final inspections and quality checks apart', () => {
     expect(onePre.checkNames).toEqual(quality.checkNames);
   });
 
-  it('exports a quality check’s rows apart, with the check’s title, in a file that says so', async () => {
+  it('exports a quality check’s rows apart, with its Machine ID and title, in a file that says so', async () => {
     const parent = await machine();
     const final = await finishedInspection(parent);
     const check = await qualityCheck(parent, { name: 'Före start' });
@@ -526,11 +545,11 @@ describe('Insights, final inspections and quality checks apart', () => {
 
     const checks = await csv({ kind: 'quality', check: 'Quality check – Före start' });
     expect(checks.lines[0]).toBe(
-      'inspectionId;inspectionNumber;serialNumber;checkName;modelCode;templateId;templateRevision;itemId;sectionTitle;displayRef;checkpointText;comment;resp;severity;category;inspectionDate;finalised;createdAt',
+      'inspectionId;inspectionNumber;serialNumber;machineName;checkName;modelCode;templateId;templateRevision;itemId;sectionTitle;displayRef;checkpointText;comment;resp;severity;category;inspectionDate;finalised;createdAt',
     );
     expect(checks.lines).toHaveLength(2);
     expect(checks.lines[1]).toContain(
-      `${inspection.number};RM-2026-016;Quality check – Före start;`,
+      `${inspection.number};RM-2026-016;Magellan#1;Quality check – Före start;`,
     );
     // "ö" can't go in a header as it is: an ASCII name first, then the real one, encoded.
     expect(checks.disposition).toMatch(

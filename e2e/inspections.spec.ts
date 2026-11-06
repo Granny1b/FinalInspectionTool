@@ -183,9 +183,11 @@ test.describe('an inspector', () => {
 
     // Nothing typed yet: Create says what is missing and goes there.
     await page.getByRole('button', { name: 'Create inspection' }).click();
-    const machineName = page.getByLabel('Machine name', { exact: true });
+    const machineName = page.getByLabel('Machine ID', { exact: true });
     await expect(machineName).toBeFocused();
-    await expect(machineName).toHaveAccessibleDescription('Machine name is required');
+    await expect(machineName).toHaveAccessibleDescription(
+      'As in Monitor, e.g. Magellan#1 Machine ID is required',
+    );
 
     await machineName.fill(machine);
     await page.getByLabel('Serial number', { exact: true }).fill('RMMG-1042');
@@ -503,6 +505,11 @@ test.describe('an inspector', () => {
       // A final inspection's, with its checklist's name.
       kind: 'final',
       checkName: published.name,
+      // Not followed up yet in the deviation log.
+      status: 'open',
+      action: '',
+      closedOn: '',
+      closedBy: '',
     };
     const expectedRows = [
       {
@@ -516,6 +523,7 @@ test.describe('an inspector', () => {
         resp: responsibles[1],
         severity: 'minor',
         category: categories[0],
+        deviationNumber: 'D-01',
       },
       {
         ...common,
@@ -528,6 +536,7 @@ test.describe('an inspector', () => {
         resp: responsibles[0],
         severity: 'minor',
         category: '',
+        deviationNumber: 'D-02',
       },
       {
         ...common,
@@ -540,6 +549,7 @@ test.describe('an inspector', () => {
         resp: responsibles[0],
         severity: 'major',
         category: categories[1],
+        deviationNumber: 'D-03',
       },
     ].sort((a, b) => a.rowKey.localeCompare(b.rowKey));
     await expect.poll(() => deviationRows(inspection.id)).toEqual(expectedRows);

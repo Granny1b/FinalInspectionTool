@@ -416,7 +416,12 @@ test.describe('an inspector', () => {
     const response = await page.request.post('/api/inspections', {
       data: {
         templateId: check.id,
-        front: { serialNumber: 'SN-1', participants: [], date: '2026-11-05' },
+        front: {
+          machineName: 'Magellan#1',
+          serialNumber: 'SN-1',
+          participants: [],
+          date: '2026-11-05',
+        },
       },
     });
     expect(response.status()).toBe(201);

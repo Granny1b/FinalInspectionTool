@@ -33,13 +33,13 @@ export function useTestStorage(): void {
 }
 
 /**
- * Deletes every template, inspection and deviation row, the settings, the people list and the
+ * Deletes every template, inspection, follow-up and deviation row, the settings, the people list and the
  * inspection and quality check counters. Safe only because the api project runs its test files one at a time
  * (vitest.config.ts): no other file is using them meanwhile.
  */
 export async function resetStorage(): Promise<void> {
   await Promise.all([ensureStorage(), ensureTable()]);
-  for (const name of [CONTAINERS.templates, CONTAINERS.inspections]) {
+  for (const name of [CONTAINERS.templates, CONTAINERS.inspections, CONTAINERS.followUps]) {
     const container = containerClient(name);
     for await (const blob of container.listBlobsFlat()) await container.deleteBlob(blob.name);
   }

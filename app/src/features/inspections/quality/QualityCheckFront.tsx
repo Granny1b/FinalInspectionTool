@@ -5,13 +5,14 @@ import { DateInput } from '../../../components/DateInput';
 import { Field, INPUT } from '../../../components/Field';
 import { FrontPageFrame } from '../../templates/FrontPage';
 import { formatCalendarDate } from '../dates';
+import { MachineIdField } from '../FrontPageFields';
 import { FRONT_FIELD_IDS } from '../issues';
 import { ParticipantsField, type PendingParticipant } from '../ParticipantsField';
 
 /** What a quality check's front page asks: which machine, when, and who checked it. */
 export type QualityCheckFrontInput = Pick<
   InspectionFrontInput,
-  'serialNumber' | 'participants' | 'date'
+  'machineName' | 'serialNumber' | 'participants' | 'date'
 >;
 
 /** The quality check it follows, as frozen in it (or as published, before it is started). */
@@ -24,18 +25,19 @@ export type QualityStandard = {
 
 type FieldsProps = {
   front: QualityCheckFrontInput;
-  /** "RigiMill MG": the machine is the quality check's model, never changed here. */
+  /** "RigiMill MG": the machine's model is the quality check's, never changed here. */
   modelLabel: string;
-  errors: { serialNumber?: string };
+  errors: { machineName?: string; serialNumber?: string };
   onChange: (patch: Partial<QualityCheckFrontInput>) => void;
   /** The check's page: a name typed under Checked by but not yet added counts as unsaved. */
   pendingParticipant?: PendingParticipant;
 };
 
 /**
- * A quality check's front page fields: Machine (its model, fixed), Serial number, Date and Checked
- * by. Nothing about delivery: no machine name, location or photo, as for a check along the build.
- * Used by the start form and by the check's front page.
+ * A quality check's front page fields, in a final inspection's order: Machine ID, Machine model
+ * (the quality check's, fixed), Serial number, Date and Checked by. Nothing about delivery: no
+ * location or photo, as for a check along the build. Used by the start form and by the check's
+ * front page.
  */
 export function QualityCheckFrontFields({
   front,
@@ -46,8 +48,13 @@ export function QualityCheckFrontFields({
 }: FieldsProps) {
   return (
     <>
+      <MachineIdField
+        value={front.machineName}
+        error={errors.machineName}
+        onChange={(machineName) => onChange({ machineName })}
+      />
       <div>
-        <p className="text-sm font-medium text-ink-800">Machine</p>
+        <p className="text-sm font-medium text-ink-800">Machine model</p>
         {/* As high as the inputs beside it, so the row lines up. */}
         <p className="mt-1.5 flex h-9 items-center text-sm text-ink-900">{modelLabel}</p>
       </div>
@@ -75,7 +82,8 @@ export function QualityCheckFrontFields({
           />
         )}
       </Field>
-      <div className="col-span-full">
+      {/* Beside the date when there are three columns: when, and who. */}
+      <div className="col-span-full @min-[44rem]:col-span-2">
         <Field label="Checked by">
           {(control) => (
             <ParticipantsField
@@ -113,7 +121,7 @@ type CardProps = {
   standard: QualityStandard;
   /** Finalised: shown as text, nothing can be changed. */
   readOnly: boolean;
-  errors: { serialNumber?: string };
+  errors: { machineName?: string; serialNumber?: string };
   onChange: (patch: Partial<InspectionFrontInput>) => void;
   pendingParticipant: PendingParticipant;
 };
@@ -137,7 +145,8 @@ export const QualityCheckFrontCard = memo(function QualityCheckFrontCard({
       {readOnly ? (
         <div className="col-span-full">
           <dl className="grid grid-cols-1 gap-x-5 gap-y-4 text-sm @min-[28rem]:grid-cols-2 @min-[44rem]:grid-cols-3">
-            <Detail label="Machine">{modelLabel}</Detail>
+            <Detail label="Machine ID">{front.machineName}</Detail>
+            <Detail label="Machine model">{modelLabel}</Detail>
             <Detail label="Serial number">{front.serialNumber}</Detail>
             <Detail label="Date">{formatCalendarDate(front.date)}</Detail>
             <Detail label="Checked by" wide>
@@ -161,7 +170,7 @@ export const QualityCheckFrontCard = memo(function QualityCheckFrontCard({
 
 function Detail({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
   return (
-    <div className={wide ? 'col-span-full' : undefined}>
+    <div className={wide ? 'col-span-full @min-[44rem]:col-span-2' : undefined}>
       <dt className="text-xs font-medium text-ink-500">{label}</dt>
       <dd className="mt-1 wrap-break-word text-ink-900">
         {children || <span className="text-ink-500">—</span>}

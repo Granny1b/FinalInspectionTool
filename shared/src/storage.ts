@@ -9,6 +9,7 @@
  *   config/people.json                       who may use the app: name, email, role
  *   config/inspection-counter.json           counter for FI-YYYY-NNNN numbers (final inspections)
  *   config/quality-check-counter.json        counter for QC-YYYY-NNNN numbers (quality checks)
+ *   follow-ups/{inspectionId}.json           its deviations' follow-up: open or closed, the action
  *
  * Table `deviations`: one row per deviation (KPI source).
  */
@@ -17,6 +18,12 @@ export const CONTAINERS = {
   inspections: 'inspections',
   images: 'images',
   config: 'config',
+  /**
+   * The follow-up of each inspection's deviations, one blob per inspection: apart from the
+   * inspection, so closing a deviation never changes the inspection's version (its page saves
+   * with If-Match) nor its findings.
+   */
+  followUps: 'follow-ups',
 } as const;
 export type ContainerName = (typeof CONTAINERS)[keyof typeof CONTAINERS];
 
@@ -38,6 +45,8 @@ export const blobNames = {
   inspectionCounter: 'inspection-counter.json',
   /** The quality checks' own series, QC-YYYY-NNNN, counted like the inspections'. */
   qualityCheckCounter: 'quality-check-counter.json',
+  /** In `follow-ups/`: whether each of the inspection's deviations is open or closed, and how. */
+  followUps: (inspectionId: string) => `${inspectionId}.json`,
 } as const;
 
 /** Table Storage keys for a deviation row (brief §4). */

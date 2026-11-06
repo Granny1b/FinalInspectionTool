@@ -103,7 +103,7 @@ async function commit(changed: Inspection, ifMatch: string, context: InvocationC
   return json(200, changed, etagHeader(etag));
 }
 
-async function orUnavailable(sync: Promise<void>, id: string, context: InvocationContext) {
+async function orUnavailable(sync: Promise<unknown>, id: string, context: InvocationContext) {
   await sync.catch((error: unknown) => {
     context.error(`Syncing the deviations of inspection ${id} failed`, error);
     throw new ServiceUnavailableError(

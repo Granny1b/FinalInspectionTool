@@ -160,7 +160,10 @@ export type ListGroup = {
   number: string;
   date: string;
   model: string;
-  /** The machine's name; a quality check's title (it has no machine name). */
+  /**
+   * The Machine ID; a quality check's with its title after it ("Magellan#1 · Quality check – Pre
+   * start up"), or only the title for one started before quality checks had a Machine ID.
+   */
   machine: string;
   serialNumber: string;
   finalised: boolean;
@@ -397,7 +400,10 @@ function deviationList(
         number: row.inspectionNumber,
         date: formatCalendarDate(row.inspectionDate),
         model: modelName(models, row.modelCode),
-        machine: (quality ? row.checkName : row.machineName).trim(),
+        machine: (quality
+          ? [row.machineName.trim(), row.checkName.trim()].filter(Boolean).join(' · ')
+          : row.machineName
+        ).trim(),
         serialNumber: row.serialNumber.trim(),
         finalised: row.finalised,
         rows: [],

@@ -41,7 +41,7 @@ export const FrontPageCard = memo(function FrontPageCard({
         <>
           <MachinePhoto imageId={front.photoId} />
           <dl className="grid content-start gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-            <Detail label="Machine name" wide>
+            <Detail label="Machine ID" wide>
               {front.machineName}
             </Detail>
             <Detail label="Machine model">{modelLabel}</Detail>

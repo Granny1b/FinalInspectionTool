@@ -4,6 +4,7 @@ import {
   ChartColumn,
   ClipboardCheck,
   LayoutTemplate,
+  ListChecks,
   LogOut,
   Settings,
   ShieldCheck,
@@ -23,17 +24,23 @@ type NavGroupItems = { label: string; items: NavItem[] };
 
 /**
  * What everyone sees, a group to a kind of work: final inspections before delivery, quality
- * checks along the build, and the templates both are made from (a machine's final inspection
- * template and its quality checks).
+ * checks along the build, each with the log of its deviations, and the templates both are made
+ * from (a machine's final inspection template and its quality checks).
  */
 const NAV_GROUPS: NavGroupItems[] = [
   {
     label: 'Final inspection',
-    items: [{ to: '/inspections', label: 'Inspections', icon: ClipboardCheck }],
+    items: [
+      { to: '/inspections', label: 'Inspections', icon: ClipboardCheck },
+      { to: '/deviations/final', label: 'Deviations', icon: ListChecks },
+    ],
   },
   {
     label: 'Quality check',
-    items: [{ to: '/quality-checks', label: 'Quality checks', icon: ShieldCheck }],
+    items: [
+      { to: '/quality-checks', label: 'Quality checks', icon: ShieldCheck },
+      { to: '/deviations/quality', label: 'Deviations', icon: ListChecks },
+    ],
   },
   { label: 'Setup', items: [{ to: '/templates', label: 'Templates', icon: LayoutTemplate }] },
 ];

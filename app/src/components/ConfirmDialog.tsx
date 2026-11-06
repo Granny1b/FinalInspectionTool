@@ -7,6 +7,8 @@ type Props = {
   title: string;
   message: ReactNode;
   confirmLabel: string;
+  /** Red for what can't be undone (the default); primary for what can, such as reopening. */
+  confirmVariant?: 'danger' | 'primary';
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -15,7 +17,14 @@ type Props = {
  * Confirmation in a native modal <dialog>: focus trap, Escape and an inert page for free.
  * Mount it to ask; it opens itself, and closing calls exactly one of the callbacks.
  */
-export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  confirmVariant = 'danger',
+  onConfirm,
+  onCancel,
+}: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const messageId = useId();
@@ -51,7 +60,7 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
           <Button type="submit" value="cancel" variant="secondary">
             Cancel
           </Button>
-          <Button type="submit" value="confirm" variant="danger">
+          <Button type="submit" value="confirm" variant={confirmVariant}>
             {confirmLabel}
           </Button>
         </div>

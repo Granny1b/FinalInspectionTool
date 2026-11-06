@@ -33,9 +33,9 @@ const TOP = 'align-top md:align-middle';
 const ROW_LINK = 'font-medium text-ink-900 outline-none after:absolute after:inset-0';
 
 /**
- * Number, machine, serial, model, date, state and #NOK (brief §5.1); the whole row opens it. A
- * quality check's machine is its model, and its title takes the machine name's place: Number,
- * Machine, Quality check, Serial number, Date, State, NOK.
+ * Number, Machine ID, serial, model, date, state and #NOK (brief §5.1); the whole row opens it. A
+ * quality check's list has its title where the model was, and the model under the Machine ID:
+ * Number, Machine ID, Quality check, Serial number, Date, State, NOK.
  */
 export function InspectionList({ kind = 'final', inspections, models }: Props) {
   if (kind === 'quality') return <QualityCheckList checks={inspections} models={models} />;
@@ -51,7 +51,7 @@ export function InspectionList({ kind = 'final', inspections, models }: Props) {
               Number
             </th>
             <th scope="col" className={clsx(HEAD, MIDDLE, WIDE)}>
-              Machine
+              Machine ID
             </th>
             <th scope="col" className={clsx(HEAD, MIDDLE, WIDE)}>
               Serial number
@@ -84,7 +84,7 @@ export function InspectionList({ kind = 'final', inspections, models }: Props) {
                   {inspection.machineName ? (
                     <span className="text-ink-900">{inspection.machineName}</span>
                   ) : (
-                    <span className="text-ink-500">No machine name</span>
+                    <span className="text-ink-500">No Machine ID</span>
                   )}
                 </div>
                 {/* Wraps after the dot, before the date; only a narrow phone breaks the serial
@@ -103,7 +103,7 @@ export function InspectionList({ kind = 'final', inspections, models }: Props) {
                 {inspection.machineName ? (
                   <span className="line-clamp-2 text-ink-900">{inspection.machineName}</span>
                 ) : (
-                  <span className="text-ink-500">No machine name</span>
+                  <span className="text-ink-500">No Machine ID</span>
                 )}
               </td>
               <td className={clsx(CELL, MIDDLE, WIDE, 'max-w-48 truncate text-ink-700')}>
@@ -144,7 +144,10 @@ export function InspectionList({ kind = 'final', inspections, models }: Props) {
 
 type QualityProps = { checks: InspectionSummary[]; models: MachineModel[] | undefined };
 
-/** The quality checks done: the same table, with the machine (model) and which check it was. */
+/**
+ * The quality checks done: the same table, with which check it was. A machine has several, so
+ * the check's title gets the model's column, and the model goes under the Machine ID.
+ */
 function QualityCheckList({ checks, models }: QualityProps) {
   return (
     <div className="overflow-x-auto rounded-lg border border-ink-200 bg-surface">
@@ -158,7 +161,7 @@ function QualityCheckList({ checks, models }: QualityProps) {
               Number
             </th>
             <th scope="col" className={clsx(HEAD, MIDDLE, WIDE)}>
-              Machine
+              Machine ID
             </th>
             <th scope="col" className={clsx(HEAD, MIDDLE, WIDE)}>
               Quality check
@@ -180,7 +183,7 @@ function QualityCheckList({ checks, models }: QualityProps) {
         <tbody className="divide-y divide-ink-100">
           {checks.map((check) => {
             const href = inspectionHref('quality', check.id);
-            const machine = modelName(models, check.modelCode);
+            const model = modelName(models, check.modelCode);
             return (
               <tr
                 key={check.id}
@@ -190,11 +193,13 @@ function QualityCheckList({ checks, models }: QualityProps) {
                   <Link to={href} className={ROW_LINK}>
                     {check.number}
                   </Link>
-                  <div className="mt-0.5 line-clamp-2 wrap-anywhere text-ink-900">
-                    {check.templateName}
+                  <div className="mt-0.5 line-clamp-2 wrap-anywhere">
+                    <span className="text-ink-900">{check.machineName || '—'}</span>
+                    <span className="text-ink-500"> · </span>
+                    <span className="text-ink-900">{check.templateName}</span>
                   </div>
                   <div className="mt-0.5 text-xs text-ink-500">
-                    {`${machine}\u00a0· S/N\u00a0${check.serialNumber}\u00a0· `}
+                    {`${model}\u00a0· S/N\u00a0${check.serialNumber}\u00a0· `}
                     <span className="whitespace-nowrap">{formatCalendarDate(check.date)}</span>
                   </div>
                 </td>
@@ -203,8 +208,10 @@ function QualityCheckList({ checks, models }: QualityProps) {
                     {check.number}
                   </Link>
                 </td>
-                <td className={clsx(CELL, MIDDLE, WIDE, 'whitespace-nowrap text-ink-700')}>
-                  {machine}
+                <td className={clsx(CELL, MIDDLE, WIDE, 'max-w-56')}>
+                  {/* An older check, started before quality checks had one, has none. */}
+                  <span className="line-clamp-2 text-ink-900">{check.machineName || '—'}</span>
+                  <span className="block text-xs whitespace-nowrap text-ink-500">{model}</span>
                 </td>
                 <td className={clsx(CELL, MIDDLE, WIDE, 'max-w-64')}>
                   <span className="line-clamp-2 text-ink-900">{check.templateName}</span>

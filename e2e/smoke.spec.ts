@@ -33,7 +33,7 @@ test('create from the seeded template → mark rows → finalise → print the r
   await page.goto('/inspections');
   await page.getByRole('link', { name: 'New final inspection' }).click();
   await page.getByRole('radio', { name: template!.publishedName! }).check();
-  await page.getByLabel('Machine name', { exact: true }).fill('RigiMill MG – smoke test');
+  await page.getByLabel('Machine ID', { exact: true }).fill('RigiMill MG – smoke test');
   await page.getByLabel('Serial number', { exact: true }).fill('RM-SMOKE-1');
   await page.getByRole('button', { name: 'Create inspection' }).click();
   await page.waitForURL(/\/inspections\/[A-Za-z0-9]{16}$/);

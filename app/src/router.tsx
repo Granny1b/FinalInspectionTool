@@ -4,6 +4,7 @@ import { RequireRole } from './components/RequireRole';
 import { RouteError } from './components/RouteError';
 import { AdminOnly } from './features/insights/report/AdminOnly';
 import { PrintShell } from './features/print/PrintShell';
+import { DeviationLogPage } from './pages/DeviationLogPage';
 import { InsightsPage } from './pages/InsightsPage';
 import { InsightsReportPage } from './pages/InsightsReportPage';
 import { InspectionNewPage } from './pages/InspectionNewPage';
@@ -34,6 +35,10 @@ export const router = createBrowserRouter([
       { path: 'quality-checks', element: <InspectionsPage kind="quality" /> },
       { path: 'quality-checks/new', element: <StartQualityCheckPage /> },
       { path: 'quality-checks/:id', element: <InspectionPage kind="quality" /> },
+      // The deviation log of each kind, for everyone; keyed, so switching starts afresh.
+      { path: 'deviations', element: <Navigate to="/deviations/final" replace /> },
+      { path: 'deviations/final', element: <DeviationLogPage key="final" kind="final" /> },
+      { path: 'deviations/quality', element: <DeviationLogPage key="quality" kind="quality" /> },
       { path: 'templates', element: <TemplatesPage /> },
       // Admins get the editor, inspectors the latest published revision (decided in the page).
       { path: 'templates/:id', element: <TemplateEditorPage /> },

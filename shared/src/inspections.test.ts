@@ -255,25 +255,27 @@ describe('validateForFinalise', () => {
     expect(issues[3]!.target).toEqual({ kind: 'extra', extraId: 'x1' });
   });
 
-  it('asks a quality check for its serial number but no machine name', () => {
+  it('asks a quality check for its Machine ID and serial number, as a final inspection', () => {
     const check = inspection({
       kind: 'quality',
-      front: { ...inspection().front, machineName: '', serialNumber: '' },
+      front: { ...inspection().front, machineName: ' ', serialNumber: '' },
       results: { i1: { status: 'OK' }, i2: { status: 'OK' }, i3: { status: 'OK' } },
     });
-    expect(validateForFinalise(check).map((issue) => issue.message)).toEqual([
+    const messages = [
+      'The front page needs a Machine ID.',
       'The front page needs a serial number.',
       'Row 2.b has no status.',
-    ]);
-    // The same front page on a final inspection also needs the machine name.
-    expect(validateForFinalise({ ...check, kind: 'final' })[0]?.message).toBe(
-      'The front page needs a machine name.',
+    ];
+    expect(validateForFinalise(check).map((issue) => issue.message)).toEqual(messages);
+    expect(validateForFinalise(check)[0]?.target).toEqual({ kind: 'front', field: 'machineName' });
+    expect(validateForFinalise({ ...check, kind: 'final' }).map((issue) => issue.message)).toEqual(
+      messages,
     );
   });
 });
 
 describe('request schemas', () => {
-  it('create needs a template, machine name and serial number', () => {
+  it('create needs a template, Machine ID and serial number', () => {
     const front = {
       machineName: ' ',
       serialNumber: 'SN',
@@ -292,11 +294,25 @@ describe('request schemas', () => {
     ).toBe('RM #7');
   });
 
-  it('starting a quality check needs a serial number, and nothing about the machine’s name', () => {
-    const front = { serialNumber: ' RM-016 ', participants: ['Sam'], date: '2026-11-06' };
+  it('starting a quality check needs a Machine ID and a serial number', () => {
+    const front = {
+      machineName: ' Magellan#1 ',
+      serialNumber: ' RM-016 ',
+      participants: ['Sam'],
+      date: '2026-11-06',
+    };
     expect(StartQualityCheckRequestSchema.parse({ templateId: 'qc1', front }).front).toEqual({
       ...front,
+      machineName: 'Magellan#1',
       serialNumber: 'RM-016',
+    });
+    const noId = StartQualityCheckRequestSchema.safeParse({
+      templateId: 'qc1',
+      front: { ...front, machineName: '' },
+    });
+    expect(noId.error?.issues[0]).toMatchObject({
+      path: ['front', 'machineName'],
+      message: 'Machine ID is required',
     });
     expect(
       StartQualityCheckRequestSchema.safeParse({

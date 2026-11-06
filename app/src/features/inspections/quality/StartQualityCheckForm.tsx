@@ -29,12 +29,12 @@ type Props = {
   models: MachineModel[] | undefined;
 };
 
-type Errors = { machine?: string; check?: string; serialNumber?: string };
+type Errors = { machine?: string; check?: string; machineName?: string; serialNumber?: string };
 
 /**
  * Start a quality check: pick the machine (models with a published quality check), then which of
- * its quality checks, then fill in the serial number and date (and who checks it, the signed-in
- * user to start with). Creating it gives it the next QC- number and opens it.
+ * its quality checks, then fill in the Machine ID, serial number and date (and who checks it, the
+ * signed-in user to start with). Creating it gives it the next QC- number and opens it.
  */
 export function StartQualityCheckForm({ templates, models }: Props) {
   const navigate = useNavigate();
@@ -52,6 +52,7 @@ export function StartQualityCheckForm({ templates, models }: Props) {
   const check = machine?.checks.find((candidate) => candidate.id === checkId);
   const revision = useTemplateRevision(check?.id ?? '', check?.publishedRevision ?? null);
   const [front, setFront] = useState<QualityCheckFrontInput>(() => ({
+    machineName: '',
     serialNumber: '',
     participants: [me.name || me.email],
     date: localDate(),
@@ -80,9 +81,11 @@ export function StartQualityCheckForm({ templates, models }: Props) {
       ? document.querySelector<HTMLInputElement>('input[name="machine"]')
       : found.check
         ? document.querySelector<HTMLInputElement>('input[name="check"]')
-        : found.serialNumber
-          ? document.getElementById(FRONT_FIELD_IDS.serialNumber)
-          : null;
+        : found.machineName
+          ? document.getElementById(FRONT_FIELD_IDS.machineName)
+          : found.serialNumber
+            ? document.getElementById(FRONT_FIELD_IDS.serialNumber)
+            : null;
     if (first) {
       first.focus();
       return;
@@ -173,7 +176,8 @@ function errorsOf(modelCode: string | null, request: StartQualityCheckRequest | 
   if (parsed.success) return {};
   const errors: Errors = {};
   for (const issue of parsed.error.issues) {
-    if (issue.path[1] === 'serialNumber') errors.serialNumber ??= issue.message;
+    const field = issue.path[1];
+    if (field === 'machineName' || field === 'serialNumber') errors[field] ??= issue.message;
   }
   return errors;
 }

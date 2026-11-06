@@ -105,7 +105,7 @@ export const createInspection = endpoint({ role: 'inspector' }, async (req, _con
 /**
  * The new inspection's front page from the request, checked against its kind's rules (400 with
  * the problems, as any invalid body). A final inspection takes the template's cover photo unless
- * it has one of its own; a quality check has no machine name, location or photo.
+ * it has one of its own; a quality check has no location or photo.
  */
 function createFront(
   kind: InspectionKind,
@@ -114,7 +114,7 @@ function createFront(
   if (kind === 'quality') {
     const { front } = parseBody(StartQualityCheckRequestSchema, body);
     return (revision) => ({
-      machineName: '',
+      machineName: front.machineName,
       modelCode: revision.modelCode,
       serialNumber: front.serialNumber,
       participants: front.participants,
@@ -198,13 +198,13 @@ export const deleteInspection = endpoint({ role: 'admin' }, async (req, context)
 
 /**
  * The front page as saved: the model never changes, and a quality check never gets the fields its
- * front page doesn't have (machine name, location, photo), whatever is sent.
+ * front page doesn't have (location, photo), whatever is sent.
  */
 function savedFront(current: Inspection, input: InspectionDraftInput): InspectionFront {
   const { modelCode } = current.front;
   if (current.kind !== 'quality') return { ...input.front, modelCode };
-  const { serialNumber, participants, date } = input.front;
-  return { machineName: '', modelCode, serialNumber, participants, location: '', date };
+  const { machineName, serialNumber, participants, date } = input.front;
+  return { machineName, modelCode, serialNumber, participants, location: '', date };
 }
 
 /**

@@ -2946,3 +2946,149 @@ don't print yet" with a link back.
   dark outline yellow and white get.
 - Stored marks carry their colour as text, so no data changes; older apps would draw a green mark
   in green too.
+
+## Deviation log (2026-11-06)
+
+The user wanted "a summary list of all the deviations divided in final inspection and quality
+checks like before", like their Excel log ("Avvikelselogg QC": one line per deviation with machine,
+model, ID, description, action, category, Open/Closed, found and done dates, department), with
+the overview Excel lacked: what is still open, per machine and per department. Then, during the
+work, a Machine ID on quality checks too ("Standardize it to make sense").
+
+### Follow-up: apart from the inspection
+
+- **A follow-up per deviation:** `status` open or closed (none: open), `action` (what was done,
+  optional), `closedOn` (a day, today unless another is given), `closedBy` (a name as typed, the
+  signed-in person's unless another is given), `updatedAt` and `updatedBy`. Keyed by the
+  deviation's key, as the table's RowKey: a NOK row's item id or an extra deviation's id.
+- **Stored in a blob of its own per inspection, `follow-ups/{inspectionId}.json`**, in a new
+  `follow-ups` container (Bicep, the seed and the API's `ensureStorage` create it; an existing
+  deployment gets it on the API's first storage call). Not in the inspection blob: closing a
+  deviation must not change the inspection's ETag, which its open page autosaves against
+  (`If-Match`), and it doesn't change what the inspection found (the row stays NOK). Written over
+  the version read (If-Match, or If-None-Match for the first), read again on a 412, so two
+  deviations of one inspection closed at once both land.
+- **Allowed in progress and finalised**, for inspectors and admins: following up is everyday
+  work, not an admin's, and a finalised report is exactly what gets followed up.
+- **Reopening keeps the action** and clears the day and name: whoever picks it up sees what was
+  tried. Editing a closed one's action keeps its day and name unless they are changed.
+- **A follow-up outlives its deviation.** A NOK set back to OK drops the deviation from the
+  table and the log, as before; the follow-up stays in the blob and applies again if the row is
+  NOK again, since it is the same checkpoint of the same inspection. Pruning it would lose a
+  closure to a slip of the keyboard (OK, then NOK again), and the leftovers are a few bytes.
+
+### The table carries it
+
+- **Each deviation row gets `deviationNumber` (D-03) and the follow-up's `status`, `action`,
+  `closedOn`, `closedBy`**, so the log is one table query. The number isn't derivable from the
+  rows alone (extra deviations are numbered in the inspection's array order), so it is stored;
+  rows written before it are numbered on reading in the Deviations tab's order (rows by ref,
+  extras by when they were recorded), and get the real one at the next write. Old rows read as
+  open. Insights still selects only its own columns, so its numbers, rows and report are
+  unchanged.
+- **`syncDeviations` reads both blobs** (the inspection given, its follow-ups from storage) and
+  returns the follow-ups' ETag. `syncSettled` checks both ETags after its sync and syncs again
+  when either changed. A follow-up PUT writes its blob and then runs the same `syncSettled`.
+  Every write syncs after it, so whichever sync lands last has read both blobs after every write
+  before its check: a save's sync that read the follow-ups just before a deviation was closed is
+  caught by its own check (a test drives exactly that interleaving), and a rebuild of the table
+  from the blobs brings the follow-ups back.
+- **A PUT whose table sync fails answers 503** ("saved, but the deviation log could not be
+  updated. Try again."). Unlike the other 503s something was stored, but sending the same request
+  again is safe (it sets values), and a 200 would leave the log showing the old state with nothing
+  to repair it, as a finalised inspection may never be saved again.
+- **Deleting an inspection deletes its follow-ups** (best effort, like its rows), and a sync that
+  finds its inspection deleted removes a follow-ups blob written meanwhile.
+
+### API
+
+- `GET` and `PUT /api/inspections/{id}/follow-ups/{key?}`: one registration with an optional key
+  (23 registrations now, well below the 40 that trouble SWA). The PUT body is a discriminated union
+  on `status` (`FollowUpRequestSchema`); the server applies it with `applyFollowUp` (shared, so its
+  defaults are tested once). 404 when the key isn't a deviation of the inspection now.
+- `GET /api/deviations` and `/api/deviations/export.csv` take `kind` (final by default, as
+  Insights) and `status` (open by default, as the page), `model`, `resp`, `category` (ignoring case;
+  `-` for none, as no list entry is a lone dash) and `q`. Quality checks' rows are picked by the
+  table (`kind eq 'quality'`), final inspections' after reading (rows without `kind` are theirs),
+  as in Insights; only rows of inspections still listed count. One shared `matchesDeviationLog`
+  filters in the API and on the page, so the CSV is what the page shows.
+- **The CSV has the Excel log's columns** in words, not the Insights CSV's camelCase: Machine ID,
+  Serial number, (Quality check,) Model (by name), Inspection, Date, Deviation ID, Description
+  (ref and checkpoint), Comment, Action, Category, Severity, Responsible, Status, Found, Closed,
+  Closed by. Same format (semicolons, BOM, CRLF, formula guard); the CSV helpers moved to
+  `api/src/lib/csv.ts` for both.
+- **Found is the day the deviation was first recorded** (the row's `createdAt`, Swedish time), not
+  the inspection's date: a quality check done over a few days finds its deviations on different
+  days, and that is what "open for more than 30 days" should count from. A table rebuilt from the
+  blobs would date them to the rebuild, as Insights' `createdAt` already would.
+
+### The log page
+
+- **`/deviations/final` and `/deviations/quality`** (`/deviations` leads to the first), a
+  "Deviations" item (ListChecks icon) under Final inspection and under Quality check, for
+  everyone; NavLink marks the one shown. The loading skeleton draws two links in those groups.
+- **The page loads every deviation of its kind once and filters in the browser**, with the same
+  shared matcher: a search or filter shows at once, and the summary counts what the status filter
+  hides (Closed while Open is shown). Filters live in the address; the search is kept as typed.
+- **Summary:** Open (the oldest's found date), Closed (its share), Open more than 30 days (red when
+  any), under every filter but the status; then the open ones per responsible as chips (spellings
+  that differ only in case count together), which pick that responsible.
+- **Grouped by machine** (the scope change): Machine ID and serial number, ignoring case and
+  spaces, of a model, plus the title for a quality check (a machine has several). Usually one
+  inspection; a machine inspected twice keeps both under one header, each linked, and each
+  deviation's ID ("QC-2026-0004 · D-03") says which it came from. Machines with open deviations
+  first, then the newest; their deviations oldest inspection first, by number. "3 open · 9 closed"
+  and a bar count every filter but the status.
+- **A table from a 58rem card (a desktop), a card per deviation below** (tablets and phones): the
+  six columns don't fit a tablet beside its sidebar. Both are rendered and one is hidden, as the
+  inspections list does with its cells, so only one is in the accessibility tree. Severity is a
+  badge by the ID rather than a column of its own.
+- **Close…, Edit, Reopen…** (`FollowUpActions`, also on the Deviations tab): Close and Edit share
+  a dialog (Action taken, Closed on with today as the latest day, Closed by); Reopen asks first,
+  with a primary button (`ConfirmDialog` gained `confirmVariant`: reopening isn't destructive).
+  Each button carries the deviation's ID for a screen reader. The change is optimistic in both
+  caches (the log and the inspection's follow-ups), rolled back with a message if it fails; a
+  success notice says where a closed deviation went when the list shows open ones only.
+
+### The inspection's Deviations tab
+
+- **Each card gets a follow-up bar**: Open/Closed, when and by whom, the action, and the same
+  buttons, also when finalised. The follow-ups are read when the tab is first shown. A deviation
+  just marked may not be stored yet (the PUT would be a 404), so a close saves pending edits first
+  (`saveAll`), as Print does.
+- **`?tab=deviations&deviation={key}`** opens the page on that tab with the focus on that card:
+  the log's links. A quality check's address keeps them when it redirects.
+
+### Machine ID (scope change)
+
+- **"Machine ID" for both kinds**, the machine as the ERP (Monitor) knows it, with the hint "As in
+  Monitor, e.g. Magellan#1". Stored in `front.machineName`, so nothing migrates; only the words
+  changed (labels, list columns, search, "Machine ID is required", "The front page needs a Machine
+  ID."). Printing and Word are the other change's.
+- **Quality checks have one**: required to start one and to finalise one (the finalise rule is now
+  the same for both kinds), on the start form and the front page in a final inspection's order
+  (Machine ID, model, serial number, date, Checked by), in the header ("QC-2026-0004 ·
+  Magellan#1") and in the list's Machine ID column with the model under it. The API stopped
+  blanking it. Older quality checks show "—" and need one before they can be finalised.
+- **The deviation rows carry it** for quality checks too; the quality checks' Insights CSV has
+  `machineName` back, with `checkName` after it (its tests changed), and the Insights report's
+  deviation list names a check "Magellan#1 · Quality check – Pre start up".
+
+### Tests
+
+- **shared** (`deviationLog.test.ts`): the request contract, `applyFollowUp`'s defaults, old rows
+  as open, numbering older rows, the found day in Swedish time, overdue, the filters and search;
+  the Machine ID rules in `inspections.test.ts`.
+- **api** (`functions/deviation-log.test.ts`, 20 tests): close, edit, reopen; the inspection's ETag
+  untouched; finalised and quality checks; 404 and 400; roles; two at once; kept across a save, a
+  rebuild and a save's sync racing a close; delete; the log's order, filters and old rows; deleted
+  inspections left out; the CSV. Changed: the table's columns (25) and the batch count (the
+  remaining extras renumber), the quality check tests for the Machine ID and their CSV.
+- **app** (`features/deviationLog/model.test.ts`): the address, grouping by machine (two
+  inspections of one, a machine's quality checks apart), order, the summary and chips, the
+  menus' choices; the list search by Machine ID; the report's quality check names.
+- **e2e** (`deviation-log.spec.ts`, 3 tests): the sidebar items; a quality check's deviation in its
+  own log, closed with an action, closed on its Deviations tab, reopened there; a fresh NOK
+  closed from the tab (saved first), a finalised inspection followed up, a non-deviation refused,
+  and the CSV. Changed: the sidebar groups, "Machine ID" labels, the quality checks' Machine ID
+  and their CSV, and the deviation table's new columns.

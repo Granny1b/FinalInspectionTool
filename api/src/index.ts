@@ -3,6 +3,8 @@
  * itself with `app.http()` when imported, so every function must be imported here.
  * SWA has an open issue with ≥ 40 registrations on Node 22 — keep the count well below that.
  */
+import './functions/deviations';
+import './functions/follow-ups';
 import './functions/images';
 import './functions/insights';
 import './functions/inspection-state';

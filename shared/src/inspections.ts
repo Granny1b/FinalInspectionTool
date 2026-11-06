@@ -33,25 +33,34 @@ export const INSPECTION_NOUNS: Record<InspectionKind, string> = {
 export const InspectionFrontInputSchema = InspectionFrontSchema.omit({ modelCode: true });
 export type InspectionFrontInput = z.infer<typeof InspectionFrontInputSchema>;
 
+/**
+ * The machine's ID as the ERP (Monitor) knows it, "Magellan#1": what people call the machine, on
+ * a final inspection and a quality check alike. Stored as `front.machineName`, the field's name
+ * from before it was called Machine ID.
+ */
+const MachineIdSchema = z.string().trim().min(1, 'Machine ID is required').max(200);
+const SerialNumberSchema = z.string().trim().min(1, 'Serial number is required').max(100);
+
 /** POST /api/inspections — start from the template's latest published revision. */
 export const CreateInspectionRequestSchema = z.object({
   templateId: IdSchema,
   front: InspectionFrontInputSchema.extend({
-    machineName: z.string().trim().min(1, 'Machine name is required').max(200),
-    serialNumber: z.string().trim().min(1, 'Serial number is required').max(100),
+    machineName: MachineIdSchema,
+    serialNumber: SerialNumberSchema,
   }),
 });
 export type CreateInspectionRequest = z.infer<typeof CreateInspectionRequestSchema>;
 
 /**
  * POST /api/inspections from a quality check: a check along the build has a shorter front page
- * (no machine name, location or photo). The machine is the quality check's model; the serial
- * number says which one it is. The template's kind decides which of the two requests applies.
+ * (no location or photo). The machine is its Machine ID, of the quality check's model, with its
+ * serial number. The template's kind decides which of the two requests applies.
  */
 export const StartQualityCheckRequestSchema = z.object({
   templateId: IdSchema,
   front: z.object({
-    serialNumber: z.string().trim().min(1, 'Serial number is required').max(100),
+    machineName: MachineIdSchema,
+    serialNumber: SerialNumberSchema,
     /** Who did the check ("Checked by"), as participants are on a final inspection. */
     participants: InspectionFrontSchema.shape.participants,
     date: InspectionFrontSchema.shape.date,
@@ -267,8 +276,8 @@ export type FinaliseIssue = z.infer<typeof FinaliseIssueSchema>;
 
 /**
  * What must hold before an inspection is locked (brief §5.3: every row has a status). A report
- * also needs to say which machine it is about, and every extra deviation needs a description. A
- * quality check has no machine name (its machine is the model): it needs the serial number only.
+ * also needs to say which machine it is about (its Machine ID and serial number, on a quality
+ * check too), and every extra deviation needs a description.
  */
 export function validateForFinalise(
   inspection: Pick<Inspection, 'front' | 'templateSnapshot' | 'results' | 'extraDeviations'> & {
@@ -276,10 +285,10 @@ export function validateForFinalise(
   },
 ): FinaliseIssue[] {
   const issues: FinaliseIssue[] = [];
-  if (inspection.kind !== 'quality' && !inspection.front.machineName.trim()) {
+  if (!inspection.front.machineName.trim()) {
     issues.push({
       target: { kind: 'front', field: 'machineName' },
-      message: 'The front page needs a machine name.',
+      message: 'The front page needs a Machine ID.',
     });
   }
   if (!inspection.front.serialNumber.trim()) {

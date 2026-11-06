@@ -27,6 +27,7 @@ import {
   type InspectionSummary,
 } from '@modig/shared';
 import { deleteDeviationRows, syncDeviations } from './deviations';
+import { deleteFollowUps, followUpsVersion } from './followUps';
 import {
   ConflictError,
   NotFoundError,
@@ -70,25 +71,34 @@ export async function writeInspection(
 const SETTLE_ROUNDS = 3;
 
 /**
- * Syncs the deviation table from `synced`, stored as version `etag`, then checks the blob. Nothing
- * orders two writers' syncs, so a slow sync can land after a newer write's sync and leave the
- * table behind; whoever syncs last therefore checks that the blob is still the version it synced,
- * and syncs again from the latest version if not. A sync failure is thrown for the caller.
+ * Syncs the deviation table from `synced`, stored as version `etag`, and its follow-ups, then
+ * checks both blobs. Nothing orders two writers' syncs (an inspection's save, a deviation closed
+ * in the log), so a slow sync can land after a newer write's sync and leave the table behind;
+ * whoever syncs last therefore checks that both blobs are still the versions it synced, and syncs
+ * again from the latest if not. Every write syncs after it, so the last sync to land has seen
+ * every write before its check. A sync failure is thrown for the caller.
  */
 export async function syncSettled(
   synced: Inspection,
   etag: string,
   context: InvocationContext,
 ): Promise<void> {
-  await syncDeviations(synced);
+  let followUps = await syncDeviations(synced);
   let last = etag;
   for (let round = 0; round < SETTLE_ROUNDS; round++) {
-    const latest = await loadInspection(synced.id);
-    // Deleted meanwhile: the rows just written belong to nothing. The delete removes the rows
-    // after the blob, so whichever of the two finishes last leaves none behind.
-    if (!latest) return deleteDeviationRows(synced.front.modelCode, synced.id);
-    if (latest.etag === last) return;
-    await syncDeviations(latest.data);
+    const [latest, latestFollowUps] = await Promise.all([
+      loadInspection(synced.id),
+      followUpsVersion(synced.id),
+    ]);
+    // Deleted meanwhile: the rows just written belong to nothing, and so do follow-ups written
+    // since. The delete removes them after the blob, so whichever of the two finishes last leaves
+    // none behind.
+    if (!latest) {
+      await deleteDeviationRows(synced.front.modelCode, synced.id);
+      return deleteFollowUps(synced.id);
+    }
+    if (latest.etag === last && latestFollowUps === followUps) return;
+    followUps = await syncDeviations(latest.data);
     last = latest.etag;
   }
   context.warn(`The deviations of inspection ${synced.id} kept changing while being synced`);
@@ -100,9 +110,10 @@ export async function syncSettled(
 
 /**
  * Deletes an inspection for good: its blob, only while it is still version `ifMatch` (412
- * otherwise, 404 if it is gone already), then its deviation rows and the photos only it uses. The
- * blob goes first: without it the inspection no longer exists anywhere the app looks (the list,
- * its page, Insights, which counts only the rows of listed inspections). The rest is best effort:
+ * otherwise, 404 if it is gone already), then its deviation rows, its deviations' follow-ups and
+ * the photos only it uses. The blob goes first: without it the inspection no longer exists
+ * anywhere the app looks (the list, its page, Insights and the deviation log, which show only the
+ * rows of listed inspections). The rest is best effort:
  * whatever can't be deleted is logged and left behind, unused, and the delete still succeeds,
  * since a retry would only get a 404. Its number is never handed out again (the counter only
  * counts up, and a lost counter carries on from the highest number in use).
@@ -127,6 +138,9 @@ export async function deleteInspection(
   await Promise.all([
     deleteDeviationRows(inspection.front.modelCode, id).catch((error: unknown) => {
       context.warn(`Deleted inspection ${id}; deleting its deviation rows failed`, error);
+    }),
+    deleteFollowUps(id).catch((error: unknown) => {
+      context.warn(`Deleted inspection ${id}; deleting its follow-ups failed`, error);
     }),
     deletePhotos(inspection, context).catch((error: unknown) => {
       context.warn(`Deleted inspection ${id}; deleting its photos failed`, error);

@@ -313,6 +313,10 @@ export const ExtraDeviationSchema = z.object({
 export type ExtraDeviation = z.infer<typeof ExtraDeviationSchema>;
 
 export const InspectionFrontSchema = z.object({
+  /**
+   * The Machine ID, as the ERP (Monitor) knows the machine: "Magellan#1". Called the machine name
+   * until quality checks got one too; the field kept its name, so nothing stored changes.
+   */
   machineName: z.string().max(200),
   /** Known from the start: an inspection is always created from a template. */
   modelCode: ModelCodeSchema,

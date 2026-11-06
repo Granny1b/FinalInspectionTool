@@ -11,3 +11,4 @@ export * from './people';
 export * from './settings';
 export * from './templateTransfer';
 export * from './qualityChecks';
+export * from './deviationLog';

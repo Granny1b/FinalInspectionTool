@@ -57,7 +57,7 @@ export function StartQualityCheckPage() {
       <div className="mt-2">
         <PageHeader
           title="Start a quality check"
-          description="Pick the machine and its quality check, then fill in the serial number and date."
+          description="Pick the machine and its quality check, then fill in its Machine ID, serial number and date."
         />
       </div>
       {body}

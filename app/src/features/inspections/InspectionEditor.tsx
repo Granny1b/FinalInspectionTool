@@ -8,6 +8,7 @@ import {
   validateForFinalise,
   type AnnotatedImage,
   type FinaliseIssue,
+  type FollowUpRequest,
   type Inspection,
   type InspectionDeviation,
   type InspectionDraftInput,
@@ -46,6 +47,7 @@ import { formatDateTime } from '../../lib/format';
 import { useCurrentUser } from '../../lib/useMe';
 import { usePersonName } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
+import { useFollowUps, usePendingFollowUps, useSetFollowUp } from '../deviationLog/queries';
 import { InspectionPreview } from '../print/InspectionPreview';
 import { inspectionPrintHref } from '../print/links';
 import type { PrintMode } from '../print/model';
@@ -59,6 +61,7 @@ import { newExtraDeviation, removeExtra, updateExtra, type ExtraDeviationPatch }
 import { FrontPageCard } from './FrontPageCard';
 import { ProgressSummary, TabBar } from './HeaderParts';
 import {
+  deviationCardId,
   deviationPhotosId,
   extraDescriptionId,
   extraIssues,
@@ -94,6 +97,10 @@ type Props = {
   loaded: LoadedInspection;
   /** Loads the inspection again and reopens the page on it; false if loading failed. */
   onReload: () => Promise<boolean>;
+  /** The tab it opens on (the deviation log links to the Deviations tab). */
+  initialTab?: InspectionTab;
+  /** A deviation's key: the Deviations tab opens at its card. */
+  initialDeviation?: string;
 };
 
 /** What only the server changes: whether it is locked, and by whom. */
@@ -118,7 +125,12 @@ const QUALITY_SHORTCUT_HINTS = <ShortcutHints guide="Pictures" />;
  * shorter front page with the quality check it follows, each row a card with its pictures and
  * large OK / NOK / N/A buttons (QualityCheckSheet), and no printing yet.
  */
-export function InspectionEditor({ loaded, onReload }: Props) {
+export function InspectionEditor({
+  loaded,
+  onReload,
+  initialTab = 'checklist',
+  initialDeviation,
+}: Props) {
   const { inspection } = loaded;
   const { id, kind, number, templateSnapshot, templateRevision } = inspection;
   const quality = kind === 'quality';
@@ -268,10 +280,10 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     [nextItemId, nextRef],
   );
   // Tabs keep their own scroll position, so going back to the checklist returns to the row.
-  const [tab, setTab] = useState<InspectionTab>('checklist');
+  const [tab, setTab] = useState<InspectionTab>(initialTab);
   // The Deviations tab is rendered when first shown, then kept: opening an inspection doesn't
   // download every deviation photo for a tab that may not be looked at.
-  const [deviationsShown, setDeviationsShown] = useState(false);
+  const [deviationsShown, setDeviationsShown] = useState(initialTab === 'deviations');
   const tabRef = useRef(tab);
   const scrollByTab = useRef<Record<InspectionTab, number>>({ checklist: 0, deviations: 0 });
   /** Shows the tab at once (so its elements can take the focus); false if it was showing. */
@@ -318,6 +330,44 @@ export function InspectionEditor({ loaded, onReload }: Props) {
     [switchTab],
   );
 
+  // Each deviation's follow-up (open or closed) on the Deviations tab, as in the deviation log,
+  // read once the tab is shown. Closing one saves pending edits first, so a deviation just marked
+  // is on the server; once finalised there is nothing to save.
+  const followUps = useFollowUps(id, deviationsShown);
+  const { mutate: sendFollowUp } = useSetFollowUp();
+  const pendingAll = usePendingFollowUps();
+  const pendingFollowUps = useMemo(
+    () =>
+      new Set(
+        [...pendingAll]
+          .filter((pending) => pending.startsWith(`${id}/`))
+          .map((pending) => pending.slice(id.length + 1)),
+      ),
+    [pendingAll, id],
+  );
+  const [followUpFailure, setFollowUpFailure] = useState<string | null>(null);
+  const followUp = useCallback(
+    (deviation: InspectionDeviation, request: FollowUpRequest) => {
+      setFollowUpFailure(null);
+      const what = request.status === 'open' ? 'reopened' : 'closed';
+      sendFollowUp(
+        {
+          inspectionId: id,
+          kind,
+          key: deviation.key,
+          request,
+          prepare: server.state === 'finalised' ? undefined : saveAll,
+        },
+        {
+          onError: (failure) =>
+            setFollowUpFailure(
+              `${number} · ${deviation.number} could not be ${what}. ${errorMessage(failure)}`,
+            ),
+        },
+      );
+    },
+    [id, kind, number, sendFollowUp, saveAll, server.state],
+  );
   const addExtraDeviation = useCallback(() => {
     const extra = newExtraDeviation();
     // Rendered at once, so its description can take the focus.
@@ -355,11 +405,21 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   }, [notice]);
 
   // On open the keyboard starts at "Continue at 3.b" (when there is one), so a single Enter
-  // resumes transcribing. Without a row to continue at, the focus stays where it was. The id never
-  // changes, so this runs once, when the page opens.
+  // resumes transcribing. Without a row to continue at, the focus stays where it was. Opened from
+  // the deviation log at one deviation, it starts at that deviation's card instead; opened on the
+  // Deviations tab otherwise, where it is. None of these change, so this runs once, when the page
+  // opens.
   useEffect(() => {
-    document.getElementById(continueId)?.focus({ preventScroll: true });
-  }, [continueId]);
+    if (initialDeviation) {
+      const card = document.getElementById(deviationCardId(initialDeviation));
+      card?.focus({ preventScroll: true });
+      card?.scrollIntoView({ block: 'center' });
+      return;
+    }
+    if (initialTab === 'checklist') {
+      document.getElementById(continueId)?.focus({ preventScroll: true });
+    }
+  }, [continueId, initialDeviation, initialTab]);
 
   const conflict = saveState.status === 'conflict' || stateConflict;
 
@@ -479,8 +539,9 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   }, [deleted, navigate, number, kind]);
 
   const modelLabel = modelName(settings.data?.machineModels, inspection.front.modelCode);
-  // A quality check's machine is its model; it has no machine name.
-  const machine = quality ? modelLabel : draft.front.machineName.trim();
+  // Its Machine ID, on a quality check as on a final inspection (one started before quality checks
+  // had one has none until it is filled in).
+  const machine = draft.front.machineName.trim();
   // Once finalised there is nothing left to save: the header says so only if saving failed.
   const showSaveStatus = !finalised || saveState.status !== 'saved';
 
@@ -504,7 +565,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
           under the actions, until 52rem (a desktop), where it fits before them. The details keep
           room for its longest text, so a change in it (Saved, Unsaved changes) never re-wraps
           anything and the header never changes height while typing. Narrower (a phone), the
-          status and then the actions go under the details, so a machine name is never cut to "R…".
+          status and then the actions go under the details, so a Machine ID is never cut to "R…".
         */}
         <div className="@container">
           <div className="grid grid-cols-[minmax(0,1fr)] @min-[42rem]:grid-cols-[minmax(0,1fr)_auto] @min-[42rem]:gap-x-6 @min-[52rem]:grid-cols-[minmax(0,1fr)_auto_auto]">
@@ -516,7 +577,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             >
               {number}
               <span className="font-normal text-ink-500"> · </span>
-              {machine || <span className="font-normal text-ink-500">No machine name</span>}
+              {machine || <span className="font-normal text-ink-500">No Machine ID</span>}
             </h1>
             {/*
               Spaced, not separated by dots: on a narrow screen a dot would dangle at a line end.
@@ -529,7 +590,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
               )}
             >
               <StateBadge state={server.state} />
-              {!quality && <span>{modelLabel}</span>}
+              <span>{modelLabel}</span>
               {quality && (
                 <span>
                   {templateSnapshot.name} · Rev {templateRevision}
@@ -692,6 +753,11 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             finalising. They are marked in red.
           </Callout>
         )}
+        {followUpFailure && (
+          <Callout tone="error" role="alert" onDismiss={() => setFollowUpFailure(null)}>
+            {followUpFailure}
+          </Callout>
+        )}
         {notice && (
           <div ref={noticeRef} tabIndex={-1} className="outline-none">
             <Callout
@@ -798,6 +864,10 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             onRemove={removeExtraDeviation}
             onPhotosChange={updateDeviationPhotos}
             onEditorDirtyChange={setEditorDirty}
+            inspectionNumber={number}
+            followUps={followUps.data?.followUps ?? null}
+            pendingFollowUps={pendingFollowUps}
+            onFollowUp={followUp}
           />
         )}
       </div>
@@ -847,7 +917,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
         <DeleteInspectionDialog
           kind={kind}
           number={number}
-          machine={quality ? '' : machine}
+          machine={machine}
           finalised={finalised}
           busy={remove.isPending || deleted}
           error={remove.error}

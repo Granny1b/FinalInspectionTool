@@ -16,7 +16,7 @@ type Props = {
 };
 
 /**
- * The front page's details (brief §2 `Main`): machine name, model, serial number, participants,
+ * The front page's details (brief §2 `Main`): Machine ID, model, serial number, participants,
  * location and date. Used by the new-inspection form and the inspection's front page card.
  */
 export function FrontPageFields({
@@ -29,18 +29,11 @@ export function FrontPageFields({
   return (
     <div className="grid content-start gap-x-4 gap-y-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
-        <Field id={FRONT_FIELD_IDS.machineName} label="Machine name" error={errors.machineName}>
-          {(control) => (
-            <input
-              {...control}
-              maxLength={200}
-              autoComplete="off"
-              value={front.machineName}
-              onChange={(event) => onChange({ machineName: event.target.value })}
-              className={clsx(INPUT, 'h-9')}
-            />
-          )}
-        </Field>
+        <MachineIdField
+          value={front.machineName}
+          error={errors.machineName}
+          onChange={(machineName) => onChange({ machineName })}
+        />
       </div>
       <div>
         <p className="text-sm font-medium text-ink-800">Machine model</p>
@@ -85,6 +78,33 @@ export function FrontPageFields({
       </Field>
       <DateField value={front.date} onChange={(date) => onChange({ date })} />
     </div>
+  );
+}
+
+/** What the hint under the Machine ID says, here and on a quality check. */
+export const MACHINE_ID_HINT = 'As in Monitor, e.g. Magellan#1';
+
+type MachineIdProps = { value: string; error?: string; onChange: (machineId: string) => void };
+
+/**
+ * The Machine ID: the machine as the ERP (Monitor) knows it, on a final inspection and a quality
+ * check alike. Stored as the front page's `machineName`.
+ */
+export function MachineIdField({ value, error, onChange }: MachineIdProps) {
+  return (
+    <Field id={FRONT_FIELD_IDS.machineName} label="Machine ID" hint={MACHINE_ID_HINT} error={error}>
+      {(control) => (
+        <input
+          {...control}
+          maxLength={200}
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={clsx(INPUT, 'h-9')}
+        />
+      )}
+    </Field>
   );
 }
 

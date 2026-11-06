@@ -14,6 +14,7 @@ import {
   type InsightsDeviations,
   type InsightsQuery,
 } from '@modig/shared';
+import { csvResponse } from '../lib/csv';
 import { BadRequestError, endpoint, json } from '../lib/http';
 import { csvFileName, deviationsCsv, loadExportRows, loadInsights } from '../lib/insights';
 
@@ -36,35 +37,8 @@ export const exportInsightsCsv = endpoint({ role: 'admin' }, async (req, context
   const query = readQuery(req);
   const rows = await loadExportRows(query, context);
   const fileName = csvFileName(query, swedishDate.format(new Date()));
-  return {
-    status: 200,
-    body: deviationsCsv(rows, queryKind(query)),
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': contentDisposition(fileName),
-      'Cache-Control': 'no-store',
-    },
-  };
+  return csvResponse(deviationsCsv(rows, queryKind(query)), fileName);
 });
-
-/**
- * An attachment named `fileName`. A quality check's title may hold any character ("–", å), which
- * a header can't carry as it is: the name then goes in `filename*` (RFC 6266), percent-encoded
- * UTF-8, after a plain ASCII copy for any client that reads only `filename`.
- */
-export function contentDisposition(fileName: string): string {
-  const ascii = fileName
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\u2013\u2014]/g, '-')
-    .replace(/[^\x20-\x7e]|["\\]/g, '_');
-  if (ascii === fileName) return `attachment; filename="${fileName}"`;
-  const encoded = encodeURIComponent(fileName).replace(
-    /['()*]/g,
-    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
-}
 
 /**
  * The CSV's rows as JSON, for the printed report's deviation list: the same filters, the same
