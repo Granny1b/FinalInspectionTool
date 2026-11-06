@@ -16,7 +16,8 @@ import {
   type TemplateView,
 } from '../features/templates/listView';
 import type { ModelContext } from '../features/templates/modelChoice';
-import { useTemplates } from '../features/templates/queries';
+import { finalTemplates, useTemplates } from '../features/templates/queries';
+import { qualityChecksByMachine } from '../features/templates/qualityCheckList';
 import { TemplateCards } from '../features/templates/TemplateCards';
 import { TemplateList } from '../features/templates/TemplateList';
 import { readTemplateFile, TemplateFileError } from '../features/templates/transfer';
@@ -38,22 +39,33 @@ export function TemplatesPage() {
     null,
   );
   const [fileError, setFileError] = useState<string | null>(null);
-  const deleted = (location.state as TemplatesPageState | null)?.deleted;
+  const pageState = location.state as TemplatesPageState | null;
+  const deleted = pageState?.deleted;
+  const deletedChecks = pageState?.qualityChecks ?? 0;
 
+  // The machines' final inspection templates; their quality checks are listed under them.
+  const finals = useMemo(
+    () => (templates.data ? finalTemplates(templates.data) : undefined),
+    [templates.data],
+  );
+  const qualityChecks = useMemo(
+    () => qualityChecksByMachine(templates.data ?? []),
+    [templates.data],
+  );
   const models = settings.data?.machineModels;
   // Needs the models and the existing templates to offer only models without one.
   const modelContext = useMemo<ModelContext | null>(
     () =>
-      models && templates.data
+      models && finals
         ? {
             models,
             free: models.filter(
-              (model) => !templates.data.some((template) => template.modelCode === model.code),
+              (model) => !finals.some((template) => template.modelCode === model.code),
             ),
-            templates: templates.data,
+            templates: finals,
           }
         : null,
-    [models, templates.data],
+    [models, finals],
   );
 
   async function pickFile(event: ChangeEvent<HTMLInputElement>) {
@@ -102,9 +114,9 @@ export function TemplatesPage() {
     <>
       <PageHeader
         title="Templates"
-        description="One checklist per machine model, published in revisions."
+        description="One per machine model: its final inspection and its quality checks, published in revisions."
         actions={
-          templates.data?.length ? (
+          finals?.length ? (
             <>
               <ViewSwitch
                 view={view}
@@ -131,6 +143,10 @@ export function TemplatesPage() {
                 “{deleted || 'Untitled template'}” was deleted.
               </strong>{' '}
               Inspections made from it are kept.
+              {deletedChecks > 0 &&
+                (deletedChecks === 1
+                  ? ' Its quality check was deleted too.'
+                  : ` Its ${deletedChecks} quality checks were deleted too.`)}
             </Callout>
           )}
           {fileError && (
@@ -149,7 +165,7 @@ export function TemplatesPage() {
           onRetry={() => void templates.refetch()}
           retrying={templates.isFetching}
         />
-      ) : templates.data.length === 0 ? (
+      ) : !finals || finals.length === 0 ? (
         <EmptyState
           icon={LayoutTemplate}
           title="No templates yet"
@@ -161,9 +177,19 @@ export function TemplatesPage() {
           action={adminActions || undefined}
         />
       ) : view === 'cards' ? (
-        <TemplateCards templates={templates.data} models={models} showDrafts={isAdmin} />
+        <TemplateCards
+          templates={finals}
+          qualityChecks={qualityChecks}
+          models={models}
+          showDrafts={isAdmin}
+        />
       ) : (
-        <TemplateList templates={templates.data} models={models} showDrafts={isAdmin} />
+        <TemplateList
+          templates={finals}
+          qualityChecks={qualityChecks}
+          models={models}
+          showDrafts={isAdmin}
+        />
       )}
       {creating && modelContext && (
         <CreateTemplateDialog models={modelContext} onClose={() => setCreating(false)} />

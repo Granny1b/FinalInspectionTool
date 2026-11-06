@@ -9,11 +9,14 @@ import {
   TemplateDetailSchema,
   TemplateListSchema,
   TemplateSchema,
+  type CreateQualityCheckRequest,
   type CreateTemplateRequest,
+  type ImportQualityCheckRequest,
   type ImportTemplateRequest,
   type PublishIssue,
   type TemplateDetail,
   type TemplateDraftInput,
+  type TemplateSummary,
 } from '@modig/shared';
 import {
   skipToken,
@@ -58,12 +61,43 @@ function withEtag<T>({ data, etag }: ApiResponse<T>): { data: T; etag: string } 
   return { data, etag };
 }
 
+/** Every template: the machines' final inspection templates and their quality checks. */
 export function useTemplates() {
   return useQuery({
     queryKey: templateKeys.list,
     queryFn: async ({ signal }) =>
       (await apiFetch('/api/templates', { schema: TemplateListSchema, signal })).data,
   });
+}
+
+/** The final inspection templates of a list: one per machine model. */
+export function finalTemplates(list: readonly TemplateSummary[]): TemplateSummary[] {
+  return list.filter((template) => template.kind === 'final');
+}
+
+/** The quality checks of the machine whose final inspection template is `parentId`. */
+export function qualityChecksOf(
+  list: readonly TemplateSummary[],
+  parentId: string,
+): TemplateSummary[] {
+  return list.filter((template) => template.kind === 'quality' && template.parentId === parentId);
+}
+
+/** The editor of a template: a final inspection's, or a quality check's under its machine. */
+export function templateHref(template: Pick<TemplateSummary, 'id' | 'kind' | 'parentId'>): string {
+  return template.kind === 'quality' && template.parentId
+    ? qualityCheckHref(template.parentId, template.id)
+    : `/templates/${template.id}`;
+}
+
+/** A machine's Quality checks tab. */
+export function qualityChecksHref(parentId: string): string {
+  return `/templates/${parentId}/quality-checks`;
+}
+
+/** A quality check's editor (or, for inspectors, its latest revision). */
+export function qualityCheckHref(parentId: string, id: string): string {
+  return `${qualityChecksHref(parentId)}/${id}`;
 }
 
 /** The draft with its ETag, revision history and publish state (admins). */
@@ -103,10 +137,13 @@ export function useTemplateRevision(id: string, revision: number | null) {
   });
 }
 
+/** A new final inspection template, or a quality check under a machine's. */
 export function useCreateTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (request: CreateTemplateRequest): Promise<LoadedTemplate> => {
+    mutationFn: async (
+      request: CreateTemplateRequest | CreateQualityCheckRequest,
+    ): Promise<LoadedTemplate> => {
       const { data, etag } = withEtag(
         await apiFetch('/api/templates', {
           method: 'POST',
@@ -127,24 +164,29 @@ export function useCreateTemplate() {
 function opened(
   queryClient: QueryClient,
   created: LoadedTemplate,
-  request: { newModel?: unknown },
+  request: { newModel?: unknown } | { kind: 'quality' },
 ) {
   queryClient.setQueryData(templateKeys.detail(created.detail.draft.id), created);
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: templateKeys.list }),
-    request.newModel ? queryClient.invalidateQueries({ queryKey: SETTINGS_KEY }) : null,
+    'newModel' in request && request.newModel
+      ? queryClient.invalidateQueries({ queryKey: SETTINGS_KEY })
+      : null,
   ]);
 }
 
 /** useSettings' key (lib/useSettings.ts): a prefix, so it matches however that query is keyed. */
 const SETTINGS_KEY = ['settings'];
 
-/** A new draft from a template file; resolves to it and the number of images left out. */
+/**
+ * A new draft from a template file, or a quality check from a quality check file; resolves to it
+ * and the number of images left out.
+ */
 export function useImportTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (
-      request: ImportTemplateRequest,
+      request: ImportTemplateRequest | ImportQualityCheckRequest,
     ): Promise<{ loaded: LoadedTemplate; droppedImages: number }> => {
       const { data, etag } = withEtag(
         await apiFetch('/api/templates/import', {

@@ -32,6 +32,12 @@ const AnnotationEditor = lazy(() =>
 const WORDS = {
   photo: { name: 'photo', title: 'Photo', notOne: 'That isn’t a photo. Drop a JPEG or PNG image.' },
   image: { name: 'image', title: 'Image', notOne: 'That isn’t an image. Drop a JPEG or PNG file.' },
+  /** A quality check's pictures of how a checkpoint should and should not look. */
+  picture: {
+    name: 'picture',
+    title: 'Picture',
+    notOne: 'That isn’t a picture. Drop a JPEG or PNG file.',
+  },
 } as const;
 type Words = (typeof WORDS)[keyof typeof WORDS];
 

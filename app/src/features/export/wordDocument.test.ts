@@ -431,6 +431,7 @@ describe('the Word export of awkward text', () => {
       templatePrint(
         {
           id: id('Tmpl', 1),
+          kind: 'final',
           name: 'Many sections',
           modelCode: 'RMMG',
           revision: 1,
@@ -486,6 +487,7 @@ describe('the Word export of a blank checklist', () => {
 describe('the Word export of a template preview', () => {
   const template: Template = {
     id: id('Tmpl', 1),
+    kind: 'final',
     name: 'Final inspection – RigiMill MG',
     modelCode: 'RMMG',
     revision: 3,
@@ -512,6 +514,7 @@ describe('the Word export of a section without checkpoints', () => {
   const sections = [SECTIONS[0]!, empty, SECTIONS[1]!];
   const template: Template = {
     id: id('Tmpl', 2),
+    kind: 'final',
     name: 'Final inspection – RigiMill MG',
     modelCode: 'RMMG',
     revision: 3,

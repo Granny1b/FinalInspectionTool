@@ -10,13 +10,26 @@ type FrameProps = {
   /** Bottom right, like "Rev: 2" on the workbook's front page. */
   revisionLabel: string;
   children: ReactNode;
+  /**
+   * A photo with the details beside it (a final inspection's front page), or fields side by side
+   * as the card's width allows (a quality check's, which has no photo).
+   */
+  layout?: 'photo' | 'fields';
+  /** The fields' grid is a list of details (read-only). */
+  details?: boolean;
 };
 
 /**
  * Card shaped like the printed checklist's front page (brief §6): logo and title on top, the
  * machine photo with the details beside it, the revision in the bottom-right corner.
  */
-export function FrontPageFrame({ revisionLabel, children }: FrameProps) {
+export function FrontPageFrame({
+  revisionLabel,
+  children,
+  layout = 'photo',
+  details = false,
+}: FrameProps) {
+  const Fields = details ? 'dl' : 'div';
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} className="rounded-lg border border-ink-200 bg-surface">
@@ -29,9 +42,17 @@ export function FrontPageFrame({ revisionLabel, children }: FrameProps) {
         </h2>
         <Logo className="-my-1.5 h-8" />
       </div>
-      <div className="grid grid-cols-1 gap-x-6 gap-y-5 p-5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
-        {children}
-      </div>
+      {layout === 'photo' ? (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-5 p-5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
+          {children}
+        </div>
+      ) : (
+        <div className="@container p-5">
+          <Fields className="grid grid-cols-1 gap-x-5 gap-y-4 text-sm @min-[28rem]:grid-cols-2 @min-[44rem]:grid-cols-3">
+            {children}
+          </Fields>
+        </div>
+      )}
       <p className="border-t border-ink-200 px-5 py-2.5 text-right text-xs text-ink-500 tabular-nums">
         {revisionLabel}
       </p>
@@ -70,7 +91,7 @@ export function PublishedFrontPage({
   );
 }
 
-function Detail({ label, children }: { label: string; children: ReactNode }) {
+export function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <dt className="text-xs font-medium text-ink-500">{label}</dt>

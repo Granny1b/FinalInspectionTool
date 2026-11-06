@@ -100,6 +100,7 @@ export async function createTemplate(
 ): Promise<Template> {
   const draft: Template = {
     id: newId(),
+    kind: 'final',
     name,
     modelCode,
     revision: published ? 2 : 1,
@@ -149,6 +150,79 @@ export async function deleteTemplate(id: string): Promise<void> {
     ...names.map((name) => templates.deleteBlob(name)),
     deleteImages([...imageIds]),
   ]);
+}
+
+/**
+ * A quality check of `parent` (a machine's final inspection template), written straight into
+ * storage like createTemplate: "Quality check – Pre start up", one section of two rows with how, references
+ * and time. `published` adds revision 1 with the same content.
+ */
+export async function createQualityCheck(parent: Template, published = false): Promise<Template> {
+  const draft: Template = {
+    id: newId(),
+    kind: 'quality',
+    parentId: parent.id,
+    name: 'Quality check – Pre start up',
+    modelCode: parent.modelCode,
+    revision: published ? 2 : 1,
+    status: 'draft',
+    quality: {
+      name: 'Pre start up',
+      department: 'Quality',
+      documentNumber: '1.22.2',
+      madeBy: 'Sam Andersson',
+      date: '2026-11-05',
+    },
+    sections: [
+      {
+        id: newId(),
+        title: 'Safety features',
+        items: [
+          {
+            id: newId(),
+            text: 'Check and verify safety decals on balancing tubes.',
+            how: 'Should be visible and not turned inward.',
+            references: ['ISO 12100', 'ISO 7010'],
+            timeHours: 0.2,
+          },
+          {
+            id: newId(),
+            text: 'Warning signs inside the electrical cabinet.',
+            references: ['IEC 60204-1'],
+            timeHours: 0.1,
+          },
+        ],
+      },
+    ],
+    updatedAt: new Date().toISOString(),
+    updatedBy: 'e2e@modig.se',
+  };
+  if (published) {
+    await writeTemplate(blobNames.templateRevision(draft.id, 1), {
+      ...draft,
+      status: 'published',
+      revision: 1,
+      changeNote: 'First version',
+    });
+  }
+  await writeTemplate(blobNames.templateDraft(draft.id), draft);
+  return draft;
+}
+
+/**
+ * Deletes every quality check of the machine whose final inspection template is `parentId`, with
+ * its revisions and pictures (as deleteTemplate). Quality checks created in the UI are found by
+ * their `parentId`.
+ */
+export async function deleteQualityChecks(parentId: string): Promise<void> {
+  const ids: string[] = [];
+  for await (const blob of templates.listBlobsFlat()) {
+    const [id = '', file] = blob.name.split('/');
+    if (file !== 'draft.json') continue;
+    const draft = await readTemplate(blob.name).catch(() => null);
+    if (draft?.kind === 'quality' && draft.parentId === parentId) ids.push(id);
+  }
+  await Promise.all(ids.map((id) => deleteTemplate(id)));
 }
 
 /** A deviation table row as stored: PartitionKey, RowKey and the brief's columns. */

@@ -211,6 +211,7 @@ describe('GET /api/templates', () => {
     expect(TemplateListSchema.parse(response.jsonBody)).toEqual([
       {
         id: im.id,
+        kind: 'final',
         name: 'Final inspection – IM8',
         modelCode: 'IM',
         publishedRevision: null,
@@ -260,6 +261,7 @@ describe('POST /api/templates', () => {
     );
     expect(draft).toEqual({
       id: expect.any(String),
+      kind: 'final',
       name: 'Final inspection – IM8',
       modelCode: 'IM',
       revision: 1,
@@ -418,6 +420,7 @@ describe('POST /api/templates/import', () => {
     expect(imported).toEqual({
       draft: {
         id: expect.any(String),
+        kind: 'final',
         name: 'Imported',
         modelCode: 'IM',
         revision: 1,

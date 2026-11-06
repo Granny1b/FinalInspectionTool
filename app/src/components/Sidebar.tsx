@@ -19,7 +19,8 @@ import { ThemeToggle } from './ThemeToggle';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 
-const MAIN_NAV: NavItem[] = [
+/** Final inspections and quality checks: both kinds of checks live under Templates. */
+const QUALITY_NAV: NavItem[] = [
   { to: '/inspections', label: 'Inspections', icon: ClipboardCheck },
   { to: '/templates', label: 'Templates', icon: LayoutTemplate },
 ];
@@ -41,7 +42,6 @@ type Props = {
  * drawer, whose theme controls stay in step (one store, lib/theme.ts).
  */
 export function Sidebar({ me, onNavigate, onClose }: Props) {
-  const adminLabelId = useId();
   return (
     // A landmark, so the user panel (and Sign out) is reachable by landmark navigation too.
     <aside aria-label="Sidebar" className="flex h-full flex-col bg-surface">
@@ -60,18 +60,9 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
       </div>
 
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-5">
-        <NavList items={MAIN_NAV} onNavigate={onNavigate} />
+        <NavGroup label="Quality" items={QUALITY_NAV} onNavigate={onNavigate} />
         {hasRole(me.roles, 'admin') && (
-          <>
-            {/* A list label, not a heading: the sidebar comes before the page's <h1>. */}
-            <p
-              id={adminLabelId}
-              className="mt-7 mb-2 px-3 text-xs font-medium tracking-wide text-ink-500 uppercase"
-            >
-              Admin
-            </p>
-            <NavList items={ADMIN_NAV} onNavigate={onNavigate} labelledBy={adminLabelId} />
-          </>
+          <NavGroup label="Admin" items={ADMIN_NAV} onNavigate={onNavigate} className="mt-7" />
         )}
       </nav>
 
@@ -80,7 +71,31 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
   );
 }
 
-type NavListProps = { items: NavItem[]; onNavigate?: () => void; labelledBy?: string };
+type NavGroupProps = {
+  label: string;
+  items: NavItem[];
+  onNavigate?: () => void;
+  className?: string;
+};
+
+/** Links under a small label ("Quality", "Admin"), which names the list for screen readers. */
+function NavGroup({ label, items, onNavigate, className }: NavGroupProps) {
+  const labelId = useId();
+  return (
+    <div className={className}>
+      {/* A list label, not a heading: the sidebar comes before the page's <h1>. */}
+      <p
+        id={labelId}
+        className="mb-2 px-3 text-xs font-medium tracking-wide text-ink-500 uppercase"
+      >
+        {label}
+      </p>
+      <NavList items={items} onNavigate={onNavigate} labelledBy={labelId} />
+    </div>
+  );
+}
+
+type NavListProps = { items: NavItem[]; onNavigate?: () => void; labelledBy: string };
 
 function NavList({ items, onNavigate, labelledBy }: NavListProps) {
   return (

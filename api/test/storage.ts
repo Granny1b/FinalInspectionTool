@@ -99,6 +99,7 @@ export async function writeSettings(machineModels = MODELS): Promise<Settings> {
 export function draftTemplate(overrides: Partial<Template> = {}): Template {
   return {
     id: newId(),
+    kind: 'final',
     name: 'Final inspection – RigiMill MG',
     modelCode: 'RMMG',
     revision: 1,

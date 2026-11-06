@@ -179,11 +179,12 @@ async function findTemplate(
     }
   }
 
+  // A quality check has its machine's model too, but it is not the model's template.
   const modelOf = async (blobName: string) => {
-    const parsed = TemplateSchema.pick({ modelCode: true }).safeParse(
+    const parsed = TemplateSchema.pick({ modelCode: true, kind: true }).safeParse(
       (await readJson(templates.getBlockBlobClient(blobName)))?.json,
     );
-    return parsed.success ? parsed.data.modelCode : undefined;
+    return parsed.success && parsed.data.kind === 'final' ? parsed.data.modelCode : undefined;
   };
   for (const templateId of drafts) {
     if ((await modelOf(blobNames.templateDraft(templateId))) === modelCode) return { templateId };
@@ -196,7 +197,12 @@ async function findTemplate(
     if (drafts.includes(templateId)) continue;
     const blob = templates.getBlockBlobClient(blobNames.templateRevision(templateId, revision));
     const parsed = TemplateSchema.safeParse((await readJson(blob))?.json);
-    if (parsed.success && parsed.data.id === templateId && parsed.data.modelCode === modelCode) {
+    if (
+      parsed.success &&
+      parsed.data.kind === 'final' &&
+      parsed.data.id === templateId &&
+      parsed.data.modelCode === modelCode
+    ) {
       return { templateId, revisionWithoutDraft: parsed.data };
     }
   }

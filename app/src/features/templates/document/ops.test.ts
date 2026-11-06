@@ -19,6 +19,7 @@ import {
   restoreRow,
   restoreSection,
   rowCountText,
+  setRowFields,
   setRowGuide,
   setRowText,
   singleLine,
@@ -239,6 +240,41 @@ describe('rows', () => {
     expect(layout(restoreRow(deleted, 'sA', 9, row))).toBe('sA:a1,a3,a2 | sB:b1,b2 | sC:');
     expect(restoreRow(deleted, 'nope', 0, row)).toBe(deleted); // its section is gone
     expect(restoreRow(before, 'sB', 0, row)).toBe(before); // already there: ids stay unique
+  });
+});
+
+describe('setRowFields (a quality check’s row)', () => {
+  it('sets how, references and time, leaving the other rows as they were', () => {
+    const sections = fixture();
+    const next = setRowFields(sections, 'a1', {
+      how: 'Paint mark unbroken',
+      references: ['ISO 12100'],
+      timeHours: 0.2,
+    });
+    expect(next[0]!.items[0]).toEqual({
+      id: 'a1',
+      text: 'Lifting columns - Marked screws',
+      how: 'Paint mark unbroken',
+      references: ['ISO 12100'],
+      timeHours: 0.2,
+    });
+    expect(next[0]!.items[1]).toBe(sections[0]!.items[1]);
+    expect(next[1]).toBe(sections[1]);
+    // Only the fields given change.
+    const timed = setRowFields(next, 'a1', { timeHours: 0.5 });
+    expect(timed[0]!.items[0]).toMatchObject({ how: 'Paint mark unbroken', timeHours: 0.5 });
+  });
+
+  it('leaves out an empty how, no references and no time, as a row without them is stored', () => {
+    const set = setRowFields(fixture(), 'a1', { how: 'x', references: ['A'], timeHours: 0 });
+    const cleared = setRowFields(set, 'a1', { how: '', references: [], timeHours: undefined });
+    expect(cleared[0]!.items[0]).toEqual({ id: 'a1', text: 'Lifting columns - Marked screws' });
+  });
+
+  it('returns the same array when nothing changes, or for an unknown row', () => {
+    const set = setRowFields(fixture(), 'a1', { references: ['A', 'B'], timeHours: 1 });
+    expect(setRowFields(set, 'a1', { references: ['A', 'B'], timeHours: 1 })).toBe(set);
+    expect(setRowFields(set, 'nope', { how: 'x' })).toBe(set);
   });
 });
 

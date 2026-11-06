@@ -9,8 +9,9 @@ import { Button } from '../../../components/Button';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { guideRow } from '../../guides/guide';
 import { GuideEditor } from '../../guides/GuideEditor';
+import { FINAL_GUIDE_WORDING, QUALITY_GUIDE_WORDING } from '../../guides/wording';
 import { sectionDndId } from './dnd';
-import { EditableSection } from './EditableSection';
+import { EditableSection, type DocumentVariant } from './EditableSection';
 import type { IssueIndex } from './issues';
 import { findRow, findSection, rowCountText } from './ops';
 import { useDocumentActions, type Deleted } from './useDocumentActions';
@@ -21,9 +22,17 @@ type Props = {
   onChange: (sections: Section[]) => void;
   issues: IssueIndex;
   onEditorDirtyChange?: (dirty: boolean) => void;
+  variant: DocumentVariant;
 };
 
-export function EditableDocument({ sections, onChange, issues, onEditorDirtyChange }: Props) {
+export function EditableDocument({
+  sections,
+  onChange,
+  issues,
+  onEditorDirtyChange,
+  variant,
+}: Props) {
+  const quality = variant === 'quality';
   const rootRef = useRef<HTMLDivElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [deleted, setDeleted] = useState<Deleted | null>(null);
@@ -55,8 +64,9 @@ export function EditableDocument({ sections, onChange, issues, onEditorDirtyChan
           </div>
           <h2 className="mt-4 text-base font-semibold text-ink-900">No sections yet</h2>
           <p className="mx-auto mt-1.5 max-w-sm text-sm text-balance text-ink-500">
-            Sections group the checkpoints, like “Loading area” or “Electrical cabinets”. Add the
-            first one to start the checklist.
+            {quality
+              ? 'Sections group the rows, like “Safety features” or “Markings”. Add the first one to start the quality check.'
+              : 'Sections group the checkpoints, like “Loading area” or “Electrical cabinets”. Add the first one to start the checklist.'}
           </p>
           <Button data-add-section="" onClick={actions.addSection} className="mt-6">
             <Plus size={16} aria-hidden="true" />
@@ -78,6 +88,7 @@ export function EditableDocument({ sections, onChange, issues, onEditorDirtyChan
                   collapsed={drag?.kind === 'section' && drag.sectionId === section.id}
                   dragKind={drag?.kind ?? null}
                   actions={actions}
+                  variant={variant}
                 />
               ))}
             </SortableContext>
@@ -131,6 +142,7 @@ export function EditableDocument({ sections, onChange, issues, onEditorDirtyChan
           }}
           onCancel={() => setGuideItemId(null)}
           onDirtyChange={onEditorDirtyChange}
+          wording={quality ? QUALITY_GUIDE_WORDING : FINAL_GUIDE_WORDING}
         />
       )}
 

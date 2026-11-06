@@ -11,6 +11,7 @@ import {
   CONTAINERS,
   hasUnpublishedChanges,
   TemplateSchema,
+  totalHours,
   type Section,
   type Template,
   type TemplateDetail,
@@ -91,8 +92,11 @@ export async function loadSummaries(): Promise<TemplateSummary[]> {
       const { id, draft } = template;
       const published = await loadLatestPublished(template).catch(unlessDeleted(id));
       if (published === DELETED) return null;
+      const quality = draft.kind === 'quality';
       return {
         id,
+        kind: draft.kind,
+        ...(draft.parentId && { parentId: draft.parentId }),
         name: draft.name,
         modelCode: draft.modelCode,
         publishedRevision: published?.revision ?? null,
@@ -102,6 +106,12 @@ export async function loadSummaries(): Promise<TemplateSummary[]> {
         hasUnpublishedChanges: hasUnpublishedChanges(draft, published),
         itemCount: draft.sections.reduce((count, section) => count + section.items.length, 0),
         ...(draft.coverImageId && { coverImageId: draft.coverImageId }),
+        // What a quality check's card shows; a final inspection's card needs none of it.
+        ...(quality && {
+          ...(draft.quality && { quality: draft.quality }),
+          sectionTitles: draft.sections.map((section) => section.title),
+          totalHours: totalHours(draft.sections),
+        }),
         updatedAt: draft.updatedAt,
         updatedBy: draft.updatedBy,
       };
@@ -130,13 +140,26 @@ export async function loadDetail(
   return { detail, etag: template.etag };
 }
 
-/** The other template whose draft uses `modelCode`, if any (one template per model, brief §1). */
+/**
+ * The other final inspection template whose draft uses `modelCode`, if any (one template per
+ * model, brief §1). Quality checks share their machine's model and don't count.
+ */
 export async function findTemplateForModel(
   modelCode: string,
   exceptId?: string,
 ): Promise<StoredTemplate | undefined> {
   return (await loadAllTemplates()).find(
-    (template) => template.draft.modelCode === modelCode && template.id !== exceptId,
+    (template) =>
+      template.draft.kind === 'final' &&
+      template.draft.modelCode === modelCode &&
+      template.id !== exceptId,
+  );
+}
+
+/** The quality checks of the machine whose final inspection template is `parentId`. */
+export async function loadQualityChecks(parentId: string): Promise<StoredTemplate[]> {
+  return (await loadAllTemplates()).filter(
+    (template) => template.draft.kind === 'quality' && template.draft.parentId === parentId,
   );
 }
 
@@ -251,6 +274,23 @@ export async function deleteTemplate(
       context.warn(`Deleted template ${id}; templates/${names[index]} was left`, result.reason);
     }
   });
+}
+
+/**
+ * Deletes a quality check whose machine's template was just deleted: its draft first, then its
+ * revisions, without a condition (the admin confirmed deleting the machine's template with its
+ * quality checks). Failures are logged and left behind: an orphaned quality check is listed under
+ * no machine.
+ */
+export async function deleteQualityCheck(id: string, context: InvocationContext): Promise<void> {
+  const container = containerClient(templates);
+  try {
+    await container.getBlobClient(blobNames.templateDraft(id)).deleteIfExists();
+    const names = await listBlobNames(templates, `${id}/`);
+    await Promise.all(names.map((name) => container.getBlobClient(name).deleteIfExists()));
+  } catch (error) {
+    context.warn(`Deleting quality check ${id} with its machine's template failed`, error);
+  }
 }
 
 /**

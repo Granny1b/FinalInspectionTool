@@ -1,4 +1,11 @@
-import { rowRef, sectionNumber, type Guide, type Item, type Section } from '@modig/shared';
+import {
+  rowHasContent,
+  rowRef,
+  sectionNumber,
+  type Guide,
+  type Item,
+  type Section,
+} from '@modig/shared';
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import {
   addRow,
@@ -18,11 +25,13 @@ import {
   renameSection,
   restoreRow,
   restoreSection,
+  setRowFields,
   setRowGuide,
   setRowText,
   singleLine,
   type Field,
   type FocusTarget,
+  type RowFields,
   type RowPosition,
 } from './ops';
 
@@ -42,6 +51,8 @@ export type DocumentActions = {
   addSection: () => void;
 
   setText: (itemId: string, text: string) => void;
+  /** A quality check's row: its how, references or time. */
+  setFields: (itemId: string, fields: RowFields) => void;
   addRow: (sectionId: string) => void;
   /** Enter in a row. */
   insertRowAfter: (itemId: string) => void;
@@ -178,6 +189,7 @@ export function useDocumentActions({
       },
 
       setText: (itemId, text) => commit(setRowText(current(), itemId, singleLine(text))),
+      setFields: (itemId, fields) => commit(setRowFields(current(), itemId, fields)),
       addRow: (sectionId) => {
         const section = current()[findSection(current(), sectionId)];
         const created = section && addRow(current(), sectionId, section.items.length);
@@ -204,16 +216,15 @@ export function useDocumentActions({
         const item = at && section?.items[at.rowIndex];
         if (!at || !section || !item) return;
         // An empty row (Enter, then Backspace) has nothing worth an undo.
-        const deleted: Deleted | null =
-          item.text.trim() || item.guide
-            ? {
-                kind: 'row',
-                label: `Row ${rowRef(at.sectionIndex, at.rowIndex)}`,
-                sectionId: section.id,
-                index: at.rowIndex,
-                item,
-              }
-            : null;
+        const deleted: Deleted | null = rowHasContent(item)
+          ? {
+              kind: 'row',
+              label: `Row ${rowRef(at.sectionIndex, at.rowIndex)}`,
+              sectionId: section.id,
+              index: at.rowIndex,
+              item,
+            }
+          : null;
         restructure(deleteRow(sections, itemId), focusAfterRowDelete(sections, itemId), deleted);
       },
       moveRowTo: (itemId, position) => restructure(moveRow(current(), itemId, position)),

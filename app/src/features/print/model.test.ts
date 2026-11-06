@@ -64,6 +64,7 @@ function inspection(patch: Partial<Inspection> = {}): Inspection {
 function template(patch: Partial<Template> = {}): Template {
   return {
     id: 'Tmpl000000000001',
+    kind: 'final',
     name: 'Final inspection – RigiMill MG',
     modelCode: 'RMMG',
     revision: 3,

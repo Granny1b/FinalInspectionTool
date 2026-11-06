@@ -16,8 +16,8 @@ Working now:
   earlier through Static Web Apps roles keep their access. A signed-in user who is neither on the
   list nor invited sees a "You don't have access yet" page. The API checks the role on every
   request.
-- **App shell.** Sidebar with Inspections and Templates, plus Insights and Settings for admins; a
-  drawer on tablets. Settings manages users and access, and admins edit the machine models, the
+- **App shell.** Sidebar with Inspections and Templates under _Quality_, plus Insights and Settings
+  under _Admin_ for admins; a drawer on tablets. Settings manages users and access, and admins edit the machine models, the
   Responsible and deviation category lists, the default location and the company name and logo
   there (see [Settings](#settings)).
 - **Templates (phase 2).** The template list; a new template for a machine model that has none;
@@ -73,6 +73,11 @@ Added after the six phases:
   [Light and dark theme](#light-and-dark-theme).
 - **Quick report preview.** **Preview** on an inspection shows the printout at once, unsaved
   edits included. See [Printing](#printing).
+- **Quality checks (set-up).** In-process checks along a machine's build, such as "Quality
+  check – Pre start up", several per machine, kept in the machine's template under a tab of their own.
+  Admins write them as rows with pictures of how it should and should not look; they are
+  published in revisions and exported and imported as JSON. Doing a check comes later. See
+  [Quality checks](#quality-checks).
 
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
@@ -236,6 +241,74 @@ In the checklist:
 
 Numbers (section 3, row 3.c) follow the position and change as rows move; each row keeps its
 identity, which is what later phases key results and statistics on.
+
+## Quality checks
+
+In-process checks along a machine's build, before the final inspection: "Quality check – Pre
+start up", several per machine. They live in the machine's template. This is their set-up: doing a
+check on a tablet or PC, printing one, importing one from Excel, approvals, and protective
+equipment and tools per section come later.
+
+- **The machine's page.** A template opens as its machine: "← Templates", the model's name and two
+  tabs, **Final inspection** (the template editor above) and **Quality checks (n)**. The Templates
+  page lists the machines' final inspection templates only; each card says "1 quality check" (or
+  "No quality checks") and lists their names under Rows, "Frame (draft), Pre start up", and the list has
+  a Quality checks column.
+- **The Quality checks tab** shows the machine's quality checks as cards: the title, the
+  department, document number and who made it, the revision, the sections, and the rows, time
+  and last edit. A card opens the quality check: the editor for admins, the latest published
+  revision for inspectors.
+- **New quality check** (admins): its Name (required), the in-process check, e.g. "Pre start
+  up", which makes its title "Quality check – Pre start up" (shown as it is typed; a name that
+  already starts with "Quality check" is not prefixed twice). A name another quality check of the
+  machine has is pointed out, not refused. It starts as an empty draft with the department
+  Quality, the admin as Made by and today's date.
+- **The editor** works as the template editor: one draft, autosave, conflicts, the leave
+  warnings, Publish with a change note, the revision history, read-only revisions, Undo, drag and
+  drop and the keys in the table above. Breadcrumbs lead back: Templates › RigiMill MG › Quality
+  checks.
+  - **Front page:** Name, Department (from the Responsible list in
+    [Settings](#settings); a department removed since stays, "(not in the list)"), Document no.,
+    Made by (people's names are suggested) and Date (may be empty). The title follows the name as
+    it is typed.
+  - **Rows are cards:** the pictures on the left, then the ref and **What** (one line; `Enter` adds
+    a row below), **How** (lines of its own), **References** (`Enter`, a comma or a semicolon adds
+    one, as ISO 12100; × removes it; up to 20) and on the right **Time** in hours with one decimal
+    ("0,5" works too) and the row's **⋯**: Pictures and information, Duplicate, Delete (with
+    Undo). `Backspace` in an empty What removes the row only when it has nothing else.
+  - Each section's header adds up its rows and time ("5 rows · 0.8 h"), and so does the
+    checklist's heading ("3 sections · 20 rows · 0.8 h").
+  - **Publish** needs a name, a section and a row; every section needs a
+    title and every row its What ("Row 1.a needs “What to check”.").
+- **Pictures and more information.** A row's picture, or **Add pictures**, opens the guide editor
+  (see [Guides](#guides)) in a quality check's words: _More information_, and up to six pictures,
+  each marked **Should look like this**, **Should not look like this** or **Info**, with a caption
+  and arrows, boxes and labels drawn on it. The card shows the first picture with ✓ or ✗ and
+  "+2" when there are more, and the start of the information. Read-only, a click shows them all.
+- **Export and import (JSON).** **⋯ → Export JSON** saves the draft as shown, unsaved changes
+  included, as `Quality check – Pre start up – RigiMill MG.json`. **Import JSON** on a machine's Quality checks
+  tab reads such a file and makes a new, unpublished draft of that machine: its name can be changed
+  first (the file's to start with), every section and row gets a new id,
+  and pictures not stored in this installation are left out, as the import says. A quality check
+  file is refused by the Templates page's Import JSON and a template file by this one, each
+  saying where it belongs; template files import exactly as before.
+- **Delete.** **⋯ → Delete quality check** asks first and goes back to the Quality checks tab.
+  Deleting a machine's final inspection template deletes its quality checks too: its dialog names
+  them.
+- **Not for inspections.** A new inspection offers final inspection templates only, and the API
+  refuses to make one from a quality check. A quality check's print preview says it doesn't print
+  yet.
+- **Addresses:** `/templates/{id}` (Final inspection), `/templates/{id}/quality-checks`,
+  `/templates/{id}/quality-checks/{qcId}` and `…/{qcId}/revisions/{n}`. Older addresses of a
+  quality check (`/templates/{qcId}`) lead to these.
+
+**How they are stored.** A quality check is a template (`templates/{id}/draft.json` and
+`rev-{n}.json`) with `kind: "quality"`, `parentId` (its machine's final inspection template), its
+machine's `modelCode` (copied when it is made), `name` ("Quality check – Pre start up") and the
+front page in `quality` (`name`, `department`, `documentNumber`, `madeBy`, `date`). A row adds
+`how`, `references` and `timeHours`, each left out when empty; its pictures and more information
+are its `guide`. Templates stored before quality checks existed have no `kind` and are final
+inspection templates.
 
 ## Inspections
 
@@ -683,34 +756,41 @@ deleting a template or an inspection need the document's `ETag` in `If-Match` an
 someone else changed it. A `503` with `unavailable` means nothing was changed and the same request
 can be sent again.
 
-| Method and route                        | Role      | What                                                                    |
-| --------------------------------------- | --------- | ----------------------------------------------------------------------- |
-| `GET /api/me`                           | inspector | Name, email and roles of the signed-in user                             |
-| `GET /api/settings`                     | inspector | Machine models, location, company name and logo, the pick lists, `ETag` |
-| `PUT /api/settings`                     | admin     | Save every editable setting (`If-Match`)                                |
-| `GET /api/users`                        | admin     | The people list (name, email, role, added by/when) and its `ETag`       |
-| `PUT /api/users`                        | admin     | Save the people list (`If-Match`, or `If-None-Match: *` for the first)  |
-| `GET /api/people`                       | inspector | Everyone's name by email, to show people by name                        |
-| `GET /api/templates`                    | inspector | All templates: latest published revision, unpublished changes           |
-| `POST /api/templates`                   | admin     | New template for a machine model without one, or for a new model        |
-| `GET /api/templates/{id}`               | admin     | The draft, its revision history and its `ETag`                          |
-| `PUT /api/templates/{id}`               | admin     | Save the draft (`If-Match`)                                             |
-| `DELETE /api/templates/{id}`            | admin     | Delete the draft and every revision (`If-Match`); inspections stay      |
-| `POST /api/templates/import`            | admin     | New draft from a template file (model, name, optional new model)        |
-| `POST /api/templates/{id}/publish`      | admin     | Publish the draft as the next revision (`If-Match`, change note)        |
-| `GET /api/templates/{id}/revisions/{n}` | inspector | A published revision (cached by the browser: it never changes)          |
-| `GET /api/inspections`                  | inspector | All inspections as list rows, newest number first                       |
-| `POST /api/inspections`                 | inspector | New inspection from a template's latest published revision              |
-| `GET /api/inspections/{id}`             | inspector | One inspection and its `ETag`                                           |
-| `PUT /api/inspections/{id}`             | inspector | Save front page, results and extra deviations (`If-Match`)              |
-| `DELETE /api/inspections/{id}`          | admin     | Delete it, its deviation rows and deviation photos (`If-Match`)         |
-| `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                        |
-| `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                              |
-| `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)              |
-| `GET /api/insights/export.csv`          | admin     | The deviation rows under the same filters, as a CSV file                |
-| `GET /api/insights/deviations`          | admin     | The same rows as JSON, for the printed report's deviation list          |
-| `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                          |
-| `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                       |
+A quality check goes through the template routes. `POST /api/templates` with `{ kind: "quality",
+parentId, name }` makes one under the final inspection template `parentId` (404
+if there is none, 400 if it is a quality check); `POST /api/templates/import` with `{ kind:
+"quality", parentId, name, file }` imports a quality check file. The list gives each
+quality check its front page, section titles and total time. Inspections refuse a quality check
+with 400.
+
+| Method and route                        | Role      | What                                                                     |
+| --------------------------------------- | --------- | ------------------------------------------------------------------------ |
+| `GET /api/me`                           | inspector | Name, email and roles of the signed-in user                              |
+| `GET /api/settings`                     | inspector | Machine models, location, company name and logo, the pick lists, `ETag`  |
+| `PUT /api/settings`                     | admin     | Save every editable setting (`If-Match`)                                 |
+| `GET /api/users`                        | admin     | The people list (name, email, role, added by/when) and its `ETag`        |
+| `PUT /api/users`                        | admin     | Save the people list (`If-Match`, or `If-None-Match: *` for the first)   |
+| `GET /api/people`                       | inspector | Everyone's name by email, to show people by name                         |
+| `GET /api/templates`                    | inspector | All templates and quality checks (`kind`, `parentId`): latest revision   |
+| `POST /api/templates`                   | admin     | New template for a model without one or a new model; or a quality check  |
+| `GET /api/templates/{id}`               | admin     | The draft, its revision history and its `ETag`                           |
+| `PUT /api/templates/{id}`               | admin     | Save the draft (`If-Match`)                                              |
+| `DELETE /api/templates/{id}`            | admin     | Delete draft and revisions (`If-Match`), a template's quality checks too |
+| `POST /api/templates/import`            | admin     | New draft from a template file (model, name, new model) or quality check |
+| `POST /api/templates/{id}/publish`      | admin     | Publish the draft as the next revision (`If-Match`, change note)         |
+| `GET /api/templates/{id}/revisions/{n}` | inspector | A published revision (cached by the browser: it never changes)           |
+| `GET /api/inspections`                  | inspector | All inspections as list rows, newest number first                        |
+| `POST /api/inspections`                 | inspector | New inspection from a template's latest revision (not a quality check)   |
+| `GET /api/inspections/{id}`             | inspector | One inspection and its `ETag`                                            |
+| `PUT /api/inspections/{id}`             | inspector | Save front page, results and extra deviations (`If-Match`)               |
+| `DELETE /api/inspections/{id}`          | admin     | Delete it, its deviation rows and deviation photos (`If-Match`)          |
+| `POST /api/inspections/{id}/finalise`   | inspector | Lock it once every row has a status (`If-Match`)                         |
+| `POST /api/inspections/{id}/reopen`     | admin     | Unlock a finalised inspection (`If-Match`)                               |
+| `GET /api/insights`                     | admin     | KPIs for `?from&to&model&includeInProgress` (all optional)               |
+| `GET /api/insights/export.csv`          | admin     | The deviation rows under the same filters, as a CSV file                 |
+| `GET /api/insights/deviations`          | admin     | The same rows as JSON, for the printed report's deviation list           |
+| `POST /api/images/upload-url`           | inspector | New image id and a 10-minute upload URL for it                           |
+| `GET /api/images/{id}/url`              | inspector | A 15-minute read URL for an image                                        |
 
 ## Seed data
 
@@ -780,7 +860,17 @@ because it usually means the command that produced it failed.
   template (asks first, its inspection kept, its revisions gone); the new machine model fields
   (suggested code, a taken code refused); Export JSON, a wrong file explained, and Import JSON
   making a new draft with new ids; and the inspector's read-only view (the API refuses their
-  saves, deletes and imports with 403). For inspections: creating one from the front page form and
+  saves, deletes and imports with 403). For quality checks (`e2e/quality-checks.spec.ts`): an
+  admin creates one on a machine's Quality checks tab, fills in the front page (the title
+  following it), adds a section and two rows from the keyboard with How, references (comma and
+  Enter) and time (a decimal comma), opens a row's pictures in a quality check's words, adds a
+  picture marked Should look like this, checks the autosaved draft, publishes, and finds it on the
+  tab, counted on the machine's card and list row and never listed as a template of its own;
+  Export JSON (unsaved changes included, the file name) and Import JSON on the same machine as a
+  new draft with fresh ids, a template file refused with its reason; deleting the machine's
+  template names its quality check and deletes it too; an inspector sees one read-only (the API
+  refuses their reads of the draft and every write with 403); and a new inspection neither offers
+  nor accepts one (400). For inspections: creating one from the front page form and
   finding it in the list; a whole checklist filled in from the keyboard (status keys, moving between
   rows, the comment, the Tab order, Escape, Enter, clearing, Set remaining to OK, the progress) and
   still there after a reload; the Deviation Summary's order and an extra deviation; the deviation table, read straight from Azurite (every column, the
@@ -886,7 +976,7 @@ save based on an outdated copy gets HTTP 412 and "Someone else changed this – 
 latest version."
 
 ```text
-templates/{templateId}/draft.json        draft being edited
+templates/{templateId}/draft.json        draft being edited (a quality check is one too)
 templates/{templateId}/rev-{n}.json      published revisions, never changed
 inspections/{inspectionId}.json          with its list row in the blob's metadata
 images/{imageId}.jpg                     photos, and flattened copies of marked-up photos

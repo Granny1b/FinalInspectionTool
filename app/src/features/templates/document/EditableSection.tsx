@@ -6,6 +6,9 @@ import clsx from 'clsx';
 import { ArrowDown, ArrowUp, Copy, ListPlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { memo, useId, useMemo, type KeyboardEvent, type ReactNode } from 'react';
 import { ActionMenu } from '../../../components/ActionMenu';
+import { ROW_LIST, SECTION_BAR } from '../../qualityChecks/layout';
+import { sectionStats } from '../../qualityChecks/stats';
+import { QualityRow } from '../../qualityChecks/QualityRow';
 import { bodyDndId, rowDndId, sectionDndId, type DragData } from './dnd';
 import { EditableRow } from './EditableRow';
 import { GRID, HEADER_FILL, ISSUE_OUTLINE, REF_CELL, SECTION_HEADER, TEXT_CELL } from './layout';
@@ -31,7 +34,12 @@ type Props = {
    */
   dragKind: DragKind;
   actions: DocumentActions;
+  /** A final inspection's sheet, or a quality check's rows as cards. */
+  variant: DocumentVariant;
 };
+
+/** A final inspection template's checklist, or a quality check's. */
+export type DocumentVariant = 'final' | 'quality';
 
 export const EditableSection = memo(function EditableSection({
   section,
@@ -42,7 +50,9 @@ export const EditableSection = memo(function EditableSection({
   collapsed,
   dragKind,
   actions,
+  variant,
 }: Props) {
+  const quality = variant === 'quality';
   const activeType = dragKind;
   const sectionData: DragData = { type: 'section', sectionId: section.id };
   const {
@@ -85,6 +95,57 @@ export const EditableSection = memo(function EditableSection({
     }
   }
 
+  const titleInput = (
+    <input
+      data-section-title={section.id}
+      aria-label={`Section ${number} title`}
+      aria-invalid={issues ? true : undefined}
+      aria-describedby={issues ? issueId : undefined}
+      maxLength={200}
+      placeholder="Section title"
+      value={section.title}
+      onChange={(event) => actions.setTitle(section.id, event.target.value)}
+      onKeyDown={onTitleKeyDown}
+      className="h-8 min-w-0 flex-1 rounded-sm bg-transparent px-2 text-[0.9375rem] font-semibold text-ellipsis text-ink-900 placeholder:font-normal placeholder:text-ink-500 focus:bg-surface focus-visible:outline-1 focus-visible:-outline-offset-1"
+    />
+  );
+  const menu = (
+    <ActionMenu
+      label={`Section ${number} actions`}
+      triggerData={{ 'data-section-menu': section.id }}
+      items={[
+        {
+          label: 'Rename',
+          icon: Pencil,
+          onSelect: () => actions.renameSection(section.id),
+        },
+        {
+          label: 'Duplicate',
+          icon: Copy,
+          onSelect: () => actions.duplicateSection(section.id),
+        },
+        {
+          label: 'Move up',
+          icon: ArrowUp,
+          disabled: index === 0,
+          onSelect: () => actions.moveSectionBy(section.id, -1),
+        },
+        {
+          label: 'Move down',
+          icon: ArrowDown,
+          disabled: index === sectionCount - 1,
+          onSelect: () => actions.moveSectionBy(section.id, 1),
+        },
+        {
+          label: 'Delete',
+          icon: Trash2,
+          danger: true,
+          onSelect: () => actions.deleteSection(section.id),
+        },
+      ]}
+    />
+  );
+
   return (
     <div
       ref={setNodeRef}
@@ -105,90 +166,78 @@ export const EditableSection = memo(function EditableSection({
               : 'opacity-0 group-focus-within/header:opacity-100 group-hover/header:opacity-100 pointer-coarse:opacity-100',
           )}
         />
-        <div className={clsx(GRID, SECTION_HEADER, issues ? 'bg-inherit' : HEADER_FILL)}>
-          <span className={clsx(REF_CELL, 'font-semibold text-ink-900')}>{number}</span>
-          {/* On a wide sheet the ⋯ button sits at the end of this cell, before the labels. */}
-          <div className={clsx(TEXT_CELL, 'items-center @min-[52rem]:pr-9')}>
-            <input
-              data-section-title={section.id}
-              aria-label={`Section ${number} title`}
-              aria-invalid={issues ? true : undefined}
-              aria-describedby={issues ? issueId : undefined}
-              maxLength={200}
-              placeholder="Section title"
-              value={section.title}
-              onChange={(event) => actions.setTitle(section.id, event.target.value)}
-              onKeyDown={onTitleKeyDown}
-              className="h-8 min-w-0 flex-1 rounded-sm bg-transparent px-2 text-[0.9375rem] font-semibold text-ellipsis text-ink-900 placeholder:font-normal placeholder:text-ink-500 focus:bg-surface focus-visible:outline-1 focus-visible:-outline-offset-1"
-            />
-            {collapsed && (
-              <span className="shrink-0 px-2 text-xs text-ink-500">{rowCountText(rowCount)}</span>
-            )}
+        {quality ? (
+          // A band over the section's cards: number, title, its size and time, and its menu.
+          <div className={clsx(SECTION_BAR, issues ? 'bg-inherit' : HEADER_FILL)}>
+            <span className="pl-2 text-sm font-semibold text-ink-900 tabular-nums">{number}</span>
+            <div className="flex min-w-0 items-center">{titleInput}</div>
+            <span className="col-start-2 row-start-2 px-2 pb-2 text-xs text-ink-500 tabular-nums @min-[36rem]:col-start-3 @min-[36rem]:row-start-1 @min-[36rem]:pb-0">
+              {sectionStats(section.items)}
+            </span>
+            <div className="col-start-3 row-start-1 flex justify-end pr-1 @min-[36rem]:col-start-4">
+              {menu}
+            </div>
           </div>
-          <div className="col-start-3 row-start-1 flex justify-end pr-1 @min-[52rem]:col-start-2 @min-[52rem]:justify-self-end">
-            <ActionMenu
-              label={`Section ${number} actions`}
-              triggerData={{ 'data-section-menu': section.id }}
-              items={[
-                {
-                  label: 'Rename',
-                  icon: Pencil,
-                  onSelect: () => actions.renameSection(section.id),
-                },
-                {
-                  label: 'Duplicate',
-                  icon: Copy,
-                  onSelect: () => actions.duplicateSection(section.id),
-                },
-                {
-                  label: 'Move up',
-                  icon: ArrowUp,
-                  disabled: index === 0,
-                  onSelect: () => actions.moveSectionBy(section.id, -1),
-                },
-                {
-                  label: 'Move down',
-                  icon: ArrowDown,
-                  disabled: index === sectionCount - 1,
-                  onSelect: () => actions.moveSectionBy(section.id, 1),
-                },
-                {
-                  label: 'Delete',
-                  icon: Trash2,
-                  danger: true,
-                  onSelect: () => actions.deleteSection(section.id),
-                },
-              ]}
-            />
+        ) : (
+          <div className={clsx(GRID, SECTION_HEADER, issues ? 'bg-inherit' : HEADER_FILL)}>
+            <span className={clsx(REF_CELL, 'font-semibold text-ink-900')}>{number}</span>
+            {/* On a wide sheet the ⋯ button sits at the end of this cell, before the labels. */}
+            <div className={clsx(TEXT_CELL, 'items-center @min-[52rem]:pr-9')}>
+              {titleInput}
+              {collapsed && (
+                <span className="shrink-0 px-2 text-xs text-ink-500">{rowCountText(rowCount)}</span>
+              )}
+            </div>
+            <div className="col-start-3 row-start-1 flex justify-end pr-1 @min-[52rem]:col-start-2 @min-[52rem]:justify-self-end">
+              {menu}
+            </div>
+            <ColumnLabels />
           </div>
-          <ColumnLabels />
-        </div>
+        )}
         {issues && <IssueNote id={issueId} messages={issues} />}
       </div>
 
       <div ref={setBodyRef} className={clsx(collapsed && 'hidden')}>
         <SortableContext id={section.id} items={rowIds} strategy={verticalListSortingStrategy}>
-          {section.items.map((item, rowIndex) => (
-            <EditableRow
-              key={item.id}
-              item={item}
-              sectionId={section.id}
-              sectionIndex={index}
-              rowIndex={rowIndex}
-              issues={itemIssues.get(item.id)}
-              dragKind={dragKind}
-              actions={actions}
-            />
-          ))}
+          {quality
+            ? rowCount > 0 && (
+                <ol className={ROW_LIST}>
+                  {section.items.map((item, rowIndex) => (
+                    <QualityRow
+                      key={item.id}
+                      item={item}
+                      sectionId={section.id}
+                      sectionIndex={index}
+                      rowIndex={rowIndex}
+                      issues={itemIssues.get(item.id)}
+                      dragKind={dragKind}
+                      actions={actions}
+                    />
+                  ))}
+                </ol>
+              )
+            : section.items.map((item, rowIndex) => (
+                <EditableRow
+                  key={item.id}
+                  item={item}
+                  sectionId={section.id}
+                  sectionIndex={index}
+                  rowIndex={rowIndex}
+                  issues={itemIssues.get(item.id)}
+                  dragKind={dragKind}
+                  actions={actions}
+                />
+              ))}
         </SortableContext>
         {/* An empty section offers Add row in its empty state, where its rows will go. */}
         {rowCount === 0 ? (
           <EmptyRows
             dropping={activeType === 'row'}
+            quality={quality}
             addRow={<AddRowButton sectionId={section.id} number={number} actions={actions} />}
           />
         ) : (
-          <div className="mt-1.5 ml-9">
+          <div className={quality ? 'mt-1.5' : 'mt-1.5 ml-9'}>
             <AddRowButton sectionId={section.id} number={number} actions={actions} />
           </div>
         )}
@@ -227,9 +276,18 @@ function AddRowButton({
  * (the whole rows area takes the drop). A section may be published like this, as a heading for
  * checkpoints still to be written.
  */
-function EmptyRows({ dropping, addRow }: { dropping: boolean; addRow: ReactNode }) {
+function EmptyRows({
+  dropping,
+  quality,
+  addRow,
+}: {
+  dropping: boolean;
+  /** Under a quality check's section band, with no sheet lines. */
+  quality: boolean;
+  addRow: ReactNode;
+}) {
   return (
-    <div className="border-b border-ink-200 py-2 pl-9">
+    <div className={quality ? 'pt-2' : 'border-b border-ink-200 py-2 pl-9'}>
       <div
         className={clsx(
           'flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-dashed py-1.5 pr-1.5 pl-3 transition-colors',
@@ -247,7 +305,7 @@ function EmptyRows({ dropping, addRow }: { dropping: boolean; addRow: ReactNode 
           ) : (
             <span>
               <span className="font-medium text-ink-700">No rows yet.</span> Add the first
-              checkpoint, or drag rows here.
+              {quality ? ' row' : ' checkpoint'}, or drag rows here.
             </span>
           )}
         </p>

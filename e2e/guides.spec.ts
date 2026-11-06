@@ -176,7 +176,7 @@ test('an admin writes a guide with pasted and dropped images, marks one up and s
   ]);
 
   await page.goto(`/templates/${template.id}`);
-  await expect(page.getByRole('heading', { level: 1, name: template.name })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: template.name })).toBeVisible();
   await page.locator(`#row-${row.id}`).hover();
   await page.getByRole('button', { name: 'Add guide, row 1.b' }).click();
   const dialog = guideEditor(page);

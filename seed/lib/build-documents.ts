@@ -36,6 +36,7 @@ export function buildTemplateDocuments(
   }
   const published = TemplateSchema.parse({
     id: options.templateId,
+    kind: 'final',
     name: `Final inspection – ${model.name}`,
     modelCode: model.code,
     revision: parsed.publishedRevision,

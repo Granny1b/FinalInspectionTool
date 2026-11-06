@@ -15,6 +15,7 @@ import {
   type GuideDraft,
 } from './guide';
 import { VerdictPicker } from './Verdict';
+import { FINAL_GUIDE_WORDING, type GuideWording } from './wording';
 
 type Props = {
   /** "3.c" */
@@ -26,6 +27,8 @@ type Props = {
   onCancel: () => void;
   /** Whether it holds changes not in the draft yet (for the page's leave guard). */
   onDirtyChange?: (dirty: boolean) => void;
+  /** A final inspection's guide unless given (a quality check's pictures). */
+  wording?: GuideWording;
 };
 
 /**
@@ -35,7 +38,15 @@ type Props = {
  * the dialog. Save puts the guide into the draft, which then autosaves; Escape or Cancel asks
  * before discarding changes.
  */
-export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyChange }: Props) {
+export function GuideEditor({
+  rowRef,
+  rowText,
+  guide,
+  onSave,
+  onCancel,
+  onDirtyChange,
+  wording = FINAL_GUIDE_WORDING,
+}: Props) {
   const [draft, setDraft] = useState<GuideDraft>(() => guideDraft(guide));
   const [photoDirty, setPhotoDirty] = useState(false);
   const [confirming, setConfirming] = useState<'discard' | 'remove' | null>(null);
@@ -48,7 +59,7 @@ export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyC
   const saved = savedGuide(draft);
   const changed = !sameGuide(saved, guide);
   const dirty = changed || photoDirty;
-  const title = `Guide · ${refWithText(rowRef, rowText)}`;
+  const title = `${wording.title} · ${refWithText(rowRef, rowText)}`;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -113,22 +124,19 @@ export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyC
           <h2 id={titleId} title={title} className="truncate text-base font-semibold">
             {title}
           </h2>
-          <p className="mt-0.5 text-xs text-ink-500">
-            What this checkpoint should and shouldn’t look like. Inspectors open it from the row’s
-            guide icon.
-          </p>
+          <p className="mt-0.5 text-xs text-ink-500">{wording.intro}</p>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <label htmlFor={descriptionId} className="block text-sm font-medium text-ink-800">
-            Description
+            {wording.descriptionLabel}
           </label>
           <textarea
             id={descriptionId}
             value={draft.description}
             maxLength={5000}
             rows={3}
-            placeholder="What good looks like, e.g. “Every screw has an unbroken paint mark from head to plate.”"
+            placeholder={wording.descriptionPlaceholder}
             onChange={(event) => {
               const description = event.target.value;
               setDraft((current) => ({ ...current, description }));
@@ -142,16 +150,13 @@ export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyC
           <section aria-labelledby={imagesId} className="mt-7">
             <div className="flex items-baseline justify-between gap-4">
               <h3 id={imagesId} className="text-sm font-medium text-ink-800">
-                Reference images
+                {wording.imagesHeading}
               </h3>
               <span className="text-xs text-ink-500 tabular-nums">
                 {draft.images.length} / {MAX_GUIDE_IMAGES}
               </span>
             </div>
-            <p className="mt-1 mb-3 text-xs text-ink-500">
-              Mark each one Good, Bad or Info. Click an image to draw arrows, boxes and labels on
-              it. Paste or drop an image anywhere here to add it.
-            </p>
+            <p className="mt-1 mb-3 text-xs text-ink-500">{wording.imagesHint}</p>
             <AnnotatedPhotos
               photos={draft.images}
               onChange={(photos) =>
@@ -161,8 +166,8 @@ export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyC
                 }))
               }
               max={MAX_GUIDE_IMAGES}
-              label={`Images of the guide for ${rowRef}`}
-              noun="image"
+              label={wording.listLabel(rowRef)}
+              noun={wording.noun}
               layout="grid"
               acceptAnywhere
               onDirtyChange={setPhotoDirty}
@@ -173,6 +178,7 @@ export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyC
                     <ImageDetails
                       image={image}
                       index={index}
+                      wording={wording}
                       onChange={(patch) => patchImage(index, patch)}
                     />
                   )
@@ -190,7 +196,7 @@ export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyC
               className="-ml-2 text-nok-fg hover:bg-nok-bg hover:text-nok-fg"
             >
               <Trash2 size={16} aria-hidden="true" />
-              Remove guide
+              {wording.removeLabel}
             </Button>
           )}
           <div className="ml-auto flex gap-2">
@@ -217,9 +223,9 @@ export function GuideEditor({ rowRef, rowText, guide, onSave, onCancel, onDirtyC
       )}
       {confirming === 'remove' && guide && (
         <ConfirmDialog
-          title={`Remove the guide of row ${rowRef}?`}
-          message="Its description and images are removed from the draft. Published revisions and the inspections made from them keep theirs."
-          confirmLabel="Remove guide"
+          title={wording.removeTitle(rowRef)}
+          message={wording.removeMessage}
+          confirmLabel={wording.removeLabel}
           onConfirm={() => {
             setConfirming(null);
             close({ guide: undefined });
@@ -236,20 +242,23 @@ type ImagePatch = Partial<Pick<GuideImage, 'verdict' | 'caption'>>;
 type DetailsProps = {
   image: GuideImage;
   index: number;
+  wording: GuideWording;
   onChange: (patch: ImagePatch) => void;
 };
 
 /** Under an image's tile: its verdict and caption. */
-function ImageDetails({ image, index, onChange }: DetailsProps) {
+function ImageDetails({ image, index, wording, onChange }: DetailsProps) {
   return (
     <div className="mt-2 space-y-1.5">
       <VerdictPicker
-        label={`Verdict, image ${index + 1}`}
+        label={`Verdict, ${wording.noun} ${index + 1}`}
         value={image.verdict}
         onChange={(verdict) => onChange({ verdict })}
+        labels={wording.verdicts}
+        stacked={wording.stackVerdicts}
       />
       <input
-        aria-label={`Caption, image ${index + 1}`}
+        aria-label={`Caption, ${wording.noun} ${index + 1}`}
         value={image.caption ?? ''}
         maxLength={500}
         placeholder="Caption"

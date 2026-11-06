@@ -55,7 +55,8 @@ const backLink = (page: Page) => page.getByRole('main').getByRole('link', { name
 
 async function openEditor(page: Page, template: Template): Promise<void> {
   await page.goto(`/templates/${template.id}`);
-  await expect(page.getByRole('heading', { level: 1, name: template.name })).toBeVisible();
+  // Under the machine's heading (its model), on its Final inspection tab.
+  await expect(page.getByRole('heading', { level: 2, name: template.name })).toBeVisible();
 }
 
 /** Types at the end of a row's text. */
@@ -100,11 +101,18 @@ test.describe('an admin', () => {
     await page.goto('/templates');
     const row = page.getByRole('row', { name: published.name });
     // E2E is not in the settings, so the model column shows the code itself.
-    await expect(row.getByRole('cell')).toHaveText([published.name, 'E2E', 'Rev 1', '6', /./]);
+    await expect(row.getByRole('cell')).toHaveText([
+      published.name,
+      'E2E',
+      'Rev 1',
+      '6',
+      'None',
+      /./,
+    ]);
     await expect(page.getByRole('button', { name: 'New template' })).toBeVisible();
 
     await row.getByRole('link', { name: published.name }).click();
-    await expect(page.getByRole('heading', { level: 1, name: published.name })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: published.name })).toBeVisible();
     await expect(page.locator('[data-item-text]')).toHaveCount(6);
     await expect(page.getByText('Published Rev 1')).toBeVisible();
   });
@@ -354,7 +362,7 @@ test.describe('an admin', () => {
     await expect(page.getByText('Published Rev 1')).toBeVisible();
     await expect(page.getByText('Draft · Rev 2')).toBeVisible();
     await notice.getByRole('button', { name: 'Dismiss' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: template.name })).toBeFocused();
+    await expect(page.getByRole('heading', { level: 2, name: template.name })).toBeFocused();
 
     // Later edits go into the draft; the published revision stays as it was.
     await appendToRow(page, row.id, ' (changed)');
@@ -626,7 +634,7 @@ test.describe('an admin', () => {
       'true',
     );
     await link.click();
-    await expect(page.getByRole('heading', { level: 1, name: published.name })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: published.name })).toBeVisible();
   });
 
   test('deleting a template asks first, keeps its inspections and goes back to the list', async ({
@@ -816,7 +824,7 @@ test.describe('an admin', () => {
         id = ((await response.json()) as { draft: { id: string } }).draft.id;
         await page.waitForURL(`**/templates/${id}`);
         await expect(
-          page.getByRole('heading', { level: 1, name: `${template.name} (imported)` }),
+          page.getByRole('heading', { level: 2, name: `${template.name} (imported)` }),
         ).toBeVisible();
         await expect(page.getByText('Draft · Rev 1')).toBeVisible();
         await expect(page.getByText('Not published', { exact: true })).toBeVisible();
@@ -847,7 +855,7 @@ test.describe('an inspector', () => {
     await expect(page.getByRole('button', { name: /New template|Import JSON/ })).toHaveCount(0);
 
     await page.getByRole('link', { name: published.name }).click();
-    await expect(page.getByRole('heading', { level: 1, name: published.name })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: published.name })).toBeVisible();
     await expect(page.getByText('Rev 1', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'Loading area' })).toBeVisible();
     await expect(page.locator('main').locator('input, textarea, select')).toHaveCount(0);

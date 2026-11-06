@@ -28,6 +28,15 @@ export function Badge({
   );
 }
 
+/** "1 quality check", "3 quality checks" or "No quality checks", on a machine's template. */
+export function QualityChecksBadge({ count }: { count: number }) {
+  return count === 0 ? (
+    <Badge>No quality checks</Badge>
+  ) : (
+    <Badge tone="brand">{count === 1 ? '1 quality check' : `${count} quality checks`}</Badge>
+  );
+}
+
 /** "Rev 2" for a published template, else "Not published". */
 export function PublishedBadge({ revision }: { revision: number | null }) {
   return revision === null ? <Badge>Not published</Badge> : <Badge tone="ok">Rev {revision}</Badge>;

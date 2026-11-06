@@ -2582,3 +2582,190 @@ them.
   lines, and the headline numbers are four cards like the parts.
 - A card that runs onto the next page (the month numbers over several years) is closed and opened
   again there (`box-decoration-break: clone`).
+
+## Quality checks: set up (2026-11-05)
+
+Quality checks are the in-process checks along a machine's build ("Quality check – Pre start up"),
+several per machine. This is their set-up: admins create, edit, publish, export, import and delete
+them. Doing a check, printing one, Excel import, approvals and protective equipment or tools per
+section are left for later; nothing of them is stubbed.
+
+### Data model
+
+- **A quality check is a template with `kind: 'quality'`.** It reuses everything a template has:
+  the `templates` container (`{id}/draft.json`, `{id}/rev-N.json`), one draft with autosave and
+  ETags, publishing revisions with change notes, the revision history, read-only revisions,
+  delete, and guide images with editable marks. A second container and a second set of endpoints
+  would have duplicated all of it for a checklist of the same shape.
+- **`kind` defaults to `final` in `TemplateSchema` (zod `.default`).** Templates stored before
+  this, drafts and revisions alike, parse as final inspection templates; nothing migrates them.
+  New writes carry `kind`. `TemplateSummarySchema.kind` has the same default.
+- **`parentId` is the machine: the id of its model's final inspection template.** The quality
+  check copies that template's `modelCode` when it is created (or imported) and keeps it: its
+  machine is `parentId`, so a final template moved to another model keeps its quality checks
+  under it, and the copied code is only a record (the export file names the machine). A save
+  never changes a quality check's model, whatever the editor sends.
+- **The front page is `quality: { name, department, documentNumber, madeBy, date }`** (200, 200,
+  100 and 200 characters; the date "YYYY-MM-DD" or empty). Final inspection
+  templates have none: a save of one drops a `quality` sent with it.
+- **A quality check is named after its in-process check, not numbered.** The first version had a
+  Position ("QC4") and an Operation ("Pre start up") with the title "QC4 · Pre start up"; the user
+  would rather not number them, so the front page has one **Name** ("Pre start up") and the title
+  is **"Quality check – Pre start up"**, as a template is "Final inspection – RigiMill MG". A name
+  that already starts with "Quality check" isn't prefixed twice. Changed before anything was
+  released, so no stored data had a position.
+- **The template's `name` follows the title** (`qualityCheckTitle`), so lists, summaries, dialogs
+  and the delete callout have it without knowing about front pages. The editor keeps it in step as
+  the name is typed; the server sets it again on every create, import and save, so the stored name
+  can't drift from the front page.
+- **Rows gain `how` (2000 characters, lines allowed), `references` (up to 20 strings of 1–100
+  characters, trimmed) and `timeHours` (0–999).** Each is left out when empty: the editor stores
+  no `how: ''`, no `references: []` and no time for a blank field. "What" is the row's `text`.
+  Final inspection templates never set them, and their editor, print, Word export and inspections
+  ignore them (an inspection's frozen checklist only ever comes from a final template).
+- **Time is hours with one decimal, rounded when typed (`parseHours`), and sums are rounded
+  again (`rowsHours`, `totalHours`),** so 0.1 + 0.2 shows 0.3 h. "0,5" is accepted: Swedish
+  keyboards type a decimal comma. Something that is not a number (or more than 999) is marked
+  invalid and not saved; leaving the field shows the last time again, as the date field does.
+- **Pictures and "more information" are the row's `guide`.** The stored verdicts stay `good`,
+  `bad` and `info`; a quality check shows them as "Should look like this", "Should not look like
+  this" and "Info" (`QUALITY_VERDICT_LABELS`). The guide editor and viewer take a `wording`
+  (`guides/wording.ts`): a final inspection's guide reads exactly as before.
+- **Department is picked from the settings' Responsible list,** which is the list of departments,
+  with "Not set" and, as for a deviation, a department removed since kept as "(not in the list)".
+  A new quality check starts in Quality, made by the admin who creates it (their name from the
+  people list) and dated today in Sweden: it is the Quality department's document and the
+  defaults are what is usually true.
+
+### Publishing and unpublished changes
+
+- **`validateForPublish` takes `kind` and `quality`.** A quality check needs the name on its front
+  page (its title follows from it): "The quality check needs a name.", and its "Go to it" focuses
+  the Name field. The other rules are the template's; an empty row says "Row 1.a needs
+  “What to check”.", the label of the field to fill.
+- **`sameTemplateContent` compares the front page and each row's how, references and time,** field
+  by field as before. A blank how or an empty list of references is the same as none, so an
+  editor that sends either never shows "Unpublished changes" for nothing.
+
+### API
+
+- **The template routes take quality checks; no new registration.** `POST /api/templates` and
+  `POST /api/templates/import` accept a body with `kind: 'quality'` (zod unions in shared:
+  `CreateAnyTemplateRequestSchema`, `ImportAnyTemplateRequestSchema`). A final body may say
+  `kind: 'final'` or nothing; a quality body missing its machine is never taken for a final one.
+- **Creating or importing under a machine:** 404 when `parentId` names no template, 400 when it
+  names a quality check (one level only). Admins only, as every template write; inspectors read
+  the list and published revisions.
+- **One template per model holds for final inspection templates only** (`findTemplateForModel`,
+  the new-model check, the editor's taken models, the free models of New template and Import
+  JSON). Quality checks share their machine's model.
+- **`GET /api/templates` lists both kinds, each with `kind` and, for quality checks, `parentId`,
+  the front page, the section titles and the total time:** what a quality check's card shows. A
+  final template's summary gains nothing but `kind`; the list stays one request.
+- **Deleting a final inspection template deletes its quality checks, after it.** The template goes
+  first, on its `If-Match`, so a refused delete leaves everything; then each quality check's draft
+  and revisions go without a condition (the admin confirmed it in a dialog that names them). A
+  failure is logged and leaves a quality check without a machine, which no page lists. Deleting
+  a quality check deletes only it.
+- **An inspection of a quality check is refused with 400,** "A quality check can’t be used for an
+  inspection. Choose the machine’s final inspection template.", before a number is taken: it can
+  never succeed, so it is no conflict (409 says the state may change).
+- **The seed's "is RigiMill MG imported?" check skips quality checks:** one left with RMMG's code
+  must not stop the seed from importing the model's template.
+
+### App
+
+- **A template opens as its machine.** `/templates/:id` is the Final inspection tab and
+  `/templates/:id/quality-checks` the Quality checks tab; both show "← Templates", the model's name
+  as the page's heading (h1) and the two tabs. The tabs are links with `aria-current`, not ARIA
+  tabs: each is an address, so Back, Reload and a shared link land on it. "Quality checks (n)" is
+  the tab's accessible name; the count is a badge on screen.
+- **On the Final inspection tab the template's own title is an h2** under the machine's heading,
+  for admins (the editor) and inspectors (the latest revision) alike. The e2e tests that looked
+  for it as the h1 now look for an h2. A template's revision page keeps its h1.
+- **A quality check's pages: `/templates/:id/quality-checks/:qcId` and `…/revisions/:n`,** with
+  breadcrumbs (Templates › machine › Quality checks) and the title as the h1. A quality check's
+  id at a template's address, or under the wrong machine, is sent to its own address (and a final
+  template's id at a quality check's address to its own), so old links keep working.
+- **One editor for both kinds.** `TemplateEditor` reads the draft's `kind`: a quality check gets
+  the breadcrumbs, its front page card (`QualityFrontCard`), its row cards, its wording in the
+  publish, delete and leave dialogs, revisions under its address and no Print preview. The
+  document components take a `variant`; `EditableSection` draws a quality check's section as a
+  band (number, title, "5 rows · 0.8 h", ⋯) over its rows as cards (`QualityRow`). Drag and drop,
+  focus, Undo and the actions are the same code (`useDocumentActions` gained `setFields`).
+- **A row card:** the pictures on the left, then the ref and What (one line: `Enter` adds a row
+  below, as in a final template), How (lines of its own), the references as chips with an input
+  after them (`Enter`, comma or semicolon adds; pasting a list splits it; duplicates are skipped
+  ignoring case), more information (two lines) and, on the right, the time and a ⋯ menu that is
+  always shown (Pictures and information, Duplicate, Delete): on a card one menu is easier to
+  find than icons that appear on hover. On a narrow sheet only What sits beside a small picture;
+  the rest spans the card, which on a phone was otherwise a column a few words wide.
+- **`Backspace` in an empty What removes the row only when the row has nothing else** (how,
+  references, time, pictures). Clearing What to retype it should not lose the rest; the ⋯ menu
+  deletes such a row, with Undo, as any row with content (`rowHasContent`).
+- **The picture tile** shows the first picture as marked up, whole (`object-contain`, as
+  everywhere marks may sit near an edge), with its verdict as a ✓ or ✗ badge: the words don't fit
+  a 72–144 px tile, and they are in the tile's accessible name and the dialog. "+2" says how many
+  more. Without pictures it says "Information" when there is some, or offers "Add pictures".
+- **In the pictures dialog the verdict picker stacks its three choices** in a quality check: "Should
+  not look like this" doesn't share an 11.5rem tile's width with two others.
+- **Read-only (inspectors, revisions):** the same cards without inputs; a row without pictures
+  keeps the pictures' column empty on a wide sheet, so every row's text starts in one line.
+- **Templates page:** the list and cards show final inspection templates only, each with "1
+  quality check" / "No quality checks", their names (a never-published one marked "(draft)")
+  in the card's footer and a Quality checks column in the list. After deleting a template the
+  callout adds how many quality checks went with it (counted when the delete is confirmed, as
+  the list reloads without them).
+- **The Quality checks tab** shows the cards (title, department · document · made by, revision,
+  numbered section chips, rows, time, last edit) and, for admins, Import JSON, New quality check
+  and a dashed New quality check card. The whole card is the link; its "Open" only shows that
+  (hidden from screen readers, so it is no second stop).
+- **A name another quality check of the machine already has is pointed out, not refused.** Two
+  checks of one name may be wanted for a while (a copy being reworked); the hint says so.
+- **The sidebar's group is now "Quality"** (the loading skeleton's label bar is shorter to match):
+  Inspections and Templates cover final inspections and quality checks.
+- **Quality checks don't print yet:** no Print preview in their editor or views, and the print
+  route says so with a link back. The new inspection page offers final inspection templates only.
+
+### Export and import (JSON)
+
+- **A quality check file has a format of its own, `modig-final-inspection/quality-check`
+  version 1:** `{ quality, modelCode, modelName?, sections }`. The template file format is
+  unchanged, so every template file exported so far imports exactly as before. Each import
+  refuses the other's file by its format, in the browser with a message that says where it
+  belongs ("This is a quality check file. Import it on the Quality checks tab of a machine’s
+  template.") and in the API with 400.
+- **Export JSON writes the draft as shown, unsaved changes included,** named "Quality check – Pre
+  start up – RigiMill MG.json" (the title, then the machine), with the characters file
+  systems refuse replaced, as a template's.
+- **Import JSON is on the machine's Quality checks tab** and always makes a new draft of that
+  machine, with the name chosen in its dialog (the file's to start with) and
+  the rest of the file's front page.
+- **An imported quality check always gets new section and row ids.** A template keeps the file's
+  ids when they are free so its rows keep their Insights history; quality check rows have no
+  history yet, and the usual case (a copy next to the original on the same machine) would need
+  new ids anyway. Pictures not stored in this installation are left out and counted, as for a
+  template.
+
+### Tests
+
+- **shared:** old templates parse as final; a quality check's fields; references and times out of
+  bounds; `validateForPublish` for quality checks; `sameTemplateContent` with the front page and
+  row fields; the request unions; the quality check file (both ways refused); the hours, title and
+  `rowHasContent` helpers.
+- **api** (`quality-checks.test.ts`): create (201 with the defaults, 404, 400 for a quality parent
+  or no name, 403); one template per model unaffected; the list's kind, parent, front page,
+  sections and time; saving (name follows, model and machine stay, front page kept when left
+  out, none on a final template, 400 for bad fields); publish (name required, revision frozen,
+  a changed time is an unpublished change); delete cascading (drafts and revisions; another
+  machine's kept) and alone; import (fresh ids, chosen title, missing pictures counted, each
+  file refused by the other import, 404, 403); and inspections refusing a quality check. The
+  existing template tests expect `kind` in drafts and summaries. **seed:** a quality check with
+  RMMG's code doesn't stop the import.
+- **app:** the row field edits (`setRowFields`), references, the names line and grouping, the
+  links, and the quality check file (name, parsing, the template file refused); the template
+  file parser refuses a quality check file.
+- **e2e** (`quality-checks.spec.ts`, 5 tests; their machine and its quality checks deleted after
+  each test): set up and publish from the tab, export and import, delete with the machine,
+  inspectors read-only and refused, and no inspection from a quality check. The template list
+  test expects the Quality checks column, and the editor title is an h2 on the machine's page.

@@ -3,6 +3,7 @@
  * JSON reads and checks a file here, so a wrong file is explained before anything is sent.
  */
 import {
+  QUALITY_CHECK_EXPORT_FORMAT,
   TEMPLATE_EXPORT_FORMAT,
   templateExport,
   TemplateExportSchema,
@@ -16,7 +17,7 @@ export class TemplateFileError extends Error {
 }
 
 /** Far more than a 90-row checklist with guides (tens of kilobytes): anything bigger is not one. */
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 /** The longest file name, without ".json". */
 const FILE_NAME_LENGTH = 150;
 
@@ -38,12 +39,17 @@ export function templateFileName(name: string): string {
 /** Downloads the draft, as the editor shows it, as a template file. */
 export function downloadTemplate(draft: TemplateDraftInput, modelName: string | undefined): void {
   const file = templateExport(draft, modelName, new Date().toISOString());
+  downloadJson(file, templateFileName(draft.name));
+}
+
+/** Saves `file` as a JSON file called `name`, from the browser. */
+export function downloadJson(file: unknown, name: string): void {
   // Indented: the file is small, and readable in a text editor.
   const blob = new Blob([`${JSON.stringify(file, null, 2)}\n`], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = templateFileName(draft.name);
+  link.download = name;
   document.body.append(link);
   link.click();
   link.remove();
@@ -60,6 +66,11 @@ export function parseTemplateFile(text: string): TemplateExport {
     throw new TemplateFileError('This file is not a template file: it does not contain JSON.');
   }
   const header = typeof json === 'object' && json !== null ? (json as Record<string, unknown>) : {};
+  if (header.format === QUALITY_CHECK_EXPORT_FORMAT) {
+    throw new TemplateFileError(
+      'This is a quality check file. Import it on the Quality checks tab of a machine’s template.',
+    );
+  }
   if (header.format !== TEMPLATE_EXPORT_FORMAT) {
     throw new TemplateFileError(
       'This is not a template file. Choose a file made with Export JSON in a template.',

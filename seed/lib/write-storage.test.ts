@@ -167,6 +167,23 @@ describe('writeSeed', () => {
     expect(report.template.action).toBe('created');
   });
 
+  it('is not stopped by a quality check for the model: it is not the model’s template', async () => {
+    await templates.createIfNotExists();
+    // Left behind for RMMG, its machine's template since moved or deleted.
+    const check = JSON.stringify({
+      kind: 'quality',
+      parentId: 'machine000000001',
+      modelCode: 'RMMG',
+    });
+    await templates
+      .getBlockBlobClient(blobNames.templateDraft('qualityCheck0001'))
+      .upload(check, Buffer.byteLength(check));
+
+    const report = await writeSeed(storage, parsed, options);
+
+    expect(report.template.action).toBe('created');
+  });
+
   it('completes an import that stopped after the published revision, with its item ids', async () => {
     const crashedId = 'crashedTemplate1';
     const { published } = buildTemplateDocuments(parsed, {

@@ -1,7 +1,8 @@
 import { hasRole, type Template } from '@modig/shared';
-import { FileClock } from 'lucide-react';
+import { ArrowLeft, FileClock, Printer } from 'lucide-react';
 import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import { ButtonLink } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { parseAppendix } from '../features/print/links';
 import { templatePrint } from '../features/print/model';
@@ -10,6 +11,7 @@ import { PrintView } from '../features/print/PrintView';
 import { usePrintImages } from '../features/print/usePrintImages';
 import {
   parseRevision,
+  qualityCheckHref,
   useTemplateDetail,
   useTemplateRevision,
   useTemplates,
@@ -98,15 +100,36 @@ function RevisionPrint({ id, param }: { id: string; param: string }) {
   );
 }
 
-function TemplatePrint({
-  template,
-  draft,
-  back,
-}: {
-  template: Template;
-  draft: boolean;
-  back: Back;
-}) {
+type PrintProps = { template: Template; draft: boolean; back: Back };
+
+/** A final inspection template's checklist; a quality check doesn't print yet. */
+function TemplatePrint(props: PrintProps) {
+  if (props.template.kind === 'quality') {
+    return (
+      <PrintMessage>
+        <EmptyState
+          icon={Printer}
+          title="Quality checks don’t print yet"
+          hint="Printing is for final inspection templates. A quality check is read and edited on its page."
+          action={
+            props.template.parentId ? (
+              <ButtonLink
+                to={qualityCheckHref(props.template.parentId, props.template.id)}
+                variant="secondary"
+              >
+                <ArrowLeft size={16} aria-hidden="true" />
+                Back to the quality check
+              </ButtonLink>
+            ) : undefined
+          }
+        />
+      </PrintMessage>
+    );
+  }
+  return <FinalTemplatePrint {...props} />;
+}
+
+function FinalTemplatePrint({ template, draft, back }: PrintProps) {
   const settings = useSettings();
   const [params, setParams] = useSearchParams();
   const appendix = parseAppendix(params.get('appendix'));
