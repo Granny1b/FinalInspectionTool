@@ -37,7 +37,7 @@ type Props = {
   onDelete: () => void;
 };
 
-/** Tools, the four colours, undo/redo and delete: the editor's bar above the photo. */
+/** Tools, the colours, undo/redo and delete: the editor's bar above the photo. */
 export function EditorToolbar({
   tool,
   color,

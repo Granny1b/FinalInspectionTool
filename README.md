@@ -511,16 +511,16 @@ whoever fixes it sees exactly where. They print on the report's deviation pages.
 The editor: tools on top, the photo filling the window, a caption and **Save** / **Cancel** at the
 bottom. Mouse, finger and pen all work.
 
-| To                            | Do                                                                                      |
-| ----------------------------- | --------------------------------------------------------------------------------------- |
-| Draw an arrow, box or ellipse | Pick **Arrow**, **Rectangle** or **Ellipse**, drag across the photo                     |
-| Write a label                 | **Text**, click where it goes, type, `Enter`                                            |
-| Draw by hand                  | **Freehand**, then draw                                                                 |
-| Pick a colour                 | Red, Cyan, Yellow or White (also recolours the selected mark, or the label being typed) |
-| Move or delete a mark         | **Select and move**: drag it; `Delete` or the bin removes it                            |
-| Change a label                | Double-click it with **Select and move**                                                |
-| Undo, redo                    | `Ctrl+Z`; `Ctrl+Shift+Z` or `Ctrl+Y` (also the buttons)                                 |
-| Cancel                        | `Esc` or **Cancel** (asks first if anything changed)                                    |
+| To                            | Do                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| Draw an arrow, box or ellipse | Pick **Arrow**, **Rectangle** or **Ellipse**, drag across the photo                            |
+| Write a label                 | **Text**, click where it goes, type, `Enter`                                                   |
+| Draw by hand                  | **Freehand**, then draw                                                                        |
+| Pick a colour                 | Red, Green, Cyan, Yellow or White (also recolours the selected mark, or the label being typed) |
+| Move or delete a mark         | **Select and move**: drag it; `Delete` or the bin removes it                                   |
+| Change a label                | Double-click it with **Select and move**                                                       |
+| Undo, redo                    | `Ctrl+Z`; `Ctrl+Shift+Z` or `Ctrl+Y` (also the buttons)                                        |
+| Cancel                        | `Esc` or **Cancel** (asks first if anything changed)                                           |
 
 Lines and labels are sized to the photo (a label is 4 % of its long edge), so they look the same
 on screen, on a thumbnail and on paper. They stay visible on a black-and-white printer: yellow

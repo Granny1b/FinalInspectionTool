@@ -25,9 +25,10 @@ export const TOOL_HINTS: Record<Tool, string> = {
   freehand: 'Draw with the mouse, a finger or a pen.',
 };
 
-/** The four colours of brief §5.4, in the order the picker shows them. */
+/** The colours in the order the picker shows them: brief §5.4's four, with green after red. */
 export const COLORS = [
   { name: 'Red', value: ANNOTATION_COLORS.red },
+  { name: 'Green', value: ANNOTATION_COLORS.green },
   { name: 'Cyan', value: ANNOTATION_COLORS.cyan },
   { name: 'Yellow', value: ANNOTATION_COLORS.yellow },
   { name: 'White', value: ANNOTATION_COLORS.white },

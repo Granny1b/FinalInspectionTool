@@ -240,7 +240,7 @@ test('a deviation photo marked up with an arrow and a label is saved, reloaded a
     .locator('[data-photo-input]')
     .setInputFiles({ name: 'cabinet.jpg', mimeType: 'image/jpeg', buffer: original });
 
-  // The editor opens on the new photo: an arrow and a label, in red, drawn with the mouse.
+  // The editor opens on the new photo: a red arrow and a green label, drawn with the mouse.
   await expect(editor(page)).toBeVisible();
   await expect(canvas(page)).toBeVisible({ timeout: 20_000 });
   await pick(page, 'Tool', 'Arrow');
@@ -248,6 +248,7 @@ test('a deviation photo marked up with an arrow and a label is saved, reloaded a
   await drag(page, [0.3, 0.3], [0.55, 0.55]);
   await expect(canvas(page)).toHaveAttribute('aria-label', 'Photo with 1 mark');
   await pick(page, 'Tool', 'Text');
+  await pick(page, 'Colour', 'Green');
   await page.mouse.click(...(await onPhoto(page, [0.6, 0.62])));
   await page.keyboard.type('Loose cable');
   await page.keyboard.press('Enter');
@@ -279,7 +280,11 @@ test('a deviation photo marked up with an arrow and a label is saved, reloaded a
   expect(photo!.renderedImageId).not.toBe(photo!.imageId);
   const [arrow, label] = photo!.annotations;
   expect(arrow).toMatchObject({ kind: 'arrow', color: ANNOTATION_COLORS.red });
-  expect(label).toMatchObject({ kind: 'text', text: 'Loose cable', color: ANNOTATION_COLORS.red });
+  expect(label).toMatchObject({
+    kind: 'text',
+    text: 'Loose cable',
+    color: ANNOTATION_COLORS.green,
+  });
   if (arrow?.kind !== 'arrow' || label?.kind !== 'text') throw new Error('Unexpected marks');
   arrow.points.forEach((value, index) =>
     expect(value).toBeCloseTo([0.3, 0.3, 0.55, 0.55][index]!, 1),

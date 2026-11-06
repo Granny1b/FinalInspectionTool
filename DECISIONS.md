@@ -2935,3 +2935,14 @@ don't print yet" with a link back.
   filling in and finalising one; Insights and its report by kind; reopen and delete. Changed: the
   quality-checks spec's last test (the API now starts a quality check), the smoke test's "New
   final inspection", the deviation table's two new columns, and the sidebar checks.
+
+## Green annotation colour (2026-11-06)
+
+- **Green is a fifth colour for photo marks,** `#22C55E`, shown right after red in the editor's
+  colour picker (Red, Green, Cyan, Yellow, White), for marking what is right next to what is
+  wrong. Brief §5.4 named four colours; the others are unchanged and red stays the default.
+- **Green keeps the soft shadow only, like red and cyan:** a black-and-white printer turns it into
+  a grey of 54 % luma, as dark as cyan, so it stays clear of a light machine surface without the
+  dark outline yellow and white get.
+- Stored marks carry their colour as text, so no data changes; older apps would draw a green mark
+  in green too.

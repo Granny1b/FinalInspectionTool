@@ -105,9 +105,10 @@ export const AnnotationSchema = z.discriminatedUnion('kind', [
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
-/** The four annotation colours (brief §5.4): red, Modig cyan, yellow, white. */
+/** The annotation colours: brief §5.4's red, Modig cyan, yellow and white, plus green. */
 export const ANNOTATION_COLORS = {
   red: '#E02424',
+  green: '#22C55E',
   cyan: '#29ABE2',
   yellow: '#FACC15',
   white: '#FFFFFF',
