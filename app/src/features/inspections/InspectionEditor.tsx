@@ -874,7 +874,6 @@ export function InspectionEditor({
         {deviationsShown && (
           <DeviationSummary
             deviations={deviations}
-            printed={!quality}
             readOnly={finalised}
             issues={extraErrors}
             responsibles={responsibles}
