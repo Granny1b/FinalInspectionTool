@@ -31,7 +31,7 @@ test('create from the seeded template → mark rows → finalise → print the r
 
   // Create: pick the checklist, fill in the front page.
   await page.goto('/inspections');
-  await page.getByRole('link', { name: 'New inspection' }).click();
+  await page.getByRole('link', { name: 'New final inspection' }).click();
   await page.getByRole('radio', { name: template!.publishedName! }).check();
   await page.getByLabel('Machine name', { exact: true }).fill('RigiMill MG – smoke test');
   await page.getByLabel('Serial number', { exact: true }).fill('RM-SMOKE-1');

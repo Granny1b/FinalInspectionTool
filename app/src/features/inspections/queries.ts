@@ -10,7 +10,9 @@ import {
   type FinaliseIssue,
   type Inspection,
   type InspectionDraftInput,
+  type InspectionKind,
   type InspectionSummary,
+  type StartQualityCheckRequest,
 } from '@modig/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -40,11 +42,19 @@ function withEtag({ data, etag }: ApiResponse<Inspection>): LoadedInspection {
   return { inspection: data, etag };
 }
 
-export function useInspections() {
+/** Each list's part of the answer; stable functions, so a list is filtered once per answer. */
+const OF_KIND: Record<InspectionKind, (list: InspectionSummary[]) => InspectionSummary[]> = {
+  final: (list) => list.filter((summary) => summary.kind === 'final'),
+  quality: (list) => list.filter((summary) => summary.kind === 'quality'),
+};
+
+/** Final inspections only, or the quality checks done on machines: one request for both lists. */
+export function useInspections(kind: InspectionKind) {
   return useQuery({
     queryKey: inspectionKeys.list,
     queryFn: async ({ signal }) =>
       (await apiFetch('/api/inspections', { schema: InspectionListSchema, signal })).data,
+    select: OF_KIND[kind],
   });
 }
 
@@ -67,7 +77,9 @@ export function useCreateInspection() {
   return useMutation({
     // No client timeout, unlike saves: giving up on a create that went through would invite a
     // second inspection for the same machine. SWA's gateway ends a hung request at 45 s anyway.
-    mutationFn: async (request: CreateInspectionRequest) =>
+    // The template's kind decides which it is: a final inspection, or a quality check started on
+    // a machine (QC- number).
+    mutationFn: async (request: CreateInspectionRequest | StartQualityCheckRequest) =>
       withEtag(
         await apiFetch('/api/inspections', {
           method: 'POST',

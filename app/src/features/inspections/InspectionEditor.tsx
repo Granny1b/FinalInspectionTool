@@ -3,6 +3,7 @@ import {
   deriveDeviations,
   hasRole,
   indexItems,
+  INSPECTION_NOUNS,
   inspectionProgress,
   validateForFinalise,
   type AnnotatedImage,
@@ -71,6 +72,8 @@ import {
 } from './issues';
 import { inspectionsListHref, type InspectionsPageState } from './listFilter';
 import type { PendingParticipant } from './ParticipantsField';
+import { QualityCheckFrontCard, type QualityStandard } from './quality/QualityCheckFront';
+import { QualityCheckSheet } from './quality/QualityCheckSheet';
 import {
   changeState,
   fetchInspection,
@@ -105,14 +108,22 @@ const NO_CHOICES: readonly string[] = [];
 const TYPING: AutosaveState = { status: 'pending' };
 // One element for the page's lifetime: React skips it when the page re-renders per key.
 const SHORTCUT_HINTS = <ShortcutHints />;
+const QUALITY_SHORTCUT_HINTS = <ShortcutHints guide="Pictures" />;
 
 /**
  * One inspection (brief §5.3): the front page, the checklist filled in from the keyboard and the
  * Deviation Summary, autosaved; Finalise locks it, and an admin can reopen it.
+ *
+ * A quality check done on a machine (kind `quality`) is the same page in a quality mode: its
+ * shorter front page with the quality check it follows, each row a card with its pictures and
+ * large OK / NOK / N/A buttons (QualityCheckSheet), and no printing yet.
  */
 export function InspectionEditor({ loaded, onReload }: Props) {
   const { inspection } = loaded;
-  const { id, number, templateSnapshot, templateRevision } = inspection;
+  const { id, kind, number, templateSnapshot, templateRevision } = inspection;
+  const quality = kind === 'quality';
+  /** "inspection", "quality check" */
+  const noun = INSPECTION_NOUNS[kind];
   // The frozen checklist keeps its identity for the page's lifetime, so the sheet's memoised
   // rows never re-render because of it (only the ETag is taken from save answers).
   const sections = templateSnapshot.sections;
@@ -124,7 +135,15 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const personName = usePersonName();
   const idPrefix = useId();
   // Back to the list as it was left (search and filters); one element for the page's lifetime.
-  const [backLink] = useState(() => <BackLink to={inspectionsListHref()} label="Inspections" />);
+  const [backLink] = useState(() => (
+    <BackLink to={inspectionsListHref(kind)} label={quality ? 'Quality checks' : 'Inspections'} />
+  ));
+  // What a quality check follows, as frozen in it; the same object for the page's lifetime.
+  const [standard] = useState<QualityStandard>(() => ({
+    title: templateSnapshot.name,
+    front: templateSnapshot.quality,
+    revision: templateRevision,
+  }));
 
   const [draft, setDraft] = useState<InspectionDraftInput>(() => draftOf(inspection));
   // The latest draft, for event handlers that run before React re-renders.
@@ -169,6 +188,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   const dirty = saveState.status !== 'saved' || uploading || participantPending;
   // A deviation photo open in the editor with marks: leaving asks first, saving can't keep them.
   const [editorDirty, setEditorDirty] = useState(false);
+  // A quality check's rows have their own photo editors: one is open at a time.
+  const onEditorDirtyChange = setEditorDirty;
   // Once deleted (admins), there is nothing left to save: the page just goes.
   const [deleted, setDeleted] = useState(false);
   const leaveGuard = useLeaveGuard(dirty && !deleted, saveAll, editorDirty && !deleted);
@@ -454,11 +475,12 @@ export function InspectionEditor({ loaded, onReload }: Props) {
   useEffect(() => {
     if (!deleted) return;
     const state: InspectionsPageState = { deleted: number };
-    void navigate(inspectionsListHref(), { replace: true, state });
-  }, [deleted, navigate, number]);
+    void navigate(inspectionsListHref(kind), { replace: true, state });
+  }, [deleted, navigate, number, kind]);
 
   const modelLabel = modelName(settings.data?.machineModels, inspection.front.modelCode);
-  const machine = draft.front.machineName.trim();
+  // A quality check's machine is its model; it has no machine name.
+  const machine = quality ? modelLabel : draft.front.machineName.trim();
   // Once finalised there is nothing left to save: the header says so only if saving failed.
   const showSaveStatus = !finalised || saveState.status !== 'saved';
 
@@ -507,11 +529,18 @@ export function InspectionEditor({ loaded, onReload }: Props) {
               )}
             >
               <StateBadge state={server.state} />
-              <span>{modelLabel}</span>
+              {!quality && <span>{modelLabel}</span>}
+              {quality && (
+                <span>
+                  {templateSnapshot.name} · Rev {templateRevision}
+                </span>
+              )}
               <span>S/N {draft.front.serialNumber.trim() || '—'}</span>
-              <span>
-                {templateSnapshot.name} · Rev {templateRevision}
-              </span>
+              {!quality && (
+                <span>
+                  {templateSnapshot.name} · Rev {templateRevision}
+                </span>
+              )}
               {finalised && server.finalisedAt && (
                 <span>
                   Finalised {formatDateTime(server.finalisedAt)}
@@ -538,35 +567,40 @@ export function InspectionEditor({ loaded, onReload }: Props) {
                 showSaveStatus ? 'mt-2' : 'mt-3',
               )}
             >
-              <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
-                <Eye size={16} aria-hidden="true" />
-                Preview
-              </Button>
-              <ActionMenu
-                label="Print / Save PDF"
-                trigger={
-                  <>
-                    <Printer size={16} aria-hidden="true" />
-                    {/* "Print" on a phone, so the three buttons share a line; the name stays whole. */}
-                    <span>
-                      Print<span className="@max-[36rem]:sr-only"> / Save PDF</span>
-                    </span>
-                    <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
-                  </>
-                }
-                items={[
-                  {
-                    label: 'Blank checklist',
-                    icon: ClipboardList,
-                    onSelect: () => void openPrint('blank'),
-                  },
-                  {
-                    label: 'Report',
-                    icon: ClipboardCheck,
-                    onSelect: () => void openPrint('report'),
-                  },
-                ]}
-              />
+              {/* A quality check doesn't print yet (nor export to Word, which is in the print view). */}
+              {!quality && (
+                <>
+                  <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
+                    <Eye size={16} aria-hidden="true" />
+                    Preview
+                  </Button>
+                  <ActionMenu
+                    label="Print / Save PDF"
+                    trigger={
+                      <>
+                        <Printer size={16} aria-hidden="true" />
+                        {/* "Print" on a phone, so the three buttons share a line; the name stays whole. */}
+                        <span>
+                          Print<span className="@max-[36rem]:sr-only"> / Save PDF</span>
+                        </span>
+                        <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
+                      </>
+                    }
+                    items={[
+                      {
+                        label: 'Blank checklist',
+                        icon: ClipboardList,
+                        onSelect: () => void openPrint('blank'),
+                      },
+                      {
+                        label: 'Report',
+                        icon: ClipboardCheck,
+                        onSelect: () => void openPrint('report'),
+                      },
+                    ]}
+                  />
+                </>
+              )}
               {!finalised ? (
                 <Button onClick={openFinalise} disabled={conflict}>
                   <Lock size={16} aria-hidden="true" />
@@ -596,11 +630,11 @@ export function InspectionEditor({ loaded, onReload }: Props) {
               {isAdmin && (
                 <span className="inline-flex @max-[36rem]:-ml-1">
                   <ActionMenu
-                    label="Inspection actions"
+                    label={quality ? 'Quality check actions' : 'Inspection actions'}
                     triggerData={{ 'data-inspection-menu': '' }}
                     items={[
                       {
-                        label: 'Delete inspection',
+                        label: quality ? 'Delete quality check' : 'Delete inspection',
                         icon: Trash2,
                         danger: true,
                         onSelect: () => {
@@ -670,8 +704,8 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             >
               {notice === 'finalise' ? (
                 <>
-                  <strong className="font-semibold">Finalised.</strong> The inspection is locked;
-                  only an admin can reopen it.
+                  <strong className="font-semibold">Finalised.</strong> The {noun} is locked; only
+                  an admin can reopen it.
                 </>
               ) : (
                 <>
@@ -691,32 +725,56 @@ export function InspectionEditor({ loaded, onReload }: Props) {
         hidden={tab !== 'checklist'}
         className="mt-6"
       >
-        <FrontPageCard
-          front={draft.front}
-          modelLabel={modelLabel}
-          templateRevision={templateRevision}
-          readOnly={finalised}
-          errors={frontErrors}
-          onChange={updateFront}
-          onUpload={trackUpload}
-          pendingParticipant={pendingParticipant}
-        />
+        {quality ? (
+          <QualityCheckFrontCard
+            front={draft.front}
+            modelLabel={modelLabel}
+            standard={standard}
+            readOnly={finalised}
+            errors={frontErrors}
+            onChange={updateFront}
+            pendingParticipant={pendingParticipant}
+          />
+        ) : (
+          <FrontPageCard
+            front={draft.front}
+            modelLabel={modelLabel}
+            templateRevision={templateRevision}
+            readOnly={finalised}
+            errors={frontErrors}
+            onChange={updateFront}
+            onUpload={trackUpload}
+            pendingParticipant={pendingParticipant}
+          />
+        )}
         <section aria-labelledby={`${idPrefix}-checklist`} className="mt-10">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
             <h2 id={`${idPrefix}-checklist`} className="text-base font-semibold text-ink-900">
               Checklist
             </h2>
-            {!finalised && SHORTCUT_HINTS}
+            {!finalised && (quality ? QUALITY_SHORTCUT_HINTS : SHORTCUT_HINTS)}
           </div>
-          <ChecklistSheet
-            sections={sections}
-            results={draft.results}
-            onChange={finalised ? undefined : updateResults}
-            responsibles={responsibles}
-            categories={categories}
-            issues={issues}
-            onShowPhotos={goToPhotos}
-          />
+          {quality ? (
+            <QualityCheckSheet
+              sections={sections}
+              results={draft.results}
+              onChange={finalised ? undefined : updateResults}
+              responsibles={responsibles}
+              categories={categories}
+              issues={issues}
+              onEditorDirtyChange={onEditorDirtyChange}
+            />
+          ) : (
+            <ChecklistSheet
+              sections={sections}
+              results={draft.results}
+              onChange={finalised ? undefined : updateResults}
+              responsibles={responsibles}
+              categories={categories}
+              issues={issues}
+              onShowPhotos={goToPhotos}
+            />
+          )}
         </section>
       </div>
       <div
@@ -729,6 +787,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
         {deviationsShown && (
           <DeviationSummary
             deviations={deviations}
+            printed={!quality}
             readOnly={finalised}
             issues={extraErrors}
             responsibles={responsibles}
@@ -750,12 +809,13 @@ export function InspectionEditor({ loaded, onReload }: Props) {
             <>
               {progress.total} rows checked,{' '}
               {deviations.length === 1 ? '1 deviation' : `${deviations.length} deviations`}. A
-              finalised inspection is locked: nothing can be changed until an admin reopens it.
+              finalised {noun} is locked: nothing can be changed until an admin reopens it.
             </>
           }
           confirmLabel="Finalise"
           workingLabel="Finalising…"
           issues={dialog.issues}
+          noun={noun}
           run={() => change('finalise')}
           onGoTo={(issue) => goTo(issueTarget(issue.target))}
           onClose={() => setDialog(null)}
@@ -785,8 +845,9 @@ export function InspectionEditor({ loaded, onReload }: Props) {
       )}
       {confirmingDelete && (
         <DeleteInspectionDialog
+          kind={kind}
           number={number}
-          machine={machine}
+          machine={quality ? '' : machine}
           finalised={finalised}
           busy={remove.isPending || deleted}
           error={remove.error}
@@ -802,7 +863,7 @@ export function InspectionEditor({ loaded, onReload }: Props) {
         />
       )}
       {reload.dialog}
-      <LeaveDialog guard={leaveGuard} conflict={conflict} noun="inspection" />
+      <LeaveDialog guard={leaveGuard} conflict={conflict} noun={noun} />
     </div>
   );
 }
@@ -811,10 +872,11 @@ function serverState({ state, finalisedAt, finalisedBy }: Inspection): ServerSta
   return { state, finalisedAt, finalisedBy };
 }
 
-/** The draft as the finalise rules see it: with the frozen checklist and the model. */
+/** The draft as the finalise rules see it: with its kind, the frozen checklist and the model. */
 function withSnapshot(inspection: Inspection, draft: InspectionDraftInput) {
   return {
     ...draft,
+    kind: inspection.kind,
     front: { ...draft.front, modelCode: inspection.front.modelCode },
     templateSnapshot: inspection.templateSnapshot,
   };

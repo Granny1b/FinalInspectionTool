@@ -1,13 +1,19 @@
 /**
  * Insights (brief §5.5, §8): the KPI dashboard's numbers and the deviation rows behind them, as a
- * CSV export and as JSON for the printed report, for admins.
+ * CSV export and as JSON for the printed report, for admins. Of final inspections, or of quality
+ * checks with `kind=quality` (and `check`, one quality check's title); never both together.
  *
- *   GET /api/insights?from&to&model&includeInProgress             admin  Insights
- *   GET /api/insights/export.csv?from&to&model&includeInProgress  admin  text/csv attachment
- *   GET /api/insights/deviations?from&to&model&includeInProgress  admin  InsightsDeviations
+ *   GET /api/insights?kind&from&to&model&check&includeInProgress             admin  Insights
+ *   GET /api/insights/export.csv?kind&from&to&model&check&includeInProgress  admin  text/csv
+ *   GET /api/insights/deviations?kind&from&to&model&check&includeInProgress  admin  rows (JSON)
  */
 import { app, type HttpRequest } from '@azure/functions';
-import { parseInsightsQuery, type InsightsDeviations, type InsightsQuery } from '@modig/shared';
+import {
+  parseInsightsQuery,
+  queryKind,
+  type InsightsDeviations,
+  type InsightsQuery,
+} from '@modig/shared';
 import { BadRequestError, endpoint, json } from '../lib/http';
 import { csvFileName, deviationsCsv, loadExportRows, loadInsights } from '../lib/insights';
 
@@ -32,15 +38,33 @@ export const exportInsightsCsv = endpoint({ role: 'admin' }, async (req, context
   const fileName = csvFileName(query, swedishDate.format(new Date()));
   return {
     status: 200,
-    body: deviationsCsv(rows),
+    body: deviationsCsv(rows, queryKind(query)),
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      // The name is ASCII (dates, a model code), so the plain quoted form is enough.
-      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Content-Disposition': contentDisposition(fileName),
       'Cache-Control': 'no-store',
     },
   };
 });
+
+/**
+ * An attachment named `fileName`. A quality check's title may hold any character ("–", å), which
+ * a header can't carry as it is: the name then goes in `filename*` (RFC 6266), percent-encoded
+ * UTF-8, after a plain ASCII copy for any client that reads only `filename`.
+ */
+export function contentDisposition(fileName: string): string {
+  const ascii = fileName
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[^\x20-\x7e]|["\\]/g, '_');
+  if (ascii === fileName) return `attachment; filename="${fileName}"`;
+  const encoded = encodeURIComponent(fileName).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
 
 /**
  * The CSV's rows as JSON, for the printed report's deviation list: the same filters, the same

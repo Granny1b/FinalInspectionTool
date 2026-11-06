@@ -1,12 +1,20 @@
 /**
  * The deviations table (brief §4), the KPI source: one row per deviation of every inspection,
- * denormalised so KPI queries need no joins. An inspection's rows are rewritten from its blob on
- * every write (`syncDeviations`), so the table always converges to `deriveDeviations(blob)`.
+ * final inspections and quality checks alike, denormalised so KPI queries need no joins. Each
+ * row says which kind it is (`kind`; rows written before quality checks could be done have none
+ * and are final), so Insights counts the two apart. An inspection's rows are rewritten from its
+ * blob on every write (`syncDeviations`), so the table always converges to `deriveDeviations(blob)`.
  *
  * PartitionKey = model code, RowKey = `{inspectionId}_{itemId or extraId}`.
  */
 import { odata, type TableEntity, type TransactionAction } from '@azure/data-tables';
-import { deriveDeviations, deviationKeys, type DeviationRow, type Inspection } from '@modig/shared';
+import {
+  deriveDeviations,
+  deviationKeys,
+  type DeviationRow,
+  type Inspection,
+  type InspectionKind,
+} from '@modig/shared';
 import { deviationsTable, ensureTable } from './storage';
 
 type DeviationEntity = TableEntity<DeviationRow>;
@@ -15,8 +23,8 @@ type DeviationEntity = TableEntity<DeviationRow>;
 const BATCH_SIZE = 100;
 
 /**
- * The brief's columns, in its order, plus `category` after `severity`: the only properties a row
- * has (and the CSV's columns).
+ * The brief's columns, in its order, plus `category` after `severity`: a final inspection's CSV
+ * export, exactly as before quality checks.
  */
 export const DEVIATION_COLUMNS = [
   'inspectionId',
@@ -40,6 +48,30 @@ export const DEVIATION_COLUMNS = [
 ] as const satisfies readonly (keyof DeviationRow)[];
 
 /**
+ * A quality check's CSV export: the same columns, with the quality check's title where a final
+ * inspection has the machine's name (a quality check has none: its machine is the model).
+ */
+export const QUALITY_DEVIATION_COLUMNS = DEVIATION_COLUMNS.map((column) =>
+  column === 'machineName' ? 'checkName' : column,
+) satisfies readonly (keyof DeviationRow)[];
+
+/** The CSV's columns for each kind. */
+export const CSV_COLUMNS: Record<InspectionKind, readonly (keyof DeviationRow)[]> = {
+  final: DEVIATION_COLUMNS,
+  quality: QUALITY_DEVIATION_COLUMNS,
+};
+
+/**
+ * Every property a row has: the brief's columns, then which kind of inspection it is from and the
+ * name of its checklist (a quality check's title), which came later.
+ */
+export const TABLE_COLUMNS = [
+  ...DEVIATION_COLUMNS,
+  'kind',
+  'checkName',
+] as const satisfies readonly (keyof DeviationRow)[];
+
+/**
  * Makes the table hold exactly this inspection's current deviations: new and changed rows are
  * replaced, rows that no longer exist are deleted, unchanged rows are left alone. Idempotent, so
  * a failed sync is repaired by simply syncing again.
@@ -53,7 +85,7 @@ export async function syncDeviations(inspection: Inspection): Promise<void> {
   const actions: TransactionAction[] = [];
   for (const entity of wanted) {
     const current = existing.get(entity.rowKey);
-    if (!current || DEVIATION_COLUMNS.some((column) => current[column] !== entity[column])) {
+    if (!current || TABLE_COLUMNS.some((column) => current[column] !== entity[column])) {
       actions.push(['upsert', entity, 'Replace']);
     }
   }
@@ -94,12 +126,13 @@ function deviationEntities(
   existing: ReadonlyMap<string, Partial<DeviationRow>>,
   now: string,
 ): DeviationEntity[] {
-  const { id, number, front, templateId, templateRevision, state } = inspection;
+  const { id, kind, number, front, templateId, templateRevision, state } = inspection;
   return deriveDeviations(inspection).map((deviation) => {
     const keys = deviationKeys(front.modelCode, id, deviation.key);
     const createdAt = existing.get(keys.rowKey)?.createdAt;
     return {
       ...keys,
+      kind,
       inspectionId: id,
       inspectionNumber: number,
       serialNumber: front.serialNumber,
@@ -119,6 +152,7 @@ function deviationEntities(
       finalised: state === 'finalised',
       // When the deviation was first recorded; KPIs over time must not move on every save.
       createdAt: typeof createdAt === 'string' ? createdAt : now,
+      checkName: inspection.templateSnapshot.name,
     };
   });
 }

@@ -1,7 +1,11 @@
 import type { PeopleDirectory } from '@modig/shared';
+import { ArrowLeft, Printer } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import { ButtonLink } from '../components/Button';
+import { EmptyState } from '../components/EmptyState';
 import { InspectionNotFound } from '../features/inspections/InspectionNotFound';
+import { inspectionHref } from '../features/inspections/listFilter';
 import { useInspection } from '../features/inspections/queries';
 import { parseAppendix, parseDeviationsPerPage, parseMode } from '../features/print/links';
 import { defaultDeviationsPerPage, inspectionPrint } from '../features/print/model';
@@ -20,7 +24,7 @@ const NO_PEOPLE: PeopleDirectory = [];
  * the blank checklist for the walk-round or the report (brief §6). Without a mode: the report
  * once finalised, else the blank checklist. A report prints 2 deviation cards per page, or 4 when
  * none has a photo, unless the address asks for the other. `appendix=1` adds the frozen
- * checklist's reference images.
+ * checklist's reference images. A quality check doesn't print yet: the page says so.
  */
 export function InspectionPrintPage() {
   const { id = '' } = useParams();
@@ -39,7 +43,7 @@ export function InspectionPrintPage() {
 
   const model = useMemo(
     () =>
-      inspection && settings.data && directory
+      inspection?.kind === 'final' && settings.data && directory
         ? inspectionPrint(inspection, mode, {
             companyName: settings.data.companyName,
             modelLabel: modelName(settings.data.machineModels, inspection.front.modelCode),
@@ -71,6 +75,23 @@ export function InspectionPrintPage() {
     return (
       <PrintMessage>
         <InspectionNotFound />
+      </PrintMessage>
+    );
+  }
+  if (inspection?.kind === 'quality') {
+    return (
+      <PrintMessage>
+        <EmptyState
+          icon={Printer}
+          title="Quality checks don’t print yet"
+          hint="Printing is for final inspections. A quality check is filled in and read on its page."
+          action={
+            <ButtonLink to={inspectionHref('quality', inspection.id)} variant="secondary">
+              <ArrowLeft size={16} aria-hidden="true" />
+              Back to the quality check
+            </ButtonLink>
+          }
+        />
       </PrintMessage>
     );
   }

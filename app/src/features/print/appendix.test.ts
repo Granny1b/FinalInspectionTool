@@ -151,6 +151,7 @@ describe('the appendix in a printout', () => {
   it("comes from an inspection's frozen checklist, in blank and report mode alike", () => {
     const inspection: Inspection = {
       id: id('Insp', 1),
+      kind: 'final',
       number: 'FI-2026-0042',
       templateId: template.id,
       templateRevision: 2,

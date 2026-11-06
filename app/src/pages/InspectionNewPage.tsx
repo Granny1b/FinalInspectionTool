@@ -11,7 +11,10 @@ import { useTemplates } from '../features/templates/queries';
 import { errorMessage } from '../lib/api';
 import { useSettings } from '../lib/useSettings';
 
-/** /inspections/new — pick a published checklist and fill in the front page (brief §5.1). */
+/**
+ * /inspections/new — pick a published checklist and fill in the front page (brief §5.1). Final
+ * inspections only: a quality check is started from /quality-checks/new.
+ */
 export function InspectionNewPage() {
   const templates = useTemplates();
   const settings = useSettings();
@@ -61,8 +64,8 @@ export function InspectionNewPage() {
       <BackLink to={inspectionsListHref()} label="Inspections" />
       <div className="mt-2">
         <PageHeader
-          title="New inspection"
-          description="Pick the machine model’s checklist and fill in the front page."
+          title="New final inspection"
+          description="Pick the machine model’s final inspection checklist and fill in the front page."
         />
       </div>
       {body}

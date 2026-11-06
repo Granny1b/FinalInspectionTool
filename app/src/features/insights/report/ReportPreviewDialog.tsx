@@ -6,7 +6,8 @@ import { errorMessage } from '../../../lib/api';
 import { FittedPages } from '../../print/FittedPages';
 import { isPrintShortcut } from '../../print/preview';
 import { useAssetsReady } from '../../print/useAssetsReady';
-import type { InsightsFilter } from '../filters';
+import { filterKind, type InsightsFilter } from '../filters';
+import { INSIGHTS_WORDS } from '../words';
 import { ListToggle } from './ListToggle';
 import { ReportDocument } from './ReportDocument';
 import { useReport, type ReportState } from './useReport';
@@ -46,7 +47,10 @@ export function ReportPreviewDialog({ filter, onPrint, onClose }: Props) {
     onPrint(includeList);
   };
 
-  const subject = state.status === 'ready' ? state.report.subject : 'Deviation report';
+  const subject =
+    state.status === 'ready'
+      ? state.report.subject
+      : INSIGHTS_WORDS[filterKind(filter)].reportTitle;
 
   return (
     <dialog

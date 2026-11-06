@@ -10,11 +10,13 @@ import {
   ModelCodeSchema,
   SEVERITIES,
   type DeviationRow,
+  type InspectionKind,
   type Severity,
 } from './schemas';
 
 // ---------------------------------------------------------------------------------------------
-// Filters: GET /api/insights?from&to&model&includeInProgress (the same for …/export.csv)
+// Filters: GET /api/insights?kind&from&to&model&check&includeInProgress (the same for
+// …/export.csv and …/deviations)
 // ---------------------------------------------------------------------------------------------
 
 /** "YYYY-MM-DD" in 2000–2099: any date an inspection has, and a month axis that stays small. */
@@ -24,11 +26,18 @@ const FilterDate = z.iso
 
 const InsightsParamsSchema = z
   .object({
+    /**
+     * Final inspections (the default) or quality checks: the two are counted apart, never
+     * together.
+     */
+    kind: z.enum(['final', 'quality']).optional(),
     /** First inspection date counted, inclusive. */
     from: FilterDate.optional(),
     /** Last inspection date counted, inclusive. */
     to: FilterDate.optional(),
     model: ModelCodeSchema.optional(),
+    /** Quality checks only: the quality check's title, "Quality check – Pre start up". */
+    check: z.string().trim().min(1).max(200).optional(),
     /** Only finalised inspections count unless this is "true" (brief §4). */
     includeInProgress: z
       .enum(['true', 'false'])
@@ -41,13 +50,25 @@ const InsightsParamsSchema = z
   });
 
 export type InsightsQuery = {
+  /** 'quality' for quality checks; left out for final inspections. */
+  kind?: InspectionKind;
   from?: string;
   to?: string;
   model?: string;
+  /**
+   * Quality checks only: one quality check by its title, on every machine that has it (the model
+   * filter narrows it to one machine).
+   */
+  check?: string;
   includeInProgress: boolean;
 };
 
-const QUERY_KEYS = ['from', 'to', 'model', 'includeInProgress'] as const;
+const QUERY_KEYS = ['kind', 'from', 'to', 'model', 'check', 'includeInProgress'] as const;
+
+/** The kind the filters are about: final inspections unless they say quality checks. */
+export function queryKind(query: Pick<InsightsQuery, 'kind'>): InspectionKind {
+  return query.kind ?? 'final';
+}
 
 /** What the filters are read from: a URLSearchParams, in the browser or in the API. */
 type QueryParams = { get(name: string): string | null };
@@ -62,9 +83,19 @@ export function parseInsightsQuery(
     if (value) raw[key] = value;
   }
   const result = InsightsParamsSchema.safeParse(raw);
-  return result.success
-    ? { success: true, data: withoutUndefined(result.data) }
-    : { success: false, error: result.error };
+  if (!result.success) return { success: false, error: result.error };
+  // Final inspections are the default, so their filters look as they always have; a quality
+  // check's title means nothing to them.
+  const { kind, check, ...rest } = result.data;
+  const quality = kind === 'quality';
+  return {
+    success: true,
+    data: withoutUndefined({
+      ...(quality && { kind }),
+      ...rest,
+      ...(quality && { check }),
+    }),
+  };
 }
 
 /**
@@ -73,9 +104,12 @@ export function parseInsightsQuery(
  */
 export function insightsQueryParams(query: InsightsQuery): Record<string, string> {
   const params: Record<string, string> = {};
+  const quality = queryKind(query) === 'quality';
+  if (quality) params.kind = 'quality';
   if (query.from) params.from = query.from;
   if (query.to) params.to = query.to;
   if (query.model) params.model = query.model;
+  if (quality && query.check) params.check = query.check;
   if (query.includeInProgress) params.includeInProgress = 'true';
   return params;
 }
@@ -96,8 +130,17 @@ const Count = z.number().int().min(0);
 export const TOP_CHECKPOINTS = 10;
 
 export const InsightsSchema = z.object({
-  /** Model codes of every inspection, whatever the filters: the model filter's choices. */
+  /**
+   * Model codes of every inspection of the kind asked for, whatever the other filters: the model
+   * filter's choices.
+   */
   modelCodes: z.array(z.string()),
+  /**
+   * Quality checks: the titles of every quality check done, whatever the other filters, by name
+   * (the quality check filter's choices). Empty for final inspections; defaulted, so an answer
+   * from an API without it still parses.
+   */
+  checkNames: z.array(z.string()).default([]),
   /**
    * The earliest front-page date of any inspection, whatever the filters ("YYYY-MM-DD"); null
    * without inspections. The month filter offers the months from this one to the current one.
@@ -168,6 +211,8 @@ export function deviationsPerInspection(insights: Pick<Insights, 'inspections' |
 export type InsightsInspection = Pick<
   InspectionSummary,
   | 'id'
+  | 'kind'
+  | 'templateName'
   | 'number'
   | 'modelCode'
   | 'date'
@@ -201,8 +246,14 @@ type AggregateInput = {
   unreadableRows?: number;
 };
 
-/** Whether an inspection counts under the filters (date and model of its front page). */
+/**
+ * Whether an inspection counts under the filters: its kind, the date and model of its front page
+ * and, for a quality check, which one it is.
+ */
 export function inScope(inspection: InsightsInspection, query: InsightsQuery): boolean {
+  const kind = queryKind(query);
+  if (inspection.kind !== kind) return false;
+  if (kind === 'quality' && query.check && inspection.templateName !== query.check) return false;
   if (query.from && inspection.date < query.from) return false;
   if (query.to && inspection.date > query.to) return false;
   if (query.model && inspection.modelCode !== query.model) return false;
@@ -212,18 +263,22 @@ export function inScope(inspection: InsightsInspection, query: InsightsQuery): b
 /**
  * The dashboard's numbers. Which inspections count comes from the inspection list alone (the
  * blobs are the truth); their deviations come from the table, matched by inspection id, so a row
- * left behind by an inspection that no longer exists is never counted.
+ * left behind by an inspection that no longer exists is never counted. Final inspections and
+ * quality checks are never counted together: only the kind asked for is looked at, and its rows
+ * are matched by kind as well as by inspection.
  */
 export function aggregateInsights({
   query,
-  inspections,
+  inspections: every,
   deviations,
   checklists,
   unreadableRows = 0,
 }: AggregateInput): Insights {
+  const kind = queryKind(query);
+  const inspections = every.filter((inspection) => inspection.kind === kind);
   const scope = inspections.filter((inspection) => inScope(inspection, query));
   const byId = new Map(scope.map((inspection) => [inspection.id, inspection]));
-  const rows = deviations.filter((row) => byId.has(row.inspectionId));
+  const rows = deviations.filter((row) => row.kind === kind && byId.has(row.inspectionId));
 
   const rowCounts = { ok: 0, nok: 0, na: 0 };
   for (const inspection of scope) {
@@ -240,6 +295,12 @@ export function aggregateInsights({
 
   return {
     modelCodes: [...new Set(inspections.map((inspection) => inspection.modelCode))].sort(),
+    checkNames:
+      kind === 'quality'
+        ? [...new Set(inspections.map((inspection) => inspection.templateName))]
+            .filter(Boolean)
+            .sort((a, b) => collator.compare(a, b))
+        : [],
     // Every inspection, in scope or not, like the model codes above.
     firstInspectionDate: inspections.reduce<string | null>(
       (first, { date }) => (date && (first === null || date < first) ? date : first),

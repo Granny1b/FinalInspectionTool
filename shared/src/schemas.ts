@@ -327,22 +327,35 @@ export type InspectionFront = z.infer<typeof InspectionFrontSchema>;
 export const InspectionStateSchema = z.enum(['in_progress', 'finalised']);
 export type InspectionState = z.infer<typeof InspectionStateSchema>;
 
-/** "FI-2026-0042" */
-export const INSPECTION_NUMBER_PATTERN = /^FI-\d{4}-\d{4,}$/;
+/**
+ * What was done: a final inspection before delivery, or a quality check along the build. It is
+ * the kind of the template it was made from. Inspections stored before quality checks could be
+ * done have none: they are final inspections.
+ */
+export const InspectionKindSchema = TemplateKindSchema;
+export type InspectionKind = TemplateKind;
+
+/** "FI-2026-0042" for a final inspection, "QC-2026-0007" for a quality check. */
+export const INSPECTION_NUMBER_PATTERN = /^(FI|QC)-\d{4}-\d{4,}$/;
 
 export const InspectionSchema = z.object({
   id: IdSchema,
+  /** Defaulted, so every inspection stored before quality checks could be done is final. */
+  kind: InspectionKindSchema.default('final'),
   number: z.string().regex(INSPECTION_NUMBER_PATTERN),
   templateId: IdSchema,
   templateRevision: z.number().int().min(1),
   /**
    * FROZEN copy at creation – template edits never change existing inspections. Besides the
-   * sections it keeps the template's name, so printing an inspection never depends on the live
-   * template.
+   * sections (a quality check's rows with their how, references, time and pictures) it keeps the
+   * template's name and a quality check's front page, so showing or printing it never depends on
+   * the live template, which may since have changed or been deleted.
    */
   templateSnapshot: z.object({
     name: z.string().max(200),
     sections: z.array(SectionSchema),
+    /** Quality checks only: the quality check's front page (name, department, document no.). */
+    quality: QualityFrontSchema.optional(),
   }),
   front: InspectionFrontSchema,
   /** Keyed by Item.id */
@@ -359,7 +372,10 @@ export const InspectionSchema = z.object({
 });
 export type Inspection = z.infer<typeof InspectionSchema>;
 
-/** `config/inspection-counter.json` — next number per year. */
+/**
+ * `config/inspection-counter.json` (final inspections) and `config/quality-check-counter.json`
+ * (quality checks) — the last number given out this year.
+ */
 export const InspectionCounterSchema = z.object({
   year: z.number().int(),
   last: z.number().int().min(0),
@@ -376,6 +392,11 @@ export type InspectionCounter = z.infer<typeof InspectionCounterSchema>;
  * For extra deviations `itemId` is empty and `displayRef` is "—".
  */
 export const DeviationRowSchema = z.object({
+  /**
+   * A final inspection's deviation or a quality check's. Rows written before quality checks could
+   * be done have none: they are final inspections'. Insights counts the two kinds apart.
+   */
+  kind: InspectionKindSchema.default('final'),
   inspectionId: IdSchema,
   inspectionNumber: z.string(),
   serialNumber: z.string(),
@@ -396,6 +417,11 @@ export const DeviationRowSchema = z.object({
   inspectionDate: z.string(),
   finalised: z.boolean(),
   createdAt: IsoDateTime,
+  /**
+   * The name of the checklist it was found with, as frozen in the inspection: "Quality check –
+   * Pre start up" ('' on rows written before quality checks could be done).
+   */
+  checkName: z.string().default(''),
 });
 export type DeviationRow = z.infer<typeof DeviationRowSchema>;
 

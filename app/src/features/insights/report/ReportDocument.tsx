@@ -54,26 +54,30 @@ export function ReportDocument({ report, logoUrl, ready, rootRef }: Props) {
             {report.unreadable}
           </p>
         )}
-        {report.empty ? <NoInspections /> : <Contents report={report} />}
+        {report.empty ? <NoInspections report={report} /> : <Contents report={report} />}
       </section>
-      {report.list && <DeviationList list={report.list} footer={report.subject} />}
+      {report.list && (
+        <DeviationList list={report.list} footer={report.subject} words={report.words} />
+      )}
     </div>
   );
 }
 
-function NoInspections() {
+function NoInspections({ report }: { report: Report }) {
+  const { many } = report.words;
   return (
     <div className="report-empty">
-      <h3>No inspections match these filters</h3>
+      <h3>No {many} match these filters</h3>
       <p>
-        Only finalised inspections count unless inspections in progress are included. Try a longer
-        period or another model on the Insights page.
+        Only finalised {many} count unless {many} in progress are included. Try a longer period or
+        another model on the Insights page.
       </p>
     </div>
   );
 }
 
 function Contents({ report }: { report: Report }) {
+  const { words } = report;
   const total = report.deviations;
   const counted = plural(total, 'deviation');
   return (
@@ -92,11 +96,11 @@ function Contents({ report }: { report: Report }) {
 
       <Section
         title="Deviations per month"
-        description="By the date on the inspection’s front page."
+        description={`By the date on the ${words.one}’s front page.`}
         aside={counted}
         breakable
       >
-        <PaperMonthChart months={report.months} />
+        <PaperMonthChart months={report.months} words={words} />
       </Section>
 
       {/* Severity's three short lines leave the room to the model table's four figures. */}
@@ -109,17 +113,20 @@ function Contents({ report }: { report: Report }) {
           )}
         </Section>
 
-        <Section title="Per model" description="Deviations, with the inspections they come from.">
-          <ModelTable rows={report.models} total={total} />
+        <Section
+          title="Per model"
+          description={`Deviations, with the ${words.many} they come from.`}
+        >
+          <ModelTable rows={report.models} total={total} words={words} />
         </Section>
       </div>
 
       <Section
         title="Top 10 recurring checkpoints"
-        description="The checkpoints that fail most often, where they are in the checklist now. Of inspections: the share of the inspections whose checklist had the checkpoint."
+        description={`The checkpoints that fail most often, where they are in the checklist now. Of ${words.shortMany.toLowerCase()}: the share of the ${words.many} whose checklist had the checkpoint.`}
       >
         {report.top.length > 0 ? (
-          <TopTable rows={report.top} showModel={report.showModel} />
+          <TopTable rows={report.top} showModel={report.showModel} words={words} />
         ) : (
           <None>No checkpoint failed in this selection.</None>
         )}

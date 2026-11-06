@@ -14,6 +14,7 @@ import {
   InspectionSchema,
   newId,
   TemplateSchema,
+  type Guide,
   type Section,
   type Template,
 } from '@modig/shared';
@@ -155,9 +156,14 @@ export async function deleteTemplate(id: string): Promise<void> {
 /**
  * A quality check of `parent` (a machine's final inspection template), written straight into
  * storage like createTemplate: "Quality check – Pre start up", one section of two rows with how, references
- * and time. `published` adds revision 1 with the same content.
+ * and time. `published` adds revision 1 with the same content; `guide` gives the first row its
+ * pictures and more information.
  */
-export async function createQualityCheck(parent: Template, published = false): Promise<Template> {
+export async function createQualityCheck(
+  parent: Template,
+  published = false,
+  guide?: Guide,
+): Promise<Template> {
   const draft: Template = {
     id: newId(),
     kind: 'quality',
@@ -184,6 +190,7 @@ export async function createQualityCheck(parent: Template, published = false): P
             how: 'Should be visible and not turned inward.',
             references: ['ISO 12100', 'ISO 7010'],
             timeHours: 0.2,
+            ...(guide && { guide }),
           },
           {
             id: newId(),
@@ -223,6 +230,38 @@ export async function deleteQualityChecks(parentId: string): Promise<void> {
     if (draft?.kind === 'quality' && draft.parentId === parentId) ids.push(id);
   }
   await Promise.all(ids.map((id) => deleteTemplate(id)));
+}
+
+/** Stores a JPEG as an uploaded image (`images/{id}.jpg`) and returns its new id. */
+export async function storeImage(jpeg: Buffer): Promise<string> {
+  const imageId = newId();
+  await images.getBlockBlobClient(blobNames.image(imageId)).upload(jpeg, jpeg.length, {
+    blobHTTPHeaders: { blobContentType: 'image/jpeg' },
+  });
+  return imageId;
+}
+
+/**
+ * Deletes every inspection made from these templates (a test's final inspections and quality
+ * checks, created in the UI or through the API), as deleteInspection does.
+ */
+export async function deleteInspectionsOf(templateIds: readonly string[]): Promise<void> {
+  const ids: string[] = [];
+  for await (const blob of inspections.listBlobsFlat()) {
+    const content = await inspections
+      .getBlobClient(blob.name)
+      .downloadToBuffer()
+      .catch(() => null);
+    if (!content) continue;
+    let parsed;
+    try {
+      parsed = InspectionSchema.safeParse(JSON.parse(content.toString('utf8')));
+    } catch {
+      continue; // not JSON: no inspection
+    }
+    if (parsed.success && templateIds.includes(parsed.data.templateId)) ids.push(parsed.data.id);
+  }
+  await Promise.all(ids.map((id) => deleteInspection(id)));
 }
 
 /** A deviation table row as stored: PartitionKey, RowKey and the brief's columns. */

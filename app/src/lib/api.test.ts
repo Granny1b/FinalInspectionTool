@@ -1,6 +1,6 @@
 import { CONFLICT_MESSAGE, MeSchema } from '@modig/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiFetch, ApiRequestError, SIGNED_OUT_MESSAGE } from './api';
+import { apiFetch, ApiRequestError, dispositionFileName, SIGNED_OUT_MESSAGE } from './api';
 import { shouldRetry } from './queryClient';
 
 const assign = vi.fn<(url: string) => void>();
@@ -201,6 +201,23 @@ describe('apiFetch', () => {
       code: 'internal',
       message: 'The server sent data in an unexpected format.',
     });
+  });
+});
+
+describe('dispositionFileName', () => {
+  it('reads the plain name, or the UTF-8 one when there is one', () => {
+    expect(dispositionFileName('attachment; filename="Deviations start to 2026-11-06.csv"')).toBe(
+      'Deviations start to 2026-11-06.csv',
+    );
+    expect(
+      dispositionFileName(
+        `attachment; filename="Quality check deviations start to 2026-11-06, Fore start.csv"; filename*=UTF-8''Quality%20check%20deviations%20start%20to%202026-11-06%2C%20F%C3%B6re%20start.csv`,
+      ),
+    ).toBe('Quality check deviations start to 2026-11-06, Före start.csv');
+    expect(dispositionFileName(`attachment; filename="a.csv"; filename*=UTF-8''%E0%A4%A`)).toBe(
+      'a.csv',
+    );
+    expect(dispositionFileName('')).toBeNull();
   });
 });
 

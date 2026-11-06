@@ -1,4 +1,5 @@
 import { formatCount, formatDecimal, formatPercent } from '../format';
+import { INSIGHTS_WORDS, type InsightsWords } from '../words';
 import type { ModelRow, ShareRow, TopRow } from './model';
 
 /** A slim bar, as long as the row's count against the largest; none for a count of zero. */
@@ -66,8 +67,19 @@ export function ShareTable({ label, rows, total }: ShareTableProps) {
   );
 }
 
-/** Per model: its inspections and deviations, deviations per machine and share (a half card). */
-export function ModelTable({ rows, total }: { rows: ModelRow[]; total: number }) {
+/**
+ * Per model: its inspections (or quality checks) and deviations, deviations per machine (per
+ * check) and share (a half card).
+ */
+export function ModelTable({
+  rows,
+  total,
+  words = INSIGHTS_WORDS.final,
+}: {
+  rows: ModelRow[];
+  total: number;
+  words?: InsightsWords;
+}) {
   return (
     <table className="report-table report-model">
       <colgroup>
@@ -81,13 +93,13 @@ export function ModelTable({ rows, total }: { rows: ModelRow[]; total: number })
         <tr>
           <th scope="col">Model</th>
           <th scope="col" className="report-num">
-            Inspections
+            {words.shortMany}
           </th>
           <th scope="col" className="report-num">
             Deviations
           </th>
           <th scope="col" className="report-num">
-            Per machine
+            {words.perOneColumn}
           </th>
           <th scope="col" className="report-num">
             Share
@@ -115,6 +127,7 @@ type TopTableProps = {
   rows: TopRow[];
   /** More than one model in the selection: refs repeat across models. */
   showModel: boolean;
+  words?: InsightsWords;
 };
 
 /**
@@ -122,7 +135,7 @@ type TopTableProps = {
  * checklist), section, model when there are several, how many inspections it failed in, and that
  * as a share of the inspections whose checklist had it.
  */
-export function TopTable({ rows, showModel }: TopTableProps) {
+export function TopTable({ rows, showModel, words = INSIGHTS_WORDS.final }: TopTableProps) {
   return (
     <table className="report-table">
       <colgroup>
@@ -147,7 +160,7 @@ export function TopTable({ rows, showModel }: TopTableProps) {
             Failed
           </th>
           <th scope="col" className="report-num">
-            Of inspections
+            Of {words.shortMany.toLowerCase()}
           </th>
         </tr>
       </thead>

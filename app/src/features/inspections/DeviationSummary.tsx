@@ -10,6 +10,8 @@ import type { ExtraDeviationPatch } from './extras';
 type Props = {
   /** NOK rows in checklist order, then extra deviations, numbered D-01… (deriveDeviations). */
   deviations: InspectionDeviation[];
+  /** A final inspection's deviations print on its report; a quality check's don't print yet. */
+  printed?: boolean;
   readOnly: boolean;
   /** Finalise problems of extra deviations ("needs a description"), by id. */
   issues: ReadonlyMap<string, string>;
@@ -34,6 +36,7 @@ type Props = {
  */
 export const DeviationSummary = memo(function DeviationSummary({
   deviations,
+  printed = true,
   readOnly,
   issues,
   responsibles,
@@ -67,8 +70,8 @@ export const DeviationSummary = memo(function DeviationSummary({
         </p>
         {!readOnly && deviations.length > 0 && (
           <p className="w-full text-sm text-ink-500">
-            Add up to two photos to each and mark them up with arrows, boxes and text: they print on
-            the report’s deviation pages.
+            Add up to two photos to each and mark them up with arrows, boxes and text
+            {printed ? ': they print on the report’s deviation pages.' : '.'}
           </p>
         )}
       </div>

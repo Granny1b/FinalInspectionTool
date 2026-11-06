@@ -8,6 +8,8 @@ import {
   deviationsPerInspection,
   EXTRA_DEVIATION_REF,
   firstPassRate,
+  qualityCheckShortName,
+  queryKind,
   SEVERITIES,
   SEVERITY_LABELS,
   type DeviationRow,
@@ -21,8 +23,7 @@ import { modelName } from '../../../lib/useSettings';
 import { formatCalendarDate } from '../../inspections/dates';
 import { PERIOD_LABELS, type Period } from '../filters';
 import { formatCount, formatDecimal, formatMonthLong, formatPercent, plural } from '../format';
-
-export const REPORT_TITLE = 'Deviation report';
+import { capitalised, INSIGHTS_WORDS, type InsightsWords } from '../words';
 
 type Range = Pick<InsightsQuery, 'from' | 'to'>;
 
@@ -68,19 +69,23 @@ const RELATIVE_PERIODS = new Set<string>(['last12', 'thisYear', 'lastYear']);
  * The PDF's name (Chrome offers the document title): the filters, as the CSV export names its
  * file, so the two files of one selection sort together. "Deviation report 2026-01-01 to
  * 2026-10-31, RMMG", "Deviation report 2026-10, RMMG, incl. in progress"; an open end is "start",
- * or today.
+ * or today. Quality checks': "Quality check deviation report 2026-10, RMMG, Pre start up".
  */
 export function reportFileName(query: InsightsQuery, today: string): string {
+  const quality = queryKind(query) === 'quality';
   const months = wholeMonths(query);
   const range = months
     ? months[0] === months[1]
       ? months[0]
       : `${months[0]} to ${months[1]}`
     : `${query.from ?? 'start'} to ${query.to ?? today}`;
-  const extras = [query.model, query.includeInProgress ? 'incl. in progress' : undefined].filter(
-    Boolean,
-  );
-  return `${REPORT_TITLE} ${range}${extras.length > 0 ? `, ${extras.join(', ')}` : ''}`;
+  const extras = [
+    query.model,
+    quality && query.check ? qualityCheckShortName(query.check) : undefined,
+    query.includeInProgress ? 'incl. in progress' : undefined,
+  ].filter(Boolean);
+  const title = INSIGHTS_WORDS[queryKind(query)].reportTitle;
+  return `${title} ${range}${extras.length > 0 ? `, ${extras.join(', ')}` : ''}`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -155,6 +160,7 @@ export type ListGroup = {
   number: string;
   date: string;
   model: string;
+  /** The machine's name; a quality check's title (it has no machine name). */
   machine: string;
   serialNumber: string;
   finalised: boolean;
@@ -162,6 +168,8 @@ export type ListGroup = {
 };
 
 export type Report = {
+  /** Final inspections or quality checks: how the report talks about what it counts. */
+  words: InsightsWords;
   title: string;
   /** The document title, which Chrome offers as the PDF's name. */
   fileName: string;
@@ -194,14 +202,18 @@ export type Report = {
 
 export function buildReport(input: ReportInput): Report {
   const { query, insights, models } = input;
+  const words = INSIGHTS_WORDS[queryKind(query)];
+  const quality = words.kind === 'quality';
   const total = insights.deviations;
   const { finalised, inProgress } = insights.inspections;
   const period = periodText(query);
   const model = query.model ? modelName(models, query.model) : 'All models';
+  const check = quality ? (query.check ?? 'All quality checks') : null;
   const subject = [
-    REPORT_TITLE,
+    words.reportTitle,
     period,
     model,
+    quality && query.check ? qualityCheckShortName(query.check) : null,
     query.includeInProgress ? 'incl. in progress' : null,
   ]
     .filter(Boolean)
@@ -211,7 +223,8 @@ export function buildReport(input: ReportInput): Report {
     : '';
 
   return {
-    title: REPORT_TITLE,
+    words,
+    title: words.reportTitle,
     fileName: reportFileName(query, input.today),
     subject,
     period,
@@ -219,8 +232,9 @@ export function buildReport(input: ReportInput): Report {
     facts: [
       { label: 'Period', value: `${period}${relative}` },
       { label: 'Model', value: model },
+      ...(check ? [{ label: 'Quality check', value: check }] : []),
       {
-        label: 'Inspections',
+        label: capitalised(words.many),
         value: query.includeInProgress ? 'Finalised and in progress' : 'Finalised only',
       },
       {
@@ -230,7 +244,7 @@ export function buildReport(input: ReportInput): Report {
     ],
     empty: finalised + inProgress === 0,
     unreadable: unreadableNote(insights.unreadableRows),
-    kpis: kpis(insights),
+    kpis: kpis(insights, words),
     deviations: total,
     months: insights.perMonth,
     severity: shareRows(
@@ -281,7 +295,7 @@ export function buildReport(input: ReportInput): Report {
       total,
     ),
     // Without deviations there is nothing to list: no page saying so (the toolbar says it).
-    list: input.deviations && total > 0 ? deviationList(input.deviations, models) : null,
+    list: input.deviations && total > 0 ? deviationList(input.deviations, models, quality) : null,
   };
 }
 
@@ -296,7 +310,7 @@ function unreadableNote(count: number): string | null {
 }
 
 /** The KPI tiles' figures and the lines that say what they count. */
-function kpis(insights: Insights): ReportKpi[] {
+function kpis(insights: Insights, words: InsightsWords): ReportKpi[] {
   const { finalised, inProgress } = insights.inspections;
   const perInspection = deviationsPerInspection(insights);
   const rate = firstPassRate(insights.rows);
@@ -304,14 +318,14 @@ function kpis(insights: Insights): ReportKpi[] {
   return [
     inProgress > 0
       ? {
-          label: 'Inspections',
+          label: capitalised(words.many),
           value: formatCount(finalised + inProgress),
           detail: `${formatCount(finalised)} finalised · ${formatCount(inProgress)} in progress`,
         }
       : {
-          label: 'Inspections finalised',
+          label: `${capitalised(words.many)} finalised`,
           value: formatCount(finalised),
-          detail: 'Machines inspected in the period',
+          detail: words.doneInPeriod,
         },
     {
       label: 'Deviations',
@@ -319,9 +333,9 @@ function kpis(insights: Insights): ReportKpi[] {
       detail: 'NOK rows and extra deviations',
     },
     {
-      label: 'Deviations per machine',
+      label: words.perOneLabel,
       value: perInspection === null ? '–' : formatDecimal(perInspection),
-      detail: 'Average per inspection',
+      detail: `Average per ${words.one}`,
     },
     {
       label: 'First-pass rate',
@@ -365,10 +379,14 @@ function modelRows(insights: Insights, models: readonly MachineModel[] | undefin
   });
 }
 
-/** The rows grouped by inspection, in the API's order (oldest inspection first). */
+/**
+ * The rows grouped by inspection, in the API's order (oldest inspection first). A quality check
+ * is named by its title, where a final inspection has its machine's name.
+ */
 function deviationList(
   rows: readonly DeviationRow[],
   models: readonly MachineModel[] | undefined,
+  quality = false,
 ): { groups: ListGroup[]; count: number } {
   const groups = new Map<string, ListGroup>();
   for (const row of rows) {
@@ -379,7 +397,7 @@ function deviationList(
         number: row.inspectionNumber,
         date: formatCalendarDate(row.inspectionDate),
         model: modelName(models, row.modelCode),
-        machine: row.machineName.trim(),
+        machine: (quality ? row.checkName : row.machineName).trim(),
         serialNumber: row.serialNumber.trim(),
         finalised: row.finalised,
         rows: [],

@@ -57,6 +57,7 @@ const SECTIONS: Section[] = [
 
 const INSPECTION: Inspection = {
   id: id('Insp', 1),
+  kind: 'final',
   number: 'FI-2026-0042',
   templateId: id('Tmpl', 1),
   templateRevision: 2,

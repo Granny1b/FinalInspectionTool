@@ -3,6 +3,7 @@ import { ID_LENGTH, ID_PATTERN, newId } from './ids';
 import {
   AnnotatedImageSchema,
   AnnotationSchema,
+  DeviationRowSchema,
   ExtraDeviationSchema,
   GUIDE_VERDICT_LABELS,
   GuideImageSchema,
@@ -245,7 +246,123 @@ describe('InspectionSchema', () => {
     };
     const parsed = InspectionSchema.parse(stored);
     expect(parsed.templateSnapshot).toEqual(snapshot);
-    expect(parsed).toEqual({ ...stored, templateSnapshot: snapshot });
+    // Stored before quality checks could be done: a final inspection.
+    expect(parsed).toEqual({ ...stored, kind: 'final', templateSnapshot: snapshot });
+  });
+
+  it('reads every inspection stored without a kind as a final inspection', () => {
+    const stored = {
+      id: newId(),
+      number: 'FI-2026-0001',
+      templateId: newId(),
+      templateRevision: 1,
+      templateSnapshot: { name: 'Final inspection – RigiMill MG', sections: [] },
+      front: {
+        machineName: 'RigiMill MG #3',
+        modelCode: 'RMMG',
+        serialNumber: '123',
+        participants: [],
+        location: 'Kalmar, Sweden',
+        date: '2026-09-30',
+      },
+      results: {},
+      extraDeviations: [],
+      state: 'in_progress',
+      createdAt: '2026-09-30T09:00:00.000Z',
+      createdBy: 'sam@modig.se',
+      updatedAt: '2026-09-30T09:00:00.000Z',
+      updatedBy: 'sam@modig.se',
+    };
+    expect(InspectionSchema.parse(stored).kind).toBe('final');
+  });
+
+  it('keeps a quality check: its kind, QC number and the frozen front page and rows', () => {
+    const itemId = newId();
+    const check = {
+      id: newId(),
+      kind: 'quality',
+      number: 'QC-2026-0007',
+      templateId: newId(),
+      templateRevision: 3,
+      templateSnapshot: {
+        name: 'Quality check – Pre start up',
+        quality: {
+          name: 'Pre start up',
+          department: 'Quality',
+          documentNumber: '1.22.2',
+          madeBy: 'Sam Andersson',
+          date: '2026-11-05',
+        },
+        sections: [
+          {
+            id: newId(),
+            title: 'Safety features',
+            items: [
+              {
+                id: itemId,
+                text: 'Safety decals on balancing tubes',
+                how: 'Visible, not turned inward.',
+                references: ['ISO 12100', 'ISO 7010'],
+                timeHours: 0.2,
+                guide: {
+                  description: 'On both tubes.',
+                  images: [{ imageId: newId(), annotations: [], verdict: 'good' }],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      front: {
+        machineName: '',
+        modelCode: 'RMMG',
+        serialNumber: 'RM-2026-016',
+        participants: ['Sam Andersson'],
+        location: '',
+        date: '2026-11-06',
+      },
+      results: { [itemId]: { status: 'NOK', comment: 'Turned inward', severity: 'major' } },
+      extraDeviations: [],
+      state: 'in_progress',
+      createdAt: '2026-11-06T09:00:00.000Z',
+      createdBy: 'sam@modig.se',
+      updatedAt: '2026-11-06T09:00:00.000Z',
+      updatedBy: 'sam@modig.se',
+    };
+    expect(InspectionSchema.parse(check)).toEqual(check);
+    expect(InspectionSchema.safeParse({ ...check, number: 'QQ-2026-0007' }).success).toBe(false);
+    expect(InspectionSchema.safeParse({ ...check, kind: 'other' }).success).toBe(false);
+  });
+});
+
+describe('DeviationRowSchema', () => {
+  it('reads a row stored before quality checks as a final inspection’s, without a check name', () => {
+    const row = {
+      inspectionId: newId(),
+      inspectionNumber: 'FI-2026-0001',
+      serialNumber: '123',
+      machineName: 'RigiMill MG #3',
+      modelCode: 'RMMG',
+      templateId: newId(),
+      templateRevision: 2,
+      itemId: newId(),
+      sectionTitle: 'Gantry',
+      displayRef: '1.a',
+      checkpointText: 'Motors',
+      comment: '',
+      resp: '',
+      severity: 'minor',
+      inspectionDate: '2026-09-30',
+      finalised: true,
+      createdAt: '2026-09-30T09:00:00.000Z',
+    };
+    expect(DeviationRowSchema.parse(row)).toEqual({
+      ...row,
+      kind: 'final',
+      category: '',
+      checkName: '',
+    });
+    expect(DeviationRowSchema.parse({ ...row, kind: 'quality' }).kind).toBe('quality');
   });
 });
 

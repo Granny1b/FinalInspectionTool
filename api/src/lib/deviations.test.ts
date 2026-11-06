@@ -17,7 +17,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** The brief's 17 columns (§4), in its order, plus `category` after `severity`. */
+/**
+ * The brief's 17 columns (§4), in its order, plus `category` after `severity`, then which kind of
+ * inspection it is from and its checklist's name.
+ */
 const COLUMNS = [
   'inspectionId',
   'inspectionNumber',
@@ -37,6 +40,8 @@ const COLUMNS = [
   'inspectionDate',
   'finalised',
   'createdAt',
+  'kind',
+  'checkName',
 ];
 
 type Row = Record<string, unknown> & { partitionKey: string; rowKey: string };
@@ -69,7 +74,7 @@ function withResults(inspection: Inspection, results: Record<string, RowResult>)
 }
 
 describe('syncDeviations', () => {
-  it('writes one row per NOK row and extra deviation, with exactly the 18 columns', async () => {
+  it('writes one row per NOK row and extra deviation, with exactly the 20 columns', async () => {
     const base = sampleInspection();
     const [a, b, c] = itemIds(base);
     const extraId = newId();
@@ -99,6 +104,8 @@ describe('syncDeviations', () => {
 
     const common = {
       partitionKey: 'RMMG',
+      kind: 'final',
+      checkName: 'Final inspection – RigiMill MG',
       inspectionId: base.id,
       inspectionNumber: 'FI-2026-0007',
       serialNumber: 'SN-1007',
@@ -219,6 +226,49 @@ describe('syncDeviations', () => {
     // The lost row comes back with a new createdAt; the edited one is put back as it was.
     expect(await rowOf(base, b!)).toEqual(before.find((row) => row.rowKey.endsWith(b!)));
     expect(await rowOf(base, a!)).toMatchObject({ itemId: a, comment: '' });
+  });
+
+  it('says a quality check’s rows are a quality check’s, with its title', async () => {
+    const base = sampleInspection({
+      kind: 'quality',
+      number: 'QC-2026-0003',
+      front: { ...sampleInspection().front, machineName: '', location: '' },
+    });
+    const check: Inspection = {
+      ...base,
+      templateSnapshot: { ...base.templateSnapshot, name: 'Quality check – Pre start up' },
+    };
+    const [a] = itemIds(check);
+    await syncDeviations(withResults(check, { [a!]: { status: 'NOK', comment: 'Inward' } }));
+    expect(await rowOf(check, a!)).toMatchObject({
+      kind: 'quality',
+      inspectionNumber: 'QC-2026-0003',
+      checkName: 'Quality check – Pre start up',
+      machineName: '',
+      comment: 'Inward',
+    });
+  });
+
+  it('gives a row written before quality checks its kind at the next save', async () => {
+    const base = sampleInspection();
+    const [a] = itemIds(base);
+    const inspection = withResults(base, { [a!]: { status: 'NOK' } });
+    await syncDeviations(inspection);
+    const {
+      partitionKey,
+      rowKey,
+      kind: _kind,
+      checkName: _name,
+      ...older
+    } = (await rowOf(inspection, a!))!;
+    await deviationsTable().upsertEntity({ partitionKey, rowKey, ...older }, 'Replace');
+    expect(DeviationRowSchema.parse(older).kind).toBe('final');
+
+    await syncDeviations(inspection);
+    expect(await rowOf(inspection, a!)).toMatchObject({
+      kind: 'final',
+      checkName: base.templateSnapshot.name,
+    });
   });
 
   it('sends more than 100 changes in batches of at most 100', async () => {

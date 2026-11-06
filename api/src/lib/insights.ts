@@ -2,7 +2,9 @@
  * Insights (brief §5.5): what the KPI dashboard and its CSV export read. Which inspections count
  * comes from the inspection list (one blob listing with metadata); their deviations come from the
  * deviations table, queried with the filters; where each checkpoint is now comes from the
- * templates' published revisions, which never change and are kept in memory once read.
+ * templates' published revisions, which never change and are kept in memory once read. Final
+ * inspections and quality checks are counted apart: the filters name one kind (final unless they
+ * say quality), and only its inspections and rows count.
  */
 import { odata } from '@azure/data-tables';
 import type { InvocationContext } from '@azure/functions';
@@ -17,9 +19,12 @@ import {
   type DeviationRow,
   type Insights,
   type InsightsQuery,
+  type InspectionKind,
   type InspectionSummary,
+  queryKind,
+  qualityCheckShortName,
 } from '@modig/shared';
-import { DEVIATION_COLUMNS } from './deviations';
+import { CSV_COLUMNS, TABLE_COLUMNS } from './deviations';
 import { loadSummaries } from './inspections';
 import { deviationsTable, ensureTable } from './storage';
 import { listRevisions, loadRevision } from './templates';
@@ -45,8 +50,9 @@ export async function loadInsights(
 }
 
 /**
- * The deviation rows of the inspections that count under the filters: the CSV export. Oldest
- * inspection first, each inspection's rows in checklist order, extra deviations last.
+ * The deviation rows of the inspections that count under the filters (of the kind they name): the
+ * CSV export. Oldest inspection first, each inspection's rows in checklist order, extra
+ * deviations last.
  */
 export async function loadExportRows(
   query: InsightsQuery,
@@ -61,8 +67,9 @@ export async function loadExportRows(
       .filter((inspection) => inScope(inspection, query))
       .map((inspection) => [inspection.id, inspection]),
   );
+  const kind = queryKind(query);
   return deviations
-    .filter((row) => byId.has(row.inspectionId))
+    .filter((row) => row.kind === kind && byId.has(row.inspectionId))
     .sort(
       (a, b) =>
         a.inspectionDate.localeCompare(b.inspectionDate) ||
@@ -74,17 +81,21 @@ export async function loadExportRows(
 }
 
 /**
- * The table's rows under the filters. The model is the PartitionKey, so a model filter reads one
- * partition. A row that doesn't match the schema (written by hand, say) is skipped, logged and
- * counted, so the dashboard can say its numbers are short: it must not take the whole dashboard
- * down, nor go unnoticed.
+ * The table's rows of the kind the filters name, under the filters. The model is the
+ * PartitionKey, so a model filter reads one partition. A row that doesn't match the schema
+ * (written by hand, say) is skipped, logged and counted, so the dashboard can say its numbers are
+ * short: it must not take the whole dashboard down, nor go unnoticed. Quality checks' rows are
+ * picked by the table; final inspections' here, since rows written before quality checks could
+ * be done have no kind, and the table would leave them out of any condition on it.
  */
 async function loadDeviationRows(
   query: InsightsQuery,
   context: InvocationContext,
 ): Promise<{ rows: DeviationRow[]; unreadable: number }> {
   await ensureTable();
+  const kind = queryKind(query);
   const conditions: string[] = [];
+  if (kind === 'quality') conditions.push(odata`kind eq ${kind}`);
   if (query.model) conditions.push(odata`PartitionKey eq ${query.model}`);
   if (query.from) conditions.push(odata`inspectionDate ge ${query.from}`);
   if (query.to) conditions.push(odata`inspectionDate le ${query.to}`);
@@ -96,13 +107,13 @@ async function loadDeviationRows(
   const entities = deviationsTable().listEntities<Record<string, unknown>>({
     queryOptions: {
       filter: conditions.length > 0 ? conditions.join(' and ') : undefined,
-      select: [...DEVIATION_COLUMNS],
+      select: [...TABLE_COLUMNS],
     },
   });
   for await (const entity of entities) {
     const row = DeviationRowSchema.safeParse(withoutNulls(entity));
     if (row.success) {
-      rows.push(row.data);
+      if (row.data.kind === kind) rows.push(row.data);
     } else {
       unreadable += 1;
       firstProblem ||= row.error.issues
@@ -229,15 +240,20 @@ async function loadChecklists(
 /**
  * Semicolons, because Excel with Swedish regional settings expects them when it opens a CSV
  * (Power BI detects either); a UTF-8 byte order mark, so Excel reads å, ä and ö; CRLF line ends.
- * The columns are the table's, in the brief's order.
+ * The columns are the table's, in the brief's order; a quality check's has the check's title
+ * where a final inspection's has the machine name (CSV_COLUMNS).
  */
 const SEPARATOR = ';';
 const BOM = '\uFEFF';
 
-export function deviationsCsv(rows: readonly DeviationRow[]): string {
+export function deviationsCsv(
+  rows: readonly DeviationRow[],
+  kind: InspectionKind = 'final',
+): string {
+  const columns = CSV_COLUMNS[kind];
   const lines = [
-    DEVIATION_COLUMNS.join(SEPARATOR),
-    ...rows.map((row) => DEVIATION_COLUMNS.map((column) => csvField(row[column])).join(SEPARATOR)),
+    columns.join(SEPARATOR),
+    ...rows.map((row) => columns.map((column) => csvField(row[column])).join(SEPARATOR)),
   ];
   return `${BOM}${lines.join('\r\n')}\r\n`;
 }
@@ -249,10 +265,19 @@ function csvField(value: string | number | boolean): string {
   return /[";\r\n]|^\s|\s$/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-/** "Deviations 2026-01-01 to 2026-10-31, RMMG.csv": the filters, so two exports stay apart. */
+/**
+ * "Deviations 2026-01-01 to 2026-10-31, RMMG.csv": the filters, so two exports stay apart. Quality
+ * checks' say so, and which one: "Quality check deviations 2026-01-01 to 2026-10-31, RMMG, Pre
+ * start up.csv".
+ */
 export function csvFileName(query: InsightsQuery, today: string): string {
+  const quality = queryKind(query) === 'quality';
   const range = `${query.from ?? 'start'} to ${query.to ?? today}`;
-  const parts = [query.model, query.includeInProgress ? 'incl. in progress' : undefined];
+  const parts = [
+    query.model,
+    quality && query.check ? qualityCheckShortName(query.check) : undefined,
+    query.includeInProgress ? 'incl. in progress' : undefined,
+  ];
   const suffix = parts.filter(Boolean).join(', ');
-  return `Deviations ${range}${suffix ? `, ${suffix}` : ''}.csv`;
+  return `${quality ? 'Quality check deviations' : 'Deviations'} ${range}${suffix ? `, ${suffix}` : ''}.csv`;
 }

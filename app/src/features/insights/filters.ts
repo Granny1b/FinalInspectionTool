@@ -1,10 +1,18 @@
 /**
- * The Insights filters (brief §5.5: date range, model, include in-progress). They live in the URL
- * (?period=&from=&to=&month=&fromMonth=&toMonth=&model=&includeInProgress=), so a view survives a
- * reload and can be shared. A relative period ("last 12 months") means the 12 months up to today,
- * whenever the link is opened; a month, a range of months and custom dates keep their own.
+ * The Insights filters (brief §5.5: date range, model, include in-progress), for final
+ * inspections or, with `kind=quality`, quality checks (and `check`, which one). They live in the
+ * URL (?kind=&period=&from=&to=&month=&fromMonth=&toMonth=&model=&check=&includeInProgress=), so a
+ * view survives a reload and can be shared. A relative period ("last 12 months") means the 12
+ * months up to today, whenever the link is opened; a month, a range of months and custom dates
+ * keep their own. Final inspections are the default, so links made before quality checks counted
+ * still show what they did.
  */
-import { ModelCodeSchema, parseInsightsQuery, type InsightsQuery } from '@modig/shared';
+import {
+  ModelCodeSchema,
+  parseInsightsQuery,
+  type InsightsQuery,
+  type InspectionKind,
+} from '@modig/shared';
 import { formatCalendarDate, localDate } from '../inspections/dates';
 import { formatMonthLong } from './format';
 
@@ -33,6 +41,8 @@ export const PERIOD_LABELS: Record<Period, string> = {
 const DEFAULT_PERIOD: Period = 'last12';
 
 export type InsightsFilter = {
+  /** 'quality' for quality checks; left out (or 'final') for final inspections. */
+  kind?: InspectionKind;
   period: Period;
   /** The custom range's ends, "YYYY-MM-DD" or ''; kept while another period is picked. */
   from: string;
@@ -48,8 +58,15 @@ export type InsightsFilter = {
   toMonth?: string;
   /** Model code, or '' for every model. */
   model: string;
+  /** Quality checks only: one quality check's title; '' or left out for every one. */
+  check?: string;
   includeInProgress: boolean;
 };
+
+/** The kind a filter is about: final inspections unless it says quality checks. */
+export function filterKind(filter: Pick<InsightsFilter, 'kind'>): InspectionKind {
+  return filter.kind ?? 'final';
+}
 
 /** "2026-10": a month the filters accept, in 2000–2099 like their dates. */
 const MONTH = /^20\d\d-(0[1-9]|1[0-2])$/;
@@ -68,6 +85,12 @@ export function filterFromParams(params: URLSearchParams): InsightsFilter {
     model: model.success ? model.data : '',
     includeInProgress: params.get('includeInProgress') === 'true',
   };
+  // Only a quality checks' filter says its kind, and which check: a final one keeps its shape.
+  if (params.get('kind') === 'quality') {
+    filter.kind = 'quality';
+    const check = params.get('check')?.trim();
+    if (check) filter.check = check.slice(0, 200);
+  }
   // Only the months the URL names: a filter without them keeps the shape it had before months.
   for (const name of ['month', 'fromMonth', 'toMonth'] as const) {
     const value = monthParam(params, name);
@@ -79,6 +102,8 @@ export function filterFromParams(params: URLSearchParams): InsightsFilter {
 /** Only what differs from the defaults, so the plain dashboard has a clean URL. */
 export function filterToParams(filter: InsightsFilter): URLSearchParams {
   const params = new URLSearchParams();
+  const quality = filterKind(filter) === 'quality';
+  if (quality) params.set('kind', 'quality');
   if (filter.period !== DEFAULT_PERIOD) params.set('period', filter.period);
   if (filter.period === 'custom') {
     if (filter.from) params.set('from', filter.from);
@@ -90,8 +115,18 @@ export function filterToParams(filter: InsightsFilter): URLSearchParams {
     if (filter.toMonth) params.set('toMonth', filter.toMonth);
   }
   if (filter.model) params.set('model', filter.model);
+  if (quality && filter.check) params.set('check', filter.check);
   if (filter.includeInProgress) params.set('includeInProgress', 'true');
   return params;
+}
+
+/**
+ * The filter for the other kind: the period, model and in-progress choice stay (they mean the
+ * same for both); which quality check goes, as it means nothing to the other.
+ */
+export function withKind(filter: InsightsFilter, kind: InspectionKind): InsightsFilter {
+  const { kind: _kind, check: _check, ...rest } = filter;
+  return kind === 'quality' ? { ...rest, kind } : rest;
 }
 
 /** The first and last day a period covers; undefined for an open end. */
@@ -260,9 +295,12 @@ export function insightsQuery(
   }
   const range = periodRange(filter, today);
   const params = new URLSearchParams();
+  const quality = filterKind(filter) === 'quality';
+  if (quality) params.set('kind', 'quality');
   if (range.from) params.set('from', range.from);
   if (range.to) params.set('to', range.to);
   if (filter.model) params.set('model', filter.model);
+  if (quality && filter.check) params.set('check', filter.check);
   if (filter.includeInProgress) params.set('includeInProgress', 'true');
   const parsed = parseInsightsQuery(params);
   if (parsed.success) return { query: parsed.data };

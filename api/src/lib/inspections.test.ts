@@ -51,23 +51,31 @@ async function counter() {
 describe('nextInspectionNumber', () => {
   it('counts FI-YYYY-0001, 0002… and keeps the counter in config/', async () => {
     const now = new Date('2026-03-01T10:00:00Z');
-    expect(await nextInspectionNumber(now)).toBe('FI-2026-0001');
-    expect(await nextInspectionNumber(now)).toBe('FI-2026-0002');
+    expect(await nextInspectionNumber('final', now)).toBe('FI-2026-0001');
+    expect(await nextInspectionNumber('final', now)).toBe('FI-2026-0002');
     expect(await counter()).toEqual({ year: 2026, last: 2 });
   });
 
   it('restarts every year at midnight in Sweden, not in UTC', async () => {
     await writeJson(config, blobNames.inspectionCounter, { year: 2026, last: 41 });
     // 23:59:59 on New Year's Eve in Stockholm (UTC+1)…
-    expect(await nextInspectionNumber(new Date('2026-12-31T22:59:59Z'))).toBe('FI-2026-0042');
+    expect(await nextInspectionNumber('final', new Date('2026-12-31T22:59:59Z'))).toBe(
+      'FI-2026-0042',
+    );
     // …and one second later it is 2027 there, while UTC is still in 2026.
-    expect(await nextInspectionNumber(new Date('2026-12-31T23:00:00Z'))).toBe('FI-2027-0001');
-    expect(await nextInspectionNumber(new Date('2027-01-02T08:00:00Z'))).toBe('FI-2027-0002');
+    expect(await nextInspectionNumber('final', new Date('2026-12-31T23:00:00Z'))).toBe(
+      'FI-2027-0001',
+    );
+    expect(await nextInspectionNumber('final', new Date('2027-01-02T08:00:00Z'))).toBe(
+      'FI-2027-0002',
+    );
   });
 
   it('never goes back to an earlier year (a clock behind another instance)', async () => {
     await writeJson(config, blobNames.inspectionCounter, { year: 2027, last: 4 });
-    expect(await nextInspectionNumber(new Date('2026-12-31T22:00:00Z'))).toBe('FI-2027-0005');
+    expect(await nextInspectionNumber('final', new Date('2026-12-31T22:00:00Z'))).toBe(
+      'FI-2027-0005',
+    );
   });
 
   it('takes the next number when it loses a race for the counter', async () => {
@@ -76,7 +84,9 @@ describe('nextInspectionNumber', () => {
       hooks.beforeWrite = undefined;
       await writeJson(config, blobNames.inspectionCounter, { year: 2026, last: 8 });
     };
-    expect(await nextInspectionNumber(new Date('2026-06-01T10:00:00Z'))).toBe('FI-2026-0009');
+    expect(await nextInspectionNumber('final', new Date('2026-06-01T10:00:00Z'))).toBe(
+      'FI-2026-0009',
+    );
   });
 
   it('gives up with a 503 after five retries, having handed out nothing', async () => {
@@ -89,7 +99,7 @@ describe('nextInspectionNumber', () => {
       const body = JSON.stringify({ year: 2026, last: 100 + rivals });
       await containerClient(config).getBlockBlobClient(blobName).upload(body, body.length);
     };
-    const attempt = nextInspectionNumber(new Date('2026-06-01T10:00:00Z'));
+    const attempt = nextInspectionNumber('final', new Date('2026-06-01T10:00:00Z'));
     await expect(attempt).rejects.toThrow(ServiceUnavailableError);
     await expect(attempt).rejects.toMatchObject({
       status: 503,
@@ -102,20 +112,55 @@ describe('nextInspectionNumber', () => {
 
   it('carries on from the newest inspection when the counter blob is lost', async () => {
     const now = new Date('2026-03-01T10:00:00Z');
-    const number = await nextInspectionNumber(now);
+    const number = await nextInspectionNumber('final', now);
     expect(number).toBe('FI-2026-0001');
     await writeInspection(sampleInspection({ number }), { ifNoneMatch: '*' });
     await writeInspection(sampleInspection({ number: 'FI-2025-0042' }), { ifNoneMatch: '*' });
     await containerClient(config).getBlobClient(blobNames.inspectionCounter).delete();
 
-    expect(await nextInspectionNumber(now)).toBe('FI-2026-0002');
+    expect(await nextInspectionNumber('final', now)).toBe('FI-2026-0002');
     expect(await counter()).toEqual({ year: 2026, last: 2 });
   });
 
   it('starts the new year at 0001 when the lost counter was in an earlier year', async () => {
     await writeInspection(sampleInspection({ number: 'FI-2025-0009' }), { ifNoneMatch: '*' });
-    expect(await nextInspectionNumber(new Date('2026-03-01T10:00:00Z'))).toBe('FI-2026-0001');
+    expect(await nextInspectionNumber('final', new Date('2026-03-01T10:00:00Z'))).toBe(
+      'FI-2026-0001',
+    );
     expect(await counter()).toEqual({ year: 2026, last: 1 });
+  });
+
+  it('numbers quality checks QC-YYYY-0001… in a counter of their own', async () => {
+    const now = new Date('2026-03-01T10:00:00Z');
+    await writeJson(config, blobNames.inspectionCounter, { year: 2026, last: 41 });
+    expect(await nextInspectionNumber('quality', now)).toBe('QC-2026-0001');
+    expect(await nextInspectionNumber('final', now)).toBe('FI-2026-0042');
+    expect(await nextInspectionNumber('quality', now)).toBe('QC-2026-0002');
+    expect(
+      (await readJson(config, blobNames.qualityCheckCounter, InspectionCounterSchema))?.data,
+    ).toEqual({ year: 2026, last: 2 });
+    expect(await counter()).toEqual({ year: 2026, last: 42 });
+  });
+
+  it('takes the next quality check number when it loses a race for that counter', async () => {
+    await writeJson(config, blobNames.qualityCheckCounter, { year: 2026, last: 3 });
+    hooks.beforeWrite = async () => {
+      hooks.beforeWrite = undefined;
+      await writeJson(config, blobNames.qualityCheckCounter, { year: 2026, last: 4 });
+    };
+    expect(await nextInspectionNumber('quality', new Date('2026-06-01T10:00:00Z'))).toBe(
+      'QC-2026-0005',
+    );
+  });
+
+  it('carries each series on from its own newest number when its counter is lost', async () => {
+    await writeInspection(sampleInspection({ number: 'FI-2026-0050' }), { ifNoneMatch: '*' });
+    await writeInspection(sampleInspection({ kind: 'quality', number: 'QC-2026-0003' }), {
+      ifNoneMatch: '*',
+    });
+    const now = new Date('2026-03-01T10:00:00Z');
+    expect(await nextInspectionNumber('quality', now)).toBe('QC-2026-0004');
+    expect(await nextInspectionNumber('final', now)).toBe('FI-2026-0051');
   });
 
   it('500s on a counter blob it cannot read, rather than starting again at 0001', async () => {
@@ -140,6 +185,7 @@ describe('loadSummaries', () => {
     };
     expect(inspectionSummary(inspection)).toEqual({
       id: base.id,
+      kind: 'final',
       number: 'FI-2026-0007',
       machineName: 'RigiMill MG #7',
       serialNumber: 'SN-1007',
@@ -152,8 +198,36 @@ describe('loadSummaries', () => {
       total: 3,
       templateId: base.templateId,
       templateRevision: 2,
+      templateName: 'Final inspection – RigiMill MG',
       updatedAt: base.updatedAt,
     } satisfies InspectionSummary);
+  });
+
+  it('says which kind it is and, for a quality check, which one', async () => {
+    const check = await stored({
+      kind: 'quality',
+      number: 'QC-2026-0001',
+      templateSnapshot: {
+        ...sampleInspection().templateSnapshot,
+        name: 'Quality check – Pre start up',
+      },
+    });
+    const [summary] = await loadSummaries();
+    expect(summary).toMatchObject({
+      id: check.id,
+      kind: 'quality',
+      number: 'QC-2026-0001',
+      templateName: 'Quality check – Pre start up',
+    });
+  });
+
+  it('reads a summary stored before quality checks could be done as a final inspection’s', async () => {
+    const inspection = await stored();
+    const { id: _id, kind: _kind, templateName: _name, ...older } = inspectionSummary(inspection);
+    await containerClient(inspections)
+      .getBlobClient(blobNames.inspection(inspection.id))
+      .setMetadata({ summary: encodeURIComponent(JSON.stringify(older)) });
+    expect(await loadSummaries()).toEqual([{ ...inspectionSummary(inspection), templateName: '' }]);
   });
 
   it('lists from blob metadata alone, as ASCII, Swedish text intact', async () => {

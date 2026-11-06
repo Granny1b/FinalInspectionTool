@@ -4,6 +4,7 @@ import { draftOf, sameDraft } from './draft';
 
 const inspection: Inspection = {
   id: 'Insp000000000001',
+  kind: 'final',
   number: 'FI-2026-0001',
   templateId: 'Tmpl000000000001',
   templateRevision: 2,

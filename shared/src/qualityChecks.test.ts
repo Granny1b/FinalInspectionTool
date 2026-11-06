@@ -3,11 +3,21 @@ import {
   formatHours,
   newQualityFront,
   parseHours,
+  qualityCheckShortName,
   qualityCheckTitle,
   rowHasContent,
   rowsHours,
   totalHours,
 } from './qualityChecks';
+
+describe('qualityCheckShortName', () => {
+  it('is the title without "Quality check –", or the title when that is all it says', () => {
+    expect(qualityCheckShortName('Quality check – Pre start up')).toBe('Pre start up');
+    expect(qualityCheckShortName('quality check - Frame')).toBe('Frame');
+    expect(qualityCheckShortName('Frame check')).toBe('Frame check');
+    expect(qualityCheckShortName('Quality check')).toBe('Quality check');
+  });
+});
 
 describe('qualityCheckTitle', () => {
   it('is "Quality check – " and the name, or nothing while the name is blank', () => {

@@ -2,6 +2,7 @@ import {
   rowRef,
   sectionNumber,
   STATUS_LABELS,
+  type AnnotatedImage,
   type Section,
   type Severity,
   type Status,
@@ -11,6 +12,7 @@ import type { Move, RowCommand } from './keys';
 import { advancesAfter, rowOrder, targetRow } from './navigation';
 import {
   withCategory,
+  withPhotos,
   withRemainingOk,
   withSeverity,
   withStatus,
@@ -28,6 +30,8 @@ export type ChecklistActions = {
   setSeverity: (itemId: string, severity: Severity) => void;
   /** A NOK row's category; '' for none. */
   setCategory: (itemId: string, category: string) => void;
+  /** A NOK row's photos, once uploaded (a quality check adds them on the row itself). */
+  setPhotos: (itemId: string, photos: AnnotatedImage[]) => void;
   setRemainingOk: (sectionId: string) => void;
   /** Escape in a field. */
   focusRow: (itemId: string) => void;
@@ -133,6 +137,7 @@ export function useChecklistActions(options: Options): ChecklistActions {
         commit(withSeverity(latest.current.results, itemId, severity)),
       setCategory: (itemId, category) =>
         commit(withCategory(latest.current.results, itemId, category)),
+      setPhotos: (itemId, photos) => commit(withPhotos(latest.current.results, itemId, photos)),
       setRemainingOk,
       focusRow: (itemId) => focusRow(rootRef.current, itemId),
       finishRow: (itemId) => {

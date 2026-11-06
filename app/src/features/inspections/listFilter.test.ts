@@ -4,6 +4,7 @@ import {
   filterFromParams,
   filterInspections,
   filterToParams,
+  inspectionHref,
   inspectionsListHref,
   isFiltered,
   rememberListSearch,
@@ -13,6 +14,7 @@ import {
 function summary(patch: Partial<InspectionSummary>): InspectionSummary {
   return {
     id: 'Insp000000000001',
+    kind: 'final',
     number: 'FI-2026-0001',
     machineName: 'RigiMill MG',
     serialNumber: '1042-7',
@@ -25,6 +27,7 @@ function summary(patch: Partial<InspectionSummary>): InspectionSummary {
     total: 90,
     templateId: 'Tpl0000000000001',
     templateRevision: 2,
+    templateName: 'Final inspection – RigiMill MG',
     updatedAt: '2026-10-07T08:00:00.000Z',
     ...patch,
   };
@@ -80,6 +83,32 @@ describe('filterInspections', () => {
     ]);
     expect(filterInspections(list, { query: 'mill', model: 'HHVDUO', state: '' })).toEqual([]);
   });
+
+  it('searches a quality check by its title instead of a machine name', () => {
+    const checks = [
+      summary({
+        id: 'Q000000000000001',
+        kind: 'quality',
+        number: 'QC-2026-0001',
+        machineName: '',
+        serialNumber: 'RM-016',
+        templateName: 'Quality check – Pre start up',
+      }),
+      summary({
+        id: 'Q000000000000002',
+        kind: 'quality',
+        number: 'QC-2026-0002',
+        machineName: '',
+        templateName: 'Quality check – Run in',
+      }),
+    ];
+    expect(ids(filterInspections(checks, { ...all, query: 'pre 016' }))).toEqual([
+      'Q000000000000001',
+    ]);
+    expect(ids(filterInspections(checks, { ...all, query: 'qc-2026' }))).toHaveLength(2);
+    // A final inspection is never found by its template's name.
+    expect(filterInspections(list, { ...all, query: 'final inspection' })).toEqual([]);
+  });
 });
 
 describe('filter in the URL', () => {
@@ -120,6 +149,20 @@ describe('the way back to the list', () => {
     expect(inspectionsListHref()).toBe('/inspections?q=rigimill&state=finalised');
     rememberListSearch('');
     expect(inspectionsListHref()).toBe('/inspections');
+  });
+
+  it('keeps the quality checks list’s search apart from the inspections list’s', () => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => stored.set(key, value),
+    });
+    rememberListSearch('state=finalised');
+    rememberListSearch('q=pre', 'quality');
+    expect(inspectionsListHref()).toBe('/inspections?state=finalised');
+    expect(inspectionsListHref('quality')).toBe('/quality-checks?q=pre');
+    expect(inspectionHref('quality', 'Q000000000000001')).toBe('/quality-checks/Q000000000000001');
+    expect(inspectionHref('final', 'A000000000000001')).toBe('/inspections/A000000000000001');
   });
 
   it('goes to the plain list when storage is blocked', () => {

@@ -37,6 +37,7 @@ const [row2a, row2b, row2c] = SECTIONS[1]!.items;
 function inspection(patch: Partial<Inspection> = {}): Inspection {
   return {
     id: 'Insp000000000001',
+    kind: 'final',
     number: 'FI-2026-0042',
     templateId: 'Tmpl000000000001',
     templateRevision: 2,
