@@ -3092,3 +3092,103 @@ work, a Machine ID on quality checks too ("Standardize it to make sense").
   closed from the tab (saved first), a finalised inspection followed up, a non-deviation refused,
   and the CSV. Changed: the sidebar groups, "Machine ID" labels, the quality checks' Machine ID
   and their CSV, and the deviation table's new columns.
+
+## Quality checks: printing (2026-11-06)
+
+The user wanted to print a quality check from its page, with a preview, either the entire report
+or only the deviations: it is printed, kept at the machine and signed off there.
+
+### One print machinery, two documents
+
+- **A quality check's report is a second document in the same machinery,** not a second one: the
+  print route, `PrintView` and its toolbar, the preview dialog, the card pages (`useCardPages`),
+  the images, readiness, `FittedPages` and the page footer. `Printout` is the union of the final
+  report's `PrintModel` (now with `document: 'checklist'`) and `QualityPrintModel`
+  (`document: 'quality'`, `features/print/quality/model.ts`, pure and unit-tested);
+  `PrintDocument` hands a quality model to `QualityPrintDocument`. The quality model keeps its
+  cards in the final report's shape (`deviations: { kind: 'cards', cards }`), so the cards, their
+  packing and the 2-or-4 default work unchanged.
+- **Final inspection printing is unchanged** but for one label: "Machine name" is "Machine ID" on
+  the front page and in the Word file (a scope change: the field is the machine's ID in the ERP,
+  "Magellan#1"). The new `DeviationCards` options (title, sign-off, lead, closing) default to
+  what a final report had.
+- **Addresses:** `/quality-checks/{id}/print?mode=report|deviations[&deviationsPerPage=2|4]`, the
+  entire report by default. `InspectionPrintPage` takes the kind as `InspectionPage` does and
+  sends the other kind to its own print address with the same query; the "Quality checks don't
+  print yet" page is gone. `mode` is the final report's parameter with the quality check's own
+  values; a final report's `blank` on a quality check prints the entire report.
+- **The page's header** has Preview and Print / Save PDF in the same place as on a final
+  inspection. The Print menu offers _Entire report_ and _Only deviations_ (there is no blank
+  form of a check done). Printing saves pending changes and opens the print tab, which prints
+  once, as before (`openPrint` now takes the address).
+- **The preview dialog takes its choices from the document.** An inspection's is the segmented
+  _Blank checklist | Report_ as before; a quality check's adds _Deviations: 2 per page | 4 per
+  page_ next to _Entire report | Only deviations_, so what is previewed is what prints (Print
+  passes both on; a layout not picked is left to the print route's default, the same rule).
+- **No Word export, no reference images, no guide pictures.** Pictures show how a row should
+  look in the app; printed, they would make the report long. The Word export is left out of the
+  toolbar for a quality check (as the brief says).
+
+### What prints
+
+- **Front page:** the final report's paper (logo, number, title at 24 pt as a check's title is
+  longer, company name, finalised or the boxed "NOT FINALISED – DRAFT REPORT"). Machine ID,
+  Machine model, Serial number, Date, Checked by and Department, as one list of fields. **No
+  document number, made by or date of the quality check** (a scope change: document control is
+  the app's, as for final inspections); the revision prints as on a final report, "Rev: N" bottom
+  right, and "Rev N" after the subject in the print toolbar. Without a machine photo, the room
+  goes to a **summary in numbers** (Rows, OK, NOK, N/A, Not filled only while some rows are, and
+  Deviations, the last two shaded), and the sign-off lines sit at the foot of the page, as a
+  final report's signatures do: _Checked by · Signature · Date_ and _Deviations closed / approved
+  by · Signature · Date_.
+- **Checklist:** the final report's tables (repeating heads, rows never split, the same keep
+  rules) with four columns, Ref | What to check | Result | Comment. The section's heading has its
+  rows and time on the right. How is a smaller line of its own (its line breaks kept), the
+  references smaller and grey, joined by " · " as on screen. The result is one column, not three
+  tick columns: a mark and a word, a NOK boxed so it stands out in black and white, an unfilled
+  row "Not filled". **A NOK row's comment starts with its card, "D-02 · Major"**, so the paper
+  leads from the row to the card to sign off. A row with very long how or comment text keeps its
+  neighbours off its page as a long comment does on a final report.
+- **Deviation cards:** the final report's, under "Deviations", with the sign-off a check needs at
+  the machine instead of "Closed · Sign · Date": _Action taken_ on two lines, then _Closed on_
+  and _Signature_, lines 7 mm apart to write on. With 4 to a page the lines run across the whole
+  card under the text and photos: in the text's column they were too short to write on.
+- **Only deviations:** a short header on the first page (logo, number, title, the draft marker
+  while in progress, Machine ID, Machine model, Serial number, Date, Checked by and the number of
+  deviations, "—" for what is empty), the cards, and _All deviations closed · Name · Signature ·
+  Date_ after the last card. Both blocks are measured with the cards: `packCards` takes `first`,
+  the room the header takes from the first page, and `closingFits` says whether the closing
+  sign-off fits under the last page's cards; when it doesn't, it gets a page of its own with the
+  heading, rather than pushing a card off a page. Without deviations the page says "No deviations
+  recorded." and has no closing sign-off, as there is nothing to close.
+- **Footer:** "QC-2026-0004 · Quality check – Pre start up · Magellan#1 · RigiMill MG · S/N …",
+  as the brief has it (no company name or revision, unlike a final report's), the Machine ID cut
+  at 60 characters as a final report cuts its machine and left out when a check has none (checks
+  done before it was asked for), and "Not finalised" while in progress, as on a draft final
+  report. The file name:
+  `QC-2026-0004 Magellan#1 RigiMill MG – Pre start up – Quality check report`
+  (`– Draft report`, `– Deviations`, `– Draft deviations`).
+
+### Tests
+
+- **app:** `print/quality/model.test.ts` (the front page's values and counts, revision, no
+  document number, sections and rows with how, references and the card of a NOK row, the cards
+  with extra deviations, only deviations, in progress, no deviations, no machine ID, a long one,
+  a check without its front page or rows, the images), `packCards` with `first` and
+  `closingFits`, the quality print links and modes; the final report's tests now expect "Machine
+  ID".
+- **e2e:** `quality-check-print.spec.ts` (4 tests): Preview in both modes and both layouts; the
+  print page from the inspection print address, printed to PDF in both modes and measured (A4,
+  footer and page numbers, no Word export); Print / Save PDF → Only deviations printing once in a
+  new tab; a check without deviations. `quality-check-inspections.spec.ts` now expects Preview on
+  the page and its print address to lead to the report.
+- **Visual review** without the local stack: the app from Vite alone with every API call mocked
+  (Playwright `page.route`), the preview and the print page screenshotted in both modes, 2 and 4
+  to a page, a check in progress without a machine ID, one without deviations, and one whose
+  closing sign-off needs a page of its own, and printed to PDF to check the page breaks.
+
+### Not this round
+
+A blank quality check form to fill in by hand (the template side's print preview of a quality
+check still says it doesn't print yet), Word export of a quality check, and its guide pictures in
+an appendix.

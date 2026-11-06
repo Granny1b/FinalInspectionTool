@@ -231,8 +231,8 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   const number = (await title.textContent())!.split(' · ')[0]!;
   await expect(page.locator('main header')).toContainText(`${CHECK} · Rev 1`);
   await expect(page.locator('main header')).toContainText('S/N RM-E2E-016');
-  // A quality check doesn't print yet.
-  await expect(page.getByRole('button', { name: /Print|Preview/ })).toHaveCount(0);
+  // It prints as a final inspection does (quality-check-print.spec.ts).
+  await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeVisible();
 
   // The rows as cards: what, how and the references.
   await expect(card(page, '1.a')).toContainText(
@@ -332,11 +332,12 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   await page.goto(`/inspections?q=${number}`);
   await expect(page.getByText('No inspections match')).toBeVisible();
 
-  // Its address as an inspection leads to it; its print route says it doesn't print yet.
+  // Its address as an inspection leads to it, and so does its print address: the report.
   await page.goto(`/inspections/${id}`);
   await expect(page).toHaveURL(new RegExp(`/quality-checks/${id}$`));
-  await page.goto(`/quality-checks/${id}/print`);
-  await expect(page.getByText('Quality checks don’t print yet')).toBeVisible();
+  await page.goto(`/inspections/${id}/print`);
+  await expect(page).toHaveURL(new RegExp(`/quality-checks/${id}/print$`));
+  await expect(page.locator('[data-print-root]')).toHaveAttribute('data-print-mode', 'report');
 });
 
 test('an admin sees a quality check only under Quality checks in Insights and its report', async ({

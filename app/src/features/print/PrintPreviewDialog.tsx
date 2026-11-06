@@ -1,19 +1,13 @@
 import { LoaderCircle, Printer, X } from 'lucide-react';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Button } from '../../components/Button';
 import { LoadError } from '../../components/PageStates';
 import { errorMessage } from '../../lib/api';
 import { FittedPages } from './FittedPages';
-import {
-  defaultDeviationsPerPage,
-  PRINT_MODE_LABELS,
-  PRINT_MODES,
-  type PrintMode,
-  type PrintModel,
-} from './model';
+import { defaultDeviationsPerPage, type DeviationsPerPage } from './model';
 import { isPrintShortcut } from './preview';
+import type { Printout } from './printout';
 import { PrintDocument } from './PrintDocument';
-import { Segmented, type Choice } from './PrintToolbar';
 import { usePrintDocument } from './usePrintDocument';
 import { usePrintImages, type PrintImages } from './usePrintImages';
 import './print.css';
@@ -24,10 +18,15 @@ type Props = {
   /** What is shown, under "Preview": "FI-2026-0042 · RigiMill MG – Volvo Skövde". */
   subject: string;
   /** Null until the settings (company name, model names) are in. */
-  model: PrintModel | null;
+  model: Printout | null;
   logoImageId: string | undefined;
-  /** The blank checklist or the report. */
-  mode: Choice<PrintMode>;
+  /**
+   * What to show, in the header: the blank checklist or the report of an inspection; the entire
+   * report or only the deviations of a quality check, and its cards per page.
+   */
+  choices: ReactNode;
+  /** The deviation cards per page; else as the print route opens the report. */
+  deviationsPerPage?: DeviationsPerPage;
   /** The settings couldn't be loaded. */
   failed?: FailedQuery | null;
   /** Prints what is shown, as Print / Save PDF does; the dialog closes first. */
@@ -46,7 +45,8 @@ export function PrintPreviewDialog({
   subject,
   model,
   logoImageId,
-  mode,
+  choices,
+  deviationsPerPage,
   failed,
   onPrint,
   onClose,
@@ -92,11 +92,7 @@ export function PrintPreviewDialog({
             </h2>
             <p className="truncate text-xs text-ink-500">{subject}</p>
           </div>
-          <Segmented
-            label="What to show"
-            options={PRINT_MODES.map((value) => ({ value, label: PRINT_MODE_LABELS[value] }))}
-            {...mode}
-          />
+          {choices}
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <Button onClick={print}>
               <Printer size={16} aria-hidden="true" />
@@ -120,7 +116,11 @@ export function PrintPreviewDialog({
         ) : !model || images.loading ? (
           <Preparing />
         ) : (
-          <FittedDocument model={model} images={images} />
+          <FittedDocument
+            model={model}
+            images={images}
+            perPage={deviationsPerPage ?? defaultDeviationsPerPage(model)}
+          />
         )}
       </div>
     </dialog>
@@ -140,10 +140,17 @@ function Preparing() {
 
 /**
  * The document on the grey desk, its sheets scaled down to the desk's width on a narrow screen
- * (FittedPages), with the cards as the print route opens them.
+ * (FittedPages), with the cards `perPage` to a page.
  */
-function FittedDocument({ model, images }: { model: PrintModel; images: PrintImages }) {
-  const perPage = defaultDeviationsPerPage(model);
+function FittedDocument({
+  model,
+  images,
+  perPage,
+}: {
+  model: Printout;
+  images: PrintImages;
+  perPage: DeviationsPerPage;
+}) {
   const { rootRef, cards, ready } = usePrintDocument(model, images, { perPage, appendix: false });
 
   return (

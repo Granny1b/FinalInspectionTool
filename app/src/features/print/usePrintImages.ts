@@ -1,6 +1,6 @@
 import { useQueries } from '@tanstack/react-query';
 import { imageUrlQuery, useImageUrl } from '../../lib/images';
-import { printedImageIds, type PrintModel } from './model';
+import { printoutImageIds, type Printout } from './printout';
 
 /** Printed when the settings name no logo of their own, or it can't be fetched. */
 export const DEFAULT_LOGO_URL = '/modig-logo.png';
@@ -13,12 +13,12 @@ export const DEFAULT_LOGO_URL = '/modig-logo.png';
  * the appendix on adds it a moment later instead of reloading the whole preview.
  */
 export function usePrintImages(
-  model: PrintModel | null,
+  model: Printout | null,
   logoImageId: string | undefined,
   { appendix }: { appendix: boolean },
 ) {
-  const ids = model ? printedImageIds(model, { appendix }) : [];
-  const base = new Set(model ? printedImageIds(model, { appendix: false }) : []);
+  const ids = model ? printoutImageIds(model, { appendix }) : [];
+  const base = new Set(model ? printoutImageIds(model, { appendix: false }) : []);
   const photos = useQueries({ queries: ids.map((id) => imageUrlQuery(id)) });
   const logo = useImageUrl(logoImageId);
 

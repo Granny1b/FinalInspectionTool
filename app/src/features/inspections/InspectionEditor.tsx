@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   ClipboardList,
+  ClipboardX,
   Eye,
   Lock,
   LockOpen,
@@ -49,9 +50,10 @@ import { usePersonName } from '../../lib/usePeople';
 import { modelName, useSettings } from '../../lib/useSettings';
 import { useFollowUps, usePendingFollowUps, useSetFollowUp } from '../deviationLog/queries';
 import { InspectionPreview } from '../print/InspectionPreview';
-import { inspectionPrintHref } from '../print/links';
-import type { PrintMode } from '../print/model';
+import { inspectionPrintHref, qualityCheckPrintHref } from '../print/links';
 import { inspectionOnScreen } from '../print/preview';
+import { QUALITY_PRINT_MODE_LABELS } from '../print/quality/model';
+import { QualityCheckPreview } from '../print/quality/QualityCheckPreview';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
 import { withPhotos } from './checklist/results';
 import { DeleteInspectionDialog } from './DeleteInspectionDialog';
@@ -123,7 +125,8 @@ const QUALITY_SHORTCUT_HINTS = <ShortcutHints guide="Pictures" />;
  *
  * A quality check done on a machine (kind `quality`) is the same page in a quality mode: its
  * shorter front page with the quality check it follows, each row a card with its pictures and
- * large OK / NOK / N/A buttons (QualityCheckSheet), and no printing yet.
+ * large OK / NOK / N/A buttons (QualityCheckSheet), and a report that prints whole or only its
+ * deviations.
  */
 export function InspectionEditor({
   loaded,
@@ -397,6 +400,12 @@ export function InspectionEditor({
     () => (previewing ? inspectionOnScreen(inspection, draft, server) : null),
     [previewing, inspection, draft, server],
   );
+  const closePreview = () => {
+    setPreviewing(false);
+    // The dialog hands the focus back to what had it, but Safari doesn't focus a button that is
+    // clicked or tapped: back to Preview in any case.
+    previewRef.current?.focus();
+  };
   const continueId = `${idPrefix}-continue`;
 
   // Finalise and Reopen swap places under the keyboard focus: the notice takes it instead.
@@ -424,13 +433,13 @@ export function InspectionEditor({
   const conflict = saveState.status === 'conflict' || stateConflict;
 
   /**
-   * The print route loads the inspection from the server, so pending changes are saved first; if
-   * that fails, the save status and its alert say why and nothing opens. It opens in a new tab,
-   * which prints as soon as it has loaded.
+   * The print route (`href`, which prints as soon as it has loaded) loads the inspection from the
+   * server, so pending changes are saved first; if that fails, the save status and its alert say
+   * why and nothing opens. It opens in a new tab.
    */
-  async function openPrint(mode: PrintMode) {
+  async function openPrint(href: string) {
     if (!(await saveAll())) return;
-    window.open(inspectionPrintHref(id, mode, true), '_blank', 'noopener');
+    window.open(href, '_blank', 'noopener');
   }
 
   function openFinalise() {
@@ -538,6 +547,34 @@ export function InspectionEditor({
     void navigate(inspectionsListHref(kind), { replace: true, state });
   }, [deleted, navigate, number, kind]);
 
+  // What Print / Save PDF offers: an inspection's blank checklist or its report; a quality check's
+  // entire report or only its deviations, to close them at the machine (it has no blank form).
+  const printItems = quality
+    ? [
+        {
+          label: QUALITY_PRINT_MODE_LABELS.report,
+          icon: ClipboardCheck,
+          onSelect: () => void openPrint(qualityCheckPrintHref(id, { mode: 'report' }, true)),
+        },
+        {
+          label: QUALITY_PRINT_MODE_LABELS.deviations,
+          icon: ClipboardX,
+          onSelect: () => void openPrint(qualityCheckPrintHref(id, { mode: 'deviations' }, true)),
+        },
+      ]
+    : [
+        {
+          label: 'Blank checklist',
+          icon: ClipboardList,
+          onSelect: () => void openPrint(inspectionPrintHref(id, 'blank', true)),
+        },
+        {
+          label: 'Report',
+          icon: ClipboardCheck,
+          onSelect: () => void openPrint(inspectionPrintHref(id, 'report', true)),
+        },
+      ];
+
   const modelLabel = modelName(settings.data?.machineModels, inspection.front.modelCode);
   // Its Machine ID, on a quality check as on a final inspection (one started before quality checks
   // had one has none until it is filled in).
@@ -628,40 +665,24 @@ export function InspectionEditor({
                 showSaveStatus ? 'mt-2' : 'mt-3',
               )}
             >
-              {/* A quality check doesn't print yet (nor export to Word, which is in the print view). */}
-              {!quality && (
-                <>
-                  <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
-                    <Eye size={16} aria-hidden="true" />
-                    Preview
-                  </Button>
-                  <ActionMenu
-                    label="Print / Save PDF"
-                    trigger={
-                      <>
-                        <Printer size={16} aria-hidden="true" />
-                        {/* "Print" on a phone, so the three buttons share a line; the name stays whole. */}
-                        <span>
-                          Print<span className="@max-[36rem]:sr-only"> / Save PDF</span>
-                        </span>
-                        <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
-                      </>
-                    }
-                    items={[
-                      {
-                        label: 'Blank checklist',
-                        icon: ClipboardList,
-                        onSelect: () => void openPrint('blank'),
-                      },
-                      {
-                        label: 'Report',
-                        icon: ClipboardCheck,
-                        onSelect: () => void openPrint('report'),
-                      },
-                    ]}
-                  />
-                </>
-              )}
+              <Button ref={previewRef} variant="secondary" onClick={() => setPreviewing(true)}>
+                <Eye size={16} aria-hidden="true" />
+                Preview
+              </Button>
+              <ActionMenu
+                label="Print / Save PDF"
+                trigger={
+                  <>
+                    <Printer size={16} aria-hidden="true" />
+                    {/* "Print" on a phone, so the three buttons share a line; the name stays whole. */}
+                    <span>
+                      Print<span className="@max-[36rem]:sr-only"> / Save PDF</span>
+                    </span>
+                    <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
+                  </>
+                }
+                items={printItems}
+              />
               {!finalised ? (
                 <Button onClick={openFinalise} disabled={conflict}>
                   <Lock size={16} aria-hidden="true" />
@@ -901,18 +922,22 @@ export function InspectionEditor({
           onClose={() => setDialog(null)}
         />
       )}
-      {previewed && (
-        <InspectionPreview
-          inspection={previewed}
-          onPrint={(mode) => void openPrint(mode)}
-          onClose={() => {
-            setPreviewing(false);
-            // The dialog hands the focus back to what had it, but Safari doesn't focus a button
-            // that is clicked or tapped: back to Preview in any case.
-            previewRef.current?.focus();
-          }}
-        />
-      )}
+      {previewed &&
+        (quality ? (
+          <QualityCheckPreview
+            inspection={previewed}
+            onPrint={(mode, deviationsPerPage) =>
+              void openPrint(qualityCheckPrintHref(id, { mode, deviationsPerPage }, true))
+            }
+            onClose={closePreview}
+          />
+        ) : (
+          <InspectionPreview
+            inspection={previewed}
+            onPrint={(mode) => void openPrint(inspectionPrintHref(id, mode, true))}
+            onClose={closePreview}
+          />
+        ))}
       {confirmingDelete && (
         <DeleteInspectionDialog
           kind={kind}

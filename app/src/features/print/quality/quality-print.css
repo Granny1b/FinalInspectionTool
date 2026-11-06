@@ -1,0 +1,300 @@
+/*
+ * A quality check's report: what it adds to the final report's paper (print.css), whose sheets,
+ * headings, tables, cards, signatures and greys it uses as they are. Black and white throughout:
+ * statuses in words and marks, a NOK boxed, light grey fills only.
+ */
+
+/* Only deviations: the deviations are the document, so their first sheet starts the first page
+   (print.css starts every other sheet on a page of its own). */
+@media print {
+  .paper > .paper-deviations:first-child > .paper-sheet:first-child {
+    break-before: auto;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Front page: as a final report's, without the machine photo; the summary in numbers and the  */
+/* sign-off at the foot of the page.                                                          */
+/* ------------------------------------------------------------------------------------------ */
+
+/* A check's title is longer than "Final Inspection". */
+.paper-qc-front .paper-title {
+  font-size: 24pt;
+}
+
+.paper-qc-front .paper-fields {
+  margin-top: 8mm;
+}
+
+.paper-qc-facts dt {
+  font-size: 7.5pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+.paper-qc-facts dd {
+  margin: 0.6mm 0 0;
+  font-size: 10pt;
+  overflow-wrap: anywhere;
+}
+
+.paper-qc-summary {
+  margin-top: 9mm;
+}
+
+.paper-qc-summary-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6mm;
+}
+
+.paper-qc-summary h3,
+.paper-qc-sign h3 {
+  font-size: 10pt;
+  font-weight: 600;
+}
+
+.paper-qc-summary-head p {
+  color: var(--paper-muted);
+}
+
+/* One box per number, side by side, the number large over its word. */
+.paper-qc-counts {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  margin: 2mm 0 0;
+  border: 0.3mm solid var(--paper-ink);
+  border-radius: 1mm;
+}
+
+.paper-qc-counts > div {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  padding: 3mm 1mm 2.5mm;
+}
+
+.paper-qc-counts > div + div {
+  border-left: 0.25mm solid var(--paper-rule);
+}
+
+.paper-qc-counts dd {
+  margin: 0;
+  font-size: 18pt;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.paper-qc-counts dt {
+  margin-top: 0.8mm;
+  font-size: 7.5pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+/* NOK and the deviations are what the reader looks for first. */
+.paper-qc-counts [data-count='NOK'],
+.paper-qc-counts [data-count='Deviations'] {
+  background: var(--paper-fill-light);
+}
+
+.paper-qc-spacer {
+  flex: 1 1 0;
+  min-height: 6mm;
+}
+
+.paper-qc-sign {
+  margin-top: 4mm;
+}
+
+/* Name, signature and date: as wide as each needs to be written by hand. */
+.paper-qc-sign-row {
+  display: grid;
+  grid-template-columns: 6fr 5fr 3fr;
+  gap: 8mm;
+}
+
+.paper-qc-sign .paper-signature {
+  padding-top: 12mm;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Checklist: Ref | What to check (how and references under it) | Result | Comment.           */
+/* ------------------------------------------------------------------------------------------ */
+
+.paper-qc-col-result {
+  width: 17mm;
+}
+
+.paper-qc-col-comment {
+  width: 52mm;
+}
+
+.paper-qc-section-stats {
+  float: right;
+  margin-left: 4mm;
+  font-size: 8pt;
+  font-weight: 400;
+  color: var(--paper-muted);
+}
+
+.paper-qc-what {
+  font-weight: 500;
+}
+
+.paper-qc-how {
+  margin-top: 0.6mm;
+  font-size: 8pt;
+  /* The how's own line breaks, as the quality check shows them. */
+  white-space: pre-line;
+}
+
+.paper-qc-refs {
+  margin-top: 0.6mm;
+  font-size: 7pt;
+  color: var(--paper-muted);
+}
+
+/* The mark beside its word, on one line: ✓ OK, ✗ NOK, – N/A. */
+.paper-qc-result {
+  display: inline-flex;
+  gap: 0.6mm;
+  align-items: center;
+  font-size: 7.5pt;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.paper-qc-result svg {
+  width: 3.2mm;
+  height: 3.2mm;
+}
+
+.paper-qc-result[data-status='NOK'] {
+  padding: 0.6mm 1.2mm;
+  border: 0.4mm solid var(--paper-ink);
+  border-radius: 0.6mm;
+}
+
+.paper-qc-result[data-status='NA'] {
+  color: var(--paper-muted);
+}
+
+.paper-qc-open {
+  font-size: 7pt;
+  font-style: italic;
+  color: var(--paper-muted);
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Deviation cards: "Action taken" on two lines, then "Closed on" and "Signature", written at  */
+/* the machine. Lines 7 mm apart, enough to write on.                                         */
+/* ------------------------------------------------------------------------------------------ */
+
+.paper-card-closed.paper-card-action {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  column-gap: 2mm;
+}
+
+.paper-card-action .paper-card-line {
+  height: 7mm;
+}
+
+.paper-card-action > .paper-card-line {
+  grid-column: 2;
+}
+
+.paper-card-action-signed {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: auto minmax(0, 2fr) auto minmax(0, 3fr);
+  align-items: end;
+  column-gap: 2mm;
+}
+
+/* Four to a page: the text and photos side by side as in a final report, the lines across the
+   whole card underneath, so there is room to write. */
+[data-deviations-per-page='4'][data-sign-off='action'] .paper-card:not([data-wide]) {
+  grid-template-areas:
+    'body photos'
+    'closed closed';
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Only deviations: a short header over the first page's cards, and "All deviations closed"   */
+/* after the last card.                                                                      */
+/* ------------------------------------------------------------------------------------------ */
+
+.paper-qc-lead {
+  margin-bottom: 7mm;
+}
+
+.paper-qc-lead-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8mm;
+  padding-bottom: 3mm;
+  border-bottom: 0.4mm solid var(--paper-ink);
+}
+
+.paper-qc-lead-logo {
+  display: block;
+  width: auto;
+  max-width: 60mm;
+  height: 10mm;
+  object-fit: contain;
+  object-position: left bottom;
+}
+
+.paper-qc-lead-title {
+  margin-top: 5mm;
+  font-size: 16pt;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.paper-qc-lead .paper-state-draft {
+  margin-top: 2.5mm;
+  font-size: 9pt;
+}
+
+.paper-qc-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3mm 6mm;
+  margin: 5mm 0 0;
+}
+
+.paper-qc-facts > div {
+  padding-top: 1.5mm;
+  border-top: 0.25mm solid var(--paper-rule);
+}
+
+/* Its own height under the cards, never a share of the page. (Specific enough to win over
+   print.css's `.paper-cards > *` whichever stylesheet loads first.) */
+.paper-cards > [data-card-closing],
+.paper-card-page > [data-card-closing] {
+  flex: none;
+}
+
+.paper-qc-closing {
+  padding: 3mm 3.5mm 2.5mm;
+  border: 0.5mm solid var(--paper-ink);
+  border-radius: 1mm;
+  break-inside: avoid;
+}
+
+.paper-qc-closing-title {
+  font-size: 10pt;
+  font-weight: 700;
+}
+
+.paper-qc-closing .paper-signature {
+  padding-top: 11mm;
+}

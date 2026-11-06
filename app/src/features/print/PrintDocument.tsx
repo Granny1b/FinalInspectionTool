@@ -4,13 +4,15 @@ import { DeviationCards } from './DeviationCards';
 import { DeviationTable } from './DeviationTable';
 import { FrontPage } from './FrontPage';
 import type { DeviationsPerPage, PrintModel } from './model';
+import type { Printout } from './printout';
+import { QualityPrintDocument } from './quality/QualityPrintDocument';
 import { ReferenceAppendix } from './ReferenceAppendix';
 import type { CardPages } from './useCardPages';
 import { PRINTS_MARGIN_BOXES } from './usePageFooter';
 import type { PrintImages } from './usePrintImages';
 
-type Props = {
-  model: PrintModel;
+type Props<Model extends Printout = Printout> = {
+  model: Model;
   images: PrintImages;
   deviationsPerPage: DeviationsPerPage;
   /** The report's deviation cards on pages, once measured. */
@@ -23,11 +25,24 @@ type Props = {
 };
 
 /**
+ * The printed document, for the print route and the preview dialog alike: a final inspection's
+ * (or template's) checklist, or a quality check's report.
+ */
+export function PrintDocument({ model, appendix, ...props }: Props) {
+  return model.document === 'quality' ? (
+    // No reference images: a quality check's pictures are for the app, the report stays short.
+    <QualityPrintDocument model={model} {...props} />
+  ) : (
+    <ChecklistDocument model={model} appendix={appendix} {...props} />
+  );
+}
+
+/**
  * The document (brief §6): front page, checklist, deviations and, when asked for, the reference
  * images, each starting on a new page. The attributes on the root are what tests and autoprint
  * wait for.
  */
-export function PrintDocument({
+function ChecklistDocument({
   model,
   images,
   deviationsPerPage,
@@ -35,7 +50,7 @@ export function PrintDocument({
   appendix,
   ready,
   rootRef,
-}: Props) {
+}: Props<PrintModel>) {
   const checklistId = useId();
   // Margin boxes print the footer in Chromium; elsewhere each table repeats it at its foot.
   const fallbackFooter = PRINTS_MARGIN_BOXES ? null : model.footer;
