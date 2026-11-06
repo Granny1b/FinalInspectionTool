@@ -19,7 +19,7 @@ type Props = {
   revision: number;
   /** Problems found in the draft when the dialog opened: they are listed instead of the form. */
   issues: PublishIssue[];
-  /** The name (a quality check's position) is blank: its problem jumps to `nameFieldId`. */
+  /** The name (a quality check's front page name) is blank: its problem jumps to `nameFieldId`. */
   nameBlank: boolean;
   nameFieldId?: string;
   /** Under the title; what a final inspection template's revision means unless given. */

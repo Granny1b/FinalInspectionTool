@@ -54,8 +54,8 @@ export function DeleteTemplateDialog({
             {checks > 0 && (
               <p className="mt-2 font-medium text-ink-800">
                 {checks === 1
-                  ? `Its quality check, ${qualityChecks[0]}, is deleted too.`
-                  : `Its ${checks} quality checks are deleted too: ${qualityChecks.join(', ')}.`}
+                  ? `Its quality check “${qualityChecks[0]}” is deleted too.`
+                  : `Its ${checks} quality checks are deleted too: ${qualityChecks.map((name) => `“${name}”`).join(', ')}.`}
               </p>
             )}
           </>

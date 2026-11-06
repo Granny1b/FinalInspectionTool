@@ -59,10 +59,9 @@ describe('TemplateSchema', () => {
       ...template,
       kind: 'quality',
       parentId,
-      name: 'QC4 · Pre start up',
+      name: 'Quality check – Pre start up',
       quality: {
-        position: 'QC4',
-        operation: 'Pre start up',
+        name: 'Pre start up',
         department: 'Quality',
         documentNumber: '1.22.2',
         madeBy: 'Sam Andersson',

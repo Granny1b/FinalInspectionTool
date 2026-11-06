@@ -7,7 +7,7 @@ import { useImageUrl } from '../../lib/images';
 import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
 import { Badge, PublishedBadge, QualityChecksBadge } from './Badge';
-import { qualityCheckPositions } from './qualityCheckList';
+import { qualityCheckNames } from './qualityCheckList';
 
 type Props = {
   /** The final inspection templates, one per machine model. */
@@ -67,8 +67,8 @@ export function TemplateCards({ templates, qualityChecks, models, showDrafts }: 
               <dt className="text-ink-500">Rows</dt>
               <dd className="text-ink-800 tabular-nums">{template.itemCount}</dd>
               <dt className="text-ink-500">Quality checks</dt>
-              <dd className="truncate text-ink-800" title={qualityCheckPositions(checks)}>
-                {qualityCheckPositions(checks) || '–'}
+              <dd className="truncate text-ink-800" title={qualityCheckNames(checks)}>
+                {qualityCheckNames(checks) || '–'}
               </dd>
               <dt className="text-ink-500">Last edited</dt>
               <dd className="truncate text-ink-800" title={template.updatedBy}>

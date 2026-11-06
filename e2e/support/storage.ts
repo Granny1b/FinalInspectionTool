@@ -154,7 +154,7 @@ export async function deleteTemplate(id: string): Promise<void> {
 
 /**
  * A quality check of `parent` (a machine's final inspection template), written straight into
- * storage like createTemplate: "QC4 · Pre start up", one section of two rows with how, references
+ * storage like createTemplate: "Quality check – Pre start up", one section of two rows with how, references
  * and time. `published` adds revision 1 with the same content.
  */
 export async function createQualityCheck(parent: Template, published = false): Promise<Template> {
@@ -162,13 +162,12 @@ export async function createQualityCheck(parent: Template, published = false): P
     id: newId(),
     kind: 'quality',
     parentId: parent.id,
-    name: 'QC4 · Pre start up',
+    name: 'Quality check – Pre start up',
     modelCode: parent.modelCode,
     revision: published ? 2 : 1,
     status: 'draft',
     quality: {
-      position: 'QC4',
-      operation: 'Pre start up',
+      name: 'Pre start up',
       department: 'Quality',
       documentNumber: '1.22.2',
       madeBy: 'Sam Andersson',

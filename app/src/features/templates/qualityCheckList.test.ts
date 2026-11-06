@@ -1,7 +1,7 @@
 import type { TemplateSummary } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
 import { qualityCheckHref, qualityChecksHref, templateHref } from './queries';
-import { qualityCheckPositions, qualityChecksByMachine } from './qualityCheckList';
+import { qualityCheckNames, qualityChecksByMachine } from './qualityCheckList';
 
 function summary(patch: Partial<TemplateSummary>): TemplateSummary {
   return {
@@ -21,31 +21,30 @@ function summary(patch: Partial<TemplateSummary>): TemplateSummary {
   };
 }
 
-const front = (position: string) => ({
-  position,
-  operation: 'Op',
+const front = (name: string) => ({
+  name,
   department: 'Quality',
   documentNumber: '',
   madeBy: '',
   date: '',
 });
 
-describe('qualityCheckPositions', () => {
-  it('lists the positions, a never published one as a draft', () => {
+describe('qualityCheckNames', () => {
+  it('lists the names, a never published one as a draft', () => {
     expect(
-      qualityCheckPositions([
-        summary({ kind: 'quality', quality: front('QC1'), publishedRevision: null }),
-        summary({ kind: 'quality', quality: front('QC4') }),
+      qualityCheckNames([
+        summary({ kind: 'quality', quality: front('Frame'), publishedRevision: null }),
+        summary({ kind: 'quality', quality: front('Pre start up') }),
       ]),
-    ).toBe('QC1 (draft), QC4');
-    // Without a position, its name; without either, "Untitled".
+    ).toBe('Frame (draft), Pre start up');
+    // Without a name on its front page, its title; without either, "Untitled".
     expect(
-      qualityCheckPositions([
-        summary({ kind: 'quality', name: 'Pre start up', quality: front(' ') }),
+      qualityCheckNames([
+        summary({ kind: 'quality', name: 'Quality check – Run in', quality: front(' ') }),
         summary({ kind: 'quality', name: '', quality: undefined }),
       ]),
-    ).toBe('Pre start up, Untitled');
-    expect(qualityCheckPositions([])).toBe('');
+    ).toBe('Quality check – Run in, Untitled');
+    expect(qualityCheckNames([])).toBe('');
   });
 });
 

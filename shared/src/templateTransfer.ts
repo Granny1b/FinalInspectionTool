@@ -93,8 +93,7 @@ export function qualityCheckExport(
     exportedAt,
     qualityCheck: {
       quality: quality ?? {
-        position: '',
-        operation: '',
+        name: '',
         department: '',
         documentNumber: '',
         madeBy: '',

@@ -64,25 +64,31 @@ test.describe('an admin', () => {
       'page',
     );
 
-    // Position and operation make its title.
+    // Its name makes its title.
     await page.getByRole('button', { name: 'New quality check', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'New quality check' });
     await expect(dialog.getByRole('button', { name: 'Create quality check' })).toBeDisabled();
-    await dialog.getByLabel('Position').fill('QC4');
-    await dialog.getByLabel('Operation').fill('Pre start up');
+    await dialog.getByLabel('Name').fill('Pre start up');
+    await expect(dialog.getByLabel('Name')).toHaveAccessibleDescription(
+      'It is called “Quality check – Pre start up”.',
+    );
     await dialog.getByRole('button', { name: 'Create quality check' }).click();
     await page.waitForURL(new RegExp(`/templates/${machine.id}/quality-checks/[A-Za-z0-9]{16}$`));
     const id = page.url().split('/').at(-1)!;
-    await expect(page.getByRole('heading', { level: 1, name: 'QC4 · Pre start up' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Quality check – Pre start up' }),
+    ).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link')).toHaveText(
       ['Templates', 'E2E', 'Quality checks'],
     );
 
-    // The front page: the title follows the operation.
+    // The front page: the title follows the name.
     await expect(page.getByLabel('Department')).toHaveValue('Quality');
     await expect(page.getByLabel('Made by')).toHaveValue('Anna Andersson');
-    await page.getByLabel('Operation').fill('Pre start-up');
-    await expect(page.getByRole('heading', { level: 1, name: 'QC4 · Pre start-up' })).toBeVisible();
+    await page.getByLabel('Name', { exact: true }).fill('Pre start-up');
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Quality check – Pre start-up' }),
+    ).toBeVisible();
     await page.getByLabel('Document no.').fill('1.22.2');
     await page.getByLabel('Made by').fill('Sam Andersson');
     await page.getByLabel('Date', { exact: true }).fill('2026-11-05');
@@ -156,11 +162,10 @@ test.describe('an admin', () => {
     expect(draft).toMatchObject({
       kind: 'quality',
       parentId: machine.id,
-      name: 'QC4 · Pre start-up',
+      name: 'Quality check – Pre start-up',
       modelCode: 'E2E',
       quality: {
-        position: 'QC4',
-        operation: 'Pre start-up',
+        name: 'Pre start-up',
         department: 'Quality',
         documentNumber: '1.22.2',
         madeBy: 'Sam Andersson',
@@ -203,7 +208,7 @@ test.describe('an admin', () => {
       .getByRole('link', { name: 'Quality checks' })
       .click();
     const card = page.getByRole('listitem').filter({
-      has: page.getByRole('link', { name: 'QC4 · Pre start-up' }),
+      has: page.getByRole('link', { name: 'Quality check – Pre start-up' }),
     });
     await expect(card).toContainText('Quality · document 1.22.2 · made by Sam Andersson');
     await expect(card).toContainText('Rev 1');
@@ -218,13 +223,13 @@ test.describe('an admin', () => {
       .getByRole('listitem')
       .filter({ has: page.getByRole('link', { name: machine.name, exact: true }) });
     await expect(machineCard).toContainText('1 quality check');
-    await expect(machineCard.locator('dd').nth(1)).toHaveText('QC4');
+    await expect(machineCard.locator('dd').nth(1)).toHaveText('Pre start-up');
     // The quality check is listed under its machine only, never as a template of its own.
-    await expect(page.getByRole('link', { name: 'QC4 · Pre start-up' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Quality check – Pre start-up' })).toHaveCount(0);
     await page.evaluate(() => localStorage.setItem('templates.view', 'list'));
     await page.reload();
     await expect(page.getByRole('row', { name: machine.name }).getByRole('cell').nth(4)).toHaveText(
-      '1QC4',
+      '1Pre start-up',
     );
   });
 
@@ -234,14 +239,16 @@ test.describe('an admin', () => {
   }) => {
     const check = await createQualityCheck(machine, true);
     await page.goto(`/templates/${machine.id}/quality-checks/${check.id}`);
-    await expect(page.getByRole('heading', { level: 1, name: 'QC4 · Pre start up' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Quality check – Pre start up' }),
+    ).toBeVisible();
     // Not saved yet: the file has what the editor shows.
     await page.getByLabel('Row 1.b how').fill('Readable from the door.');
     const downloading = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Quality check actions' }).click();
     await page.getByRole('menuitem', { name: 'Export JSON' }).click();
     const download = await downloading;
-    expect(download.suggestedFilename()).toBe('QC4 Pre start up – E2E.json');
+    expect(download.suggestedFilename()).toBe('Quality check – Pre start up – E2E.json');
     const content = await readFile((await download.path())!, 'utf8');
     const file = QualityCheckExportSchema.parse(JSON.parse(content));
     expect(file.qualityCheck.quality).toEqual(check.quality);
@@ -285,24 +292,25 @@ test.describe('an admin', () => {
     await expect(dialog).toContainText(
       `From “${download.suggestedFilename()}”: 1 section, 2 rows. It becomes a new draft for E2E`,
     );
-    await expect(dialog.getByLabel('Position')).toHaveValue('QC4');
-    await expect(dialog.getByLabel('Position')).toHaveAccessibleDescription(
-      '“QC4 · Pre start up” has this position too.',
+    await expect(dialog.getByLabel('Name')).toHaveValue('Pre start up');
+    await expect(dialog.getByLabel('Name')).toHaveAccessibleDescription(
+      'This machine already has a quality check with this name.',
     );
-    await dialog.getByLabel('Position').fill('QC5');
-    await dialog.getByLabel('Operation').fill('Run in');
+    await dialog.getByLabel('Name').fill('Run in');
     await dialog.getByRole('button', { name: 'Import quality check' }).click();
     await page.waitForURL(new RegExp(`/templates/${machine.id}/quality-checks/[A-Za-z0-9]{16}$`));
     const importedId = page.url().split('/').at(-1)!;
     expect(importedId).not.toBe(check.id);
-    await expect(page.getByRole('heading', { level: 1, name: 'QC5 · Run in' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Quality check – Run in' }),
+    ).toBeVisible();
     await expect(page.getByText('Not published', { exact: true })).toBeVisible();
 
     const imported = await savedDraft(page.request, importedId);
     expect(imported).toMatchObject({
       kind: 'quality',
       parentId: machine.id,
-      quality: { ...check.quality, position: 'QC5', operation: 'Run in' },
+      quality: { ...check.quality, name: 'Run in' },
     });
     // Fresh ids, the rest as exported.
     const oldIds = new Set([check.sections[0]!.id, ...check.sections[0]!.items.map((i) => i.id)]);
@@ -331,7 +339,9 @@ test.describe('an admin', () => {
     await page.getByRole('button', { name: 'Template actions' }).click();
     await page.getByRole('menuitem', { name: 'Delete template' }).click();
     const confirm = page.getByRole('dialog', { name: `Delete “${machine.name}”?` });
-    await expect(confirm).toContainText('Its quality check, QC4 · Pre start up, is deleted too.');
+    await expect(confirm).toContainText(
+      'Its quality check “Quality check – Pre start up” is deleted too.',
+    );
     await confirm.getByRole('button', { name: 'Delete template' }).click();
     await page.waitForURL(/\/templates$/);
     await expect(
@@ -350,9 +360,11 @@ test.describe('an inspector', () => {
     await expect(page.getByRole('button', { name: /New quality check|Import JSON/ })).toHaveCount(
       0,
     );
-    await page.getByRole('link', { name: 'QC4 · Pre start up' }).click();
+    await page.getByRole('link', { name: 'Quality check – Pre start up' }).click();
     await page.waitForURL(`**/templates/${machine.id}/quality-checks/${check.id}`);
-    await expect(page.getByRole('heading', { level: 1, name: 'QC4 · Pre start up' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Quality check – Pre start up' }),
+    ).toBeVisible();
     await expect(page.getByText('Rev 1', { exact: true })).toBeVisible();
     const main = page.locator('main');
     await expect(main).toContainText('Document no.1.22.2');
@@ -380,7 +392,7 @@ test.describe('an inspector', () => {
         headers: { 'If-Match': '"x"' },
       }),
       await page.request.post('/api/templates', {
-        data: { kind: 'quality', parentId: machine.id, position: 'QC9', operation: '' },
+        data: { kind: 'quality', parentId: machine.id, name: 'Run in' },
       }),
     ];
     expect(forbidden.map((response) => response.status())).toEqual([403, 403, 403, 403, 403]);
@@ -393,7 +405,7 @@ test.describe('an inspector', () => {
     // The new inspection page offers the machine's final inspection template only.
     await page.goto('/inspections/new');
     await expect(page.getByText(machine.name).first()).toBeVisible();
-    await expect(page.getByText('QC4 · Pre start up')).toHaveCount(0);
+    await expect(page.getByText('Quality check – Pre start up')).toHaveCount(0);
 
     const response = await page.request.post('/api/inspections', {
       data: {

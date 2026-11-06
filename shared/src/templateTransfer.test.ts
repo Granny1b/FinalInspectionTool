@@ -60,8 +60,7 @@ describe('templateExport', () => {
 
 describe('qualityCheckExport', () => {
   const quality = {
-    position: 'QC4',
-    operation: 'Pre start up',
+    name: 'Pre start up',
     department: 'Quality',
     documentNumber: '1.22.2',
     madeBy: 'Sam Andersson',
@@ -108,7 +107,7 @@ describe('qualityCheckExport', () => {
       undefined,
       '2026-11-05T08:00:00.000Z',
     );
-    expect(file.qualityCheck.quality.position).toBe('');
+    expect(file.qualityCheck.quality.name).toBe('');
     expect(Object.keys(file.qualityCheck)).toEqual(['quality', 'modelCode', 'sections']);
   });
 });

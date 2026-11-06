@@ -10,23 +10,21 @@ import {
 } from './qualityChecks';
 
 describe('qualityCheckTitle', () => {
-  it('joins position and operation, leaving out what is blank', () => {
-    expect(qualityCheckTitle({ position: 'QC4', operation: 'Pre start up' })).toBe(
-      'QC4 · Pre start up',
-    );
-    expect(qualityCheckTitle({ position: ' QC4 ', operation: ' ' })).toBe('QC4');
-    expect(qualityCheckTitle({ position: '', operation: 'Pre start up' })).toBe('Pre start up');
-    expect(qualityCheckTitle({ position: '', operation: '' })).toBe('');
+  it('is "Quality check – " and the name, or nothing while the name is blank', () => {
+    expect(qualityCheckTitle({ name: ' Pre start up ' })).toBe('Quality check – Pre start up');
+    expect(qualityCheckTitle({ name: ' ' })).toBe('');
+  });
+
+  it('does not say "Quality check" twice', () => {
+    expect(qualityCheckTitle({ name: 'Quality check – Frame' })).toBe('Quality check – Frame');
+    expect(qualityCheckTitle({ name: 'quality check frame' })).toBe('quality check frame');
   });
 });
 
 describe('newQualityFront', () => {
   it('starts with the Quality department and what is known', () => {
-    expect(
-      newQualityFront({ position: ' QC1 ', operation: 'Frame', madeBy: 'Sam', date: '2026-11-05' }),
-    ).toEqual({
-      position: 'QC1',
-      operation: 'Frame',
+    expect(newQualityFront({ name: ' Frame ', madeBy: 'Sam', date: '2026-11-05' })).toEqual({
+      name: 'Frame',
       department: 'Quality',
       documentNumber: '',
       madeBy: 'Sam',

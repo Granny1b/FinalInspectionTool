@@ -73,8 +73,8 @@ Added after the six phases:
   [Light and dark theme](#light-and-dark-theme).
 - **Quick report preview.** **Preview** on an inspection shows the printout at once, unsaved
   edits included. See [Printing](#printing).
-- **Quality checks (set-up).** Checks done at positions along a machine's build, such as "QC4 ·
-  Pre start up", several per machine, kept in the machine's template under a tab of their own.
+- **Quality checks (set-up).** In-process checks along a machine's build, such as "Quality
+  check – Pre start up", several per machine, kept in the machine's template under a tab of their own.
   Admins write them as rows with pictures of how it should and should not look; they are
   published in revisions and exported and imported as JSON. Doing a check comes later. See
   [Quality checks](#quality-checks).
@@ -244,32 +244,33 @@ identity, which is what later phases key results and statistics on.
 
 ## Quality checks
 
-Checks done at positions along a machine's build, before the final inspection: "QC4 · Pre start
-up", several per machine. They live in the machine's template. This is their set-up: doing a
+In-process checks along a machine's build, before the final inspection: "Quality check – Pre
+start up", several per machine. They live in the machine's template. This is their set-up: doing a
 check on a tablet or PC, printing one, importing one from Excel, approvals, and protective
 equipment and tools per section come later.
 
 - **The machine's page.** A template opens as its machine: "← Templates", the model's name and two
   tabs, **Final inspection** (the template editor above) and **Quality checks (n)**. The Templates
   page lists the machines' final inspection templates only; each card says "1 quality check" (or
-  "No quality checks") and lists their positions under Rows, "QC1 (draft), QC4", and the list has
+  "No quality checks") and lists their names under Rows, "Frame (draft), Pre start up", and the list has
   a Quality checks column.
 - **The Quality checks tab** shows the machine's quality checks as cards: the title, the
   department, document number and who made it, the revision, the sections, and the rows, time
   and last edit. A card opens the quality check: the editor for admins, the latest published
   revision for inspectors.
-- **New quality check** (admins): Position (required, e.g. QC4) and Operation (e.g. Pre start
-  up), which make its title, "QC4 · Pre start up". A position another quality check of the
+- **New quality check** (admins): its Name (required), the in-process check, e.g. "Pre start
+  up", which makes its title "Quality check – Pre start up" (shown as it is typed; a name that
+  already starts with "Quality check" is not prefixed twice). A name another quality check of the
   machine has is pointed out, not refused. It starts as an empty draft with the department
   Quality, the admin as Made by and today's date.
 - **The editor** works as the template editor: one draft, autosave, conflicts, the leave
   warnings, Publish with a change note, the revision history, read-only revisions, Undo, drag and
   drop and the keys in the table above. Breadcrumbs lead back: Templates › RigiMill MG › Quality
   checks.
-  - **Front page:** Position, Operation, Department (from the Responsible list in
+  - **Front page:** Name, Department (from the Responsible list in
     [Settings](#settings); a department removed since stays, "(not in the list)"), Document no.,
-    Made by (people's names are suggested) and Date (may be empty). The title follows Position and
-    Operation as they are typed.
+    Made by (people's names are suggested) and Date (may be empty). The title follows the name as
+    it is typed.
   - **Rows are cards:** the pictures on the left, then the ref and **What** (one line; `Enter` adds
     a row below), **How** (lines of its own), **References** (`Enter`, a comma or a semicolon adds
     one, as ISO 12100; × removes it; up to 20) and on the right **Time** in hours with one decimal
@@ -277,7 +278,7 @@ equipment and tools per section come later.
     Undo). `Backspace` in an empty What removes the row only when it has nothing else.
   - Each section's header adds up its rows and time ("5 rows · 0.8 h"), and so does the
     checklist's heading ("3 sections · 20 rows · 0.8 h").
-  - **Publish** needs a position (instead of a name), a section and a row; every section needs a
+  - **Publish** needs a name, a section and a row; every section needs a
     title and every row its What ("Row 1.a needs “What to check”.").
 - **Pictures and more information.** A row's picture, or **Add pictures**, opens the guide editor
   (see [Guides](#guides)) in a quality check's words: _More information_, and up to six pictures,
@@ -285,9 +286,9 @@ equipment and tools per section come later.
   and arrows, boxes and labels drawn on it. The card shows the first picture with ✓ or ✗ and
   "+2" when there are more, and the start of the information. Read-only, a click shows them all.
 - **Export and import (JSON).** **⋯ → Export JSON** saves the draft as shown, unsaved changes
-  included, as `QC4 Pre start up – RigiMill MG.json`. **Import JSON** on a machine's Quality checks
-  tab reads such a file and makes a new, unpublished draft of that machine: its position and
-  operation can be changed first (the file's to start with), every section and row gets a new id,
+  included, as `Quality check – Pre start up – RigiMill MG.json`. **Import JSON** on a machine's Quality checks
+  tab reads such a file and makes a new, unpublished draft of that machine: its name can be changed
+  first (the file's to start with), every section and row gets a new id,
   and pictures not stored in this installation are left out, as the import says. A quality check
   file is refused by the Templates page's Import JSON and a template file by this one, each
   saying where it belongs; template files import exactly as before.
@@ -303,8 +304,8 @@ equipment and tools per section come later.
 
 **How they are stored.** A quality check is a template (`templates/{id}/draft.json` and
 `rev-{n}.json`) with `kind: "quality"`, `parentId` (its machine's final inspection template), its
-machine's `modelCode` (copied when it is made), `name` ("QC4 · Pre start up") and the front page
-in `quality` (`position`, `operation`, `department`, `documentNumber`, `madeBy`, `date`). A row adds
+machine's `modelCode` (copied when it is made), `name` ("Quality check – Pre start up") and the
+front page in `quality` (`name`, `department`, `documentNumber`, `madeBy`, `date`). A row adds
 `how`, `references` and `timeHours`, each left out when empty; its pictures and more information
 are its `guide`. Templates stored before quality checks existed have no `kind` and are final
 inspection templates.
@@ -756,9 +757,9 @@ someone else changed it. A `503` with `unavailable` means nothing was changed an
 can be sent again.
 
 A quality check goes through the template routes. `POST /api/templates` with `{ kind: "quality",
-parentId, position, operation }` makes one under the final inspection template `parentId` (404
+parentId, name }` makes one under the final inspection template `parentId` (404
 if there is none, 400 if it is a quality check); `POST /api/templates/import` with `{ kind:
-"quality", parentId, position, operation, file }` imports a quality check file. The list gives each
+"quality", parentId, name, file }` imports a quality check file. The list gives each
 quality check its front page, section titles and total time. Inspections refuse a quality check
 with 400.
 

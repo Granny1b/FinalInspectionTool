@@ -4,12 +4,11 @@ import { TemplateFileError } from '../templates/transfer';
 import { parseQualityCheckFile, qualityCheckFileName, readQualityCheckFile } from './transfer';
 
 const draft: TemplateDraftInput = {
-  name: 'QC4 · Pre start up',
+  name: 'Quality check – Pre start up',
   modelCode: 'RMMG',
   coverImageId: undefined,
   quality: {
-    position: 'QC4',
-    operation: 'Pre start up',
+    name: 'Pre start up',
     department: 'Quality',
     documentNumber: '1.22.2',
     madeBy: 'Sam Andersson',
@@ -35,14 +34,12 @@ const file = qualityCheckExport(draft, 'RigiMill MG', '2026-11-05T08:00:00.000Z'
 const text = (value: unknown) => JSON.stringify(value);
 
 describe('qualityCheckFileName', () => {
-  it('is the position, operation and machine, safe for any file system', () => {
+  it('is the title and the machine, safe for any file system', () => {
     expect(qualityCheckFileName(draft.quality, 'RigiMill MG')).toBe(
-      'QC4 Pre start up – RigiMill MG.json',
+      'Quality check – Pre start up – RigiMill MG.json',
     );
-    expect(qualityCheckFileName({ position: 'QC1', operation: '' }, undefined)).toBe('QC1.json');
-    expect(qualityCheckFileName({ position: 'QC/2', operation: 'A:B' }, 'IM8')).toBe(
-      'QC-2 A-B – IM8.json',
-    );
+    expect(qualityCheckFileName({ name: 'Frame' }, undefined)).toBe('Quality check – Frame.json');
+    expect(qualityCheckFileName({ name: 'A/B:C' }, 'IM8')).toBe('Quality check – A-B-C – IM8.json');
     expect(qualityCheckFileName(undefined, 'IM8')).toBe('Quality check – IM8.json');
   });
 });
@@ -63,8 +60,8 @@ describe('parseQualityCheckFile', () => {
     ['a newer version', text({ ...file, version: 2 }), /newer version/],
     [
       'a damaged file',
-      text({ ...file, qualityCheck: { ...file.qualityCheck, quality: { position: 'QC4' } } }),
-      /damaged or incomplete \(at qualityCheck\.quality\.operation\)/,
+      text({ ...file, qualityCheck: { ...file.qualityCheck, quality: { name: 'Frame' } } }),
+      /damaged or incomplete \(at qualityCheck\.quality\.department\)/,
     ],
   ])('explains %s', (_case, content, message) => {
     expect(() => parseQualityCheckFile(content)).toThrow(TemplateFileError);

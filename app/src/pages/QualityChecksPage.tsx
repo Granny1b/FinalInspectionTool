@@ -45,11 +45,7 @@ export function QualityChecksPage() {
     [templates.data, id],
   );
   const taken = useMemo(
-    () =>
-      checks.map((check) => ({
-        position: check.quality?.position ?? '',
-        title: check.name || 'Untitled quality check',
-      })),
+    () => checks.map((check) => ({ name: check.quality?.name ?? '' })),
     [checks],
   );
 
@@ -103,8 +99,8 @@ export function QualityChecksPage() {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <p className="max-w-prose text-sm text-ink-600">
-          Checks done at positions along the build, before the final inspection. Each one is a
-          checklist of its own, published in revisions.
+          In-process checks along the build, before the final inspection. Each one is a checklist of
+          its own, published in revisions.
         </p>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">

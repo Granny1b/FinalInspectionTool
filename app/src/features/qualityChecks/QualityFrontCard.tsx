@@ -7,8 +7,8 @@ import { formatDateTime } from '../../lib/format';
 import { nameSuggestions, usePeopleDirectory, usePersonName } from '../../lib/usePeople';
 import { Detail, FrontPageFrame } from '../templates/FrontPage';
 
-/** The position input; publish problems about the position jump here. */
-export const QUALITY_POSITION_ID = 'quality-position';
+/** The name input; publish problems about the name jump here. */
+export const QUALITY_NAME_ID = 'quality-name';
 
 type Props = {
   front: QualityFront;
@@ -16,21 +16,21 @@ type Props = {
   revision: number;
   /** The settings' Responsible list: the departments to choose from. */
   departments: readonly string[] | undefined;
-  /** Shown while publish problems are highlighted and the position is blank. */
-  positionError: string | undefined;
+  /** Shown while publish problems are highlighted and the name is blank. */
+  nameError: string | undefined;
   onChange: (patch: Partial<QualityFront>) => void;
 };
 
 /**
- * A quality check's front page, edited in place: Position and Operation (its title, "QC4 · Pre
- * start up"), Department, Document no., Made by and Date. Memoised: the editor re-renders on
+ * A quality check's front page, edited in place: its Name (the in-process check, "Pre start up";
+ * the check is called "Quality check – Pre start up"), Department, Document no., Made by and Date. Memoised: the editor re-renders on
  * every keystroke in the checklist.
  */
 export const QualityFrontCard = memo(function QualityFrontCard({
   front,
   revision,
   departments,
-  positionError,
+  nameError,
   onChange,
 }: Props) {
   const directory = usePeopleDirectory();
@@ -46,24 +46,13 @@ export const QualityFrontCard = memo(function QualityFrontCard({
 
   return (
     <FrontPageFrame revisionLabel={`Draft – Rev ${revision}`} layout="fields">
-      <Field id={QUALITY_POSITION_ID} label="Position" hint="E.g. QC4" error={positionError}>
-        {(control) => (
-          <input
-            {...control}
-            maxLength={50}
-            value={front.position}
-            onChange={(event) => onChange({ position: event.target.value })}
-            className={clsx(INPUT, 'h-9')}
-          />
-        )}
-      </Field>
-      <Field label="Operation" hint="E.g. Pre start up">
+      <Field id={QUALITY_NAME_ID} label="Name" hint="E.g. Pre start up" error={nameError}>
         {(control) => (
           <input
             {...control}
             maxLength={200}
-            value={front.operation}
-            onChange={(event) => onChange({ operation: event.target.value })}
+            value={front.name}
+            onChange={(event) => onChange({ name: event.target.value })}
             className={clsx(INPUT, 'h-9')}
           />
         )}
@@ -141,8 +130,7 @@ export function PublishedQualityFront({ template }: { template: Template }) {
     text?.trim() ? text : <span className="text-ink-500">—</span>;
   return (
     <FrontPageFrame revisionLabel={`Rev: ${template.revision}`} layout="fields" details>
-      <Detail label="Position">{value(front?.position)}</Detail>
-      <Detail label="Operation">{value(front?.operation)}</Detail>
+      <Detail label="Name">{value(front?.name)}</Detail>
       <Detail label="Department">{value(front?.department)}</Detail>
       <Detail label="Document no.">{value(front?.documentNumber)}</Detail>
       <Detail label="Made by">{value(front?.madeBy)}</Detail>

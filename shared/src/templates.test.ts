@@ -309,10 +309,9 @@ describe('quality checks', () => {
     id: 'qc1',
     kind: 'quality',
     parentId: 'tpl1',
-    name: 'QC4 · Pre start up',
+    name: 'Quality check – Pre start up',
     quality: {
-      position: 'QC4',
-      operation: 'Pre start up',
+      name: 'Pre start up',
       department: 'Quality',
       documentNumber: '1.22.2',
       madeBy: 'Sam Andersson',
@@ -340,15 +339,15 @@ describe('quality checks', () => {
     sections: [{ ...check.sections[0]!, items: [{ ...check.sections[0]!.items[0]!, ...patch }] }],
   });
 
-  it('publish needs a position (the name follows from it), and says rows need What', () => {
+  it('publish needs a name (the title follows from it), and says rows need What', () => {
     expect(validateForPublish(check)).toEqual([]);
-    const blank = { ...check, name: '', quality: { ...check.quality!, position: ' ' } };
+    const blank = { ...check, quality: { ...check.quality!, name: ' ' } };
     expect(validateForPublish(blank).map((issue) => issue.message)).toEqual([
-      'The quality check needs a position.',
+      'The quality check needs a name.',
     ]);
-    // An operation alone is no title: the position is what is asked for.
+    // The front page's name is what counts, not the title kept in step with it.
     expect(validateForPublish({ ...check, quality: undefined })[0]?.message).toBe(
-      'The quality check needs a position.',
+      'The quality check needs a name.',
     );
     expect(validateForPublish(withItem({ text: ' ' })).map((issue) => issue.message)).toEqual([
       'Row 1.a needs “What to check”.',
@@ -365,13 +364,7 @@ describe('quality checks', () => {
 
   it('counts changes to the front page and to how, references and time', () => {
     expect(hasUnpublishedChanges(check, published)).toBe(false);
-    for (const field of [
-      'position',
-      'operation',
-      'department',
-      'documentNumber',
-      'madeBy',
-    ] as const) {
+    for (const field of ['name', 'department', 'documentNumber', 'madeBy'] as const) {
       const changed = { ...check, quality: { ...check.quality!, [field]: 'Changed' } };
       expect(hasUnpublishedChanges(changed, published), field).toBe(true);
     }
@@ -397,13 +390,13 @@ describe('quality checks', () => {
     expect(parsed.quality).toEqual(check.quality);
   });
 
-  it('create takes the machine, a position and an operation', () => {
-    const request = { kind: 'quality', parentId: 'tpl1', position: ' QC4 ', operation: 'Pre' };
+  it('create takes the machine and a name', () => {
+    const request = { kind: 'quality', parentId: 'tpl1', name: ' Pre start up ' };
     expect(CreateQualityCheckRequestSchema.parse(request)).toEqual({
       ...request,
-      position: 'QC4',
+      name: 'Pre start up',
     });
-    expect(CreateQualityCheckRequestSchema.safeParse({ ...request, position: ' ' }).success).toBe(
+    expect(CreateQualityCheckRequestSchema.safeParse({ ...request, name: ' ' }).success).toBe(
       false,
     );
     expect(
@@ -414,15 +407,14 @@ describe('quality checks', () => {
     const final = { name: 'Final inspection – IM8', modelCode: 'IM' };
     expect(CreateAnyTemplateRequestSchema.parse(final)).toEqual(final);
     // A quality check missing its machine is never taken for a final inspection template.
-    expect(
-      CreateAnyTemplateRequestSchema.safeParse({ ...final, kind: 'quality', position: 'QC1' })
-        .success,
-    ).toBe(false);
+    expect(CreateAnyTemplateRequestSchema.safeParse({ ...final, kind: 'quality' }).success).toBe(
+      false,
+    );
   });
 
   it('import takes a quality check file only, and the template import refuses one', () => {
     const file = qualityCheckExport(check, 'RigiMill MG', '2026-11-05T08:00:00.000Z');
-    const request = { kind: 'quality', parentId: 'tpl1', position: 'QC5', operation: '', file };
+    const request = { kind: 'quality', parentId: 'tpl1', name: 'Pre start up', file };
     expect(ImportQualityCheckRequestSchema.parse(request)).toEqual(request);
     expect(ImportAnyTemplateRequestSchema.parse(request)).toEqual(request);
     const templateFile = templateExport(base, 'RigiMill MG', '2026-11-05T08:00:00.000Z');

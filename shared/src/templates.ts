@@ -39,9 +39,8 @@ export type TemplateDraftInput = z.infer<typeof TemplateDraftInputSchema>;
 
 const TemplateNameSchema = z.string().trim().min(1, 'Name is required').max(200);
 
-/** A quality check's position ("QC4"), required when it is created and to publish it. */
-const PositionSchema = z.string().trim().min(1, 'Position is required').max(50);
-const OperationSchema = z.string().trim().max(200);
+/** A quality check's name ("Pre start up"), required when it is created and to publish it. */
+const QualityNameSchema = z.string().trim().min(1, 'Name is required').max(200);
 
 /** A machine model created along with its template must have the template's model code. */
 const newModelMatches = {
@@ -69,13 +68,12 @@ export type CreateTemplateRequest = z.infer<typeof CreateTemplateRequestSchema>;
 /**
  * POST /api/templates with `kind: 'quality'`: a new, empty quality check under the machine whose
  * final inspection template is `parentId`. It gets that template's model; its title is
- * "{position} · {operation}".
+ * "Quality check – {name}".
  */
 export const CreateQualityCheckRequestSchema = z.object({
   kind: z.literal('quality'),
   parentId: IdSchema,
-  position: PositionSchema,
-  operation: OperationSchema,
+  name: QualityNameSchema,
 });
 export type CreateQualityCheckRequest = z.infer<typeof CreateQualityCheckRequestSchema>;
 
@@ -102,14 +100,13 @@ export type ImportTemplateRequest = z.infer<typeof ImportTemplateRequestSchema>;
 
 /**
  * POST /api/templates/import with `kind: 'quality'`: a new quality check draft from a quality
- * check file, under the machine whose final inspection template is `parentId`, with the position
- * and operation the admin chose (the rest of the front page comes from the file).
+ * check file, under the machine whose final inspection template is `parentId`, with the name the
+ * admin chose (the rest of the front page comes from the file).
  */
 export const ImportQualityCheckRequestSchema = z.object({
   kind: z.literal('quality'),
   parentId: IdSchema,
-  position: PositionSchema,
-  operation: OperationSchema,
+  name: QualityNameSchema,
   file: QualityCheckExportSchema,
 });
 export type ImportQualityCheckRequest = z.infer<typeof ImportQualityCheckRequestSchema>;
@@ -244,9 +241,9 @@ export function validateForPublish(template: {
 }): PublishIssue[] {
   const issues: PublishIssue[] = [];
   const quality = template.kind === 'quality';
-  // A quality check's name follows from its position and operation: the position is what it needs.
-  if (quality && !template.quality?.position.trim()) {
-    issues.push({ target: { kind: 'template' }, message: 'The quality check needs a position.' });
+  // A quality check's title follows from the name on its front page.
+  if (quality && !template.quality?.name.trim()) {
+    issues.push({ target: { kind: 'template' }, message: 'The quality check needs a name.' });
   } else if (!quality && !template.name.trim()) {
     issues.push({ target: { kind: 'template' }, message: 'The template needs a name.' });
   }
@@ -299,16 +296,7 @@ function publishedContent(t: TemplateContent): string {
     t.name,
     t.modelCode,
     t.coverImageId ?? null,
-    front
-      ? [
-          front.position,
-          front.operation,
-          front.department,
-          front.documentNumber,
-          front.madeBy,
-          front.date,
-        ]
-      : null,
+    front ? [front.name, front.department, front.documentNumber, front.madeBy, front.date] : null,
     t.sections.map((s) => [
       s.id,
       s.title,

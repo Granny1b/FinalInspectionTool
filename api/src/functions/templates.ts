@@ -154,12 +154,12 @@ export const importTemplate = endpoint({ role: 'admin' }, async (req, _context, 
 
 /**
  * A new quality check draft from a quality check file, under the machine it is imported on, with
- * the position and operation the admin chose and the rest of the file's front page. Every section
+ * the name the admin chose and the rest of the file's front page. Every section
  * and row gets a new id (a quality check's rows have no history yet), and images this
  * installation doesn't have are left out, as for a template.
  */
 async function importQualityCheck(body: ImportQualityCheckRequest, by: string) {
-  const { parentId, position, operation, file } = body;
+  const { parentId, name, file } = body;
   const { quality, sections } = file.qualityCheck;
   const [machine, stored] = await Promise.all([
     loadMachine(parentId),
@@ -173,7 +173,7 @@ async function importQualityCheck(body: ImportQualityCheckRequest, by: string) {
     kind: 'quality',
     parentId: machine.id,
     modelCode: machine.draft.modelCode,
-    ...withQuality({ ...quality, position, operation }),
+    ...withQuality({ ...quality, name }),
     sections: checklist.sections,
     updatedBy: by,
   });
@@ -264,12 +264,12 @@ export const deleteTemplate = endpoint({ role: 'admin' }, async (req, context) =
   return { status: 204 };
 });
 
-/** A quality check's front page with the name that follows from it ("QC4 · Pre start up"). */
+/** A quality check's front page with the title that follows from it ("Quality check – Pre start up"). */
 function withQuality(quality: QualityFront): { name: string; quality: QualityFront } {
   return { name: qualityCheckTitle(quality), quality };
 }
 
-const EMPTY_FRONT = { position: '', operation: '' };
+const EMPTY_FRONT = { name: '' };
 
 /** "2026-11-05" in Sweden, where the checks are written. */
 const swedishDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' });

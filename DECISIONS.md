@@ -2585,7 +2585,7 @@ them.
 
 ## Quality checks: set up (2026-11-05)
 
-Quality checks are the checks done at positions along a machine's build ("QC4 · Pre start up"),
+Quality checks are the in-process checks along a machine's build ("Quality check – Pre start up"),
 several per machine. This is their set-up: admins create, edit, publish, export, import and delete
 them. Doing a check, printing one, Excel import, approvals and protective equipment or tools per
 section are left for later; nothing of them is stubbed.
@@ -2605,13 +2605,19 @@ section are left for later; nothing of them is stubbed.
   machine is `parentId`, so a final template moved to another model keeps its quality checks
   under it, and the copied code is only a record (the export file names the machine). A save
   never changes a quality check's model, whatever the editor sends.
-- **The front page is `quality: { position, operation, department, documentNumber, madeBy, date }`**
-  (50, 200, 200, 100 and 200 characters; the date "YYYY-MM-DD" or empty). Final inspection
+- **The front page is `quality: { name, department, documentNumber, madeBy, date }`** (200, 200,
+  100 and 200 characters; the date "YYYY-MM-DD" or empty). Final inspection
   templates have none: a save of one drops a `quality` sent with it.
-- **The title is "{position} · {operation}"** ("QC4" without an operation), and `name` follows it,
-  so lists, summaries, dialogs and the delete callout have it without knowing about front pages.
-  The editor keeps `name` in step as Position or Operation is typed; the server sets it again on
-  every create, import and save, so the stored name can't drift from the front page.
+- **A quality check is named after its in-process check, not numbered.** The first version had a
+  Position ("QC4") and an Operation ("Pre start up") with the title "QC4 · Pre start up"; the user
+  would rather not number them, so the front page has one **Name** ("Pre start up") and the title
+  is **"Quality check – Pre start up"**, as a template is "Final inspection – RigiMill MG". A name
+  that already starts with "Quality check" isn't prefixed twice. Changed before anything was
+  released, so no stored data had a position.
+- **The template's `name` follows the title** (`qualityCheckTitle`), so lists, summaries, dialogs
+  and the delete callout have it without knowing about front pages. The editor keeps it in step as
+  the name is typed; the server sets it again on every create, import and save, so the stored name
+  can't drift from the front page.
 - **Rows gain `how` (2000 characters, lines allowed), `references` (up to 20 strings of 1–100
   characters, trimmed) and `timeHours` (0–999).** Each is left out when empty: the editor stores
   no `how: ''`, no `references: []` and no time for a blank field. "What" is the row's `text`.
@@ -2633,9 +2639,9 @@ section are left for later; nothing of them is stubbed.
 
 ### Publishing and unpublished changes
 
-- **`validateForPublish` takes `kind` and `quality`.** A quality check needs a position instead of
-  a name (its name follows from it): "The quality check needs a position.", and its "Go to it"
-  focuses the Position field. The other rules are the template's; an empty row says "Row 1.a needs
+- **`validateForPublish` takes `kind` and `quality`.** A quality check needs the name on its front
+  page (its title follows from it): "The quality check needs a name.", and its "Go to it" focuses
+  the Name field. The other rules are the template's; an empty row says "Row 1.a needs
   “What to check”.", the label of the field to fill.
 - **`sameTemplateContent` compares the front page and each row's how, references and time,** field
   by field as before. A blank how or an empty list of references is the same as none, so an
@@ -2706,7 +2712,7 @@ section are left for later; nothing of them is stubbed.
 - **Read-only (inspectors, revisions):** the same cards without inputs; a row without pictures
   keeps the pictures' column empty on a wide sheet, so every row's text starts in one line.
 - **Templates page:** the list and cards show final inspection templates only, each with "1
-  quality check" / "No quality checks", their positions (a never-published one marked "(draft)")
+  quality check" / "No quality checks", their names (a never-published one marked "(draft)")
   in the card's footer and a Quality checks column in the list. After deleting a template the
   callout adds how many quality checks went with it (counted when the delete is confirmed, as
   the list reloads without them).
@@ -2714,8 +2720,8 @@ section are left for later; nothing of them is stubbed.
   numbered section chips, rows, time, last edit) and, for admins, Import JSON, New quality check
   and a dashed New quality check card. The whole card is the link; its "Open" only shows that
   (hidden from screen readers, so it is no second stop).
-- **A position another quality check of the machine already has is pointed out, not refused.**
-  Two checks at one position may be wanted (a check split in two); the hint says which one.
+- **A name another quality check of the machine already has is pointed out, not refused.** Two
+  checks of one name may be wanted for a while (a copy being reworked); the hint says so.
 - **The sidebar's group is now "Quality"** (the loading skeleton's label bar is shorter to match):
   Inspections and Templates cover final inspections and quality checks.
 - **Quality checks don't print yet:** no Print preview in their editor or views, and the print
@@ -2729,11 +2735,11 @@ section are left for later; nothing of them is stubbed.
   refuses the other's file by its format, in the browser with a message that says where it
   belongs ("This is a quality check file. Import it on the Quality checks tab of a machine’s
   template.") and in the API with 400.
-- **Export JSON writes the draft as shown, unsaved changes included,** named "QC4 Pre start up –
-  RigiMill MG.json" (the title without its dot, then the machine), with the characters file
+- **Export JSON writes the draft as shown, unsaved changes included,** named "Quality check – Pre
+  start up – RigiMill MG.json" (the title, then the machine), with the characters file
   systems refuse replaced, as a template's.
 - **Import JSON is on the machine's Quality checks tab** and always makes a new draft of that
-  machine, with the position and operation chosen in its dialog (the file's to start with) and
+  machine, with the name chosen in its dialog (the file's to start with) and
   the rest of the file's front page.
 - **An imported quality check always gets new section and row ids.** A template keeps the file's
   ids when they are free so its rows keep their Insights history; quality check rows have no
@@ -2748,15 +2754,15 @@ section are left for later; nothing of them is stubbed.
   row fields; the request unions; the quality check file (both ways refused); the hours, title and
   `rowHasContent` helpers.
 - **api** (`quality-checks.test.ts`): create (201 with the defaults, 404, 400 for a quality parent
-  or no position, 403); one template per model unaffected; the list's kind, parent, front page,
+  or no name, 403); one template per model unaffected; the list's kind, parent, front page,
   sections and time; saving (name follows, model and machine stay, front page kept when left
-  out, none on a final template, 400 for bad fields); publish (position required, revision frozen,
+  out, none on a final template, 400 for bad fields); publish (name required, revision frozen,
   a changed time is an unpublished change); delete cascading (drafts and revisions; another
   machine's kept) and alone; import (fresh ids, chosen title, missing pictures counted, each
   file refused by the other import, 404, 403); and inspections refusing a quality check. The
   existing template tests expect `kind` in drafts and summaries. **seed:** a quality check with
   RMMG's code doesn't stop the import.
-- **app:** the row field edits (`setRowFields`), references, the positions line and grouping, the
+- **app:** the row field edits (`setRowFields`), references, the names line and grouping, the
   links, and the quality check file (name, parsing, the template file refused); the template
   file parser refuses a quality check file.
 - **e2e** (`quality-checks.spec.ts`, 5 tests; their machine and its quality checks deleted after

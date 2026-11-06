@@ -5,7 +5,7 @@ import { formatDate } from '../../lib/format';
 import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
 import { Badge, PublishedBadge } from './Badge';
-import { qualityCheckPositions } from './qualityCheckList';
+import { qualityCheckNames } from './qualityCheckList';
 
 type Props = {
   /** The final inspection templates, one per machine model. */
@@ -103,17 +103,17 @@ export function TemplateList({ templates, qualityChecks, models, showDrafts }: P
   );
 }
 
-/** How many quality checks a machine has, and their positions. */
+/** How many quality checks a machine has, and their names. */
 function QualityChecksCell({ checks }: { checks: TemplateSummary[] }) {
-  const positions = qualityCheckPositions(checks);
+  const names = qualityCheckNames(checks);
   return (
     <td className={clsx(CELL, FROM_SM, 'max-w-48')}>
       <div className="text-ink-700 tabular-nums">
         {checks.length === 0 ? 'None' : checks.length}
       </div>
-      {positions && (
-        <div className="truncate text-xs text-ink-500" title={positions}>
-          {positions}
+      {names && (
+        <div className="truncate text-xs text-ink-500" title={names}>
+          {names}
         </div>
       )}
     </td>

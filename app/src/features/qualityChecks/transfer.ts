@@ -20,14 +20,14 @@ import {
 } from '../templates/transfer';
 
 /**
- * "QC4 Pre start up – RigiMill MG.json": the position, the operation and the machine, with the
+ * "Quality check – Pre start up – RigiMill MG.json": the title and the machine, with the
  * characters Windows and macOS refuse in file names replaced.
  */
 export function qualityCheckFileName(
-  front: { position: string; operation: string } | undefined,
+  front: { name: string } | undefined,
   machine: string | undefined,
 ): string {
-  const title = front ? qualityCheckTitle(front).replace(' · ', ' ') : '';
+  const title = front ? qualityCheckTitle(front) : '';
   const name = [title || 'Quality check', machine?.trim()].filter(Boolean).join(' – ');
   return templateFileName(name);
 }

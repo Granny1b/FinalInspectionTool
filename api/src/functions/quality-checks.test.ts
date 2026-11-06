@@ -118,15 +118,14 @@ async function machine(overrides: Partial<Template> = {}) {
 }
 
 /** A new quality check under `parentId`, as the dialog creates it. */
-async function newCheck(parentId: string, position = 'QC4', operation = 'Pre start up') {
-  const response = await post(createTemplate, { kind: 'quality', parentId, position, operation });
+async function newCheck(parentId: string, name = 'Pre start up') {
+  const response = await post(createTemplate, { kind: 'quality', parentId, name });
   expect(response.status).toBe(201);
   return { draft: TemplateDetailSchema.parse(response.jsonBody).draft, etag: etagOf(response) };
 }
 
 const front: QualityFront = {
-  position: 'QC4',
-  operation: 'Pre start up',
+  name: 'Pre start up',
   department: 'Quality',
   documentNumber: '1.22.2',
   madeBy: 'Sam Andersson',
@@ -160,8 +159,7 @@ describe('POST /api/templates with kind quality', () => {
     const response = await post(createTemplate, {
       kind: 'quality',
       parentId: template.id,
-      position: ' QC4 ',
-      operation: 'Pre start up',
+      name: ' Pre start up ',
     });
     expect(response.status).toBe(201);
     const { draft, revisions, hasUnpublishedChanges } = TemplateDetailSchema.parse(
@@ -174,13 +172,12 @@ describe('POST /api/templates with kind quality', () => {
       id: expect.any(String),
       kind: 'quality',
       parentId: template.id,
-      name: 'QC4 · Pre start up',
+      name: 'Quality check – Pre start up',
       modelCode: 'RMMG',
       revision: 1,
       status: 'draft',
       quality: {
-        position: 'QC4',
-        operation: 'Pre start up',
+        name: 'Pre start up',
         department: 'Quality',
         documentNumber: '',
         madeBy: 'Bo Ss',
@@ -204,28 +201,25 @@ describe('POST /api/templates with kind quality', () => {
     const response = await post(createTemplate, {
       kind: 'quality',
       parentId: newId(),
-      position: 'QC1',
-      operation: '',
+      name: 'Run in',
     });
     expect(response.status).toBe(404);
   });
 
-  it('400 when the parent is a quality check, or without a position', async () => {
+  it('400 when the parent is a quality check, or without a name', async () => {
     const { template } = await machine();
     const { draft } = await newCheck(template.id);
     const nested = await post(createTemplate, {
       kind: 'quality',
       parentId: draft.id,
-      position: 'QC5',
-      operation: '',
+      name: 'Run in',
     });
     expect(nested.status).toBe(400);
     expect(errorOf(nested).message).toMatch(/final inspection template/);
     const blank = await post(createTemplate, {
       kind: 'quality',
       parentId: template.id,
-      position: ' ',
-      operation: 'X',
+      name: ' ',
     });
     expect(blank.status).toBe(400);
   });
@@ -233,8 +227,8 @@ describe('POST /api/templates with kind quality', () => {
   it('leaves the one-template-per-model rule to final inspection templates', async () => {
     const { template } = await machine();
     // Several quality checks for one model are fine.
-    await newCheck(template.id, 'QC1');
-    await newCheck(template.id, 'QC2');
+    await newCheck(template.id, 'Frame');
+    await newCheck(template.id, 'Electrical');
     // The model's final inspection template is still the only one.
     const second = await post(createTemplate, { name: 'Another', modelCode: 'RMMG' });
     expect(second.status).toBe(409);
@@ -253,7 +247,7 @@ describe('POST /api/templates with kind quality', () => {
     const { template } = await machine();
     const response = await post(
       createTemplate,
-      { kind: 'quality', parentId: template.id, position: 'QC1', operation: '' },
+      { kind: 'quality', parentId: template.id, name: 'Frame' },
       inspector,
     );
     expect(response.status).toBe(403);
@@ -278,7 +272,7 @@ describe('GET /api/templates', () => {
       id: draft.id,
       kind: 'quality',
       parentId: template.id,
-      name: 'QC4 · Pre start up',
+      name: 'Quality check – Pre start up',
       modelCode: 'RMMG',
       publishedRevision: null,
       publishedName: null,
@@ -305,7 +299,7 @@ describe('PUT /api/templates/{id} of a quality check', () => {
       {
         name: 'Something else',
         modelCode: 'IM',
-        quality: { ...front, position: 'QC5', operation: 'Run in' },
+        quality: { ...front, name: 'Run in' },
         sections,
       },
       etag,
@@ -315,9 +309,9 @@ describe('PUT /api/templates/{id} of a quality check', () => {
     expect(saved).toMatchObject({
       kind: 'quality',
       parentId: template.id,
-      name: 'QC5 · Run in',
+      name: 'Quality check – Run in',
       modelCode: 'RMMG',
-      quality: { ...front, position: 'QC5', operation: 'Run in' },
+      quality: { ...front, name: 'Run in' },
       sections,
     });
   });
@@ -361,19 +355,19 @@ describe('PUT /api/templates/{id} of a quality check', () => {
 });
 
 describe('publishing a quality check', () => {
-  it('needs a position, then freezes the front page and rows as revision 1', async () => {
+  it('needs a name, then freezes the front page and rows as revision 1', async () => {
     const { template } = await machine();
     const { draft, etag } = await newCheck(template.id);
     const sections = checklist();
     const blank = await put(
       draft.id,
-      { ...draft, quality: { ...front, position: '', operation: '' }, sections },
+      { ...draft, quality: { ...front, name: '' }, sections },
       etag,
     );
     const refused = await publish(draft.id, etagOf(blank));
     expect(refused.status).toBe(400);
     expect(errorOf(refused).details).toEqual([
-      { target: { kind: 'template' }, message: 'The quality check needs a position.' },
+      { target: { kind: 'template' }, message: 'The quality check needs a name.' },
     ]);
 
     const fixed = await put(draft.id, { ...draft, quality: front, sections }, etagOf(blank));
@@ -390,7 +384,7 @@ describe('publishing a quality check', () => {
     expect(TemplateSchema.parse(revision.jsonBody)).toMatchObject({
       kind: 'quality',
       parentId: template.id,
-      name: 'QC4 · Pre start up',
+      name: 'Quality check – Pre start up',
       status: 'published',
       revision: 1,
       quality: front,
@@ -414,8 +408,8 @@ describe('publishing a quality check', () => {
 describe('DELETE /api/templates/{id}', () => {
   it('deletes a final inspection template’s quality checks with it, drafts and revisions', async () => {
     const { template, etag } = await machine();
-    const first = await newCheck(template.id, 'QC1');
-    const second = await newCheck(template.id, 'QC2');
+    const first = await newCheck(template.id, 'Frame');
+    const second = await newCheck(template.id, 'Electrical');
     const fixed = await put(
       first.draft.id,
       { ...first.draft, quality: front, sections: checklist() },
@@ -424,7 +418,7 @@ describe('DELETE /api/templates/{id}', () => {
     expect((await publish(first.draft.id, etagOf(fixed))).status).toBe(200);
     // Another machine's quality check stays.
     const other = await machine({ name: 'Final inspection – IM8', modelCode: 'IM' });
-    const kept = await newCheck(other.template.id, 'QC9');
+    const kept = await newCheck(other.template.id, 'Run in');
 
     expect((await remove(template.id, etag)).status).toBe(204);
     expect(await blobsOf(template.id)).toEqual([]);
@@ -485,8 +479,7 @@ describe('POST /api/templates/import with kind quality', () => {
     const response = await post(importTemplate, {
       kind: 'quality',
       parentId: template.id,
-      position: 'QC5',
-      operation: 'Run in',
+      name: 'Run in',
       file,
     });
     expect(response.status).toBe(201);
@@ -496,8 +489,8 @@ describe('POST /api/templates/import with kind quality', () => {
       kind: 'quality',
       parentId: template.id,
       modelCode: 'RMMG',
-      name: 'QC5 · Run in',
-      quality: { ...front, position: 'QC5', operation: 'Run in' },
+      name: 'Quality check – Run in',
+      quality: { ...front, name: 'Run in' },
       revision: 1,
     });
     // Fresh ids, the rest as in the file.
@@ -520,8 +513,7 @@ describe('POST /api/templates/import with kind quality', () => {
     const wrongFile = await post(importTemplate, {
       kind: 'quality',
       parentId: template.id,
-      position: 'QC5',
-      operation: '',
+      name: 'Run in',
       file: templateFile,
     });
     expect(wrongFile.status).toBe(400);
@@ -540,7 +532,7 @@ describe('POST /api/templates/import with kind quality', () => {
       undefined,
       '2026-11-05T08:00:00.000Z',
     );
-    const body = { kind: 'quality', parentId: newId(), position: 'QC1', operation: '', file };
+    const body = { kind: 'quality', parentId: newId(), name: 'Frame', file };
     expect((await post(importTemplate, body)).status).toBe(404);
     const { template } = await machine();
     expect((await post(importTemplate, { ...body, parentId: template.id }, inspector)).status).toBe(

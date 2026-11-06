@@ -203,7 +203,7 @@ export type TemplateStatus = z.infer<typeof TemplateStatusSchema>;
 
 /**
  * What a template is: a machine model's final inspection checklist, or one of its quality checks
- * (checks at positions along the build, such as "QC4 · Pre start up").
+ * (in-process checks along the build, such as "Quality check – Pre start up").
  */
 export const TEMPLATE_KINDS = ['final', 'quality'] as const;
 export const TemplateKindSchema = z.enum(TEMPLATE_KINDS);
@@ -211,10 +211,8 @@ export type TemplateKind = z.infer<typeof TemplateKindSchema>;
 
 /** A quality check's front page. Empty strings while it is being written. */
 export const QualityFrontSchema = z.object({
-  /** "QC4": where along the build the check is done. Required to publish. */
-  position: z.string().max(50),
-  /** "Pre start up" */
-  operation: z.string().max(200),
+  /** The in-process check, "Pre start up": the quality check is called after it. Required to publish. */
+  name: z.string().max(200),
   /** The department that owns the check, e.g. "Quality" (from the Responsible list). */
   department: z.string().max(200),
   /** "1.22.2" */
@@ -233,8 +231,8 @@ export const TemplateSchema = z.object({
   /** A quality check's machine: the id of its model's final inspection template. */
   parentId: IdSchema.optional(),
   /**
-   * "Final inspection – RigiMill MG". A quality check's is "{position} · {operation}", kept in
-   * step with its front page.
+   * "Final inspection – RigiMill MG". A quality check's is "Quality check – {its front page's
+   * name}", kept in step with the front page.
    */
   name: z.string().max(200),
   /** A quality check has its machine's code, copied when it is created. */

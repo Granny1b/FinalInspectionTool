@@ -6,7 +6,7 @@ import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
 import { errorMessage } from '../../lib/api';
 import { qualityCheckHref, useImportTemplate } from '../templates/queries';
-import { PositionFields } from './PositionFields';
+import { NameField } from './NameField';
 
 type Props = {
   /** A file that passed the checks (transfer.ts), and what it was called. */
@@ -16,14 +16,13 @@ type Props = {
   parentId: string;
   machineName: string;
   /** The machine's other quality checks. */
-  taken: readonly { position: string; title: string }[];
+  taken: readonly { name: string }[];
   onClose: () => void;
 };
 
 /**
  * Import JSON on a machine's Quality checks tab: the file's quality check becomes a new,
- * unpublished draft of this machine, under the position and operation chosen here (the file's to
- * start with). Opens it in the editor, after saying how many pictures were left out when there
+ * unpublished draft of this machine, under the name chosen here (the file's to start with). Opens it in the editor, after saying how many pictures were left out when there
  * were any.
  */
 export function ImportQualityCheckDialog({
@@ -38,19 +37,16 @@ export function ImportQualityCheckDialog({
   const navigate = useNavigate();
   const importing = useImportTemplate();
   const { quality, sections } = file.qualityCheck;
-  const [title, setTitle] = useState({
-    position: quality.position,
-    operation: quality.operation,
-  });
+  const [name, setName] = useState(quality.name);
   const [imported, setImported] = useState<{ id: string; droppedImages: number } | null>(null);
   const close = () => dialogRef.current?.close();
   const rows = sections.reduce((count, section) => count + section.items.length, 0);
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!title.position.trim()) return;
+    if (!name.trim()) return;
     importing.mutate(
-      { kind: 'quality', parentId, ...title, file },
+      { kind: 'quality', parentId, name, file },
       {
         onSuccess: ({ loaded, droppedImages }) => {
           const id = loaded.detail.draft.id;
@@ -106,11 +102,7 @@ export function ImportQualityCheckDialog({
       busy={importing.isPending}
     >
       <form onSubmit={submit} className="mt-6 space-y-5">
-        <PositionFields
-          {...title}
-          taken={taken}
-          onChange={(patch) => setTitle((current) => ({ ...current, ...patch }))}
-        />
+        <NameField name={name} taken={taken} onChange={setName} />
         {importing.isError && (
           <p role="alert" className="text-sm font-medium text-nok-fg">
             {errorMessage(importing.error)}
@@ -120,7 +112,7 @@ export function ImportQualityCheckDialog({
           <Button variant="secondary" onClick={close} disabled={importing.isPending}>
             Cancel
           </Button>
-          <Button type="submit" disabled={importing.isPending || !title.position.trim()}>
+          <Button type="submit" disabled={importing.isPending || !name.trim()}>
             {importing.isPending && (
               <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />
             )}

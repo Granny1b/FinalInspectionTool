@@ -15,7 +15,7 @@ type Props = {
 };
 
 /**
- * A machine's quality checks as cards: the title ("QC4 · Pre start up"), who owns and wrote it,
+ * A machine's quality checks as cards: the title ("Quality check – Pre start up"), who owns and wrote it,
  * its revision, its sections, and its rows, time and last edit. The whole card opens it. Admins
  * get a dashed card for another one at the end.
  */
@@ -117,7 +117,7 @@ export function QualityCheckCards({ checks, isAdmin, onNew }: Props) {
             <Plus size={24} aria-hidden="true" className="text-brand-600" />
             <span className="font-semibold text-brand-700">New quality check</span>
             <span className="max-w-64 text-sm">
-              Another position along the build for this machine, such as QC1 or QC2.
+              Another in-process check along the build of this machine, such as Pre start up.
             </span>
           </button>
         </li>

@@ -1,14 +1,14 @@
 import type { TemplateSummary } from '@modig/shared';
 
 /**
- * A machine's quality checks by position, for its card and list row: "QC1, QC4 (draft)", with
- * "(draft)" for one never published. '' without any.
+ * A machine's quality checks by name, for its card and list row: "Pre start up, Frame (draft)",
+ * with "(draft)" for one never published. '' without any.
  */
-export function qualityCheckPositions(checks: readonly TemplateSummary[]): string {
+export function qualityCheckNames(checks: readonly TemplateSummary[]): string {
   return checks
     .map((check) => {
-      const position = check.quality?.position.trim() || check.name.trim() || 'Untitled';
-      return check.publishedRevision === null ? `${position} (draft)` : position;
+      const name = check.quality?.name.trim() || check.name.trim() || 'Untitled';
+      return check.publishedRevision === null ? `${name} (draft)` : name;
     })
     .join(', ');
 }

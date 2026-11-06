@@ -1,5 +1,5 @@
 /**
- * Quality checks: checks done at positions along a machine's build ("QC4 · Pre start up"),
+ * Quality checks: in-process checks along a machine's build ("Quality check – Pre start up"),
  * several per machine model. Each is a template of kind `quality` under its machine's final
  * inspection template (`parentId`), with a front page of its own and rows that say what to check,
  * how, against which references and in how much time. Pure helpers shared by the API and the app.
@@ -9,21 +9,28 @@ import type { Item, QualityFront } from './schemas';
 /** A new quality check's department until an admin picks another (the Quality department's). */
 export const DEFAULT_QUALITY_DEPARTMENT = 'Quality';
 
-/** "QC4 · Pre start up"; "QC4" without an operation; '' when both are blank. */
-export function qualityCheckTitle(front: Pick<QualityFront, 'position' | 'operation'>): string {
-  return [front.position.trim(), front.operation.trim()].filter(Boolean).join(' · ');
+const TITLE_PREFIX = 'Quality check';
+
+/**
+ * "Quality check – Pre start up" for the name "Pre start up"; '' when the name is blank. A name
+ * that already starts with "Quality check" is not prefixed twice.
+ */
+export function qualityCheckTitle(front: Pick<QualityFront, 'name'>): string {
+  const name = front.name.trim();
+  if (!name) return '';
+  return name.toLowerCase().startsWith(TITLE_PREFIX.toLowerCase())
+    ? name
+    : `${TITLE_PREFIX} – ${name}`;
 }
 
 /** A new quality check's front page. */
 export function newQualityFront(fields: {
-  position: string;
-  operation: string;
+  name: string;
   madeBy?: string;
   date?: string;
 }): QualityFront {
   return {
-    position: fields.position.trim(),
-    operation: fields.operation.trim(),
+    name: fields.name.trim(),
     department: DEFAULT_QUALITY_DEPARTMENT,
     documentNumber: '',
     madeBy: fields.madeBy?.trim() ?? '',

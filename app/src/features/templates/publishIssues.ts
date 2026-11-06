@@ -25,7 +25,7 @@ export function templateIssueField(
 export function focusIssue(
   target: PublishIssue['target'],
   templateField: 'name' | 'checklist',
-  /** The name's input, or a quality check's position's. */
+  /** The name's input (a quality check's front page name). */
   nameFieldId: string = TEMPLATE_NAME_ID,
 ) {
   const selector =

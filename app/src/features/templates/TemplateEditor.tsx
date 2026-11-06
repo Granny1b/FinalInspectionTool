@@ -30,7 +30,7 @@ import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { modelName, useSettings } from '../../lib/useSettings';
 import { useScrollPaddingBelow } from '../../lib/useScrollPaddingBelow';
 import { templatePrintHref } from '../print/links';
-import { QUALITY_POSITION_ID, QualityFrontCard } from '../qualityChecks/QualityFrontCard';
+import { QUALITY_NAME_ID, QualityFrontCard } from '../qualityChecks/QualityFrontCard';
 import { downloadQualityCheck } from '../qualityChecks/transfer';
 import { Badge } from './Badge';
 import { ChecklistHeading } from './ChecklistHeading';
@@ -143,7 +143,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
     [saver],
   );
   const updateSections = useCallback((sections: Section[]) => update({ sections }), [update]);
-  // A quality check's name follows its position and operation, so lists show its title.
+  // A quality check's template name follows its front page's name, so lists show its title.
   const updateFront = useCallback(
     (patch: Partial<QualityFront>) => {
       const front = { ...(draftRef.current.quality ?? newQualityFront(EMPTY_TITLE)), ...patch };
@@ -160,8 +160,8 @@ export function TemplateEditor({ loaded, onReload }: Props) {
     () => (issueKey ? (JSON.parse(issueKey) as PublishIssue[]) : NO_ISSUES),
     [issueKey],
   );
-  // The template's name, or a quality check's position, which its title starts with.
-  const nameBlank = quality ? !draft.quality?.position.trim() : !draft.name.trim();
+  // The template's name, or a quality check's name, which its title follows.
+  const nameBlank = quality ? !draft.quality?.name.trim() : !draft.name.trim();
 
   const [publishing, setPublishing] = useState<PublishIssue[] | null>(null);
   const [publishConflict, setPublishConflict] = useState(false);
@@ -458,9 +458,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             front={draft.quality ?? newQualityFront(EMPTY_TITLE)}
             revision={server.revision}
             departments={settings.data?.responsibles}
-            positionError={
-              checking && nameBlank ? 'The quality check needs a position.' : undefined
-            }
+            nameError={checking && nameBlank ? 'The quality check needs a name.' : undefined}
             onChange={updateFront}
           />
         ) : (
@@ -503,7 +501,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           revision={server.revision}
           issues={publishing}
           nameBlank={nameBlank}
-          nameFieldId={quality ? QUALITY_POSITION_ID : TEMPLATE_NAME_ID}
+          nameFieldId={quality ? QUALITY_NAME_ID : TEMPLATE_NAME_ID}
           description={
             quality
               ? 'A published revision can’t be changed: later edits go into the next one.'
@@ -555,7 +553,7 @@ function draftInput({
   return { name, modelCode, coverImageId, ...(quality && { quality }), sections };
 }
 
-const EMPTY_TITLE = { position: '', operation: '' };
+const EMPTY_TITLE = { name: '' };
 
 function serverState(detail: TemplateDetail): ServerState {
   return {
