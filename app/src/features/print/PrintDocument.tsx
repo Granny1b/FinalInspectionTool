@@ -5,6 +5,7 @@ import { DeviationTable } from './DeviationTable';
 import { FrontPage } from './FrontPage';
 import type { DeviationsPerPage, PrintModel } from './model';
 import type { Printout } from './printout';
+import { InstructionsDocument } from './quality/InstructionsDocument';
 import { QualityPrintDocument } from './quality/QualityPrintDocument';
 import { ReferenceAppendix } from './ReferenceAppendix';
 import type { CardPages } from './useCardPages';
@@ -26,15 +27,19 @@ type Props<Model extends Printout = Printout> = {
 
 /**
  * The printed document, for the print route and the preview dialog alike: a final inspection's
- * (or template's) checklist, or a quality check's report.
+ * (or template's) checklist, a quality check's report, or a quality check's instructions.
  */
 export function PrintDocument({ model, appendix, ...props }: Props) {
-  return model.document === 'quality' ? (
-    // No reference images: a quality check's pictures are for the app, the report stays short.
-    <QualityPrintDocument model={model} {...props} />
-  ) : (
-    <ChecklistDocument model={model} appendix={appendix} {...props} />
-  );
+  switch (model.document) {
+    case 'quality':
+      // No reference images: a quality check's pictures are for the app, the report stays short.
+      return <QualityPrintDocument model={model} {...props} />;
+    case 'instructions':
+      // The pictures are in the instructions, by their rows.
+      return <InstructionsDocument model={model} {...props} />;
+    default:
+      return <ChecklistDocument model={model} appendix={appendix} {...props} />;
+  }
 }
 
 /**

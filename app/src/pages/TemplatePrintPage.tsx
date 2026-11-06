@@ -1,11 +1,11 @@
 import { hasRole, type Template } from '@modig/shared';
-import { ArrowLeft, FileClock, Printer } from 'lucide-react';
+import { FileClock } from 'lucide-react';
 import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router';
-import { ButtonLink } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { parseAppendix } from '../features/print/links';
 import { templatePrint } from '../features/print/model';
+import { qualityInstructionsPrint } from '../features/print/quality/instructions';
 import { PrintLoadError, PrintLoading, PrintMessage } from '../features/print/PrintStates';
 import { PrintView } from '../features/print/PrintView';
 import { usePrintImages } from '../features/print/usePrintImages';
@@ -19,15 +19,17 @@ import {
 import { TemplateNotFound } from '../features/templates/TemplateNotFound';
 import { isMissing } from '../lib/api';
 import { useCurrentUser } from '../lib/useMe';
+import { personName, usePeopleDirectory } from '../lib/usePeople';
 import { modelName, useSettings } from '../lib/useSettings';
 
 type Back = { to: string; label: string };
 
 /**
  * /templates/:id/print[?revision=n][&appendix=1] — a template's checklist as it prints for a new
- * inspection, blank, with an empty front page. Admins see the draft (marked as such), inspectors
- * the latest published revision; `?revision=n` shows that revision to both. `appendix=1` adds
- * its reference images.
+ * inspection, blank, with an empty front page; for a quality check, its instructions (a manual
+ * for the operator, pictures included). Admins see the draft (marked as such), inspectors the
+ * latest published revision; `?revision=n` shows that revision to both. `appendix=1` adds a
+ * checklist's reference images.
  */
 export function TemplatePrintPage() {
   const { id = '' } = useParams();
@@ -95,38 +97,70 @@ function RevisionPrint({ id, param }: { id: string; param: string }) {
     <TemplatePrint
       template={revision.data}
       draft={false}
+      revision={number}
       back={{ to: `/templates/${id}/revisions/${number}`, label: `Back to revision ${number}` }}
     />
   );
 }
 
-type PrintProps = { template: Template; draft: boolean; back: Back };
+type PrintProps = {
+  template: Template;
+  draft: boolean;
+  back: Back;
+  /** The revision asked for (`?revision=n`), so a quality check's way back leads to it. */
+  revision?: number;
+};
 
-/** A final inspection template's checklist; a quality check doesn't print yet. */
+/** A final inspection template's checklist, or a quality check's instructions. */
 function TemplatePrint(props: PrintProps) {
-  if (props.template.kind === 'quality') {
-    return (
-      <PrintMessage>
-        <EmptyState
-          icon={Printer}
-          title="Quality checks don’t print yet"
-          hint="Printing is for final inspection templates. A quality check is read and edited on its page."
-          action={
-            props.template.parentId ? (
-              <ButtonLink
-                to={qualityCheckHref(props.template.parentId, props.template.id)}
-                variant="secondary"
-              >
-                <ArrowLeft size={16} aria-hidden="true" />
-                Back to the quality check
-              </ButtonLink>
-            ) : undefined
-          }
-        />
-      </PrintMessage>
-    );
-  }
-  return <FinalTemplatePrint {...props} />;
+  return props.template.kind === 'quality' ? (
+    <QualityTemplatePrint {...props} />
+  ) : (
+    <FinalTemplatePrint {...props} />
+  );
+}
+
+/**
+ * A quality check's instructions: every row with how, references, time, more information and
+ * pictures, nothing to fill in. Its way back is to the quality check's own pages, under its
+ * machine.
+ */
+function QualityTemplatePrint({ template, draft, revision }: PrintProps) {
+  const settings = useSettings();
+  const people = usePeopleDirectory();
+  const directory = people.data;
+  const model = useMemo(
+    () =>
+      settings.data
+        ? qualityInstructionsPrint(template, {
+            draft,
+            companyName: settings.data.companyName,
+            modelLabel: modelName(settings.data.machineModels, template.modelCode),
+            personName: (email) => personName(directory, email),
+          })
+        : null,
+    [template, draft, settings.data, directory],
+  );
+  const images = usePrintImages(model, settings.data?.logoImageId, { appendix: false });
+  if (settings.isError) return <PrintLoadError query={settings} />;
+  if (!model || images.loading) return <PrintLoading />;
+
+  const page = template.parentId
+    ? qualityCheckHref(template.parentId, template.id)
+    : `/templates/${template.id}`;
+  const back: Back =
+    revision === undefined
+      ? { to: page, label: draft ? 'Back to the editor' : 'Back to the quality check' }
+      : { to: `${page}/revisions/${revision}`, label: `Back to revision ${revision}` };
+  return (
+    <PrintView
+      model={model}
+      images={images}
+      subject={model.subject}
+      revision={model.revisionLabel}
+      back={back}
+    />
+  );
 }
 
 function FinalTemplatePrint({ template, draft, back }: PrintProps) {

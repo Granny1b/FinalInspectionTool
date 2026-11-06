@@ -5,6 +5,7 @@ import { Breadcrumbs } from '../components/Breadcrumbs';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
 import { LoadError, PageLoading } from '../components/PageStates';
+import { templatePrintHref } from '../features/print/links';
 import { Badge } from '../features/templates/Badge';
 import { PublishedTemplateView } from '../features/templates/PublishedTemplateView';
 import {
@@ -94,6 +95,7 @@ function LatestQualityCheck({ parentId, id }: { parentId: string; id: string }) 
       title={revision.data.name || title}
       description="The latest published revision."
       badges={<Badge tone="ok">Rev {latest}</Badge>}
+      printHref={templatePrintHref(id)}
     />
   );
 }

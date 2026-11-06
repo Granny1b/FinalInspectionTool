@@ -403,8 +403,7 @@ importing one from Excel, approvals, and protective equipment and tools per sect
   Deleting a machine's final inspection template deletes its quality checks too: its dialog names
   them.
 - **Not for final inspections.** A new final inspection offers final inspection templates only; a
-  quality check is started from _Quality checks_ (see below). A quality check's print preview says
-  it doesn't print yet. Deleting a quality check (or its machine's template) never deletes the
+  quality check is started from _Quality checks_ (see below). Deleting a quality check (or its machine's template) never deletes the
   checks already done with it: each keeps its own copy.
 - **Addresses:** `/templates/{id}` (Final inspection), `/templates/{id}/quality-checks`,
   `/templates/{id}/quality-checks/{qcId}` and `…/{qcId}/revisions/{n}`. Older addresses of a
@@ -719,9 +718,19 @@ machine name longer than 60 characters is shortened in the footer.
 - **From a template**: **Print preview**. From the editor: admins see the draft, marked "Draft –
   Rev N"; inspectors the latest published revision. From a revision page: that revision. It
   prints as a new inspection's blank checklist would, with an empty front page.
+- **A quality check's instructions**: **Print instructions** on a quality check's template (its
+  editor, its page for inspectors, a revision page), the same address. A manual for the operator
+  at the machine, nothing to fill in: a cover (logo, the check's title and "Instructions", Machine
+  model, Department, Revision, Published date and by whom, Size, and the sections as contents),
+  then every row as the app shows it: ref, what to check and its time, How, References, More
+  information, and its pictures two to a line, as marked up, each with "✓ Should look like this",
+  "✗ Should not look like this" or "ⓘ Info" and its caption. A row's text and its first pictures
+  never split; a section's title stays with its first row. A draft says "DRAFT – NOT PUBLISHED" on
+  the cover and "Draft – Rev N" in every footer. Print or save it as a PDF; no Word export.
 - Addresses: `/inspections/{id}/print?mode=blank|report[&deviationsPerPage=2|4][&appendix=1]`
   (without a mode: the report once finalised, else the blank checklist),
-  `/templates/{id}/print[?revision=n]`; `appendix=1` adds the reference images to any of them.
+  `/templates/{id}/print[?revision=n]` (a quality check's: its instructions); `appendix=1` adds
+  the reference images to a checklist.
 
 **The document** (brief §6):
 

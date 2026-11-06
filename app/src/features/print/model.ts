@@ -396,7 +396,9 @@ function printedPhoto(photo: AnnotatedImage): DeviationPhoto {
  * (DEFAULT_DEVIATIONS_PER_PAGE); four when no deviation has a photo, because two cards without
  * one left three quarters of every page to empty sketch frames.
  */
-export function defaultDeviationsPerPage(model: Pick<PrintModel, 'deviations'>): DeviationsPerPage {
+export function defaultDeviationsPerPage(model: {
+  deviations: PrintModel['deviations'] | { kind: 'none' };
+}): DeviationsPerPage {
   const { deviations } = model;
   const photos = deviations.kind === 'cards' && deviations.cards.some((card) => card.photos.length);
   return photos ? DEFAULT_DEVIATIONS_PER_PAGE : 4;
