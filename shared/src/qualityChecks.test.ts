@@ -32,13 +32,10 @@ describe('qualityCheckTitle', () => {
 });
 
 describe('newQualityFront', () => {
-  it('starts with the Quality department and what is known', () => {
-    expect(newQualityFront({ name: ' Frame ', madeBy: 'Sam', date: '2026-11-05' })).toEqual({
+  it('starts with the name and the Quality department', () => {
+    expect(newQualityFront({ name: ' Frame ' })).toEqual({
       name: 'Frame',
       department: 'Quality',
-      documentNumber: '',
-      madeBy: 'Sam',
-      date: '2026-11-05',
     });
   });
 });

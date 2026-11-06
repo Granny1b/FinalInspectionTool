@@ -221,7 +221,7 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   // Checked by starts with the inspector; the quality check's front page is shown read-only.
   const frontPage = page.getByRole('region', { name: 'Front page' });
   await expect(frontPage.getByText('Sam Andersson', { exact: true })).toBeVisible();
-  await expect(frontPage.getByText('1.22.2')).toBeVisible();
+  await expect(frontPage.getByText('Quality check – Pre start up')).toBeVisible();
   await startButton.click();
 
   await page.waitForURL(/\/quality-checks\/[A-Za-z0-9]{16}$/);
@@ -300,7 +300,7 @@ test('an inspector starts a quality check, marks its rows on the cards and final
       machineName: 'Magellan#16',
     },
   });
-  expect(stored.templateSnapshot.quality?.documentNumber).toBe('1.22.2');
+  expect(stored.templateSnapshot.quality).toEqual({ name: 'Pre start up', department: 'Quality' });
   const [first] = stored.templateSnapshot.sections[0]!.items;
   expect(stored.results[first!.id]).toMatchObject({
     status: 'NOK',

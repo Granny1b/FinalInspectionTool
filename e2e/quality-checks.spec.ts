@@ -84,16 +84,15 @@ test.describe('an admin', () => {
       ['Templates', 'E2E', 'Quality checks'],
     );
 
-    // The front page: the title follows the name.
+    // The front page: the title follows the name; the document control is the revision's own, so
+    // there is nothing else to type (no document number, made by or date).
     await expect(page.getByLabel('Department')).toHaveValue('Quality');
-    await expect(page.getByLabel('Made by')).toHaveValue('Anna Andersson');
+    await expect(page.getByLabel('Document no.')).toHaveCount(0);
+    await expect(page.getByLabel('Made by')).toHaveCount(0);
     await page.getByLabel('Name', { exact: true }).fill('Pre start-up');
     await expect(
       page.getByRole('heading', { level: 1, name: 'Quality check – Pre start-up' }),
     ).toBeVisible();
-    await page.getByLabel('Document no.').fill('1.22.2');
-    await page.getByLabel('Made by').fill('Sam Andersson');
-    await page.getByLabel('Date', { exact: true }).fill('2026-11-05');
 
     // A section, then its rows from the keyboard: Enter in the title starts them, Enter in What
     // adds the next.
@@ -166,13 +165,7 @@ test.describe('an admin', () => {
       parentId: machine.id,
       name: 'Quality check – Pre start-up',
       modelCode: 'E2E',
-      quality: {
-        name: 'Pre start-up',
-        department: 'Quality',
-        documentNumber: '1.22.2',
-        madeBy: 'Sam Andersson',
-        date: '2026-11-05',
-      },
+      quality: { name: 'Pre start-up', department: 'Quality' },
     });
     expect(draft.sections[0]!.items).toEqual([
       {
@@ -212,7 +205,8 @@ test.describe('an admin', () => {
     const card = page.getByRole('listitem').filter({
       has: page.getByRole('link', { name: 'Quality check – Pre start-up' }),
     });
-    await expect(card).toContainText('Quality · document 1.22.2 · made by Sam Andersson');
+    await expect(card).toContainText('Quality');
+    await expect(card).not.toContainText('document');
     await expect(card).toContainText('Rev 1');
     await expect(card.getByRole('list', { name: 'Sections' })).toHaveText('1Safety features');
     await expect(card).toContainText('0.3 h');
@@ -369,7 +363,8 @@ test.describe('an inspector', () => {
     ).toBeVisible();
     await expect(page.getByText('Rev 1', { exact: true })).toBeVisible();
     const main = page.locator('main');
-    await expect(main).toContainText('Document no.1.22.2');
+    await expect(main).toContainText('DepartmentQuality');
+    await expect(main).not.toContainText('Document no.');
     await expect(main.getByRole('heading', { level: 2, name: 'Safety features' })).toBeVisible();
     await expect(main).toContainText('Should be visible and not turned inward.');
     await expect(

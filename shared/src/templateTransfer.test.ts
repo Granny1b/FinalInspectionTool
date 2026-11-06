@@ -62,9 +62,6 @@ describe('qualityCheckExport', () => {
   const quality = {
     name: 'Pre start up',
     department: 'Quality',
-    documentNumber: '1.22.2',
-    madeBy: 'Sam Andersson',
-    date: '2026-11-05',
   };
   const rows: Section[] = [
     {

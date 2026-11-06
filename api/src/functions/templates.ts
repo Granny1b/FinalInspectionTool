@@ -85,10 +85,7 @@ export const createTemplate = endpoint({ role: 'admin' }, async (req, _context, 
       kind: 'quality',
       parentId: machine.id,
       modelCode: machine.draft.modelCode,
-      // Filled in on its front page; who made it and when start as the admin and today.
-      ...withQuality(
-        newQualityFront({ ...body, madeBy: user.name, date: swedishDate.format(new Date()) }),
-      ),
+      ...withQuality(newQualityFront(body)),
       // The editor starts from an empty state with "+ Add section".
       sections: [],
       updatedBy: user.email,
@@ -270,9 +267,6 @@ function withQuality(quality: QualityFront): { name: string; quality: QualityFro
 }
 
 const EMPTY_FRONT = { name: '' };
-
-/** "2026-11-05" in Sweden, where the checks are written. */
-const swedishDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' });
 
 /**
  * The machine a quality check belongs to: its final inspection template. 404 when it doesn't

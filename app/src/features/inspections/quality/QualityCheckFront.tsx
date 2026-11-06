@@ -100,8 +100,8 @@ export function QualityCheckFrontFields({
 }
 
 /**
- * The quality check it follows, read-only, under the fields: its title, department and document
- * number (the revision is in the frame's corner).
+ * The quality check it follows, read-only, under the fields: its title and department (the
+ * revision is in the frame's corner).
  */
 export function QualityStandardDetails({ standard }: { standard: QualityStandard }) {
   return (
@@ -109,7 +109,6 @@ export function QualityStandardDetails({ standard }: { standard: QualityStandard
       <dl className="grid grid-cols-1 gap-x-5 gap-y-4 text-sm @min-[28rem]:grid-cols-2 @min-[44rem]:grid-cols-3">
         <Detail label="Quality check">{standard.title}</Detail>
         <Detail label="Department">{standard.front?.department}</Detail>
-        <Detail label="Document no.">{standard.front?.documentNumber}</Detail>
       </dl>
     </div>
   );

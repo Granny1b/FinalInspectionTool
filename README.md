@@ -273,22 +273,22 @@ importing one from Excel, approvals, and protective equipment and tools per sect
   "No quality checks") and lists their names under Rows, "Frame (draft), Pre start up", and the list has
   a Quality checks column.
 - **The Quality checks tab** shows the machine's quality checks as cards: the title, the
-  department, document number and who made it, the revision, the sections, and the rows, time
-  and last edit. A card opens the quality check: the editor for admins, the latest published
+  department, the revision, the sections, and the rows, time and last edit. A card opens the quality check: the editor for admins, the latest published
   revision for inspectors.
 - **New quality check** (admins): its Name (required), the in-process check, e.g. "Pre start
   up", which makes its title "Quality check – Pre start up" (shown as it is typed; a name that
   already starts with "Quality check" is not prefixed twice). A name another quality check of the
   machine has is pointed out, not refused. It starts as an empty draft with the department
-  Quality, the admin as Made by and today's date.
+  Quality.
 - **The editor** works as the template editor: one draft, autosave, conflicts, the leave
   warnings, Publish with a change note, the revision history, read-only revisions, Undo, drag and
   drop and the keys in the table above. Breadcrumbs lead back: Templates › RigiMill MG › Quality
   checks.
-  - **Front page:** Name, Department (from the Responsible list in
-    [Settings](#settings); a department removed since stays, "(not in the list)"), Document no.,
-    Made by (people's names are suggested) and Date (may be empty). The title follows the name as
-    it is typed.
+  - **Front page:** Name and Department (from the Responsible list in
+    [Settings](#settings); a department removed since stays, "(not in the list)"). The title
+    follows the name as it is typed. Nothing about the document is typed: as for final
+    inspections, the revision is counted by publishing, and the published front page shows who
+    published it, when, and the change note (the revision history has every revision's).
   - **Rows are cards:** the pictures on the left, then the ref and **What** (one line; `Enter` adds
     a row below), **How** (lines of its own), **References** (`Enter`, a comma or a semicolon adds
     one, as ISO 12100; × removes it; up to 20) and on the right **Time** in hours with one decimal
@@ -346,12 +346,11 @@ the deviation fields and photos, extra deviations, Finalise and Reopen, Delete a
   title, with the revision it will copy), then the **Machine ID** ("As in Monitor, e.g.
   Magellan#1") and the serial number (both required), the date (today) and _Checked by_ (the
   signed-in person to start with; `Enter`, a comma or a semicolon adds a name).
-  The quality check's title, department and document number are shown under them. **Start
+  The quality check's title and department are shown under them. **Start
   quality check** gives it the next number of its own series, `QC-2026-0001` (counted like the
   inspections' FI- series, restarting every year), and opens it.
 - **A frozen copy.** It keeps its own copy of the quality check's latest published revision: the
-  rows with their how, references, time and pictures, and the front page's title, department and
-  document number. Later revisions, or deleting the quality check, never change it.
+  rows with their how, references, time and pictures, and the front page's title and department. Later revisions, or deleting the quality check, never change it.
 - **The page** (`/quality-checks/{id}`): the header with the number and machine, the quality
   check and its revision, the serial number, the save status, **Preview** and **Print / Save
   PDF** (_Entire report_ or _Only deviations_, see

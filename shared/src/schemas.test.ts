@@ -64,9 +64,6 @@ describe('TemplateSchema', () => {
       quality: {
         name: 'Pre start up',
         department: 'Quality',
-        documentNumber: '1.22.2',
-        madeBy: 'Sam Andersson',
-        date: '2026-11-05',
       },
       sections: [
         {
@@ -85,11 +82,13 @@ describe('TemplateSchema', () => {
       ],
     };
     expect(TemplateSchema.parse(check)).toEqual(check);
-    // An undated front page is allowed; a date that isn't one is not.
-    const undated = { ...check, quality: { ...check.quality, date: '' } };
-    expect(TemplateSchema.safeParse(undated).success).toBe(true);
-    const misdated = { ...check, quality: { ...check.quality, date: '05/11/2026' } };
-    expect(TemplateSchema.safeParse(misdated).success).toBe(false);
+    // A front page stored when the document number, made by and date were typed reads without
+    // them: the revision, its publisher and date are the document control now.
+    const older = {
+      ...check,
+      quality: { ...check.quality, documentNumber: '1.22.2', madeBy: 'Sam', date: '2026-11-05' },
+    };
+    expect(TemplateSchema.parse(older).quality).toEqual(check.quality);
   });
 
   it('checks the new row fields: references short and not blank, time not negative', () => {
@@ -289,9 +288,6 @@ describe('InspectionSchema', () => {
         quality: {
           name: 'Pre start up',
           department: 'Quality',
-          documentNumber: '1.22.2',
-          madeBy: 'Sam Andersson',
-          date: '2026-11-05',
         },
         sections: [
           {

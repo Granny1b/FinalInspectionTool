@@ -210,18 +210,17 @@ export const TEMPLATE_KINDS = ['final', 'quality'] as const;
 export const TemplateKindSchema = z.enum(TEMPLATE_KINDS);
 export type TemplateKind = z.infer<typeof TemplateKindSchema>;
 
-/** A quality check's front page. Empty strings while it is being written. */
+/**
+ * A quality check's front page. Empty strings while it is being written. Its document control is
+ * the template's, as for final inspections: the revision, who published it and when. Front pages
+ * written before that also had a typed document number, made by and date: they are dropped when
+ * read (and when such a file is imported).
+ */
 export const QualityFrontSchema = z.object({
   /** The in-process check, "Pre start up": the quality check is called after it. Required to publish. */
   name: z.string().max(200),
   /** The department that owns the check, e.g. "Quality" (from the Responsible list). */
   department: z.string().max(200),
-  /** "1.22.2" */
-  documentNumber: z.string().max(100),
-  /** Who wrote the check (a name as typed). */
-  madeBy: z.string().max(200),
-  /** "YYYY-MM-DD", or '' when not set. */
-  date: z.union([IsoDate, z.literal('')]),
 });
 export type QualityFront = z.infer<typeof QualityFrontSchema>;
 

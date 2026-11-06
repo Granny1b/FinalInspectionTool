@@ -313,9 +313,6 @@ describe('quality checks', () => {
     quality: {
       name: 'Pre start up',
       department: 'Quality',
-      documentNumber: '1.22.2',
-      madeBy: 'Sam Andersson',
-      date: '2026-11-05',
     },
     sections: [
       {
@@ -364,13 +361,10 @@ describe('quality checks', () => {
 
   it('counts changes to the front page and to how, references and time', () => {
     expect(hasUnpublishedChanges(check, published)).toBe(false);
-    for (const field of ['name', 'department', 'documentNumber', 'madeBy'] as const) {
+    for (const field of ['name', 'department'] as const) {
       const changed = { ...check, quality: { ...check.quality!, [field]: 'Changed' } };
       expect(hasUnpublishedChanges(changed, published), field).toBe(true);
     }
-    expect(
-      hasUnpublishedChanges({ ...check, quality: { ...check.quality!, date: '' } }, published),
-    ).toBe(true);
     expect(hasUnpublishedChanges(withItem({ how: 'Turned outward.' }), published)).toBe(true);
     expect(hasUnpublishedChanges(withItem({ references: ['ISO 12100'] }), published)).toBe(true);
     expect(hasUnpublishedChanges(withItem({ timeHours: 0.3 }), published)).toBe(true);

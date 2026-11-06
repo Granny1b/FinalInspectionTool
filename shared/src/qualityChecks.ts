@@ -33,18 +33,8 @@ export function qualityCheckShortName(title: string): string {
 }
 
 /** A new quality check's front page. */
-export function newQualityFront(fields: {
-  name: string;
-  madeBy?: string;
-  date?: string;
-}): QualityFront {
-  return {
-    name: fields.name.trim(),
-    department: DEFAULT_QUALITY_DEPARTMENT,
-    documentNumber: '',
-    madeBy: fields.madeBy?.trim() ?? '',
-    date: fields.date ?? '',
-  };
+export function newQualityFront(fields: { name: string }): QualityFront {
+  return { name: fields.name.trim(), department: DEFAULT_QUALITY_DEPARTMENT };
 }
 
 /** Hours to one decimal, without the float noise of a sum (0.1 + 0.2 is 0.3). */

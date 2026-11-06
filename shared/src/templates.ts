@@ -296,7 +296,7 @@ function publishedContent(t: TemplateContent): string {
     t.name,
     t.modelCode,
     t.coverImageId ?? null,
-    front ? [front.name, front.department, front.documentNumber, front.madeBy, front.date] : null,
+    front ? [front.name, front.department] : null,
     t.sections.map((s) => [
       s.id,
       s.title,

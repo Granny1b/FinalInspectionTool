@@ -173,13 +173,7 @@ export async function createQualityCheck(
     modelCode: parent.modelCode,
     revision: published ? 2 : 1,
     status: 'draft',
-    quality: {
-      name: 'Pre start up',
-      department: 'Quality',
-      documentNumber: '1.22.2',
-      madeBy: 'Sam Andersson',
-      date: '2026-11-05',
-    },
+    quality: { name: 'Pre start up', department: 'Quality' },
     sections: [
       {
         id: newId(),

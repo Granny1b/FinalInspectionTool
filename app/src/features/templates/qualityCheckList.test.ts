@@ -24,9 +24,6 @@ function summary(patch: Partial<TemplateSummary>): TemplateSummary {
 const front = (name: string) => ({
   name,
   department: 'Quality',
-  documentNumber: '',
-  madeBy: '',
-  date: '',
 });
 
 describe('qualityCheckNames', () => {

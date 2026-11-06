@@ -42,9 +42,9 @@ const SECTIONS: Section[] = [
 ];
 
 /**
- * The quality check's front page as frozen in older checks. Not a literal at its place in the
- * inspection: the typed document number, made by and date are on their way out of the schema,
- * and the printout never shows them either way.
+ * The quality check's front page as frozen in older checks, with the typed document number, made
+ * by and date the schema no longer has. Not a literal at its place in the inspection, so the
+ * extra fields typecheck: the printout must not show them even if they reach it.
  */
 const QUALITY_FRONT = {
   name: 'Pre start up',

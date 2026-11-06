@@ -25,11 +25,7 @@ export function QualityCheckCards({ checks, isAdmin, onNew }: Props) {
     <ul className="grid gap-4 lg:grid-cols-2">
       {checks.map((check) => {
         const front = check.quality;
-        const meta = [
-          front?.department,
-          front?.documentNumber && `document ${front.documentNumber}`,
-          front?.madeBy && `made by ${front.madeBy}`,
-        ].filter(Boolean);
+        const meta = [front?.department].filter(Boolean);
         const sections = check.sectionTitles ?? [];
         return (
           <li

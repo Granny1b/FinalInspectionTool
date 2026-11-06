@@ -111,9 +111,6 @@ describe('snapshotTemplate', () => {
       quality: {
         name: 'Pre start up',
         department: 'Quality',
-        documentNumber: '1.22.2',
-        madeBy: 'Sam Andersson',
-        date: '2026-11-05',
       },
       sections: [
         {
@@ -142,8 +139,8 @@ describe('snapshotTemplate', () => {
       sections: qualityCheck.sections,
     });
     // A copy: changing the template's front page later changes nothing in the check.
-    qualityCheck.quality!.documentNumber = '9.9';
-    expect(snap.quality?.documentNumber).toBe('1.22.2');
+    qualityCheck.quality!.department = 'Assembly';
+    expect(snap.quality?.department).toBe('Quality');
   });
 
   it('gives a final inspection no quality front page', () => {

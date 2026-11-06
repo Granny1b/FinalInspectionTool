@@ -3192,3 +3192,17 @@ or only the deviations: it is printed, kept at the machine and signed off there.
 A blank quality check form to fill in by hand (the template side's print preview of a quality
 check still says it doesn't print yet), Word export of a quality check, and its guide pictures in
 an appendix.
+
+## Quality checks: automatic document control (2026-11-06)
+
+- **No typed document number, made by or date on a quality check.** The user typed the document
+  number by hand and wanted it automatic, as final inspections are. A quality check's document
+  control is now its template's, the same as a final inspection template's: the revision counted
+  by publishing (Rev 1, Rev 2…), who published it and when, and the change note, all in the
+  revision history. A check is named by its title, machine model and revision ("Quality check –
+  Pre start up · RigiMill MG · Rev 3"); a report done on a machine has its QC number too.
+- **Older data reads as before, without those fields:** the front page schema no longer has them,
+  so templates, frozen copies in quality checks and quality check files (version 1) that still
+  carry them are read and imported with them dropped. Nothing is migrated.
+- **Who wrote it is who published it.** A separate typed author was dropped with the rest; the
+  revision history already names who published each revision.
