@@ -455,3 +455,51 @@ test('only admins edit checklists, update, link, rename and delete machines', as
   expect((await page.request.get(`/api/machines/${machine.machine.id}`)).status()).toBe(404);
   expect((await page.request.get(`/api/inspections/${id}`)).status()).toBe(404);
 });
+
+test('the lists’ search boxes offer every machine; picking one shows only its checks and deviations', async ({
+  page,
+  context,
+  model,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const first = await makeMachine(page.request, model, [model.preStart]);
+  const second = await makeMachine(page.request, model, [model.preStart]);
+  await startedWithNok(page.request, first.checks[0]!.id);
+  await startedWithNok(page.request, second.checks[0]!.id);
+  const [one, two] = [first.machine, second.machine];
+
+  // Quality checks: the box lists the machines matching what is typed; a click picks one.
+  await page.goto(`/quality-checks?model=${model.code}`);
+  const search = page.getByRole('combobox', { name: 'Search quality checks' });
+  await search.fill(one.machineName.slice(0, -2));
+  const options = page.getByRole('listbox', { name: 'Machines' });
+  await expect(options.getByRole('option', { name: new RegExp(one.machineName) })).toBeVisible();
+  await options.getByRole('option', { name: new RegExp(one.machineName) }).click();
+  await expect(page).toHaveURL(new RegExp(`[?&]machine=${one.id}`));
+  await expect(search).toHaveValue(one.machineName);
+  await expect(options).toBeHidden();
+  await expect(page.getByRole('row').filter({ hasText: one.machineName })).toHaveCount(1);
+  await expect(page.getByRole('row').filter({ hasText: two.machineName })).toHaveCount(0);
+
+  // Quality check deviations: the keyboard picks one too (the list shows them all once picked).
+  const group = (name: string) => page.getByRole('region', { name: new RegExp(`^${name} S/N`) });
+  await page.goto(`/deviations/quality?model=${model.code}`);
+  await expect(group(one.machineName)).toBeVisible();
+  await expect(group(two.machineName)).toBeVisible();
+  const logSearch = page.getByRole('combobox', { name: 'Search deviations' });
+  await logSearch.fill(two.machineName);
+  await logSearch.press('Enter');
+  await expect(logSearch).toHaveValue(two.machineName);
+  await expect(group(two.machineName)).toBeVisible();
+  await expect(group(one.machineName)).toHaveCount(0);
+  // The CSV is named after the machine.
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  expect((await download).suggestedFilename()).toContain(`, ${two.machineName}.csv`);
+
+  // × goes back to every machine.
+  await page.getByRole('button', { name: 'Show every machine' }).click();
+  await expect(logSearch).toHaveValue('');
+  await expect(group(one.machineName)).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]machine=/);
+});

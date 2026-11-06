@@ -46,7 +46,7 @@ const list = [
   summary({ id: 'A000000000000001', number: 'FI-2026-0001' }),
 ];
 const ids = (found: InspectionSummary[]) => found.map((inspection) => inspection.id);
-const all: InspectionFilter = { query: '', model: '', state: '' };
+const all: InspectionFilter = { query: '', model: '', machine: '', state: '' };
 
 describe('filterInspections', () => {
   it('keeps everything, in the given order, without filters', () => {
@@ -81,7 +81,30 @@ describe('filterInspections', () => {
       'A000000000000003',
       'A000000000000001',
     ]);
-    expect(filterInspections(list, { query: 'mill', model: 'HHVDUO', state: '' })).toEqual([]);
+    expect(filterInspections(list, { ...all, query: 'mill', model: 'HHVDUO' })).toEqual([]);
+  });
+
+  it('filters by machine: only the inspections linked to it', () => {
+    const linked = [
+      summary({
+        id: 'M000000000000001',
+        machineName: 'Magellan#1',
+        machineRef: 'Mach000000000001',
+      }),
+      // Same Machine ID typed, but not linked: not the machine's.
+      summary({ id: 'M000000000000002', machineName: 'Magellan#1' }),
+      summary({
+        id: 'M000000000000003',
+        machineName: 'Magellan#10',
+        machineRef: 'Mach000000000010',
+      }),
+    ];
+    expect(ids(filterInspections(linked, { ...all, machine: 'Mach000000000001' }))).toEqual([
+      'M000000000000001',
+    ]);
+    expect(
+      filterInspections(linked, { ...all, machine: 'Mach000000000001', query: 'fi-2027' }),
+    ).toEqual([]);
   });
 
   it('searches a quality check by its Machine ID and its title', () => {
@@ -116,9 +139,14 @@ describe('filterInspections', () => {
 
 describe('filter in the URL', () => {
   it('round-trips, leaving out what is not in use', () => {
-    const filter: InspectionFilter = { query: 'rigi 10', model: 'RMMG', state: 'finalised' };
+    const filter: InspectionFilter = {
+      query: 'rigi 10',
+      model: 'RMMG',
+      machine: 'Mach000000000001',
+      state: 'finalised',
+    };
     const params = filterToParams(filter);
-    expect(params.toString()).toBe('q=rigi+10&model=RMMG&state=finalised');
+    expect(params.toString()).toBe('q=rigi+10&model=RMMG&machine=Mach000000000001&state=finalised');
     expect(filterFromParams(params)).toEqual(filter);
     expect(filterToParams(all).toString()).toBe('');
   });
@@ -131,6 +159,7 @@ describe('filter in the URL', () => {
     expect(isFiltered(all)).toBe(false);
     expect(isFiltered({ ...all, query: '   ' })).toBe(false);
     expect(isFiltered({ ...all, state: 'finalised' })).toBe(true);
+    expect(isFiltered({ ...all, machine: 'Mach000000000001' })).toBe(true);
   });
 });
 
@@ -147,7 +176,7 @@ describe('the way back to the list', () => {
     });
     expect(inspectionsListHref()).toBe('/inspections');
     rememberListSearch(
-      filterToParams({ query: 'rigimill', model: '', state: 'finalised' }).toString(),
+      filterToParams({ ...all, query: 'rigimill', state: 'finalised' }).toString(),
     );
     expect(inspectionsListHref()).toBe('/inspections?q=rigimill&state=finalised');
     rememberListSearch('');

@@ -112,11 +112,12 @@ describe('filters in the address', () => {
       kind: 'final',
       status: 'closed',
       model: 'RMMG',
+      machine: 'Mach000000000001',
       resp: 'Electrical',
       q: 'cables ',
     };
     expect(filterToParams(filter).toString()).toBe(
-      'status=closed&model=RMMG&resp=Electrical&q=cables+',
+      'status=closed&model=RMMG&machine=Mach000000000001&resp=Electrical&q=cables+',
     );
     expect(filterFromParams(filterToParams(filter), 'final')).toEqual(filter);
     expect(queryOf(filter)).toEqual({ ...filter, q: 'cables' });
@@ -124,6 +125,7 @@ describe('filters in the address', () => {
     expect(isFiltered(OPEN)).toBe(false);
     expect(isFiltered({ ...OPEN, status: 'all' })).toBe(false);
     expect(isFiltered({ ...OPEN, q: ' x' })).toBe(true);
+    expect(isFiltered({ ...OPEN, machine: 'Mach000000000001' })).toBe(true);
   });
 
   it('links to an inspection’s Deviations tab, at one deviation', () => {

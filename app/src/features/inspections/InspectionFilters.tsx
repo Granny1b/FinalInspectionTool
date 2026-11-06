@@ -1,7 +1,8 @@
 import type { InspectionKind, InspectionState, MachineModel } from '@modig/shared';
 import clsx from 'clsx';
-import { Search } from 'lucide-react';
 import { INPUT } from '../../components/Field';
+import { MachineSearch } from '../machines/MachineSearch';
+import type { MachineChoice } from '../machines/model';
 import type { InspectionFilter } from './listFilter';
 
 type Props = {
@@ -10,33 +11,37 @@ type Props = {
   filter: InspectionFilter;
   /** Models that have inspections, by name. */
   models: MachineModel[];
+  /** The machines the search box offers (those of the model picked), by Machine ID. */
+  machines: readonly MachineChoice[];
+  /** Every model, to name each machine's. */
+  machineModels: readonly MachineModel[] | undefined;
   onChange: (filter: InspectionFilter) => void;
 };
 
 /**
- * Search box plus model and state filters above the inspections table (brief §5.1), and above the
- * quality checks done.
+ * Search box (with the machines to pick from) plus model and state filters above the inspections
+ * table (brief §5.1), and above the quality checks done.
  */
-export function InspectionFilters({ kind = 'final', filter, models, onChange }: Props) {
+export function InspectionFilters({
+  kind = 'final',
+  filter,
+  models,
+  machines,
+  machineModels,
+  onChange,
+}: Props) {
   const quality = kind === 'quality';
   return (
     <div role="search" className="flex flex-wrap items-center gap-2">
-      <div className="relative w-full sm:w-auto sm:min-w-64 sm:flex-1">
-        <Search
-          size={16}
-          aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-500"
-        />
+      <div className="w-full sm:w-auto sm:min-w-64 sm:flex-1">
         {/* Short enough for a 320 px phone; the icon and the name already say it is a search. */}
-        <input
-          type="search"
-          aria-label={quality ? 'Search quality checks' : 'Search inspections'}
+        <MachineSearch
+          label={quality ? 'Search quality checks' : 'Search inspections'}
           placeholder={quality ? 'Number, machine ID, check or S/N' : 'Number, machine ID or S/N'}
-          autoComplete="off"
-          spellCheck={false}
-          value={filter.query}
-          onChange={(event) => onChange({ ...filter, query: event.target.value })}
-          className={clsx(INPUT, 'h-9 pl-9')}
+          machines={machines}
+          models={machineModels}
+          value={{ query: filter.query, machine: filter.machine }}
+          onChange={({ query, machine }) => onChange({ ...filter, query, machine })}
         />
       </div>
       {/* Sized by a wrapper: INPUT is full width. Just wide enough for the longest choices, so the

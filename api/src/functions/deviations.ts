@@ -3,8 +3,8 @@
  * the quality checks, with its follow-up, for everyone who works with them; and the same as a CSV
  * file. One kind at a time, never both.
  *
- *   GET /api/deviations?kind&status&model&resp&category&q             inspector  DeviationLog
- *   GET /api/deviations/export.csv?kind&status&model&resp&category&q  inspector  text/csv
+ *   GET /api/deviations?kind&status&model&machine&resp&category&q             inspector  DeviationLog
+ *   GET /api/deviations/export.csv?kind&status&model&machine&resp&category&q  inspector  text/csv
  *
  * Without `kind` they are final inspections'; without `status`, the open ones (as the page).
  */
@@ -29,13 +29,14 @@ export const getDeviationLog = endpoint({ role: 'inspector' }, async (req, conte
 
 export const exportDeviationLogCsv = endpoint({ role: 'inspector' }, async (req, context) => {
   const query = readQuery(req);
-  const [{ entries }, settings] = await Promise.all([
+  const [{ entries, machines }, settings] = await Promise.all([
     loadDeviationLog(query, context),
     loadSettings(),
   ]);
+  const machineName = machines.find((machine) => machine.id === query.machine)?.machineName;
   return csvResponse(
     deviationLogCsv(entries, query.kind, settings?.machineModels ?? []),
-    deviationLogFileName(query, swedishDay(new Date())),
+    deviationLogFileName(query, swedishDay(new Date()), machineName),
   );
 });
 

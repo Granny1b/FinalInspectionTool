@@ -61,10 +61,30 @@ export function filterMachines(
   { query, model, stage }: MachineFilter,
   models: readonly MachineModel[] | undefined,
 ): MachineSummary[] {
+  return matchingMachines(machines, query, models).filter(
+    (machine) =>
+      (!model || machine.modelCode === model) &&
+      (!stage || machineStage(machine.progress) === stage),
+  );
+}
+
+/** What a machine is found by, and how a pick list names it. */
+export type MachineChoice = Pick<
+  MachineSummary,
+  'id' | 'machineName' | 'serialNumber' | 'modelCode'
+>;
+
+/**
+ * The machines whose Machine ID, serial number and model name hold every word of `query`, in the
+ * order given: "magellan 016", "rigimill 2". All of them for an empty query.
+ */
+export function matchingMachines<T extends MachineChoice>(
+  machines: readonly T[],
+  query: string,
+  models: readonly MachineModel[] | undefined,
+): T[] {
   const words = lower(query).split(/\s+/).filter(Boolean);
   return machines.filter((machine) => {
-    if (model && machine.modelCode !== model) return false;
-    if (stage && machineStage(machine.progress) !== stage) return false;
     const haystack = lower(
       `${machine.machineName} ${machine.serialNumber} ${modelName(models, machine.modelCode)}`,
     );

@@ -180,12 +180,19 @@ export function deviationLogCsv(
  * "Quality check deviations 2026-11-06, open, RMMG.csv": the kind, the day and the filters, so
  * two exports stay apart.
  */
-export function deviationLogFileName(query: DeviationLogQuery, today: string): string {
+export function deviationLogFileName(
+  query: DeviationLogQuery,
+  today: string,
+  /** The machine filtered on, by its Machine ID ("machine" when it isn't known). */
+  machineName?: string,
+): string {
   const what =
     query.kind === 'quality' ? 'Quality check deviations' : 'Final inspection deviations';
   const parts = [
     query.status === 'all' ? 'open and closed' : query.status,
     query.model,
+    // Characters a file name can't hold ("Spinner/2") become dashes.
+    query.machine && (machineName ? machineName.replace(/[\\/:*?"<>|]/g, '-') : 'machine'),
     query.resp && `responsible ${query.resp === NOT_SET ? 'not assigned' : query.resp}`,
     query.category && `category ${query.category === NOT_SET ? 'none' : query.category}`,
     query.q && 'searched',

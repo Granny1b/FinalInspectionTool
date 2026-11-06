@@ -17,7 +17,7 @@ type Props = {
   description: string;
   /** Badges next to the description, e.g. "Latest". */
   badges?: ReactNode;
-  /** This revision's print preview; none for a quality check (it doesn't print yet). */
+  /** This revision's print preview (a quality check's instructions). */
   printHref?: string;
   /** 2 under a machine's heading (its Final inspection tab); the page's heading otherwise. */
   titleLevel?: 1 | 2;
@@ -44,7 +44,7 @@ export function PublishedTemplateView({
       {printHref && (
         <ButtonLink variant="secondary" to={printHref} className="ml-2">
           <Printer size={16} aria-hidden="true" />
-          Print preview
+          {quality ? 'Print instructions' : 'Print preview'}
         </ButtonLink>
       )}
     </>

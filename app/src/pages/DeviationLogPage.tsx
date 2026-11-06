@@ -32,6 +32,7 @@ import {
   useSetFollowUp,
 } from '../features/deviationLog/queries';
 import { localDate } from '../features/inspections/dates';
+import { useMachines } from '../features/machines/queries';
 import { errorMessage } from '../lib/api';
 import { modelName, useSettings } from '../lib/useSettings';
 
@@ -69,6 +70,8 @@ export function DeviationLogPage({ kind }: { kind: InspectionKind }) {
   const log = useDeviationLog(kind);
   const settings = useSettings();
   const models = settings.data?.machineModels;
+  // Offered in the search box; without them it searches words only.
+  const machineList = useMachines();
   const [params, setParams] = useSearchParams();
   const filter = filterFromParams(params, kind);
   // Typing in the search box replaces the history entry instead of adding one per key, and is
@@ -200,6 +203,10 @@ export function DeviationLogPage({ kind }: { kind: InspectionKind }) {
           <LogFilters
             filter={filter}
             models={modelOptions(all, filter.model, models)}
+            machines={(machineList.data ?? []).filter(
+              (machine) => !filter.model || machine.modelCode === filter.model,
+            )}
+            machineModels={models}
             responsibles={listChoices(all, 'resp', filter.resp)}
             categories={listChoices(all, 'category', filter.category)}
             onChange={setFilter}

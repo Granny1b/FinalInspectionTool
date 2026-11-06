@@ -29,6 +29,7 @@ import {
   useTestStorage,
   writeSettings,
 } from '../../test/storage';
+import { deviationLogFileName } from '../lib/deviationLog';
 import type * as Deviations from '../lib/deviations';
 import { syncDeviations } from '../lib/deviations';
 import { loadInspection, writeInspection } from '../lib/inspections';
@@ -650,6 +651,19 @@ describe('GET /api/deviations/export.csv', () => {
     ]);
     expect(headers.get('Content-Disposition')).toBe(
       `attachment; filename="Quality check deviations ${today}, open, RMMG, responsible Electrical.csv"`,
+    );
+  });
+
+  it('names one machine’s export after its Machine ID', () => {
+    const query = { kind: 'quality', status: 'open', machine: 'Mach000000000001' } as const;
+    expect(deviationLogFileName(query, '2026-11-06', 'Magellan#1')).toBe(
+      'Quality check deviations 2026-11-06, open, Magellan#1.csv',
+    );
+    expect(deviationLogFileName(query, '2026-11-06', 'Spinner/2')).toBe(
+      'Quality check deviations 2026-11-06, open, Spinner-2.csv',
+    );
+    expect(deviationLogFileName(query, '2026-11-06')).toBe(
+      'Quality check deviations 2026-11-06, open, machine.csv',
     );
   });
 });

@@ -332,7 +332,7 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   // inspections.
   await expect(page.getByRole('main').getByRole('link', { name: machineId }).first()).toBeVisible();
   await mainNav(page).getByRole('link', { name: 'Quality checks' }).click();
-  await page.getByRole('searchbox', { name: 'Search quality checks' }).fill(number);
+  await page.getByRole('combobox', { name: 'Search quality checks' }).fill(number);
   const row = page.getByRole('row').filter({ hasText: number });
   await expect(row).toContainText(machineId);
   await expect(row).toContainText(machine.model);

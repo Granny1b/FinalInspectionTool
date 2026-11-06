@@ -3514,3 +3514,52 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
   landing page and sidebar in `auth-shell.spec.ts` and the sidebar test. The one-time action is
   only offered and cancelled in e2e: run, it would link every other test's inspections (and change
   their pages' ETags) in the shared Azurite; its effect is covered by the API tests.
+
+## Search boxes: pick a machine (2026-11-06)
+
+- **Asked for:** the search boxes of the lists (the deviation logs, Inspections and Quality checks)
+  should search every existing machine, as a drop-down of machines you can search in.
+- **One box, two ways** (`MachineSearch`): typing still searches words as before (numbers,
+  Machine IDs, deviation text), and the drop-down under it lists the machines whose Machine ID,
+  serial number or model hold every word typed (all of them in an empty box). Picking one filters
+  by that machine exactly (`?machine={id}`: the inspections linked to it, `machineRef`), and the
+  box then names it; editing the name, or ×, goes back to searching words. Replacing the search
+  with a machine menu would have lost finding a deviation by its text or an inspection by its
+  number, and a separate menu would have been a fifth control in the row.
+- **Exact, not by name:** a machine is matched by its link, not by the Machine ID typed on the
+  front page, so "Magellan#1" never brings in "Magellan#10", and an inspection not linked to a
+  machine (older ones, until "Create machines from existing inspections" runs) is found by the
+  words only.
+- **Which machines:** every machine (`GET /api/machines`), only those of the model picked when
+  one is. The drop-down is an ARIA combobox: the arrow keys, Home and End move, Enter picks (the
+  best match is ready once something is typed), Escape closes it; a press on it keeps the focus
+  in the box. Without machines (or when they can't be loaded) the box is the plain search it was.
+- **The CSV export** takes the machine too (`machine` in `GET /api/deviations/export.csv`), and
+  its file is named after the machine's Machine ID.
+
+## Quality checks: instructions printed from the template (2026-11-06)
+
+- **Asked for:** a quality check's full instructions on paper or as a PDF, from its template, to
+  be used as a manual by the operator at the machine. This replaces "Quality checks don't print
+  yet" (Quality check templates, above): `/templates/{id}/print` prints a quality check's
+  template as its instructions, with **Print instructions** where a final inspection template has
+  **Print preview** (the editor for admins' draft, the quality check's page for inspectors' latest
+  revision, a revision page for that revision).
+- **A manual, not a blank form:** nothing to tick or sign, as it is read at the machine, not
+  filed; the check done is recorded in the app, and its report prints from there. So the rows are
+  blocks, not a table with result columns: what to check (with its time), How, References and
+  More information under it, then the pictures.
+- **Pictures by their rows** (the reference appendix's layout and component, `GuideImage`, two to
+  a line, the marked-up copy when there is one), worded as quality checks word them ("Should look
+  like this"). A quality check's report still leaves them out: it records a check, short; the
+  instructions are where the pictures belong.
+- **Cover:** what the check is for, which revision and when and by whom it was published, its
+  size and time, and its sections as contents; a draft marked "DRAFT – NOT PUBLISHED", and in
+  every footer ("Company · Quality check – Pre start up · Draft – Rev 3"), so a printed draft is
+  never taken for the instructions in force.
+- **One more document for the print machinery** (`InstructionsModel`, `document:
+'instructions'`): its images are its pictures, it has no appendix and no deviation cards
+  (`deviations: { kind: 'none' }`). Browsers without margin boxes get its blocks as table rows
+  under a repeating footer, as the reference appendix does.
+- **Not (yet):** a machine's own copy of a check printed as instructions (its rows may differ
+  from the template's); it would be a third choice in a quality check's Print menu.

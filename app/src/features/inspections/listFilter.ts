@@ -1,6 +1,6 @@
 /**
  * Search and filters of the inspections list (brief §5.1), and of the quality checks list, which
- * works the same way. They live in the URL (?q=&model=&state=), so coming back from an inspection
+ * works the same way. They live in the URL (?q=&model=&machine=&state=), so coming back from an inspection
  * keeps them, and a filtered list can be shared as a link.
  */
 import {
@@ -29,6 +29,8 @@ export type InspectionFilter = {
   query: string;
   /** Model code, or '' for every model. */
   model: string;
+  /** One machine's id (its linked inspections), or '' for every machine. */
+  machine: string;
   state: InspectionState | '';
 };
 
@@ -37,15 +39,22 @@ export function filterFromParams(params: URLSearchParams): InspectionFilter {
   return {
     query: params.get('q') ?? '',
     model: params.get('model') ?? '',
+    machine: params.get('machine') ?? '',
     state: state.success ? state.data : '',
   };
 }
 
 /** Only the filters in use, so an unfiltered list has a clean URL. */
-export function filterToParams({ query, model, state }: InspectionFilter): URLSearchParams {
+export function filterToParams({
+  query,
+  model,
+  machine,
+  state,
+}: InspectionFilter): URLSearchParams {
   const params = new URLSearchParams();
   if (query) params.set('q', query);
   if (model) params.set('model', model);
+  if (machine) params.set('machine', machine);
   if (state) params.set('state', state);
   return params;
 }
@@ -88,8 +97,8 @@ export function inspectionsListHref(kind: InspectionKind = 'final'): string {
  */
 export type InspectionsPageState = { deleted?: string };
 
-export function isFiltered({ query, model, state }: InspectionFilter): boolean {
-  return Boolean(query.trim() || model || state);
+export function isFiltered({ query, model, machine, state }: InspectionFilter): boolean {
+  return Boolean(query.trim() || model || machine || state);
 }
 
 const lower = (text: string) => text.toLocaleLowerCase('sv');
@@ -101,11 +110,12 @@ const lower = (text: string) => text.toLocaleLowerCase('sv');
  */
 export function filterInspections(
   inspections: readonly InspectionSummary[],
-  { query, model, state }: InspectionFilter,
+  { query, model, machine, state }: InspectionFilter,
 ): InspectionSummary[] {
   const words = lower(query).split(/\s+/).filter(Boolean);
   return inspections.filter((inspection) => {
     if (model && inspection.modelCode !== model) return false;
+    if (machine && inspection.machineRef !== machine) return false;
     if (state && inspection.state !== state) return false;
     // A quality check's title says which check it is.
     const check = inspection.kind === 'quality' ? inspection.templateName : '';

@@ -367,15 +367,15 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             onReload={reload.askReload}
           />
           <div className="flex items-center gap-2">
-            {/* The draft as it prints; leaving the editor saves first, like any link. On a phone
-                just the printer, so the header keeps to one row of buttons. Spaced as the
-                inspection's header buttons. Quality checks don't print yet. */}
-            {!quality && (
-              <ButtonLink variant="secondary" to={templatePrintHref(id)} className="max-sm:px-2.5">
-                <Printer size={16} aria-hidden="true" />
-                <span className="max-sm:sr-only">Print preview</span>
-              </ButtonLink>
-            )}
+            {/* The draft as it prints (a quality check's as its instructions); leaving the editor
+                saves first, like any link. On a phone just the printer, so the header keeps to
+                one row of buttons. Spaced as the inspection's header buttons. */}
+            <ButtonLink variant="secondary" to={templatePrintHref(id)} className="max-sm:px-2.5">
+              <Printer size={16} aria-hidden="true" />
+              <span className="max-sm:sr-only">
+                {quality ? 'Print instructions' : 'Print preview'}
+              </span>
+            </ButtonLink>
             {/* Nothing to publish when the draft equals the latest revision (the badges say so). */}
             <Button onClick={openPublish} disabled={!unpublished || conflict}>
               <Upload size={16} aria-hidden="true" />

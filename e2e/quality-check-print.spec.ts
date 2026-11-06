@@ -439,3 +439,81 @@ test('a quality check without deviations says so', async ({ page, machine }) => 
   await expect(root.locator('[data-count="Deviations"]')).toContainText('0');
   await expect(root).toContainText('No deviations recorded.');
 });
+
+test('a quality check’s template prints its instructions, pictures included; a draft says so', async ({
+  page,
+  context,
+  machine,
+}) => {
+  const photoId = await decalPhoto(page);
+  const guided = await createQualityCheck(machine.template, true, {
+    description: 'Decals on both tubes, facing out.',
+    images: [
+      { imageId: photoId, annotations: [], verdict: 'good', caption: 'Left tube' },
+      { imageId: photoId, annotations: [], verdict: 'bad' },
+    ],
+  });
+  const checkPage = `/templates/${machine.template.id}/quality-checks/${guided.id}`;
+
+  // An inspector prints the latest revision from the quality check's page.
+  await page.goto(checkPage);
+  await page.getByRole('link', { name: 'Print instructions' }).click();
+  await expect(page).toHaveURL(new RegExp(`/templates/${guided.id}/print$`));
+  const root = page.locator('[data-print-root]');
+  await expect(root).toHaveAttribute('data-print-document', 'instructions');
+  await expectReady(root);
+  await expect(page.getByRole('link', { name: 'Back to the quality check' })).toHaveAttribute(
+    'href',
+    checkPage,
+  );
+  await expect(page.locator('header').first()).toContainText('Rev 1');
+  // Nothing to choose: no modes, no reference images appendix, no Word.
+  await expect(page.getByRole('group', { name: 'What to print' })).toHaveCount(0);
+  await expect(page.getByLabel('Include reference images')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Word/ })).toHaveCount(0);
+
+  const pages = await printPdf(page, 'quality-check-instructions');
+  expect(pages.length).toBeGreaterThanOrEqual(2);
+  for (const pdfPage of pages) {
+    const footer = footerTexts(pdfPage).map((text) => text.text);
+    expect(footer).toContain(`Page ${pdfPage.number} of ${pages.length}`);
+    expect(footer.some((text) => text.endsWith(` · ${CHECK} · Rev 1`))).toBe(true);
+  }
+  const cover = pageText(pages[0]!);
+  for (const text of [CHECK, 'Instructions', 'Machine model', 'Department', 'Contents']) {
+    expect(cover).toContain(compact(text));
+  }
+  expect(cover).not.toContain(compact('NOT PUBLISHED'));
+  const body = pages.slice(1).map(pageText).join('');
+  for (const text of [
+    '1.a',
+    'Check and verify safety decals on balancing tubes.',
+    'Should be visible and not turned inward.',
+    'ISO 12100 · ISO 7010',
+    'More information',
+    'Decals on both tubes, facing out.',
+    'Should look like this',
+    'Should not look like this',
+    'Left tube',
+    '1.b',
+  ]) {
+    expect(body).toContain(compact(text));
+  }
+  // Nothing to fill in: it is a manual, not a report.
+  expect(body).not.toContain('Result');
+  expect(pages.slice(1).reduce((sum, pdfPage) => sum + pdfPage.images, 0)).toBeGreaterThanOrEqual(
+    2,
+  );
+
+  // An admin prints the draft from the editor, marked as not published.
+  await signIn(context, 'anna.andersson@modig.se', ['admin']);
+  await page.goto(checkPage);
+  await page.getByRole('link', { name: 'Print instructions' }).click();
+  await expectReady(root);
+  await expect(page.getByRole('link', { name: 'Back to the editor' })).toHaveAttribute(
+    'href',
+    checkPage,
+  );
+  await expect(root).toContainText('DRAFT – NOT PUBLISHED');
+  await expect(page.locator('header').first()).toContainText('Draft – Rev 2');
+});

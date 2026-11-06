@@ -1,4 +1,4 @@
-import { GUIDE_VERDICT_LABELS } from '@modig/shared';
+import { GUIDE_VERDICT_LABELS, type GuideVerdict } from '@modig/shared';
 import { useId, type ReactNode } from 'react';
 // ✓ ✗ ⓘ as on screen, drawn like the checklist's status marks: Inter has no such glyphs.
 import { VERDICT_ICONS } from '../guides/verdicts';
@@ -99,7 +99,19 @@ function Entry({
   );
 }
 
-function GuideImage({ image, url }: { image: AppendixImage; url: string | null }) {
+/**
+ * One guide picture with its verdict as a symbol and words, and its caption. `labels` words the
+ * verdicts (a quality check's say "Should look like this").
+ */
+export function GuideImage({
+  image,
+  url,
+  labels = GUIDE_VERDICT_LABELS,
+}: {
+  image: AppendixImage;
+  url: string | null;
+  labels?: Readonly<Record<GuideVerdict, string>>;
+}) {
   const Icon = VERDICT_ICONS[image.verdict];
   return (
     <figure className="paper-guide-image" data-guide-image="" data-verdict={image.verdict}>
@@ -114,7 +126,7 @@ function GuideImage({ image, url }: { image: AppendixImage; url: string | null }
         {/* "3.c · ✓ Good": the verdict as a symbol and a word, never colour alone. */}
         <strong className="paper-guide-label">
           {image.ref} · <Icon className="paper-guide-icon" strokeWidth={3} aria-hidden="true" />
-          {GUIDE_VERDICT_LABELS[image.verdict]}
+          {labels[image.verdict]}
         </strong>
         {image.caption && <span className="paper-guide-caption">{image.caption}</span>}
       </figcaption>

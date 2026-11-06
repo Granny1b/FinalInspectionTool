@@ -97,6 +97,7 @@ export function TemplateRevisionPage() {
         title={revision.data.name || 'Untitled quality check'}
         description={description}
         badges={badges}
+        printHref={templatePrintHref(templateId, number)}
       />
     );
   }

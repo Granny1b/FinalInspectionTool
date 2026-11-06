@@ -323,3 +323,139 @@
 .paper-qc-closing .paper-signature {
   padding-top: 11mm;
 }
+
+/* ------------------------------------------------------------------------------------------ */
+/* Instructions: a quality check's rows as a manual for the operator, printed from its         */
+/* template, with the pictures by their rows.                                                  */
+/* ------------------------------------------------------------------------------------------ */
+
+.paper-qi-contents {
+  margin-top: 9mm;
+}
+
+.paper-qi-contents h3 {
+  font-size: 10pt;
+  font-weight: 600;
+}
+
+.paper-qi-contents ol {
+  margin: 2mm 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 0.3mm solid var(--paper-ink);
+}
+
+.paper-qi-contents li {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  padding: 1.6mm 0;
+  border-bottom: 0.25mm solid var(--paper-rule);
+}
+
+.paper-qi-contents-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.paper-qi-contents-stats {
+  color: var(--paper-muted);
+  white-space: nowrap;
+}
+
+/* Blocks that never split: a row's text with its first pictures, each further pair. */
+.paper-qi-start,
+.paper-qi-more {
+  break-inside: avoid;
+}
+
+.paper-qi-start + .paper-qi-start,
+.paper-qi-flow tr + tr .paper-qi-start {
+  margin-top: 4mm;
+}
+
+.paper-qi-section-title {
+  margin: 0 0 3mm;
+  padding: 1.6mm 2mm;
+  border: 0.3mm solid var(--paper-ink);
+  background: var(--paper-fill);
+  font-size: 10pt;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* A section after another starts clear of the row above it. */
+.paper-qi-start:not(:first-child) > .paper-qi-section-title,
+.paper-qi-flow tr + tr .paper-qi-section-title {
+  margin-top: 4mm;
+}
+
+.paper-qi-row {
+  padding-bottom: 3mm;
+  border-bottom: 0.25mm solid var(--paper-rule);
+}
+
+.paper-qi-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 2.5mm;
+}
+
+/* The ref sits over the section number's column. */
+.paper-qi-row-head .paper-ref {
+  flex: none;
+  width: 9.5mm;
+}
+
+.paper-qi-what {
+  flex: 1;
+  min-width: 0;
+  font-size: 10pt;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.paper-qi-time {
+  flex: none;
+  color: var(--paper-muted);
+  white-space: nowrap;
+}
+
+.paper-qi-details {
+  display: grid;
+  grid-template-columns: 26mm minmax(0, 1fr);
+  gap: 1mm 2.5mm;
+  margin: 1.5mm 0 0 12mm;
+}
+
+.paper-qi-details dt {
+  font-size: 7.5pt;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+.paper-qi-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  /* The text's own line breaks, as the app shows them. */
+  white-space: pre-line;
+}
+
+/* The pictures under the text, indented as it is. */
+.paper-qi-row .paper-guide-row,
+.paper-qi-more .paper-guide-row {
+  margin-left: 12mm;
+}
+
+.paper-qi-more {
+  padding-bottom: 3mm;
+  border-bottom: 0.25mm solid var(--paper-rule);
+}
+
+/* A row with more pictures draws its rule under the last of them. */
+.paper-qi-row:has(+ .paper-qi-more),
+.paper-qi-start:has(+ .paper-qi-more) .paper-qi-row,
+.paper-qi-more:has(+ .paper-qi-more) {
+  border-bottom: 0;
+}

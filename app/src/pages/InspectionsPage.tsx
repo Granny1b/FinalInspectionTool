@@ -19,6 +19,7 @@ import {
   type InspectionsPageState,
 } from '../features/inspections/listFilter';
 import { useInspections } from '../features/inspections/queries';
+import { useMachines } from '../features/machines/queries';
 import { errorMessage } from '../lib/api';
 import { modelName, useSettings } from '../lib/useSettings';
 
@@ -62,6 +63,8 @@ export function InspectionsPage({ kind = 'final' }: { kind?: InspectionKind }) {
   const words = WORDS[kind];
   const inspections = useInspections(kind);
   const settings = useSettings();
+  // Offered in the search box; without them it searches words only.
+  const machines = useMachines();
   const [params, setParams] = useSearchParams();
   const filter = filterFromParams(params);
   // Typing in the search box replaces the history entry instead of adding one per key. Rendered at
@@ -147,6 +150,10 @@ export function InspectionsPage({ kind = 'final' }: { kind?: InspectionKind }) {
             kind={kind}
             filter={filter}
             models={modelOptions}
+            machines={(machines.data ?? []).filter(
+              (machine) => !filter.model || machine.modelCode === filter.model,
+            )}
+            machineModels={settings.data?.machineModels}
             onChange={setFilter}
           />
           {/* Announced, so a screen reader hears what a search or filter left. */}
@@ -161,11 +168,11 @@ export function InspectionsPage({ kind = 'final' }: { kind?: InspectionKind }) {
             <EmptyState
               icon={SearchX}
               title={words.noMatch}
-              hint="Try other words, or another model or state."
+              hint="Try other words, or another machine, model or state."
               action={
                 <Button
                   variant="secondary"
-                  onClick={() => setFilter({ query: '', model: '', state: '' })}
+                  onClick={() => setFilter({ query: '', model: '', machine: '', state: '' })}
                 >
                   Clear search and filters
                 </Button>
