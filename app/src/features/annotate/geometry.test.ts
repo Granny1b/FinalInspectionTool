@@ -3,16 +3,22 @@ import { describe, expect, it } from 'vitest';
 import {
   annotationBounds,
   clampMove,
+  DUPLICATE_OFFSET,
+  duplicateOffset,
   extendStroke,
   fitInto,
+  limitBox,
   MIN_ARROW_PX,
+  MIN_BOX_PX,
   MIN_DRAG_PX,
   moveAnnotation,
+  moveArrowEnd,
   roundFraction,
   screenDistance,
   shapeFromDrag,
   strokeFromPoints,
   toFraction,
+  transformAnnotation,
 } from './geometry';
 
 /** The photo as shown on screen in these tests: 1000 × 500 px. */
@@ -278,5 +284,139 @@ describe('moveAnnotation', () => {
     const arrow: Annotation = { kind: 'arrow', points: [0.1, 0.2, 0.3, 0.4], color: RED };
     moveAnnotation(arrow, 0.1, 0.1);
     expect(arrow.points).toEqual([0.1, 0.2, 0.3, 0.4]);
+  });
+});
+
+describe('transformAnnotation', () => {
+  it('resizes a box: its corner moves with the origin, its size with the scale', () => {
+    const box: Annotation = { kind: 'rect', x: 0.2, y: 0.4, w: 0.2, h: 0.1, color: RED };
+    // Dragged by its bottom-right handle to twice the width and three times the height.
+    expect(transformAnnotation(box, { x: -0.2, y: -0.8, scaleX: 2, scaleY: 3 })).toEqual({
+      ...box,
+      x: 0.2,
+      y: 0.4,
+      w: 0.4,
+      h: 0.3,
+    });
+  });
+
+  it('scales every point of a freehand line and an arrow', () => {
+    const stroke: Annotation = { kind: 'freehand', points: [0.1, 0.1, 0.3, 0.2], color: RED };
+    expect(transformAnnotation(stroke, { x: 0.05, y: 0, scaleX: 0.5, scaleY: 0.5 })).toEqual({
+      ...stroke,
+      points: [0.1, 0.05, 0.2, 0.1],
+    });
+  });
+
+  it('makes a label’s text bigger with its height', () => {
+    const label: Annotation = {
+      kind: 'text',
+      x: 0.5,
+      y: 0.5,
+      text: 'Burr',
+      size: 0.04,
+      color: RED,
+    };
+    expect(transformAnnotation(label, { x: -0.25, y: -0.25, scaleX: 1.5, scaleY: 1.5 })).toEqual({
+      ...label,
+      x: 0.5,
+      y: 0.5,
+      size: 0.06,
+    });
+  });
+
+  it('keeps the result on the photo, rounded', () => {
+    const box: Annotation = { kind: 'ellipse', x: 0.6, y: 0.6, w: 0.3, h: 0.3, color: RED };
+    const resized = transformAnnotation(box, { x: 0.0001, y: 0, scaleX: 1.5, scaleY: 1 / 3 });
+    expect(resized).toEqual({ ...box, x: 0.9001, y: 0.2, w: 0.0999, h: 0.1 });
+  });
+
+  it('treats a broken scale as none', () => {
+    const box: Annotation = { kind: 'rect', x: 0.2, y: 0.2, w: 0.2, h: 0.2, color: RED };
+    expect(transformAnnotation(box, { x: 0, y: 0, scaleX: Infinity, scaleY: NaN })).toEqual(box);
+  });
+});
+
+describe('limitBox', () => {
+  const AREA = { width: 1000, height: 500 };
+  const OLD = { x: 100, y: 100, width: 200, height: 100, rotation: 0 };
+
+  it('lets a handle resize the box freely on the photo', () => {
+    const next = { ...OLD, width: 400, height: 50 };
+    expect(limitBox(OLD, next, AREA, false)).toEqual(next);
+  });
+
+  it('stops a side the handle moved at the photo’s edge', () => {
+    expect(limitBox(OLD, { ...OLD, width: 1200 }, AREA, false)).toEqual({ ...OLD, width: 900 });
+    expect(limitBox(OLD, { ...OLD, x: -50, width: 350 }, AREA, false)).toEqual({
+      ...OLD,
+      x: 0,
+      width: 300,
+    });
+  });
+
+  it('lets a side already past the edge stay there', () => {
+    const past = { ...OLD, x: -4, width: 204 };
+    expect(limitBox(past, { ...past, width: 300 }, AREA, false)).toEqual({ ...past, width: 300 });
+  });
+
+  it('keeps a direction’s old size rather than going below the minimum', () => {
+    const next = { ...OLD, width: MIN_BOX_PX - 1, height: 60 };
+    expect(limitBox(OLD, next, AREA, false)).toEqual({ ...OLD, height: 60 });
+    // A side handle on a box already that thin (a straight line) still works the other way.
+    const thin = { ...OLD, height: 4 };
+    expect(limitBox(thin, { ...thin, width: 300 }, AREA, false)).toEqual({
+      ...thin,
+      width: 300,
+    });
+  });
+
+  it('keeps the old box whole when a box with its ratio kept would leave the photo', () => {
+    expect(limitBox(OLD, { ...OLD, width: 1000, height: 500 }, AREA, true)).toEqual(OLD);
+    expect(limitBox(OLD, { ...OLD, width: 8, height: 4 }, AREA, true)).toEqual(OLD);
+    const next = { ...OLD, width: 300, height: 150 };
+    expect(limitBox(OLD, next, AREA, true)).toEqual(next);
+  });
+});
+
+describe('moveArrowEnd', () => {
+  const arrow: Extract<Annotation, { kind: 'arrow' }> = {
+    kind: 'arrow',
+    points: [0.1, 0.1, 0.5, 0.5],
+    color: RED,
+  };
+
+  it('moves the tail or the tip', () => {
+    expect(moveArrowEnd(arrow, 'tail', { x: 0.2, y: 0.3 }, SHOWN)?.points).toEqual([
+      0.2, 0.3, 0.5, 0.5,
+    ]);
+    expect(moveArrowEnd(arrow, 'tip', { x: 0.9, y: 0.12345 }, SHOWN)?.points).toEqual([
+      0.1, 0.1, 0.9, 0.1235,
+    ]);
+  });
+
+  it('refuses an arrow shorter than the minimum', () => {
+    const close = { x: 0.5 - (MIN_ARROW_PX - 1) / SHOWN.width, y: 0.5 };
+    expect(moveArrowEnd(arrow, 'tail', close, SHOWN)).toBeNull();
+  });
+});
+
+describe('duplicateOffset', () => {
+  it('sets a copy down and to the right', () => {
+    expect(duplicateOffset({ x0: 0.2, y0: 0.2, x1: 0.5, y1: 0.5 })).toEqual({
+      x: DUPLICATE_OFFSET,
+      y: DUPLICATE_OFFSET,
+    });
+  });
+
+  it('sets it up or left where the photo ends, and forward again where both ends are near', () => {
+    expect(duplicateOffset({ x0: 0.5, y0: 0.2, x1: 0.99, y1: 0.5 })).toEqual({
+      x: -DUPLICATE_OFFSET,
+      y: DUPLICATE_OFFSET,
+    });
+    expect(duplicateOffset({ x0: 0, y0: 0.01, x1: 1, y1: 0.99 })).toEqual({
+      x: DUPLICATE_OFFSET,
+      y: DUPLICATE_OFFSET,
+    });
   });
 });

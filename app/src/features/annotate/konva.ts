@@ -5,6 +5,7 @@
  */
 import Konva from 'konva/lib/Core';
 import { Arrow } from 'konva/lib/shapes/Arrow';
+import { Circle } from 'konva/lib/shapes/Circle';
 import { Ellipse } from 'konva/lib/shapes/Ellipse';
 import { Image } from 'konva/lib/shapes/Image';
 import { Line } from 'konva/lib/shapes/Line';
@@ -12,4 +13,4 @@ import { Rect } from 'konva/lib/shapes/Rect';
 import { Text } from 'konva/lib/shapes/Text';
 import { Transformer } from 'konva/lib/shapes/Transformer';
 
-export { Arrow, Ellipse, Image, Konva, Line, Rect, Text, Transformer };
+export { Arrow, Circle, Ellipse, Image, Konva, Line, Rect, Text, Transformer };

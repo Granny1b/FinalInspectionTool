@@ -10,6 +10,7 @@ import {
   blobNames,
   CONTAINERS,
   DeviationLogSchema,
+  DeviationPhotosSchema,
   FollowUpSchema,
   FollowUpsSchema,
   newId,
@@ -34,7 +35,7 @@ import type * as Deviations from '../lib/deviations';
 import { syncDeviations } from '../lib/deviations';
 import { loadInspection, writeInspection } from '../lib/inspections';
 import { containerClient, deviationsTable, readJson, writeJson } from '../lib/storage';
-import { exportDeviationLogCsv, getDeviationLog } from './deviations';
+import { exportDeviationLogCsv, getDeviationLog, getDeviationPhotos } from './deviations';
 import { getFollowUps, setFollowUp } from './follow-ups';
 import { deleteInspection, saveInspection } from './inspections';
 
@@ -665,5 +666,49 @@ describe('GET /api/deviations/export.csv', () => {
     expect(deviationLogFileName(query, '2026-11-06')).toBe(
       'Quality check deviations 2026-11-06, open, machine.csv',
     );
+  });
+});
+
+describe('GET /api/deviations/photos', () => {
+  async function photosOf(query: Record<string, string> = {}) {
+    const response = await getDeviationPhotos(request({ principal: inspector, query }), context());
+    expect(response.status).toBe(200);
+    return DeviationPhotosSchema.parse(response.jsonBody).photos;
+  }
+
+  it('gives the photos of the deviations under the filters, read from their inspections', async () => {
+    const extraId = newId();
+    const photoId = newId();
+    const { inspection } = await stored({
+      extraDeviations: [
+        {
+          id: extraId,
+          description: 'Scratch on the door',
+          resp: 'Mechanical',
+          severity: 'minor',
+          photos: [{ imageId: photoId, annotations: [], caption: 'Door' }],
+        },
+      ],
+    });
+    // Deviations without photos are left out.
+    await stored();
+    expect(await photosOf()).toEqual([
+      {
+        inspectionId: inspection.id,
+        key: extraId,
+        photos: [{ imageId: photoId, annotations: [], caption: 'Door' }],
+      },
+    ]);
+    // The same filters as the log: another responsible's deviations have none.
+    expect(await photosOf({ resp: 'Electrical' })).toEqual([]);
+    expect(await photosOf({ kind: 'quality' })).toEqual([]);
+  });
+
+  it('refuses filters it can’t read', async () => {
+    const response = await getDeviationPhotos(
+      request({ principal: inspector, query: { status: 'done' } }),
+      context(),
+    );
+    expect(response.status).toBe(400);
   });
 });

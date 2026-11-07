@@ -1,0 +1,121 @@
+/*
+ * The deviation log on paper (DeviationLogDocument): what it adds to the reports' paper
+ * (print.css) and a quality check's (quality-print.css), whose sheets, tables, cards, header and
+ * sign-off it uses as they are. Black and white throughout: closed by a tick and words.
+ */
+
+/* The checklist: one table per machine. Narrow columns for the box, who and what kind; the
+   deviation and the room to write what was done share the rest. */
+.paper-log-col-done {
+  width: 9mm;
+}
+
+.paper-log-col-resp {
+  width: 22mm;
+}
+
+.paper-log-col-category {
+  width: 24mm;
+}
+
+/* No Found column: when it was found doesn't help whoever fixes it. The room goes to writing what
+   was done. */
+.paper-log-col-action {
+  width: 52mm;
+}
+
+/* The serial number and model after the Machine ID, the inspections on a line of their own. */
+.paper-log-machine {
+  margin-left: 2.5mm;
+  font-size: 8pt;
+  font-weight: 400;
+  color: var(--paper-muted);
+}
+
+.paper-log-inspections {
+  display: block;
+  margin-top: 0.6mm;
+  font-size: 7.5pt;
+  font-weight: 400;
+  color: var(--paper-muted);
+}
+
+/* An open deviation's row is high enough to write in by hand. */
+.paper-log-table tbody tr[data-status='open'] td {
+  height: 15mm;
+}
+
+.paper-log-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5mm;
+  font-weight: 600;
+}
+
+.paper-log-where {
+  margin-top: 0.6mm;
+  font-size: 7.5pt;
+  color: var(--paper-muted);
+}
+
+.paper-log-text {
+  margin-top: 0.6mm;
+  font-weight: 500;
+}
+
+.paper-log-comment {
+  margin-top: 0.6mm;
+  font-size: 8pt;
+  white-space: pre-line;
+}
+
+/* A closed deviation's box, ticked: the same size as an empty one. */
+.paper-log-done {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.8mm;
+  height: 3.8mm;
+  border: 0.3mm solid var(--paper-ink);
+  border-radius: 0.4mm;
+  vertical-align: middle;
+}
+
+.paper-log-done svg {
+  width: 3.2mm;
+  height: 3.2mm;
+}
+
+.paper-log-closed {
+  font-size: 8pt;
+}
+
+.paper-log-closed p + p {
+  margin-top: 0.6mm;
+  white-space: pre-line;
+}
+
+/* Two lines to write on, the lower one for the signature and date. */
+.paper-log-lines {
+  display: grid;
+  gap: 5mm;
+  padding-top: 5mm;
+}
+
+.paper-log-lines span {
+  display: block;
+  border-bottom: 0.25mm solid var(--paper-rule);
+}
+
+.paper-log-closing {
+  margin-top: 6mm;
+}
+
+/* On a card: where it was found, above its section. */
+.paper-card-context {
+  margin-top: 1.2mm;
+  font-size: 8pt;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

@@ -101,6 +101,11 @@ export type DeviationCard = {
   category: string;
   photos: DeviationPhoto[];
   /**
+   * Above the section: where the deviation was found when the cards come from many inspections
+   * (the printed deviation log): "Magellan#1 · S/N RM-2026-016 · Pre start up".
+   */
+  context?: string;
+  /**
    * Closed in the app (the deviation log): what was done, the day and who, printed where a
    * quality check's card leaves room to write them by hand. Absent while it is open.
    */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { editorCommand } from './commands';
+import { editorCommand, nudgeOf } from './commands';
 
 const key = (
   key: string,
@@ -34,6 +34,13 @@ describe('editorCommand', () => {
     expect(editorCommand(key('Backspace'))).toBe('delete');
   });
 
+  it('duplicates the selected mark with Ctrl+D and ⌘D', () => {
+    expect(editorCommand(key('d', { ctrl: true }))).toBe('duplicate');
+    expect(editorCommand(key('D', { meta: true }))).toBe('duplicate');
+    expect(editorCommand(key('d'))).toBeNull();
+    expect(editorCommand(key('D', { ctrl: true, shift: true }))).toBeNull();
+  });
+
   it('ignores everything else', () => {
     expect(editorCommand(key('z'))).toBeNull();
     expect(editorCommand(key('y', { ctrl: true, shift: true }))).toBeNull();
@@ -45,5 +52,21 @@ describe('editorCommand', () => {
   it('leaves AltGr (Ctrl+Alt) combinations to the keyboard layout', () => {
     expect(editorCommand(key('z', { ctrl: true, alt: true }))).toBeNull();
     expect(editorCommand(key('Delete', { alt: true }))).toBeNull();
+  });
+});
+
+describe('nudgeOf', () => {
+  it('moves the selected mark a pixel with an arrow key, ten with Shift', () => {
+    expect(nudgeOf(key('ArrowLeft'))).toEqual({ x: -1, y: 0 });
+    expect(nudgeOf(key('ArrowRight'))).toEqual({ x: 1, y: 0 });
+    expect(nudgeOf(key('ArrowUp', { shift: true }))).toEqual({ x: 0, y: -10 });
+    expect(nudgeOf(key('ArrowDown', { shift: true }))).toEqual({ x: 0, y: 10 });
+  });
+
+  it('leaves other keys and modified arrows alone', () => {
+    expect(nudgeOf(key('a'))).toBeNull();
+    expect(nudgeOf(key('ArrowLeft', { ctrl: true }))).toBeNull();
+    expect(nudgeOf(key('ArrowLeft', { meta: true }))).toBeNull();
+    expect(nudgeOf(key('ArrowLeft', { alt: true }))).toBeNull();
   });
 });

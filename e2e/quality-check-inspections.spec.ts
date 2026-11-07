@@ -339,8 +339,10 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   await expect(row).toContainText(CHECK);
   await expect(row).toContainText('RM-E2E-016');
   await expect(row).toContainText('Finalised');
+  // Not found among the final inspections: "No inspections yet" when there are none at all (a
+  // fresh store on CI), "No inspections match" otherwise.
   await page.goto(`/inspections?q=${number}`);
-  await expect(page.getByText('No inspections match')).toBeVisible();
+  await expect(page.getByText(/^No inspections (match|yet)$/)).toBeVisible();
 
   // Its address as an inspection leads to it, and so does its print address: the report.
   await page.goto(`/inspections/${id}`);

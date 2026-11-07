@@ -628,16 +628,21 @@ whoever fixes it sees exactly where. They print on the report's deviation pages.
 The editor: tools on top, the photo filling the window, a caption and **Save** / **Cancel** at the
 bottom. Mouse, finger and pen all work.
 
-| To                            | Do                                                                                             |
-| ----------------------------- | ---------------------------------------------------------------------------------------------- |
-| Draw an arrow, box or ellipse | Pick **Arrow**, **Rectangle** or **Ellipse**, drag across the photo                            |
-| Write a label                 | **Text**, click where it goes, type, `Enter`                                                   |
-| Draw by hand                  | **Freehand**, then draw                                                                        |
-| Pick a colour                 | Red, Green, Cyan, Yellow or White (also recolours the selected mark, or the label being typed) |
-| Move or delete a mark         | **Select and move**: drag it; `Delete` or the bin removes it                                   |
-| Change a label                | Double-click it with **Select and move**                                                       |
-| Undo, redo                    | `Ctrl+Z`; `Ctrl+Shift+Z` or `Ctrl+Y` (also the buttons)                                        |
-| Cancel                        | `Esc` or **Cancel** (asks first if anything changed)                                           |
+| To                            | Do                                                                                                         |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Draw an arrow, box or ellipse | Pick **Arrow**, **Rectangle** or **Ellipse**, drag across the photo                                        |
+| Write a label                 | **Text**, click where it goes, type, `Enter`                                                               |
+| Draw by hand                  | **Freehand**, then draw                                                                                    |
+| Pick a colour                 | Red, Green, Cyan, Yellow or White (also recolours the selected mark, or the label being typed)             |
+| Move a mark                   | Drag it by its line, with any tool; with **Select and move** also by the inside of a box or circle         |
+| Select a mark                 | Click its line (any tool) or its inside (**Select and move**); `Esc` lets go of it                         |
+| Resize a mark                 | Select it, drag a handle: a box or circle by any side or corner, a label or freehand line by a corner      |
+| Change an arrow               | Select it, drag the dot on either end                                                                      |
+| Nudge a mark                  | Arrow keys move the selected mark a pixel, with `Shift` ten                                                |
+| Copy, layer or delete a mark  | Select it: **Duplicate mark** (`Ctrl+D`), **Bring to front**, **Send to back**, **Delete mark** (`Delete`) |
+| Change a label                | Double-click it                                                                                            |
+| Undo, redo                    | `Ctrl+Z`; `Ctrl+Shift+Z` or `Ctrl+Y` (also the buttons)                                                    |
+| Cancel                        | `Esc` (a second one if a mark is selected) or **Cancel** (asks first if anything changed)                  |
 
 Lines and labels are sized to the photo (a label is 4 % of its long edge), so they look the same
 on screen, on a thumbnail and on paper. They stay visible on a black-and-white printer: yellow
@@ -915,6 +920,22 @@ and per responsible. The two kinds are never shown together.
   Comment, Action, Category, Severity, Responsible, Status, Found, Closed, Closed by; UTF-8 with a
   byte order mark and semicolons, as the Insights CSV. It is named after the filters:
   `Quality check deviations 2026-11-06, open, RMMG.csv`.
+- **Preview** and **Print / Save PDF** print what the filters show, for the copy kept at the
+  machine: pick a machine (and status, responsible…), then print. Two layouts:
+  - _Checklist_: under a header (logo, title, Printed, Status and the filters in use, "5
+    deviations · 3 open · 2 closed"), one table per machine as on the page (Machine ID, S/N,
+    model, its inspections, "3 open · 2 closed"), its title and column labels repeated on every
+    page: Done (a box to tick; ✓ for one closed in the app) | Deviation (ID, severity, check and
+    section, the checkpoint, comment) | Responsible | Category | Action taken · Sign · Date (lines to write on; for one closed in the app, the day, who and what was done).
+  - _With pictures_: the same header, then a card per deviation as a quality check's report
+    prints them, with the machine and check on each card, its photos (as marked up) and lines for
+    Action taken, Closed on and Signature (or how it was closed), 2 or 4 to a page.
+    Both end with _All deviations above closed_ · Name · Signature · Date while some are open. The
+    preview opens on the checklist; Print / Save PDF → _Checklist_ or _With pictures_ opens the
+    print page in a new tab, which prints once everything has loaded; its toolbar switches the
+    layout. Address: `/deviations/final/print` and `/deviations/quality/print`, with the page's
+    filters and `layout=list|cards[&deviationsPerPage=2|4]`. Footer: "Quality check deviations ·
+    Magellan#1 · Open · Printed 2026-11-07" and "Page X of Y".
 - A NOK row set back to OK leaves the log, as it leaves the deviation table; marked NOK again, it
   comes back with its follow-up (it is the same checkpoint of the same inspection).
 
@@ -1150,6 +1171,7 @@ it was stored but the log's table could not be updated: sending the same request
 | `POST /api/inspections/{id}/template-update`  | admin     | Merge its template's newer revision into it (`If-Match`, choices)        |
 | `PUT /api/inspections/{id}/machine`           | admin     | Link it to a machine of its model, or unlink it (`If-Match`)             |
 | `GET /api/deviations`                         | inspector | The deviation log for `?kind&status&model&machine&resp&category&q`       |
+| `GET /api/deviations/photos`                  | inspector | Its deviations' photos, read from their inspections (same filters)       |
 | `GET /api/deviations/export.csv`              | inspector | The same deviations as a CSV file, the Excel log's columns               |
 | `GET /api/insights`                           | admin     | KPIs for `?kind&from&to&model&check&machine&includeInProgress`           |
 | `GET /api/insights/export.csv`                | admin     | The deviation rows under the same filters, as a CSV file                 |

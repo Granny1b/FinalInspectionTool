@@ -4,7 +4,7 @@
  * the canvas only turns pointer gestures into these actions.
  */
 import type { Annotation } from '@modig/shared';
-import { moveAnnotation, type Point } from './geometry';
+import { annotationBounds, duplicateOffset, moveAnnotation, type Point } from './geometry';
 import { record, redo, startHistory, undo, type History } from './history';
 import { DEFAULT_COLOR, DEFAULT_TOOL, type Tool } from './tools';
 
@@ -35,6 +35,12 @@ export type EditorAction =
   | { type: 'select'; id: number | null }
   | { type: 'add'; annotation: Annotation }
   | { type: 'move'; id: number; dx: number; dy: number }
+  /** A mark resized by its handles or an arrow's end moved: its new shape. */
+  | { type: 'reshape'; id: number; annotation: Annotation }
+  /** A copy of the selected mark, set off from it and selected. */
+  | { type: 'duplicate' }
+  /** The selected mark drawn over all others (`front`) or under them (`back`). */
+  | { type: 'order'; to: 'front' | 'back' }
   | { type: 'delete' }
   | { type: 'undo' }
   | { type: 'redo' }
@@ -64,8 +70,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
 
   switch (action.type) {
     case 'tool':
-      // Selecting belongs to the select tool: with a drawing tool, picking a colour for the next
-      // mark must not recolour one picked earlier.
+      // Picking a tool to draw with is for a new mark: a colour picked next is for that one, not
+      // for a mark picked earlier.
       return {
         ...state,
         tool: action.tool,
@@ -95,7 +101,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       };
 
     case 'add':
-      // Not selected: the next mark is usually drawn right away (Ctrl+Z takes this one back).
+      // Not selected: the next mark is usually drawn right away, often in another colour, which
+      // would recolour this one (Ctrl+Z takes it back; a press on its line picks it).
       return {
         ...change([...items, { id: state.nextId, annotation: action.annotation }]),
         nextId: state.nextId + 1,
@@ -106,6 +113,33 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return change(
         update(action.id, (annotation) => moveAnnotation(annotation, action.dx, action.dy)),
       );
+
+    case 'reshape': {
+      const current = items.find((item) => item.id === action.id)?.annotation;
+      if (current?.kind !== action.annotation.kind) return state;
+      if (sameAnnotations([current], [action.annotation])) return state;
+      return change(update(action.id, () => action.annotation));
+    }
+
+    case 'duplicate': {
+      const selected = selectedItem(state);
+      if (!selected) return state;
+      const offset = duplicateOffset(annotationBounds(selected.annotation));
+      const copy = moveAnnotation(selected.annotation, offset.x, offset.y);
+      return {
+        ...change([...items, { id: state.nextId, annotation: copy }]),
+        selectedId: state.nextId,
+        nextId: state.nextId + 1,
+      };
+    }
+
+    case 'order': {
+      const selected = selectedItem(state);
+      if (!selected) return state;
+      const others = items.filter((item) => item !== selected);
+      const next = action.to === 'front' ? [...others, selected] : [selected, ...others];
+      return next.every((item, index) => item === items[index]) ? state : change(next);
+    }
 
     case 'delete': {
       const selected = selectedItem(state);
@@ -187,7 +221,7 @@ function commitText(state: EditorState, draft: TextDraft): EditorState {
   return { ...closed, history: record(state.history, next) };
 }
 
-function selectedItem(state: EditorState): Item | undefined {
+export function selectedItem(state: EditorState): Item | undefined {
   return state.history.present.find((item) => item.id === state.selectedId);
 }
 
