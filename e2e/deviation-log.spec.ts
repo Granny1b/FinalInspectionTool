@@ -14,6 +14,8 @@ import {
 } from '@modig/shared';
 import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
 import { signIn } from './support/auth';
+import { pageText, readPdf } from './support/pdf';
+import { testPhoto, uploadPhoto } from './support/photos';
 import {
   createQualityCheck,
   createTemplate,
@@ -317,4 +319,114 @@ test('a deviation just marked is closed from the inspection’s Deviations tab, 
       `^${machine.id};SN-LOG-1;${machine.model};${inspection.number};2026-10-07;${id};1\\.b Pallet changer - Smooth movement, no noise;;;;Minor;;Closed;\\d{4}-\\d{2}-\\d{2};\\d{4}-\\d{2}-\\d{2};Anna Andersson$`,
     ),
   );
+});
+
+test('the log prints what its filters show, as a checklist or with pictures, after a preview', async ({
+  page,
+  context,
+  machine,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  // The print tab's window.print() is counted, not shown.
+  await context.addInitScript(() => {
+    window.print = () => {
+      document.documentElement.dataset.printed = String(
+        Number(document.documentElement.dataset.printed ?? 0) + 1,
+      );
+    };
+  });
+  // A quality check's deviation with a photo.
+  const { inspection: check, etag } = await withDeviation(page.request, machine.check, machine.id);
+  const jpeg = await testPhoto(page.context().browser()!, {
+    width: 800,
+    height: 600,
+    label: 'Decal',
+  });
+  const photoId = await uploadPhoto(page.request, jpeg);
+  const first = check.templateSnapshot.sections[0]!.items[0]!.id;
+  const { modelCode: _model, ...front } = check.front;
+  const saved = await page.request.put(`/api/inspections/${check.id}`, {
+    headers: { 'If-Match': etag },
+    data: {
+      front,
+      results: {
+        ...check.results,
+        [first]: {
+          ...check.results[first],
+          photos: [{ imageId: photoId, annotations: [], caption: 'Left tube' }],
+        },
+      },
+      extraDeviations: [],
+    },
+  });
+  expect(saved.status()).toBe(200);
+  const id = `${check.number} · D-01`;
+  await page.goto(`/deviations/quality?q=${encodeURIComponent(machine.id)}`);
+  await expect(machineCard(page, machine.id)).toContainText(id);
+
+  // Preview: the checklist of what the filters show, then the cards with the photo.
+  await page.getByRole('button', { name: 'Preview' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Preview' });
+  const previewed = dialog.locator('[data-print-root]');
+  await expect(previewed).toHaveAttribute('data-print-ready', 'true', { timeout: 30_000 });
+  await expect(previewed).toHaveAttribute('data-print-mode', 'list');
+  await expect(previewed.locator('[data-log-row]')).toHaveCount(1);
+  for (const text of [
+    'Quality check deviations',
+    `“${machine.id}”`,
+    machine.id,
+    id,
+    'Decal turned inward',
+    'Mechanical',
+    'Action taken · Sign · Date',
+    'All deviations above closed',
+  ]) {
+    await expect(previewed).toContainText(text);
+  }
+  await expect(dialog.getByRole('button', { name: '2 per page' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'With pictures' }).click();
+  await expect(previewed).toHaveAttribute('data-print-mode', 'cards');
+  await expect(previewed).toHaveAttribute('data-print-ready', 'true', { timeout: 30_000 });
+  await expect(previewed.locator('[data-deviation-card]')).toHaveCount(1);
+  await expect(previewed.locator('[data-deviation-card]')).toContainText(
+    `${machine.id} · S/N RM-LOG-016 · Pre start up`,
+  );
+  await expect(previewed.locator('[data-deviation-card] img')).toHaveCount(1);
+  await expect(dialog.getByRole('button', { name: '2 per page' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
+  // Print / Save PDF → Checklist: the print page under the same filters, printed once.
+  await page.getByRole('button', { name: 'Print / Save PDF' }).click();
+  await expect(page.getByRole('menuitem')).toHaveText(['Checklist', 'With pictures']);
+  const [tab] = await Promise.all([
+    context.waitForEvent('page'),
+    page.getByRole('menuitem', { name: 'Checklist' }).click(),
+  ]);
+  await expect(tab).toHaveURL(/\/deviations\/quality\/print\?q=Magellan%23[A-Z]{6}&layout=list/);
+  const printed = tab.locator('[data-print-root]');
+  await expect(printed).toHaveAttribute('data-print-ready', 'true', { timeout: 30_000 });
+  await expect(tab.locator('html')).toHaveAttribute('data-printed', '1');
+  await expect(tab).not.toHaveURL(/autoprint/);
+  await expect(tab.getByRole('link', { name: 'Back to the deviations' })).toHaveAttribute(
+    'href',
+    `/deviations/quality?q=${encodeURIComponent(machine.id)}`,
+  );
+  const pages = await readPdf(await tab.pdf({ format: 'A4', preferCSSPageSize: true }));
+  expect(pages.length).toBeGreaterThanOrEqual(1);
+  const text = pages.map(pageText).join('');
+  for (const words of ['Quality check deviations', id, 'Decal turned inward', machine.id]) {
+    expect(text).toContain(words.replace(/\s+/g, ''));
+  }
+  expect(pages[0]!.texts.map((part) => part.text)).toContain(`Page 1 of ${pages.length}`);
+
+  // With pictures, on the same page: the cards, two or four to a page.
+  await tab
+    .getByRole('group', { name: 'What to print' })
+    .getByRole('button', { name: 'With pictures' })
+    .click();
+  await expect(tab).toHaveURL(/layout=cards/);
+  await expect(printed).toHaveAttribute('data-print-mode', 'cards');
+  await expect(printed).toHaveAttribute('data-print-ready', 'true', { timeout: 30_000 });
+  await expect(printed.locator('[data-deviation-card] img')).toHaveCount(1);
+  await expect(tab.getByRole('button', { name: '4 per page' })).toBeVisible();
 });

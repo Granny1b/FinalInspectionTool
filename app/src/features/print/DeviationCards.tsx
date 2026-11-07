@@ -33,6 +33,8 @@ type Props = {
   lead?: ReactNode;
   /** After the last card: a sign-off for all of them, under it or on a page of its own. */
   closing?: ReactNode;
+  /** What a page's heading says of its cards after the subject; "D-01–D-04" unless given. */
+  rangeOf?: (page: DeviationCardModel[]) => string;
 };
 
 /**
@@ -55,6 +57,7 @@ export function DeviationCards({
   signOff = 'closed',
   lead,
   closing,
+  rangeOf = range,
 }: Props) {
   const titleId = useId();
   const { pages, heights, room, first, closingAlone, measureRef } = cardPages;
@@ -110,7 +113,7 @@ export function DeviationCards({
                     // Repeated on every page for the reader of the paper; once for a screen reader.
                     titleId={index === 0 ? titleId : undefined}
                     title={title}
-                    subject={`${subject} · ${range(page)}`}
+                    subject={`${subject} · ${rangeOf(page)}`}
                   />
                   <div className="paper-cards">
                     {page.map((model) => card(model, oversized))}
@@ -200,6 +203,7 @@ function DeviationCard({
           </span>
           {card.closed && <span className="paper-card-status">Closed</span>}
         </h3>
+        {card.context && <p className="paper-card-context">{card.context}</p>}
         <p className="paper-card-section">
           {card.ref ? card.sectionTitle : 'Not on the checklist'}
         </p>

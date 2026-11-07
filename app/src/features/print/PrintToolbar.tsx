@@ -32,7 +32,10 @@ type Props = {
   deviationsPerPage?: Choice<DeviationsPerPage>;
   /** "Include reference images"; `available` is false when no row has any. */
   appendix?: Choice<boolean> & { available: boolean };
-  /** Other documents' own layout choices, after the built-in ones (the Insights report's list). */
+  /**
+   * Other documents' own choices (the Insights report's list, the deviation log's layout), before
+   * the deviations per page and the appendix.
+   */
   choices?: ReactNode;
   /** Until the document is complete, Print would miss a photo or the font. */
   ready: boolean;
@@ -107,6 +110,8 @@ export function PrintToolbar({
               {...qualityMode}
             />
           )}
+          {/* Before the layout's details: what to print first, then how. */}
+          {choices}
           {deviationsPerPage && (
             <Segmented
               label="Deviations"
@@ -116,7 +121,6 @@ export function PrintToolbar({
             />
           )}
           {appendix && <AppendixToggle {...appendix} />}
-          {choices}
           {/* Each setting stays whole, its separator with it, so a wrapped line never starts
               with a dot or splits "Headers and footers: off". */}
           <p id={hintId} className="text-xs text-ink-500 sm:ml-auto sm:text-right">

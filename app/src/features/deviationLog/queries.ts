@@ -6,6 +6,7 @@
 import {
   deviationLogParams,
   DeviationLogSchema,
+  DeviationPhotosSchema,
   FollowUpSchema,
   FollowUpsSchema,
   type DeviationLog,
@@ -23,6 +24,8 @@ export const deviationLogKeys = {
   /** Everything here: a follow-up changes the log and the inspection's follow-ups alike. */
   all: ['deviations'] as const,
   log: (kind: InspectionKind) => ['deviations', 'log', kind] as const,
+  photos: (query: DeviationLogQuery) =>
+    ['deviations', 'photos', deviationLogParams(query)] as const,
   followUps: (inspectionId: string) => ['deviations', 'follow-ups', inspectionId] as const,
 };
 
@@ -47,6 +50,26 @@ export function useDeviationLog(kind: InspectionKind) {
       return (await apiFetch(`/api/deviations?${search}`, { schema: DeviationLogSchema, signal }))
         .data;
     },
+  });
+}
+
+/**
+ * The photos of the deviations under `query`, for printing the log with its pictures: asked for
+ * only then (`enabled`), as each inspection has to be read for them.
+ */
+export function useDeviationPhotos(query: DeviationLogQuery, enabled: boolean) {
+  return useQuery({
+    queryKey: deviationLogKeys.photos(query),
+    queryFn: async ({ signal }) => {
+      const search = new URLSearchParams(deviationLogParams(query)).toString();
+      return (
+        await apiFetch(`/api/deviations/photos?${search}`, {
+          schema: DeviationPhotosSchema,
+          signal,
+        })
+      ).data;
+    },
+    enabled,
   });
 }
 

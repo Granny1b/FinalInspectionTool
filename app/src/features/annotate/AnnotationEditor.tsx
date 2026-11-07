@@ -8,12 +8,13 @@ import { INPUT } from '../../components/Field';
 import { ApiRequestError, errorMessage } from '../../lib/api';
 import { fitWithin, ImageError, isTimeout, uploadJpeg, useImageUrl } from '../../lib/images';
 import { AnnotationCanvas } from './AnnotationCanvas';
-import { editorCommand } from './commands';
+import { editorCommand, nudgeOf } from './commands';
 import {
   annotationsOf,
   editorReducer,
   initialEditorState,
   sameAnnotations,
+  selectedItem,
   type EditorAction,
 } from './editorState';
 import { EditorToolbar } from './EditorToolbar';
@@ -22,7 +23,7 @@ import { canRedo, canUndo } from './history';
 import { needsRender, savedPhoto } from './photos';
 import { renderAnnotatedJpeg } from './render';
 import { defaultTextSize } from './style';
-import { TOOL_HINTS } from './tools';
+import { SELECTED_HINTS, TOOL_HINTS } from './tools';
 import type { PendingUpload } from './upload';
 import { useElementSize, useLoadedImage } from './useLoadedImage';
 
@@ -91,8 +92,9 @@ export function AnnotationEditor({
   const shown = size && fitInto(size, areaSize);
   const items = state.history.present;
   const annotations = annotationsOf(state);
+  const selected = selectedItem(state);
   // The picker shows the selected mark's colour; picking another recolours it.
-  const selectedColor = items.find((item) => item.id === state.selectedId)?.annotation.color;
+  const selectedColor = selected?.annotation.color;
   // A guide image's caption may still have the spaces it was typed with: they don't count.
   const dirty =
     !sameAnnotations(annotations, initial?.annotations ?? []) ||
@@ -177,13 +179,26 @@ export function AnnotationEditor({
     event.stopPropagation();
     if (event.key === 'Escape') {
       // Handled here, not by the dialog: Chrome refuses only one Escape per click, so a
-      // prevented `cancel` would not keep the editor open on a second press.
+      // prevented `cancel` would not keep the editor open on a second press. A selected mark is
+      // let go first; the next Escape cancels.
       event.preventDefault();
-      requestCancel();
+      if (selected && !saving) dispatch({ type: 'select', id: null });
+      else requestCancel();
       return;
     }
     // In the caption or a label, keys are text (and Ctrl+Z is the field's own undo).
     if (saving || event.target instanceof HTMLInputElement) return;
+    const nudge = nudgeOf(event);
+    if (nudge && selected && shown) {
+      event.preventDefault();
+      dispatch({
+        type: 'move',
+        id: selected.id,
+        dx: nudge.x / shown.width,
+        dy: nudge.y / shown.height,
+      });
+      return;
+    }
     const command = editorCommand(event);
     if (!command) return;
     event.preventDefault();
@@ -220,12 +235,16 @@ export function AnnotationEditor({
               color={state.text?.color ?? selectedColor ?? state.color}
               canUndo={canUndo(state.history)}
               canRedo={canRedo(state.history)}
-              canDelete={state.selectedId !== null}
+              selected={
+                selected ? { front: items.at(-1) === selected, back: items[0] === selected } : null
+              }
               disabled={saving}
               onTool={(tool) => act({ type: 'tool', tool })}
               onColor={(color) => act({ type: 'color', color })}
               onUndo={() => act({ type: 'undo' })}
               onRedo={() => act({ type: 'redo' })}
+              onDuplicate={() => act({ type: 'duplicate' })}
+              onOrder={(to) => act({ type: 'order', to })}
               onDelete={() => act({ type: 'delete' })}
             />
           </header>
@@ -246,6 +265,7 @@ export function AnnotationEditor({
                   onSelect={(id) => act({ type: 'select', id })}
                   onAdd={(annotation) => act({ type: 'add', annotation })}
                   onMove={(id, dx, dy) => act({ type: 'move', id, dx, dy })}
+                  onReshape={(id, annotation) => act({ type: 'reshape', id, annotation })}
                   onPlaceText={(at) => act({ type: 'text-start', at, size: defaultTextSize(size) })}
                   onEditText={(id) => act({ type: 'text-edit', id })}
                   onTextChange={(value) => dispatch({ type: 'text-change', value })}
@@ -266,7 +286,9 @@ export function AnnotationEditor({
               )}
             </div>
             <p className="px-4 pb-2.5 text-center text-xs text-on-stage-muted">
-              {TOOL_HINTS[state.tool]}
+              {selected && !state.text
+                ? SELECTED_HINTS[selected.annotation.kind]
+                : TOOL_HINTS[state.tool]}
             </p>
           </div>
 

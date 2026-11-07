@@ -1,5 +1,11 @@
 import type { InspectionKind } from '@modig/shared';
+import {
+  filterToParams as logFilterToParams,
+  LOG_PATHS,
+  type LogFilter,
+} from '../deviationLog/model';
 import { LIST_PATHS } from '../inspections/listFilter';
+import type { LogPrintLayout } from './log/model';
 import { DEVIATIONS_PER_PAGE, PRINT_MODES, type DeviationsPerPage, type PrintMode } from './model';
 import { QUALITY_PRINT_MODES, type QualityPrintMode } from './quality/model';
 
@@ -54,4 +60,21 @@ export function parseDeviationsPerPage(value: string | null): DeviationsPerPage 
 /** The `appendix` query parameter: "1" includes the reference images. */
 export function parseAppendix(value: string | null): boolean {
   return value === '1';
+}
+
+/**
+ * The deviation log's printout under the log page's filters (their address, as the page keeps
+ * them), in `layout`; `autoprint` opens the print dialog once it has loaded.
+ */
+export function deviationLogPrintHref(
+  kind: InspectionKind,
+  filter: LogFilter,
+  { layout, deviationsPerPage }: { layout: LogPrintLayout; deviationsPerPage?: DeviationsPerPage },
+  autoprint = false,
+): string {
+  const query = logFilterToParams(filter);
+  query.set('layout', layout);
+  if (deviationsPerPage) query.set('deviationsPerPage', String(deviationsPerPage));
+  if (autoprint) query.set('autoprint', '1');
+  return `${LOG_PATHS[kind]}/print?${query.toString()}`;
 }

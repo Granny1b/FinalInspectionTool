@@ -684,3 +684,131 @@ test('the photo editor keeps the keyboard, gives a label the colour picked, and 
   expect(arrow).toMatchObject({ kind: 'arrow', color: ANNOTATION_COLORS.red });
   expect(label).toMatchObject({ kind: 'text', text: 'Loose', color: ANNOTATION_COLORS.yellow });
 });
+
+/**
+ * Where a selected box's handle is on screen: its corner or side (fractions), out by the
+ * selection's 6 px padding, `side` saying which way (−1, 0 or 1 across and down).
+ */
+async function handle(
+  page: Page,
+  [x, y]: [number, number],
+  [sideX, sideY]: [number, number],
+): Promise<[number, number]> {
+  const box = (await canvas(page).boundingBox())!;
+  return [box.x + x * box.width + sideX * 6, box.y + y * box.height + sideY * 6];
+}
+
+test('a mark is picked with any tool, moved, resized, copied, layered and deleted', async ({
+  page,
+  context,
+  published,
+  tracked,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const created = await createInspection(page.request, published, tracked);
+  const { id } = created.inspection;
+  const itemId = published.sections[0]!.items[1]!.id;
+  const [imageId] = await uploadPhotos(page, ['Cabinet']);
+  await save(page.request, created, {
+    [itemId]: { status: 'NOK', photos: [{ imageId: imageId!, annotations: [] }] },
+  });
+  await page.goto(`/inspections/${id}`);
+  await page.getByRole('tab', { name: /^Deviations/ }).click();
+  await page
+    .locator('article[data-deviation="D-01"]')
+    .getByRole('button', { name: 'Edit photo 1' })
+    .click();
+  await expect(canvas(page)).toBeVisible({ timeout: 20_000 });
+  const marks = (count: number) =>
+    expect(canvas(page)).toHaveAttribute(
+      'aria-label',
+      `Photo with ${count} mark${count === 1 ? '' : 's'}`,
+    );
+  const selected = (kind: string | null) =>
+    kind
+      ? expect(canvas(page)).toHaveAttribute('data-selected-kind', kind)
+      : expect(canvas(page)).not.toHaveAttribute('data-selected-kind');
+  const bin = editor(page).getByRole('button', { name: 'Delete mark' });
+
+  // A box, not selected once drawn (the next mark may well be in another colour).
+  await pick(page, 'Tool', 'Rectangle');
+  await drag(page, [0.2, 0.2], [0.4, 0.4]);
+  await marks(1);
+  await selected(null);
+  await expect(bin).toHaveAttribute('aria-disabled', 'true');
+
+  // Still with Rectangle: its line moves it rather than drawing another.
+  await drag(page, [0.2, 0.3], [0.3, 0.4]);
+  await marks(1);
+  await selected('rect');
+  await expect(bin).not.toHaveAttribute('aria-disabled');
+
+  // Inside it, a drawing tool draws: a circle within the box.
+  await pick(page, 'Tool', 'Ellipse');
+  await selected(null);
+  await drag(page, [0.35, 0.35], [0.45, 0.45]);
+  await marks(2);
+
+  // The select tool picks the box by its inside, and its corner handle resizes it.
+  await pick(page, 'Tool', 'Select and move');
+  await page.mouse.click(...(await onPhoto(page, [0.32, 0.47])));
+  await selected('rect');
+  await expect(
+    editor(page).getByText('Drag the box to move it, or a handle to resize it.'),
+  ).toBeVisible();
+  await page.mouse.move(...(await handle(page, [0.5, 0.5], [1, 1])));
+  await page.mouse.down();
+  await page.mouse.move(...(await handle(page, [0.7, 0.6], [1, 1])), { steps: 10 });
+  await page.mouse.up();
+
+  // A copy, selected, sent under everything.
+  await editor(page).getByRole('button', { name: 'Duplicate mark' }).click();
+  await marks(3);
+  await selected('rect');
+  const back = editor(page).getByRole('button', { name: 'Send to back' });
+  await back.click();
+  await expect(back).toHaveAttribute('aria-disabled', 'true');
+
+  // The circle, picked by its line, goes with the Delete key.
+  await page.mouse.click(...(await onPhoto(page, [0.35, 0.4])));
+  await selected('ellipse');
+  await page.keyboard.press('Delete');
+  await marks(2);
+
+  // An arrow, picked by its line with the Arrow tool; its tip is dragged, then it is nudged.
+  await pick(page, 'Tool', 'Arrow');
+  await drag(page, [0.1, 0.8], [0.3, 0.8]);
+  await marks(3);
+  await page.mouse.click(...(await onPhoto(page, [0.2, 0.8])));
+  await selected('arrow');
+  await drag(page, [0.3, 0.8], [0.3, 0.9]);
+  await marks(3);
+  await page.keyboard.press('Shift+ArrowRight');
+
+  // Escape lets go of the mark and leaves the editor open.
+  await page.keyboard.press('Escape');
+  await selected(null);
+  await expect(editor(page)).toBeVisible();
+
+  const shownWidth = (await canvas(page).boundingBox())!.width;
+  await editor(page).getByRole('button', { name: 'Save' }).click();
+  await expect(editor(page)).toBeHidden({ timeout: 30_000 });
+  await expect
+    .poll(
+      async () =>
+        (await stored(page.request, id)).results[itemId]?.photos?.[0]?.annotations.length ?? 0,
+      { timeout: 15_000 },
+    )
+    .toBe(3);
+  const [copy, box, arrow] = (await stored(page.request, id)).results[itemId]!.photos![0]!
+    .annotations;
+  expect(copy?.kind).toBe('rect');
+  expect(box?.kind).toBe('rect');
+  expect(arrow?.kind).toBe('arrow');
+  const close = (actual: number[], expected: number[]) =>
+    actual.forEach((value, index) => expect(value).toBeCloseTo(expected[index]!, 2));
+  close(fractions(box!), [0.3, 0.3, 0.4, 0.3]);
+  close(fractions(copy!), [0.33, 0.33, 0.4, 0.3]);
+  const nudge = 10 / shownWidth;
+  close(fractions(arrow!), [0.1 + nudge, 0.8, 0.3 + nudge, 0.9]);
+});
