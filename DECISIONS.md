@@ -1130,7 +1130,9 @@ The calls with product, data or paper impact. Each is explained in its section b
   label being typed), unit-tested in node; the canvas only turns gestures into actions.
 - **Selection belongs to the Select tool.** Drawing never selects the new mark; picking a colour
   sets it for the next mark and recolours a selected one (one undo step). Selecting each new mark
-  made "pick a colour for the next mark" recolour the previous one.
+  made "pick a colour for the next mark" recolour the previous one. (2026-11-07: any tool now
+  picks a mark by its line; a new mark is still not selected. See "Annotations: select, move,
+  resize".)
 - **It opens with the Arrow tool in red**, the most common mark.
 - **Undo and redo keep the last 100 steps** of the marks; the caption has its field's own undo.
 - **Marks are stored rounded to 4 decimals and kept on the photo.** Boxes drawn in any direction
@@ -1180,8 +1182,9 @@ The calls with product, data or paper impact. Each is explained in its section b
   recolours it; before, the press ended the label in its old colour while the toolbar showed the
   new one. The tool buttons still end a label. Keyboard users who Tab from the label to a colour
   still end it first.
-- **Marks are drawn and edited with a pointer only** (review: recorded): the canvas is no Tab
-  stop, and there is no keyboard way to select, move or edit a mark; the keyboard has the tools,
+- **Marks are drawn and edited with a pointer only** (review: recorded; 2026-11-07: arrow keys
+  now move a selected mark): the canvas is no Tab stop, and there is no keyboard way to select,
+  move or edit a mark; the keyboard has the tools,
   colours, Undo/Redo, Delete for a selected mark, the caption, Save and Cancel. Not asked for by
   the brief; photos come from a camera and are marked by hand.
 - **The first opening returns the focus too** (review): the "Opening the photo editor" dialog
@@ -3598,3 +3601,47 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
 - **No Found column on the checklist** (the user, the same day): when a deviation was found tells
   the operator fixing it nothing, and the column took room from the deviation and from the
   lines to write what was done (now 52 mm). The page and the CSV still show Found.
+
+## Annotations: select, move, resize (2026-11-07)
+
+- **Asked for:** "When I make a circle or a square, I want to be able to target this one and move
+  it and delete it etc. A bit more functionality."
+- **Any tool picks a mark by its line** (the same 24 px hit width as before): a drag moves it, a
+  press selects it, without first switching to **Select and move**. A drawing tool picks only by
+  the line, so a box or circle can still be drawn inside another (Konva fills a shape's hit area
+  even without a fill: `fillEnabled` is off for boxes and circles except with the select tool,
+  which also picks them by their inside). A press anywhere else lets go of the selection and draws
+  the next mark. A label is picked like any mark, so the Text tool selects a label it is pressed
+  on instead of starting a new one there; a double-click edits it with any tool.
+- **A new mark is still not selected** (settled earlier: selecting each new mark made "pick a
+  colour for the next mark" recolour the previous one). It takes one press on its line, or Ctrl+Z
+  takes it back. Picking a tool to draw with still lets go of the selection, for the same reason.
+- **Handles on the selected mark:** a box or circle has one on each corner and side; a label and a
+  freehand line on their corners, keeping their proportions (text and handwriting never stretch);
+  an arrow has a dot on each end that moves that end. Handles sit on the mark's outline, not the
+  outer edge of its line (`ignoreStroke`): measured with the line, the outline grew by a little
+  less than the handle moved. A resize is baked into the stored coordinates (the group's scale
+  goes back to 1), so the line keeps its width; the stored schema is unchanged.
+- **Limits while resizing** (`limitBox`): a side stops at the photo's edge (one already past it
+  may stay), and no direction gets smaller than 12 screen px; a label or freehand line that
+  would leave the photo or get too small keeps its last size whole. An arrow end stays on the
+  photo and the arrow at least 12 px long, as when drawn.
+- **Handles are larger for fingers** (`pointer: coarse`): 16 px squares hit 40 px wide, ends 9 px
+  dots hit 48 px wide; with a mouse 10 px and 6 px. They are drawn on an unscaled layer of their
+  own, so they keep their size whatever the photo's.
+- **The selected mark's buttons are in the toolbar** (group "Selected mark"): **Duplicate mark**
+  (Ctrl+D; the copy 3 % down and right of the original, up or left where the photo ends, and
+  selected), **Bring to front**, **Send to back** and **Delete mark**. They are always there and
+  `aria-disabled` without a selection (the earlier rule for buttons that turn themselves off), so
+  the bar, and the photo under it, never change size when a mark is picked. A bar floating by the
+  mark was not chosen: on a phone it would cover the photo. Bring to front and Send to back turn
+  off when the mark is already there.
+- **The toolbar's dividers only show from 1024 px,** where the whole bar fits on one line;
+  narrower, the groups wrap and a divider dangled at the end of a line.
+- **Keyboard:** arrow keys move the selected mark 1 screen px, with Shift 10, each press one undo
+  step; Ctrl+D duplicates; Escape lets go of a selected mark first and cancels the editor on the
+  next press. Selecting is still by pointer only (the canvas is no Tab stop).
+- **Every change is one undo step:** a move, a resize, an arrow end, a copy, a change of order.
+  The same shape again, or an order that is already so, records nothing.
+- **The line under the photo** says what the selected mark's handles do while one is selected,
+  and how a tool is used otherwise.

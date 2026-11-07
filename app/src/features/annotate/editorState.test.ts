@@ -51,7 +51,7 @@ describe('tool and colour', () => {
     expect(canUndo(state.history)).toBe(false);
   });
 
-  it('leaves the selection to the select tool: a drawing tool clears it', () => {
+  it('keeps the selection with the select tool; picking a tool to draw with clears it', () => {
     let state = run(
       initialEditorState([ARROW]),
       { type: 'tool', tool: 'select' },
@@ -164,6 +164,82 @@ describe('move', () => {
   it('records nothing for a move of zero (a click on a mark)', () => {
     const before = initialEditorState([ARROW]);
     expect(run(before, { type: 'move', id: 1, dx: 0, dy: 0 })).toBe(before);
+  });
+});
+
+describe('reshape', () => {
+  it('gives a mark its resized shape as one step', () => {
+    const resized = { ...BOX, w: 0.4, h: 0.1 };
+    const state = run(initialEditorState([ARROW, BOX]), {
+      type: 'reshape',
+      id: 2,
+      annotation: resized,
+    });
+    expect(annotationsOf(state)).toEqual([ARROW, resized]);
+    expect(run(state, { type: 'undo' }).history.present[1]!.annotation).toEqual(BOX);
+  });
+
+  it('records nothing for the same shape or another kind of mark', () => {
+    const state = initialEditorState([BOX]);
+    expect(run(state, { type: 'reshape', id: 1, annotation: { ...BOX } })).toBe(state);
+    expect(run(state, { type: 'reshape', id: 1, annotation: ARROW })).toBe(state);
+    expect(run(state, { type: 'reshape', id: 9, annotation: BOX })).toBe(state);
+  });
+});
+
+describe('duplicate', () => {
+  it('copies the selected mark down and to the right, selected, as one step', () => {
+    const state = run(
+      initialEditorState([ARROW, BOX]),
+      { type: 'select', id: 2 },
+      {
+        type: 'duplicate',
+      },
+    );
+    expect(annotationsOf(state)).toEqual([ARROW, BOX, { ...BOX, x: 0.23, y: 0.23 }]);
+    expect(state.selectedId).toBe(3);
+    expect(state.nextId).toBe(4);
+    const undone = run(state, { type: 'undo' });
+    expect(annotationsOf(undone)).toEqual([ARROW, BOX]);
+    expect(undone.selectedId).toBeNull();
+  });
+
+  it('sets a copy up or left where the photo ends', () => {
+    const corner: Annotation = { ...BOX, x: 0.7, y: 0.75, w: 0.29, h: 0.24 };
+    const state = run(
+      initialEditorState([corner]),
+      { type: 'select', id: 1 },
+      {
+        type: 'duplicate',
+      },
+    );
+    expect(annotationsOf(state)[1]).toEqual({ ...corner, x: 0.67, y: 0.72 });
+  });
+
+  it('does nothing with nothing selected', () => {
+    const state = initialEditorState([BOX]);
+    expect(run(state, { type: 'duplicate' })).toBe(state);
+  });
+});
+
+describe('order', () => {
+  const three = () => initialEditorState([ARROW, BOX, LABEL]);
+
+  it('brings the selected mark to the front and sends it to the back, one step each', () => {
+    let state = run(three(), { type: 'select', id: 1 }, { type: 'order', to: 'front' });
+    expect(annotationsOf(state)).toEqual([BOX, LABEL, ARROW]);
+    expect(state.selectedId).toBe(1);
+    state = run(state, { type: 'select', id: 3 }, { type: 'order', to: 'back' });
+    expect(annotationsOf(state)).toEqual([LABEL, BOX, ARROW]);
+    expect(annotationsOf(run(state, { type: 'undo' }))).toEqual([BOX, LABEL, ARROW]);
+  });
+
+  it('records nothing when it is already there, or with nothing selected', () => {
+    const front = run(three(), { type: 'select', id: 3 });
+    expect(run(front, { type: 'order', to: 'front' })).toBe(front);
+    const back = run(three(), { type: 'select', id: 1 });
+    expect(run(back, { type: 'order', to: 'back' })).toBe(back);
+    expect(run(three(), { type: 'order', to: 'front' })).toEqual(three());
   });
 });
 

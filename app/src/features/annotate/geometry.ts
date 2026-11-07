@@ -170,3 +170,137 @@ export function moveAnnotation(annotation: Annotation, dx: number, dy: number): 
       return { ...annotation, x: shiftX(annotation.x), y: shiftY(annotation.y) };
   }
 }
+
+/** A resize by the selection's handles: where the mark's origin goes, and its scale. */
+export type Transform = { x: number; y: number; scaleX: number; scaleY: number };
+
+/**
+ * The annotation resized: every point p goes to (x + scaleX · p.x, y + scaleY · p.y), in
+ * fractions, and a label's text grows with its height. Kept on the photo and rounded, as drawn
+ * marks are.
+ */
+export function transformAnnotation(annotation: Annotation, transform: Transform): Annotation {
+  const scaleX = Number.isFinite(transform.scaleX) ? Math.abs(transform.scaleX) : 1;
+  const scaleY = Number.isFinite(transform.scaleY) ? Math.abs(transform.scaleY) : 1;
+  const mapX = (value: number) => roundFraction(clamp(transform.x + scaleX * value, 0, 1));
+  const mapY = (value: number) => roundFraction(clamp(transform.y + scaleY * value, 0, 1));
+  switch (annotation.kind) {
+    case 'arrow':
+    case 'freehand':
+      return {
+        ...annotation,
+        points: annotation.points.map((value, index) =>
+          index % 2 === 0 ? mapX(value) : mapY(value),
+        ),
+      };
+    case 'rect':
+    case 'ellipse': {
+      const x = mapX(annotation.x);
+      const y = mapY(annotation.y);
+      return {
+        ...annotation,
+        x,
+        y,
+        w: roundFraction(mapX(annotation.x + annotation.w) - x),
+        h: roundFraction(mapY(annotation.y + annotation.h) - y),
+      };
+    }
+    case 'text':
+      return {
+        ...annotation,
+        x: mapX(annotation.x),
+        y: mapY(annotation.y),
+        // Never 0, which the schema refuses: the handles keep a label far bigger than this.
+        size: Math.max(0.0001, roundFraction(annotation.size * scaleY)),
+      };
+  }
+}
+
+/** A box on screen in pixels, as the selection's handles report it while they are dragged. */
+export type Box = { x: number; y: number; width: number; height: number };
+
+/** Boxes, labels and freehand lines can't be made smaller than this by their handles (pixels). */
+export const MIN_BOX_PX = 12;
+
+/**
+ * The box a handle drag may take (`next`, from `old`): on the photo (`area`), and no smaller than
+ * MIN_BOX_PX. A side a handle moved stops at the photo's edge; one already past it (an old or
+ * hand-made mark) may stay there. Shrinking below the minimum keeps that direction's old size.
+ * With `keepRatio` (labels, freehand), a box that would leave the photo or get too small keeps
+ * the old one whole, since stopping one side would stretch the other.
+ */
+export function limitBox<B extends Box>(old: B, next: B, area: Size, keepRatio: boolean): B {
+  const x = limitAxis(old.x, old.width, next.x, next.width, area.width);
+  const y = limitAxis(old.y, old.height, next.y, next.height, area.height);
+  if (keepRatio) {
+    if (!x || !y) return old;
+    const held = (start: number, size: number, limited: readonly [number, number]) =>
+      Math.abs(limited[0] - start) > EDGE_PX || Math.abs(limited[1] - size) > EDGE_PX;
+    return held(next.x, next.width, x) || held(next.y, next.height, y) ? old : next;
+  }
+  return {
+    ...next,
+    ...(x ? { x: x[0], width: x[1] } : { x: old.x, width: old.width }),
+    ...(y ? { y: y[0], height: y[1] } : { y: old.y, height: old.height }),
+  };
+}
+
+/** Less than this (pixels) is the same edge: the handles' arithmetic leaves crumbs. */
+const EDGE_PX = 0.01;
+
+/** One direction of limitBox: the start and size it may take, or null to keep the old one. */
+function limitAxis(
+  oldStart: number,
+  oldSize: number,
+  start: number,
+  size: number,
+  length: number,
+): readonly [number, number] | null {
+  let from = start;
+  let to = start + size;
+  if (Math.abs(from - oldStart) > EDGE_PX) from = Math.max(from, Math.min(0, oldStart));
+  if (Math.abs(to - (oldStart + oldSize)) > EDGE_PX) {
+    to = Math.min(to, Math.max(length, oldStart + oldSize));
+  }
+  const limited = to - from;
+  if (limited < MIN_BOX_PX && limited < oldSize) return null;
+  return [from, limited];
+}
+
+export type ArrowEnd = 'tail' | 'tip';
+
+/**
+ * The arrow with one end dragged to `at` (fractions, already on the photo), or null when that
+ * would leave it shorter than MIN_ARROW_PX on screen.
+ */
+export function moveArrowEnd(
+  annotation: Extract<Annotation, { kind: 'arrow' }>,
+  end: ArrowEnd,
+  at: Point,
+  shown: Size,
+): Extract<Annotation, { kind: 'arrow' }> | null {
+  const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = annotation.points;
+  const points = end === 'tail' ? [at.x, at.y, x2, y2] : [x1, y1, at.x, at.y];
+  const length = screenDistance(
+    { x: points[0]!, y: points[1]! },
+    { x: points[2]!, y: points[3]! },
+    shown,
+  );
+  if (length < MIN_ARROW_PX) return null;
+  return { ...annotation, points: points.map(roundFraction) };
+}
+
+/** How far a copy is set off from its original, as a fraction of each side of the photo. */
+export const DUPLICATE_OFFSET = 0.03;
+
+/**
+ * Where a copy of a mark goes: down and right of it, or up or left where the photo ends, so it is
+ * seen as a copy rather than lying exactly on the original.
+ */
+export function duplicateOffset(bounds: Bounds): Point {
+  const along = (from: number, to: number) =>
+    to + DUPLICATE_OFFSET <= 1 || from - DUPLICATE_OFFSET < 0
+      ? DUPLICATE_OFFSET
+      : -DUPLICATE_OFFSET;
+  return { x: along(bounds.x0, bounds.x1), y: along(bounds.y0, bounds.y1) };
+}
