@@ -3569,3 +3569,29 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
   the report's without "Not finalised", since the instructions don't change with the check's
   state. `QualityReportMode` is what the report itself prints; `qualityCheckPrintout` picks the
   document for a mode.
+
+## Deviation log: printing it for the machine (2026-11-07)
+
+- **Asked for:** print (or save as PDF) the deviations page's list to put up at the machine,
+  filtered by machine and the rest, with a preview; either a checklist form only, or with the
+  pictures.
+- **What prints is what the filters show** (`useDeviationLogPrint`): the same entries and the
+  same `logView` as the page, so the paper never disagrees with the screen. The print address
+  carries the page's filters as the page keeps them (`/deviations/{kind}/print?…&layout=`), so a
+  printout can be opened again or shared.
+- **Checklist (`list`):** a table per machine, as the page groups them, with a box to tick and
+  two lines to write what was done and sign; rows of open deviations are high enough to write in
+  (15 mm). One closed in the app is ticked and says how, when and who, so the paper shows what
+  is left. Final inspection and quality check logs print alike.
+- **With pictures (`cards`):** the quality check report's deviation cards (`DeviationCards`,
+  `signOff="action"`), so the photos, the "Action taken / Closed on / Signature" lines and the
+  CLOSED badge are the same everywhere. A card from the log names its machine and check
+  (`DeviationCard.context`), as its cards come from many inspections; the page headings count the
+  cards ("3–4 of 12") instead of their long IDs.
+- **Photos are asked for only for that layout** (`GET /api/deviations/photos`, same filters): the
+  deviations table has no photos, so the API reads the inspections behind the deviations shown,
+  eight at a time. The log page itself stays one table query. Photos that can't be loaded leave
+  the cards their sketch frames rather than failing the printout.
+- **A sign-off for all of them** at the end while some are open (as a quality check's "Only
+  deviations"); none when everything printed is closed.
+- **No Word export**, as for quality checks: the printout is for the machine.

@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { compareRefs } from './insights';
 import { deviationNumber, refWithText } from './numbering';
 import {
+  AnnotatedImageSchema,
   DeviationRowSchema,
   IdSchema,
   InspectionKindSchema,
@@ -151,6 +152,18 @@ export const LogMachineSchema = z.object({
   modelCode: z.string(),
 });
 export type LogMachine = z.infer<typeof LogMachineSchema>;
+
+/**
+ * GET /api/deviations/photos (same filters as the log): the photos of the deviations under the
+ * filters, for printing the log with its pictures. Only deviations with photos are listed; the
+ * table has none, so they are read from the inspections.
+ */
+export const DeviationPhotosSchema = z.object({
+  photos: z.array(
+    z.object({ inspectionId: IdSchema, key: IdSchema, photos: z.array(AnnotatedImageSchema) }),
+  ),
+});
+export type DeviationPhotos = z.infer<typeof DeviationPhotosSchema>;
 
 /** GET /api/deviations */
 export const DeviationLogSchema = z.object({

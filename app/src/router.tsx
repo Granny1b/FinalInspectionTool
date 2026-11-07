@@ -6,6 +6,7 @@ import { AdminOnly } from './features/insights/report/AdminOnly';
 import { ChecklistEditPage } from './pages/ChecklistEditPage';
 import { PrintShell } from './features/print/PrintShell';
 import { DeviationLogPage } from './pages/DeviationLogPage';
+import { DeviationLogPrintPage } from './pages/DeviationLogPrintPage';
 import { InsightsPage } from './pages/InsightsPage';
 import { InsightsReportPage } from './pages/InsightsReportPage';
 import { InspectionPage } from './pages/InspectionPage';
@@ -80,6 +81,15 @@ export const router = createBrowserRouter([
       // A quality check's report: entire, or only its deviations.
       { path: 'quality-checks/:id/print', element: <InspectionPrintPage kind="quality" /> },
       { path: 'templates/:id/print', element: <TemplatePrintPage /> },
+      // The deviation log under the log page's filters, for the machine.
+      {
+        path: 'deviations/final/print',
+        element: <DeviationLogPrintPage key="final" kind="final" />,
+      },
+      {
+        path: 'deviations/quality/print',
+        element: <DeviationLogPrintPage key="quality" kind="quality" />,
+      },
       // The Insights report, admins only like Insights.
       {
         element: <AdminOnly />,

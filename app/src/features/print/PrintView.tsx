@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { WordExportButton } from '../export/WordExportButton';
 import { DEFAULT_DEVIATIONS_PER_PAGE, type DeviationsPerPage, type PrintMode } from './model';
 import { FittedPages } from './FittedPages';
@@ -27,6 +27,8 @@ type Props = {
   deviationsPerPage?: Choice<DeviationsPerPage>;
   /** "Include reference images" (`?appendix=1`), and how to change it; not for a quality check. */
   appendix?: Choice<boolean>;
+  /** Other documents' own choices (the deviation log's layout), after the built-in ones. */
+  choices?: ReactNode;
   /** `?autoprint=1`: open the print dialog once, as soon as everything is loaded. */
   autoprint?: boolean;
   /** Called as autoprint fires, to drop the flag (a reload must not print again). */
@@ -47,6 +49,7 @@ export function PrintView({
   qualityMode,
   deviationsPerPage,
   appendix,
+  choices,
   autoprint = false,
   onAutoprinted,
 }: Props) {
@@ -84,6 +87,7 @@ export function PrintView({
             ? { ...appendix, available: model.appendix.length > 0 }
             : undefined
         }
+        choices={choices}
         ready={ready}
       >
         {/* A quality check's report is printed or saved as a PDF only. */}

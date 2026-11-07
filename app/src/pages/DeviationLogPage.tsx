@@ -5,9 +5,19 @@ import {
   type InspectionKind,
   type MachineModel,
 } from '@modig/shared';
-import { CircleCheck, Download, ListChecks, SearchX } from 'lucide-react';
+import {
+  ChevronDown,
+  CircleCheck,
+  Download,
+  Eye,
+  Images,
+  ListChecks,
+  Printer,
+  SearchX,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { ActionMenu } from '../components/ActionMenu';
 import { Button } from '../components/Button';
 import { Callout } from '../components/Callout';
 import { EmptyState } from '../components/EmptyState';
@@ -33,6 +43,9 @@ import {
 } from '../features/deviationLog/queries';
 import { localDate } from '../features/inspections/dates';
 import { useMachines } from '../features/machines/queries';
+import { deviationLogPrintHref } from '../features/print/links';
+import { DeviationLogPreview } from '../features/print/log/DeviationLogPreview';
+import { LOG_PRINT_LAYOUT_LABELS } from '../features/print/log/model';
 import { errorMessage } from '../lib/api';
 import { modelName, useSettings } from '../lib/useSettings';
 
@@ -97,6 +110,7 @@ export function DeviationLogPage({ kind }: { kind: InspectionKind }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   function followUp(entry: DeviationLogEntry, request: FollowUpRequest) {
     setFailure(null);
@@ -123,6 +137,11 @@ export function DeviationLogPage({ kind }: { kind: InspectionKind }) {
     );
   }
 
+  /** The printout of what the filters show, in a new tab, which prints once it has loaded. */
+  function openPrint(layout: 'list' | 'cards') {
+    window.open(deviationLogPrintHref(kind, filter, { layout }, true), '_blank', 'noopener');
+  }
+
   async function exportCsv() {
     setExporting(true);
     setExportError(null);
@@ -141,10 +160,39 @@ export function DeviationLogPage({ kind }: { kind: InspectionKind }) {
       description={words.description}
       actions={
         entries?.length ? (
-          <Button variant="secondary" onClick={() => void exportCsv()} disabled={exporting}>
-            <Download size={16} aria-hidden="true" />
-            {exporting ? 'Exporting…' : 'Export CSV'}
-          </Button>
+          // What the filters show, for the machine (on paper or as a PDF) or as a file.
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={() => setPreviewing(true)}>
+              <Eye size={16} aria-hidden="true" />
+              Preview
+            </Button>
+            <ActionMenu
+              label="Print / Save PDF"
+              trigger={
+                <>
+                  <Printer size={16} aria-hidden="true" />
+                  Print / Save PDF
+                  <ChevronDown size={14} aria-hidden="true" className="-mr-1 text-ink-500" />
+                </>
+              }
+              items={[
+                {
+                  label: LOG_PRINT_LAYOUT_LABELS.list,
+                  icon: ListChecks,
+                  onSelect: () => openPrint('list'),
+                },
+                {
+                  label: LOG_PRINT_LAYOUT_LABELS.cards,
+                  icon: Images,
+                  onSelect: () => openPrint('cards'),
+                },
+              ]}
+            />
+            <Button variant="secondary" onClick={() => void exportCsv()} disabled={exporting}>
+              <Download size={16} aria-hidden="true" />
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </Button>
+          </div>
         ) : undefined
       }
     />
@@ -187,6 +235,9 @@ export function DeviationLogPage({ kind }: { kind: InspectionKind }) {
   return (
     <>
       {header}
+      {previewing && (
+        <DeviationLogPreview kind={kind} filter={filter} onClose={() => setPreviewing(false)} />
+      )}
       <div className="space-y-6">
         {log.data.unreadableRows > 0 && (
           <Callout tone="error" role="status">
