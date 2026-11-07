@@ -4,8 +4,8 @@
  * sign-off it uses as they are. Black and white throughout: closed by a tick and words.
  */
 
-/* The checklist: one table per machine. Narrow columns for the box, who, what kind and when;
-   the deviation and the room to write what was done share the rest. */
+/* The checklist: one table per machine. Narrow columns for the box, who and what kind; the
+   deviation and the room to write what was done share the rest. */
 .paper-log-col-done {
   width: 9mm;
 }
@@ -18,13 +18,10 @@
   width: 24mm;
 }
 
-/* Room for "2026-11-04" on one line. */
-.paper-log-col-found {
-  width: 20mm;
-}
-
+/* No Found column: when it was found doesn't help whoever fixes it. The room goes to writing what
+   was done. */
 .paper-log-col-action {
-  width: 44mm;
+  width: 52mm;
 }
 
 /* The serial number and model after the Machine ID, the inspections on a line of their own. */
@@ -71,10 +68,6 @@
   margin-top: 0.6mm;
   font-size: 8pt;
   white-space: pre-line;
-}
-
-.paper-log-found {
-  white-space: nowrap;
 }
 
 /* A closed deviation's box, ticked: the same size as an empty one. */

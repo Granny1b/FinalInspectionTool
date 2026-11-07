@@ -921,8 +921,7 @@ and per responsible. The two kinds are never shown together.
     deviations · 3 open · 2 closed"), one table per machine as on the page (Machine ID, S/N,
     model, its inspections, "3 open · 2 closed"), its title and column labels repeated on every
     page: Done (a box to tick; ✓ for one closed in the app) | Deviation (ID, severity, check and
-    section, the checkpoint, comment) | Responsible | Category | Found | Action taken · Sign ·
-    Date (lines to write on; for one closed in the app, the day, who and what was done).
+    section, the checkpoint, comment) | Responsible | Category | Action taken · Sign · Date (lines to write on; for one closed in the app, the day, who and what was done).
   - _With pictures_: the same header, then a card per deviation as a quality check's report
     prints them, with the machine and check on each card, its photos (as marked up) and lines for
     Action taken, Closed on and Signature (or how it was closed), 2 or 4 to a page.

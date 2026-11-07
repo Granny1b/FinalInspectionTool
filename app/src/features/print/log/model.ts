@@ -62,8 +62,6 @@ export type LogPrintRow = {
   comment: string;
   resp: string;
   category: string;
-  /** "YYYY-MM-DD" */
-  foundOn: string;
   /** Closed in the app: how, when and who. Null while it is open. */
   closed: ClosedDeviation | null;
 };
@@ -234,7 +232,6 @@ function printRow(entry: DeviationLogEntry): LogPrintRow {
     comment: entry.comment.trim(),
     resp: entry.resp.trim(),
     category: entry.category.trim(),
-    foundOn: entry.foundOn,
     closed:
       entry.status === 'closed'
         ? { action: entry.action.trim(), closedOn: entry.closedOn, closedBy: entry.closedBy.trim() }

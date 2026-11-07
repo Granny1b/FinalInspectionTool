@@ -3595,3 +3595,6 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
 - **A sign-off for all of them** at the end while some are open (as a quality check's "Only
   deviations"); none when everything printed is closed.
 - **No Word export**, as for quality checks: the printout is for the machine.
+- **No Found column on the checklist** (the user, the same day): when a deviation was found tells
+  the operator fixing it nothing, and the column took room from the deviation and from the
+  lines to write what was done (now 52 mm). The page and the CSV still show Found.

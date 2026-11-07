@@ -113,7 +113,7 @@ function LogHeader({ model, logoUrl }: { model: DeviationLogPrintModel; logoUrl:
 }
 
 /**
- * One machine's deviations: Done | Deviation | Responsible | Category | Found | Action taken. Its
+ * One machine's deviations: Done | Deviation | Responsible | Category | Action taken. Its
  * machine and the column labels are the table head, repeated on every page it runs onto; a row
  * is never split (print.css).
  */
@@ -132,12 +132,11 @@ function GroupTable({
         <col />
         <col className="paper-log-col-resp" />
         <col className="paper-log-col-category" />
-        <col className="paper-log-col-found" />
         <col className="paper-log-col-action" />
       </colgroup>
       <thead>
         <tr className="paper-section-title">
-          <th id={titleId} colSpan={6} scope="colgroup">
+          <th id={titleId} colSpan={5} scope="colgroup">
             {/* First, floated right: the machine then wraps clear of it. */}
             <span className="paper-qc-section-stats">{group.counts}</span>
             {group.machineName || 'No Machine ID'}
@@ -158,14 +157,13 @@ function GroupTable({
           <th scope="col">Deviation</th>
           <th scope="col">Responsible</th>
           <th scope="col">Category</th>
-          <th scope="col">Found</th>
           <th scope="col">Action taken · Sign · Date</th>
         </tr>
       </thead>
       {fallbackFooter && (
         <tfoot className="paper-fallback-footer">
           <tr>
-            <td colSpan={6}>{fallbackFooter}</td>
+            <td colSpan={5}>{fallbackFooter}</td>
           </tr>
         </tfoot>
       )}
@@ -210,7 +208,6 @@ function Row({ row }: { row: LogPrintRow }) {
       </td>
       <td>{row.resp || '—'}</td>
       <td>{row.category || '—'}</td>
-      <td className="paper-log-found">{row.foundOn}</td>
       <td>
         {row.closed ? (
           <div className="paper-log-closed">

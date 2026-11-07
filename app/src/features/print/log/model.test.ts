@@ -155,7 +155,6 @@ describe('the deviation log on paper', () => {
         comment: 'Its broken and dont work.',
         resp: 'Mechanical',
         category: 'Function & adjustment',
-        foundOn: '2026-11-06',
         closed: null,
       },
       expect.objectContaining({
