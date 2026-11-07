@@ -39,6 +39,7 @@ describe('print links', () => {
     expect(parseMode('deviations')).toBeNull();
     expect(parseQualityMode('report')).toBe('report');
     expect(parseQualityMode('deviations')).toBe('deviations');
+    expect(parseQualityMode('instructions')).toBe('instructions');
     // A final inspection's blank checklist is no quality check mode: the report is printed.
     expect(parseQualityMode('blank')).toBeNull();
     expect(parseQualityMode(null)).toBeNull();

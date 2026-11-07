@@ -442,7 +442,7 @@ the deviation fields and photos, extra deviations, Finalise and Reopen, Delete a
   check, never change it, unless an admin updates it (see [Machines](#machines)).
 - **The page** (`/quality-checks/{id}`): the header with the number and machine, the quality
   check and its revision, the serial number, the save status, **Preview** and **Print / Save
-  PDF** (_Entire report_ or _Only deviations_, see
+  PDF** (_Entire report_, _Only deviations_ or _Instructions_, see
   [Printing a quality check](#printing-a-quality-check)), **Finalise** (or **Reopen**), the
   tabs _Checklist_ and _Deviations (n)_, the progress (`3 / 10 rows filled · 1 NOK`) and _Continue
   at 1.d_.
@@ -787,12 +787,12 @@ and no Word export or reference images.
 
 - **Preview** on the quality check's page shows it at once, unsaved edits included, as on an
   inspection (Escape or **Close** go back, **Print / Save PDF** or Ctrl+P prints what is shown).
-  Its header has **Entire report | Only deviations** and **Deviations: 2 per page | 4 per page**;
-  it opens on the entire report.
-- **Print / Save PDF** → _Entire report_ or _Only deviations_ saves pending changes and opens the
-  print page in a new tab, which prints once everything has loaded. Its toolbar has the same two
-  choices, kept in the address, and **Rev N** after what is printed.
-- Address: `/quality-checks/{id}/print?mode=report|deviations[&deviationsPerPage=2|4]`; the
+  Its header has **Entire report | Only deviations | Instructions** and **Deviations: 2 per page |
+  4 per page** (not for the instructions); it opens on the entire report.
+- **Print / Save PDF** → _Entire report_, _Only deviations_ or _Instructions_ saves pending changes
+  and opens the print page in a new tab, which prints once everything has loaded. Its toolbar has
+  the same choices, kept in the address, and **Rev N** after what is printed.
+- Address: `/quality-checks/{id}/print?mode=report|deviations|instructions[&deviationsPerPage=2|4]`; the
   entire report without a mode. `/inspections/{id}/print` of a quality check leads there (and the
   other way round for a final inspection), with the same choices.
 
@@ -821,6 +821,15 @@ Date, Checked by and how many deviations there are. The same cards follow, and a
 _All deviations closed_ with _Name · Signature · Date_, under the last card or, when it doesn't fit
 there, on a page of its own. The first page holds fewer cards for the header. Without deviations
 the page says "No deviations recorded." and has nothing to sign.
+
+**Instructions.** The check's rows as a manual for the operator, as the check has them (a
+machine's own copy, with its own rows): the same document as a quality check template's **Print
+instructions** (see [Printing](#printing)), pictures included and nothing filled in, whatever the
+check's state. Its cover names the machine: Machine ID, Machine model, Serial number, Quality
+check (its number), Department and Checklist ("This machine's copy, based on Rev 2", or "Rev 2"
+for a check on no machine), then Size and the contents. Its footer is the report's, without "Not
+finalised": the instructions don't change with the check. The PDF is named
+`QC-2026-0004 Magellan#1 RigiMill MG – Pre start up – Instructions`.
 
 **Footer.** Every page: "QC-2026-0004 · Quality check – Pre start up · Magellan#1 · RigiMill MG ·
 S/N RM-2026-016" bottom left (the Machine ID left out when there is none, "Not finalised" added

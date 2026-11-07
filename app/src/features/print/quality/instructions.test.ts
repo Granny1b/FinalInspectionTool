@@ -2,11 +2,14 @@ import type { Section } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
 import { defaultDeviationsPerPage } from '../model';
 import { appendixCount, printoutImageIds } from '../printout';
+import type { Inspection } from '@modig/shared';
 import {
+  checkInstructionsPrint,
   instructionImageIds,
   qualityInstructionsPrint,
   type InstructionsSource,
 } from './instructions';
+import { qualityCheckPrintout } from './model';
 
 const CONTEXT = {
   companyName: 'Modig Machine Tool',
@@ -147,5 +150,89 @@ describe('a quality check’s instructions', () => {
     expect(bare.cover.fields).toContainEqual({ label: 'Department', value: '' });
     expect(bare.cover.contents).toEqual([]);
     expect(bare.footer).toMatch(/ · Quality check · Rev 3$/);
+  });
+});
+
+describe('a quality check’s instructions printed from the check', () => {
+  const check = {
+    number: 'QC-2026-0004',
+    templateRevision: 2,
+    templateSnapshot: {
+      name: 'Quality check – Pre start up',
+      quality: { name: 'Pre start up', department: 'Quality' },
+      sections: SECTIONS,
+    },
+    front: {
+      machineName: 'Magellan#2',
+      modelCode: 'RMMG',
+      serialNumber: 'RM-2026-031',
+      participants: ['Erik Lund'],
+      location: '',
+      date: '2026-11-06',
+    },
+    machineRef: id('Mach', 1),
+  } satisfies Parameters<typeof checkInstructionsPrint>[0];
+
+  it('names the machine and says the checklist is the machine’s own copy', () => {
+    const model = checkInstructionsPrint(check, CONTEXT);
+    expect(model.cover.draft).toBe(false);
+    expect(model.cover.fields).toEqual([
+      { label: 'Machine ID', value: 'Magellan#2' },
+      { label: 'Machine model', value: 'RigiMill MG' },
+      { label: 'Serial number', value: 'RM-2026-031' },
+      { label: 'Quality check', value: 'QC-2026-0004' },
+      { label: 'Department', value: 'Quality' },
+      { label: 'Checklist', value: 'This machine’s copy, based on Rev 2' },
+      { label: 'Size', value: '2 sections · 2 rows · 0.3 h' },
+    ]);
+    // The same rows and pictures as from the template.
+    expect(model.sections).toEqual(
+      qualityInstructionsPrint(SOURCE, { ...CONTEXT, draft: false }).sections,
+    );
+    expect(model.checklistTitle).toBe('Quality check – Pre start up · Rev 2');
+    expect(model.subject).toBe(
+      'QC-2026-0004 · Quality check – Pre start up · Magellan#2 · RigiMill MG',
+    );
+    expect(model.footer).toBe(
+      'QC-2026-0004 · Quality check – Pre start up · Magellan#2 · RigiMill MG · S/N RM-2026-031',
+    );
+    expect(model.fileName).toBe(
+      'QC-2026-0004 Magellan#2 RigiMill MG – Pre start up – Instructions',
+    );
+  });
+
+  it('says only the revision for a check on no machine', () => {
+    const { machineRef: _none, ...unlinked } = check;
+    expect(checkInstructionsPrint(unlinked, CONTEXT).cover.fields).toContainEqual({
+      label: 'Checklist',
+      value: 'Rev 2',
+    });
+  });
+
+  it('is what a check prints in the Instructions mode; the other modes print its report', () => {
+    const inspection = {
+      ...check,
+      id: id('Insp', 4),
+      kind: 'quality',
+      templateId: id('Tmpl', 2),
+      state: 'in_progress',
+      results: {},
+      extraDeviations: [],
+      createdAt: '2026-11-06T08:00:00.000Z',
+      createdBy: 'sam@modig.se',
+      updatedAt: '2026-11-06T08:00:00.000Z',
+      updatedBy: 'sam@modig.se',
+    } as Inspection;
+    expect(qualityCheckPrintout(inspection, 'instructions', CONTEXT)).toEqual(
+      checkInstructionsPrint(inspection, CONTEXT),
+    );
+    expect(qualityCheckPrintout(inspection, 'report', CONTEXT)).toMatchObject({
+      document: 'quality',
+      mode: 'report',
+    });
+    expect(qualityCheckPrintout(inspection, 'deviations', CONTEXT)).toMatchObject({
+      document: 'quality',
+      mode: 'deviations',
+    });
   });
 });

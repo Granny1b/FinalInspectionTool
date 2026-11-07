@@ -371,7 +371,11 @@ test('Print / Save PDF saves and prints the entire report or only the deviations
   await page.goto(`/quality-checks/${check.id}`);
 
   await page.getByRole('button', { name: 'Print / Save PDF' }).click();
-  await expect(page.getByRole('menuitem')).toHaveText(['Entire report', 'Only deviations']);
+  await expect(page.getByRole('menuitem')).toHaveText([
+    'Entire report',
+    'Only deviations',
+    'Instructions',
+  ]);
   const [tab] = await Promise.all([
     context.waitForEvent('page'),
     page.getByRole('menuitem', { name: 'Only deviations' }).click(),
@@ -516,4 +520,58 @@ test('a quality check’s template prints its instructions, pictures included; a
   );
   await expect(root).toContainText('DRAFT – NOT PUBLISHED');
   await expect(page.locator('header').first()).toContainText('Draft – Rev 2');
+});
+
+test('a started quality check prints its instructions too, naming its machine', async ({
+  page,
+  machine,
+}) => {
+  const photoId = await decalPhoto(page);
+  const guided = await createQualityCheck(machine.template, true, {
+    description: 'Decals on both tubes, facing out.',
+    images: [{ imageId: photoId, annotations: [], verdict: 'good', caption: 'Left tube' }],
+  });
+  const check = await doneCheck(page.request, guided, { serialNumber: 'RM-E2E-P05' });
+
+  // From the report's print page, the third choice; no deviations per page for it.
+  await page.goto(`/quality-checks/${check.id}/print?mode=report`);
+  const root = page.locator('[data-print-root]');
+  await expectReady(root);
+  const what = page.getByRole('group', { name: 'What to print' });
+  await what.getByRole('button', { name: 'Instructions' }).click();
+  await expect(page).toHaveURL(/mode=instructions/);
+  await expect(root).toHaveAttribute('data-print-document', 'instructions');
+  await expect(page.getByRole('button', { name: '4 per page' })).toHaveCount(0);
+
+  const pages = await printPdf(page, 'quality-check-own-instructions');
+  const footer = `${check.number} · ${CHECK} · ${MACHINE_ID} · ${machine.model} · S/N RM-E2E-P05`;
+  for (const pdfPage of pages) {
+    expect(
+      footerTexts(pdfPage)
+        .map((text) => text.text)
+        .sort(),
+    ).toEqual([footer, `Page ${pdfPage.number} of ${pages.length}`].sort());
+  }
+  const cover = pageText(pages[0]!);
+  for (const text of [CHECK, 'Instructions', MACHINE_ID, check.number, 'RM-E2E-P05', 'Rev 1']) {
+    expect(cover).toContain(compact(text));
+  }
+  const body = pages.slice(1).map(pageText).join('');
+  for (const text of ['Decals on both tubes, facing out.', 'Should look like this', 'Left tube']) {
+    expect(body).toContain(compact(text));
+  }
+  // What was found is the report's, never the instructions'.
+  expect(body).not.toContain(compact('Decal on the left tube turned inward'));
+  expect(pages.slice(1).reduce((sum, pdfPage) => sum + pdfPage.images, 0)).toBeGreaterThan(0);
+
+  // The preview on the check's page has it too.
+  await page.goto(`/quality-checks/${check.id}`);
+  await page.getByRole('button', { name: 'Preview' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Preview' });
+  await dialog.getByRole('button', { name: 'Instructions' }).click();
+  await expect(dialog.locator('[data-print-root]')).toHaveAttribute(
+    'data-print-document',
+    'instructions',
+  );
+  await expect(dialog.getByRole('button', { name: '4 per page' })).toHaveCount(0);
 });
