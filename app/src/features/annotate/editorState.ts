@@ -5,7 +5,7 @@
  */
 import type { Annotation } from '@modig/shared';
 import { annotationBounds, duplicateOffset, moveAnnotation, type Point } from './geometry';
-import { record, redo, startHistory, undo, type History } from './history';
+import { record, redo, startHistory, undo, type History } from '../../lib/history';
 import { DEFAULT_COLOR, DEFAULT_TOOL, type Tool } from './tools';
 
 /** An annotation with an id that lives as long as the editor: React keys and the selection. */
@@ -18,6 +18,8 @@ export type TextDraft = {
   size: number;
   color: string;
   value: string;
+  /** An existing label's turn (degrees), so it is typed where it is drawn. */
+  rotation: number;
 };
 
 export type EditorState = {
@@ -27,9 +29,15 @@ export type EditorState = {
   selectedId: number | null;
   text: TextDraft | null;
   nextId: number;
+  /**
+   * The photo's width over its height, once it is loaded: how far a turned box reaches depends
+   * on it, so moves and copies keep it on the photo.
+   */
+  aspect: number;
 };
 
 export type EditorAction =
+  | { type: 'aspect'; aspect: number }
   | { type: 'tool'; tool: Tool }
   | { type: 'color'; color: string }
   | { type: 'select'; id: number | null }
@@ -59,6 +67,7 @@ export function initialEditorState(annotations: readonly Annotation[]): EditorSt
     selectedId: null,
     text: null,
     nextId: annotations.length + 1,
+    aspect: 1,
   };
 }
 
@@ -69,6 +78,11 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     items.map((item) => (item.id === id ? { id, annotation: patch(item.annotation) } : item));
 
   switch (action.type) {
+    case 'aspect':
+      return action.aspect > 0 && action.aspect !== state.aspect
+        ? { ...state, aspect: action.aspect }
+        : state;
+
     case 'tool':
       // Picking a tool to draw with is for a new mark: a colour picked next is for that one, not
       // for a mark picked earlier.
@@ -111,7 +125,9 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'move':
       if (action.dx === 0 && action.dy === 0) return state;
       return change(
-        update(action.id, (annotation) => moveAnnotation(annotation, action.dx, action.dy)),
+        update(action.id, (annotation) =>
+          moveAnnotation(annotation, action.dx, action.dy, state.aspect),
+        ),
       );
 
     case 'reshape': {
@@ -124,8 +140,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'duplicate': {
       const selected = selectedItem(state);
       if (!selected) return state;
-      const offset = duplicateOffset(annotationBounds(selected.annotation));
-      const copy = moveAnnotation(selected.annotation, offset.x, offset.y);
+      const offset = duplicateOffset(annotationBounds(selected.annotation, state.aspect));
+      const copy = moveAnnotation(selected.annotation, offset.x, offset.y, state.aspect);
       return {
         ...change([...items, { id: state.nextId, annotation: copy }]),
         selectedId: state.nextId,
@@ -157,17 +173,24 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return {
         ...state,
         selectedId: null,
-        text: { id: null, at: action.at, size: action.size, color: state.color, value: '' },
+        text: {
+          id: null,
+          at: action.at,
+          size: action.size,
+          color: state.color,
+          value: '',
+          rotation: 0,
+        },
       };
 
     case 'text-edit': {
       const item = items.find((candidate) => candidate.id === action.id);
       if (item?.annotation.kind !== 'text') return state;
-      const { x, y, size, color, text } = item.annotation;
+      const { x, y, size, color, text, rotation = 0 } = item.annotation;
       return {
         ...state,
         selectedId: item.id,
-        text: { id: item.id, at: { x, y }, size, color, value: text },
+        text: { id: item.id, at: { x, y }, size, color, value: text, rotation },
       };
     }
 

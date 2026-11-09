@@ -218,8 +218,10 @@ where the app opens.
   **Final inspection**, a card each: its state (_Not started_, _In progress_ with the rows filled,
   _Finalised_), number, deviations open and closed (a link to them), where its copy came from
   ("Based on Pre start up rev 3 · 2 rows added, 1 removed") and **Start** or **Open**. The next
-  check to do has the blue Start. Admins also get each check's ⋯ (**Edit checklist**, **Remove
-  from machine** for one not started) and, when its template has a newer published revision,
+  check to do has the blue Start. Admins also get each check's ⋯ (**Edit checklist**; **Remove
+  from machine** for one not started; **Delete quality check** or **Delete final inspection** for
+  one started or finalised, after asking: what was recorded on it goes too, and **Add check**
+  can add it again as a new copy) and, when its template has a newer published revision,
   "Rev 4 available · this machine has rev 3" with **Update…**.
 - **Start** gives the check its number (`QC-2026-0004`, `FI-2026-0042`) and fills in its front
   page from the machine: Machine ID, model and serial number, today's date, and you as Checked by
@@ -329,17 +331,23 @@ has an empty frame of the same size.
 
 In the checklist:
 
-| To                                          | Do                                                                |
-| ------------------------------------------- | ----------------------------------------------------------------- |
-| Add a row below                             | `Enter` in a row; **+ Add row** at the end of a section           |
-| Start a new section's rows                  | `Enter` in its title                                              |
-| Delete an empty row                         | `Backspace` in it (holding it down only empties a row)            |
-| Undo deleting a row or section              | **Undo** at the bottom of the window, until the next such change  |
-| Move between rows                           | `↑` / `↓` from the first or last line of a row                    |
-| Duplicate or delete a row                   | The icons that appear on hover or focus; on a tablet, its **⋯**   |
-| Rename, duplicate, move or delete a section | Its **⋯** menu (deleting a section with rows asks first)          |
-| Move a row or section                       | Drag its handle (⠿, left of it), also between sections            |
-| Move it with the keyboard                   | `Tab` to the handle, `Space`, arrow keys, `Space` (`Esc` cancels) |
+| To                                          | Do                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| Add a row below                             | `Enter` in a row; **+ Add row** at the end of a section             |
+| Start a new section's rows                  | `Enter` in its title                                                |
+| Delete an empty row                         | `Backspace` in it (holding it down only empties a row)              |
+| Undo or redo any change                     | `Ctrl+Z`; `Ctrl+Y` or `Ctrl+Shift+Z`; the ↶ ↷ buttons in the header |
+| Put back the last deleted row or section    | **Undo** at the bottom of the window, until the next such change    |
+| Move between rows                           | `↑` / `↓` from the first or last line of a row                      |
+| Duplicate or delete a row                   | The icons that appear on hover or focus; on a tablet, its **⋯**     |
+| Rename, duplicate, move or delete a section | Its **⋯** menu (deleting a section with rows asks first)            |
+| Move a row or section                       | Drag its handle (⠿, left of it), also between sections              |
+| Move it with the keyboard                   | `Tab` to the handle, `Space`, arrow keys, `Space` (`Esc` cancels)   |
+
+Undo and redo cover every change to the draft (the front page, the checklist's text and
+structure, guides), the last 100 steps, while the editor is open. Typing on in one field is one
+step until a pause of 1.5 s. Each step is autosaved as any change is. A machine's own copy of a
+check has no undo: deleting a row there deletes its result when it is saved.
 
 Numbers (section 3, row 3.c) follow the position and change as rows move; each row keeps its
 identity, which is what later phases key results and statistics on.
@@ -442,7 +450,7 @@ the deviation fields and photos, extra deviations, Finalise and Reopen, Delete a
   check, never change it, unless an admin updates it (see [Machines](#machines)).
 - **The page** (`/quality-checks/{id}`): the header with the number and machine, the quality
   check and its revision, the serial number, the save status, **Preview** and **Print / Save
-  PDF** (_Entire report_, _Only deviations_ or _Instructions_, see
+  PDF** (_Entire report_, _Only checklist_, _Only deviations_ or _Instructions_, see
   [Printing a quality check](#printing-a-quality-check)), **Finalise** (or **Reopen**), the
   tabs _Checklist_ and _Deviations (n)_, the progress (`3 / 10 rows filled · 1 NOK`) and _Continue
   at 1.d_.
@@ -637,6 +645,7 @@ bottom. Mouse, finger and pen all work.
 | Move a mark                   | Drag it by its line, with any tool; with **Select and move** also by the inside of a box or circle         |
 | Select a mark                 | Click its line (any tool) or its inside (**Select and move**); `Esc` lets go of it                         |
 | Resize a mark                 | Select it, drag a handle: a box or circle by any side or corner, a label or freehand line by a corner      |
+| Turn a mark                   | Select a box, circle, label or freehand line, drag its round handle (it snaps to every 45°)                |
 | Change an arrow               | Select it, drag the dot on either end                                                                      |
 | Nudge a mark                  | Arrow keys move the selected mark a pixel, with `Shift` ten                                                |
 | Copy, layer or delete a mark  | Select it: **Duplicate mark** (`Ctrl+D`), **Bring to front**, **Send to back**, **Delete mark** (`Delete`) |
@@ -787,21 +796,23 @@ only, thin rules. Inter is bundled with the app, so a printout looks the same of
 ### Printing a quality check
 
 A quality check done on a machine prints on the same A4 paper as a final report, black and white
-throughout, to be filed at the machine and signed there. No guide pictures (they are for the app)
-and no Word export or reference images.
+throughout, to be filed at the machine and signed there. Guide pictures only in the instructions
+(the checklist and the cards are for results), and no Word export or reference images.
 
 - **Preview** on the quality check's page shows it at once, unsaved edits included, as on an
   inspection (Escape or **Close** go back, **Print / Save PDF** or Ctrl+P prints what is shown).
-  Its header has **Entire report | Only deviations | Instructions** and **Deviations: 2 per page |
-  4 per page** (not for the instructions); it opens on the entire report.
-- **Print / Save PDF** → _Entire report_, _Only deviations_ or _Instructions_ saves pending changes
+  Its header has **Entire report | Only checklist | Only deviations | Instructions** and
+  **Deviations: 2 per page | 4 per page** (where there are cards); it opens on the entire report.
+- **Print / Save PDF** → _Entire report_, _Only checklist_, _Only deviations_ or _Instructions_
+  saves pending changes
   and opens the print page in a new tab, which prints once everything has loaded. Its toolbar has
   the same choices, kept in the address, and **Rev N** after what is printed.
-- Address: `/quality-checks/{id}/print?mode=report|deviations|instructions[&deviationsPerPage=2|4]`; the
+- Address: `/quality-checks/{id}/print?mode=report|checklist|deviations|instructions[&deviationsPerPage=2|4]`; the
   entire report without a mode. `/inspections/{id}/print` of a quality check leads there (and the
   other way round for a final inspection), with the same choices.
 
-**Entire report.**
+**Entire report.** Everything, in this order: the front page, the checklist, the deviations and
+the instructions.
 
 - **Front page:** the logo and the number (`QC-2026-0004`), the check's title ("Quality check –
   Pre start up"), the company name, "Finalised 2026-11-06 14:32 by Anna Andersson" (or "NOT
@@ -819,6 +830,14 @@ and no Word export or reference images.
   "Not on the checklist", comment, Category, Responsible, photos), 2 or 4 to a page, each with
   lines to fill in at the machine: _Action taken_ (two lines), _Closed on_ and _Signature_. With
   4 to a page the lines run across the whole card. "No deviations recorded." when there are none.
+- **Instructions:** last, as _Instructions_ below prints them but without their cover (the front
+  page already says what they are for): the rows with how, references, time and pictures.
+
+**Only checklist.** The first page starts with the short header of _Only deviations_ (below), its
+last line the result ("15 OK · 2 NOK · 1 N/A", and how many are not filled while the check is
+being done). The checklist follows as in the entire report, then _Checked_ with _Name · Signature
+· Date_. No cards and no instructions. The PDF ends in "– Checklist" ("– Draft checklist" in
+progress).
 
 **Only deviations.** The first page starts with a short header: logo and number, the title, "NOT
 FINALISED – DRAFT REPORT" while it is in progress, then Machine ID, Machine model, Serial number,

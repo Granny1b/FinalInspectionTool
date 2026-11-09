@@ -208,6 +208,54 @@ test.describe('an admin', () => {
       .toEqual(rowIds(template));
   });
 
+  test('every change can be undone and redone, step by step', async ({ page, template }) => {
+    const [a, b] = template.sections[0]!.items;
+    const history = page.getByRole('group', { name: 'History' });
+    const undoButton = history.getByRole('button', { name: 'Undo' });
+    const redoButton = history.getByRole('button', { name: 'Redo' });
+    await openEditor(page, template);
+    await expect(undoButton).toHaveAttribute('aria-disabled', 'true');
+    await expect(redoButton).toHaveAttribute('aria-disabled', 'true');
+
+    // Two steps: typing on in row 1.a (one step, however many letters), then deleting row 1.b.
+    await appendToRow(page, a!.id, ' and the bolts');
+    await page.locator(`#row-${b!.id}`).hover();
+    await page.getByRole('button', { name: 'Delete row 1.b' }).click();
+    await expect(rowText(page, b!.id)).toHaveCount(0);
+    const deleted = page.getByRole('status').filter({ hasText: 'Row 1.b deleted.' });
+    await expect(deleted).toBeVisible();
+
+    // Ctrl+Z puts the row back (and the bar, with nothing left to put back, goes), then takes
+    // back the typing, all of it.
+    await page.keyboard.press('Control+Z');
+    await expect(rowText(page, b!.id)).toHaveValue(b!.text);
+    await expect(deleted).toBeHidden();
+    await expect(rowText(page, a!.id)).toHaveValue(`${a!.text} and the bolts`);
+    await page.keyboard.press('Control+Z');
+    await expect(rowText(page, a!.id)).toHaveValue(a!.text);
+    await expect(undoButton).toHaveAttribute('aria-disabled', 'true');
+    await expect
+      .poll(async () => rowTexts(await savedDraft(page.request, template.id)))
+      .toEqual(rowTexts(template));
+
+    // Redo, by its button and by Ctrl+Y, does both again.
+    await redoButton.click();
+    await expect(rowText(page, a!.id)).toHaveValue(`${a!.text} and the bolts`);
+    await page.keyboard.press('Control+Y');
+    await expect(rowText(page, b!.id)).toHaveCount(0);
+    await expect(redoButton).toHaveAttribute('aria-disabled', 'true');
+    await expect
+      .poll(async () => rowTexts(await savedDraft(page.request, template.id))[0])
+      .toEqual([
+        `${a!.text} and the bolts`,
+        ...template.sections[0]!.items.slice(2).map((item) => item.text),
+      ]);
+
+    // The Undo button takes the delete back too.
+    await undoButton.click();
+    await expect(rowText(page, b!.id)).toHaveValue(b!.text);
+  });
+
   test('a long unbroken word wraps inside its row instead of widening the page', async ({
     page,
     template,

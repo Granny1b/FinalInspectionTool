@@ -503,3 +503,60 @@ test('the lists’ search boxes offer every machine; picking one shows only its 
   await expect(group(one.machineName)).toBeVisible();
   await expect(page).not.toHaveURL(/[?&]machine=/);
 });
+
+test('an admin deletes a machine’s started quality check after confirming; an inspector can’t', async ({
+  page,
+  context,
+  model,
+}) => {
+  await signIn(context, ADMIN, ['admin']);
+  const machine = await makeMachine(page.request, model, [model.preStart, model.frame]);
+  // The machine lists its checks in the model's order, not the order asked for.
+  const preStart = machine.checks.find((check) => check.templateId === model.preStart.id)!;
+  const started = await startedWithNok(page.request, preStart.id);
+
+  await page.goto(`/machines/${machine.machine.id}`);
+  const card = checkCard(page, 'Pre start up');
+  await expect(card).toContainText(started.number);
+  // Not started: removed from the machine. Started: deleted, with what was recorded.
+  await checkCard(page, 'Frame').getByRole('button', { name: 'Frame actions' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Remove from machine' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await card.getByRole('button', { name: 'Pre start up actions' }).click();
+  await page.getByRole('menuitem', { name: 'Delete quality check' }).click();
+
+  // It asks first and says what goes; Cancel keeps it.
+  const dialog = page.getByRole('dialog', { name: `Delete ${started.number}?` });
+  await expect(dialog).toContainText(
+    `The quality check of ${machine.machine.machineName}, its deviation photos and its deviation records will be deleted`,
+  );
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+  expect((await page.request.get(`/api/inspections/${started.id}`)).status()).toBe(200);
+
+  await card.getByRole('button', { name: 'Pre start up actions' }).click();
+  await page.getByRole('menuitem', { name: 'Delete quality check' }).click();
+  await dialog.getByRole('button', { name: 'Delete' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(`${started.number} was deleted.`)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 3, name: 'Pre start up' })).toHaveCount(0);
+  await expect(checkCard(page, 'Frame')).toBeVisible();
+  expect((await page.request.get(`/api/inspections/${started.id}`)).status()).toBe(404);
+
+  // An inspector sees no menu, and the API refuses them.
+  const other = await makeMachine(page.request, model, [model.preStart]);
+  const theirs = await startedWithNok(
+    page.request,
+    other.checks.find((check) => check.templateId === model.preStart.id)!.id,
+  );
+  const etag = (await page.request.get(`/api/inspections/${theirs.id}`)).headers()['etag']!;
+  await context.clearCookies();
+  await signIn(context, INSPECTOR, ['inspector']);
+  await page.goto(`/machines/${other.machine.id}`);
+  await expect(checkCard(page, 'Pre start up')).toContainText(theirs.number);
+  await expect(page.getByRole('button', { name: 'Pre start up actions' })).toHaveCount(0);
+  const refused = await page.request.delete(`/api/inspections/${theirs.id}`, {
+    headers: { 'If-Match': etag },
+  });
+  expect(refused.status()).toBe(403);
+});

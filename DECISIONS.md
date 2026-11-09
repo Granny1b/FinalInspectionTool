@@ -540,7 +540,8 @@ The calls with product, security or data impact. Each is explained in its sectio
   offered until the next change to the structure (add, duplicate, move, delete), not timed, and
   not for an empty row or an empty untitled section (Enter then Backspace would show it all the
   time). There is no undo for anything else: text fields have the browser's own, and a confirm
-  per row would slow a 90-row checklist down.
+  per row would slow a 90-row checklist down. (2026-11-09: every change now has Undo and Redo;
+  see "Template editor: undo and redo".)
 - **`↑` / `↓` leave a row only from its first or last visual line,** measured on an off-screen
   copy of the field.
 - **Duplicates are deep copies with new ids**; guide image ids are copied as they are (the images
@@ -3645,3 +3646,94 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
   The same shape again, or an order that is already so, records nothing.
 - **The line under the photo** says what the selected mark's handles do while one is selected,
   and how a tool is used otherwise.
+
+## Annotations: turning marks (2026-11-09)
+
+- **Asked for:** rotate text and boxes in the photo editor.
+- **Boxes, ellipses, labels and freehand lines turn** by a round handle on the selection, which
+  turns with the mark. Arrows already turn by their end dots.
+- **Stored as an optional `rotation`** in degrees clockwise, -180 to 180, to a tenth, on `rect`,
+  `ellipse` and `text`. It is left out when 0, so marks drawn before read as they did and an
+  unturned mark stores what it always did. A box or ellipse keeps `x`, `y`, `w`, `h` as drawn
+  and turns about its centre; a label turns about its top-left corner, the point it was placed
+  at, since its width depends on the font. A freehand line stores no turn: its points are turned
+  into place.
+- **The turn is on screen, not in fractions:** fractions of a 4:3 photo are not square, so a
+  turn applied to them would skew the mark. The flattened copy, thumbnails and print draw the
+  turn from the same shape settings as the editor.
+- **Snaps to every 45° within 5°**, so a mark is easily put straight again (back to 0, the
+  `rotation` is dropped).
+- **A turn keeps the size exactly:** Konva's turn leaves crumbs in the scale (a box came back
+  0.05 % smaller), so a drag of the round handle stores the turn alone.
+- **The round handle is put where it can be reached:** above the mark, else below, right or left,
+  the first that is on the photo (a label at the photo's top edge gets it below).
+- **Turned marks stay on the photo** by the corners they reach: moves and copies use the bounds of
+  the turned box or ellipse, which depend on the photo's shape (`aspect` in the editor's state,
+  set once the photo has loaded). A turn or a resize that would take a corner off the photo stops,
+  as a resize at an edge does. A label is still kept on by its corner only.
+- **The handles now hold the mark's shapes** (its dark outline and the mark), not its group, so
+  they line up with a turned mark; a resize or turn is written into the annotation and the shapes
+  are drawn from it again, unscaled.
+- **A turned label is typed turned** when it is changed (double-click), where it is drawn.
+
+## Template editor: undo and redo (2026-11-09)
+
+- **Asked for:** saved steps and Ctrl+Z when building checklists (the user picked the template
+  editor, for final inspections and quality checks, over filling in a check).
+- **Every change to the draft is a step** (`draftHistory.ts`): the settings or front page, the
+  checklist's text and structure, guides, the cover photo. Ctrl+Z undoes, Ctrl+Y or
+  Ctrl+Shift+Z redoes (⌘ on a Mac), and so do the ↶ ↷ buttons in the header, for a tablet.
+  The last 100 steps are kept, while the editor is open; a reload starts afresh.
+- **Typing on in one field is one step** until a pause of 1.5 s or another field, so Ctrl+Z takes
+  back a phrase rather than a letter. "Typing" is worked out from the drafts alone (only
+  strings changed, the same ones as the step before; ids and codes don't count as text), so no
+  field has to say what it is. A quality check's name, which the template's name follows, is
+  one field.
+- **The draft's steps, also in a text field:** Ctrl+Z in a row's text undoes the draft's last
+  step rather than the field's own undo, which would leave the history out of step with what is
+  saved. A dialog (a guide, a photo, Publish) keeps its own keys.
+- **An undo or redo brings its change into view** (the row or section, without taking the focus),
+  so one far down the checklist isn't missed.
+- **Each step is autosaved** like any change: undoing is changing the draft back.
+- **The "Row 1.c deleted · Undo" bar stays,** for putting back the last deleted row or section
+  while typing on elsewhere, but only while it is gone: once Ctrl+Z has put it back the bar goes,
+  so it can't be put back twice.
+- **Not on a machine's own copy of a check:** deleting a row there deletes its result when it is
+  saved, which an undo couldn't bring back. Undo/Redo are aria-disabled, not disabled, when there
+  is no step (the focus stays on them, as in the photo editor).
+- `lib/history.ts` (moved from the photo editor) is shared: it gained `amend` (more of the same
+  step) and `historyKey` (the shortcuts).
+
+## Quality checks: printing all of it, or only the checklist (2026-11-09)
+
+- **Asked for:** "Entire report should be all" (checklist, instructions and deviations), and a
+  way to print only the checklist; Only deviations and Instructions as they are.
+- **Entire report = everything:** the front page with the sign-off, the checklist, the deviation
+  cards, then the instructions. The instructions come last: the checklist and the cards are what
+  is filled in and signed at the machine, the instructions are the manual to look things up in.
+  They print without their own cover, which would repeat the front page, but with their heading
+  and the same blocks as the instructions alone (`InstructionsSheet`, shared). So the entire
+  report now loads the check's guide pictures too.
+- **Only checklist:** the short header of Only deviations, whose last line is the result instead
+  of the deviation count, the checklist, and a _Checked_ sign-off (Name · Signature · Date). No
+  cards, so no "per page" choice. In the menus between Entire report and Only deviations.
+- The modes are `report | checklist | deviations | instructions`; `checklist` leaves the model's
+  `deviations` as `{ kind: 'none' }`, as a checklist printout's blank form has it.
+
+## Machines: admins delete a started check from the machine's page (2026-11-09)
+
+- **Asked for:** delete quality checks assigned to a machine even when started, asking first,
+  admins only.
+- **The check's ⋯ on the machine's page has Delete quality check** (Delete final inspection for
+  the final inspection) once it is started or finalised; one not started keeps Remove from
+  machine. A check's own page already had its admins-only Delete; this puts it where the machine's
+  checks are managed.
+- **The same dialog and delete as on the check's page** (`DeleteInspectionDialog`,
+  `DELETE /api/inspections/{id}`, admins only on the server): "Delete QC-2026-0004?", what goes
+  (its deviation photos and records; Insights stops counting it; can't be undone), and for a
+  finalised final inspection that its report may have been sent. Cancel keeps it. The check is
+  read just before it is deleted (as Remove from machine), so only a save in that instant meets a
+  conflict, which offers Reload. Afterwards "QC-2026-0004 was deleted." and the card is gone; Add
+  check can add the quality check again, as a new copy with a new number.
+- The final inspection gets the same item: it is the machine's other check, and an admin could
+  delete it from its own page already.

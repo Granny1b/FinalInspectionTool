@@ -26,9 +26,46 @@ type Props = {
  * as the reference appendix does, so every page still names the check.
  */
 export function InstructionsDocument({ model, images, ready, rootRef }: Props) {
+  return (
+    <div
+      ref={rootRef}
+      className="paper"
+      data-print-root=""
+      data-print-document="instructions"
+      data-print-mode="instructions"
+      data-print-ready={ready ? 'true' : 'false'}
+    >
+      <Cover cover={model.cover} logoUrl={images.logoUrl} />
+      <InstructionsSheet
+        sections={model.sections}
+        checklistTitle={model.checklistTitle}
+        footer={model.footer}
+        imageUrls={images.urls}
+      />
+    </div>
+  );
+}
+
+/**
+ * The instructions themselves, section by section, under their heading: after their cover, or
+ * at the end of a quality check's entire report.
+ */
+export function InstructionsSheet({
+  sections,
+  checklistTitle,
+  footer,
+  imageUrls,
+}: {
+  sections: InstructionsModel['sections'];
+  /** Right of the heading: "Quality check – Pre start up · Rev 2". */
+  checklistTitle: string;
+  /** Repeated at the foot of the pages where the browser has no margin boxes. */
+  footer: string;
+  imageUrls: ReadonlyMap<string, string>;
+}) {
   const headingId = useId();
-  const fallbackFooter = PRINTS_MARGIN_BOXES ? null : model.footer;
-  const blocks = model.sections.flatMap((section): ReactElement[] => {
+  const fallbackFooter = PRINTS_MARGIN_BOXES ? null : footer;
+  const blocks = sections.flatMap((section): ReactElement[] => {
     const title = (
       <h3 className="paper-qi-section-title" data-section-ref={section.number}>
         <span className="paper-qc-section-stats">{section.stats}</span>
@@ -45,47 +82,37 @@ export function InstructionsDocument({ model, images, ready, rootRef }: Props) {
       ];
     }
     return section.rows.flatMap((row, index) =>
-      rowBlocks(row, images.urls, index === 0 ? title : null),
+      rowBlocks(row, imageUrls, index === 0 ? title : null),
     );
   });
 
   return (
-    <div
-      ref={rootRef}
-      className="paper"
-      data-print-root=""
-      data-print-document="instructions"
-      data-print-mode="instructions"
-      data-print-ready={ready ? 'true' : 'false'}
-    >
-      <Cover cover={model.cover} logoUrl={images.logoUrl} />
-      <section className="paper-sheet" aria-labelledby={headingId}>
-        <div className="paper-heading">
-          <h2 id={headingId}>Instructions</h2>
-          <p>{model.checklistTitle}</p>
-        </div>
-        {blocks.length === 0 ? (
-          <p className="paper-empty">This quality check has no sections.</p>
-        ) : fallbackFooter ? (
-          <table className="paper-appendix-flow paper-qi-flow">
-            <tbody>
-              {blocks.map((block, index) => (
-                <tr key={index}>
-                  <td>{block}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="paper-fallback-footer">
-              <tr>
-                <td>{fallbackFooter}</td>
+    <section className="paper-sheet" aria-labelledby={headingId}>
+      <div className="paper-heading">
+        <h2 id={headingId}>Instructions</h2>
+        <p>{checklistTitle}</p>
+      </div>
+      {blocks.length === 0 ? (
+        <p className="paper-empty">This quality check has no sections.</p>
+      ) : fallbackFooter ? (
+        <table className="paper-appendix-flow paper-qi-flow">
+          <tbody>
+            {blocks.map((block, index) => (
+              <tr key={index}>
+                <td>{block}</td>
               </tr>
-            </tfoot>
-          </table>
-        ) : (
-          blocks
-        )}
-      </section>
-    </div>
+            ))}
+          </tbody>
+          <tfoot className="paper-fallback-footer">
+            <tr>
+              <td>{fallbackFooter}</td>
+            </tr>
+          </tfoot>
+        </table>
+      ) : (
+        blocks
+      )}
+    </section>
   );
 }
 

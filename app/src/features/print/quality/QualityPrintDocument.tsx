@@ -4,6 +4,7 @@ import type { DeviationsPerPage } from '../model';
 import type { CardPages } from '../useCardPages';
 import { PRINTS_MARGIN_BOXES } from '../usePageFooter';
 import type { PrintImages } from '../usePrintImages';
+import { InstructionsSheet } from './InstructionsDocument';
 import { QUALITY_DEVIATIONS_TITLE, type QualityPrintModel } from './model';
 import { QualityChecklistTable } from './QualityChecklistTable';
 import { QualityFrontPage } from './QualityFrontPage';
@@ -22,9 +23,10 @@ type Props = {
 
 /**
  * A quality check's report, on the final report's paper: the entire report (front page with the
- * sign-off, the checklist, the deviation cards), or only the deviations, under a short header and
- * with a sign-off for all of them at the end. Each card has room to note the action taken and
- * sign it off at the machine. The attributes on the root are what tests and autoprint wait for.
+ * sign-off, the checklist, the deviation cards, the instructions), or only the checklist or only
+ * the deviations, each under a short header and with a sign-off at the end. Each card has room
+ * to note the action taken and sign it off at the machine. The attributes on the root are what
+ * tests and autoprint wait for.
  */
 export function QualityPrintDocument({
   model,
@@ -38,6 +40,26 @@ export function QualityPrintDocument({
   // Margin boxes print the footer in Chromium; elsewhere each table repeats it at its foot.
   const fallbackFooter = PRINTS_MARGIN_BOXES ? null : model.footer;
   const report = model.mode === 'report';
+  const lead = <LeadHeader model={model} logoUrl={images.logoUrl} />;
+  const checklist = (
+    <>
+      <div className="paper-heading">
+        <h2 id={checklistId}>Checklist</h2>
+        <p>{model.checklistTitle}</p>
+      </div>
+      {model.sections.length === 0 ? (
+        <p className="paper-empty">This quality check has no sections.</p>
+      ) : (
+        model.sections.map((section) => (
+          <QualityChecklistTable
+            key={section.number}
+            section={section}
+            fallbackFooter={fallbackFooter}
+          />
+        ))
+      )}
+    </>
+  );
 
   return (
     <div
@@ -52,46 +74,56 @@ export function QualityPrintDocument({
         <>
           <QualityFrontPage front={model.front} logoUrl={images.logoUrl} />
           <section className="paper-sheet" aria-labelledby={checklistId}>
-            <div className="paper-heading">
-              <h2 id={checklistId}>Checklist</h2>
-              <p>{model.checklistTitle}</p>
-            </div>
-            {model.sections.length === 0 ? (
-              <p className="paper-empty">This quality check has no sections.</p>
-            ) : (
-              model.sections.map((section) => (
-                <QualityChecklistTable
-                  key={section.number}
-                  section={section}
-                  fallbackFooter={fallbackFooter}
-                />
-              ))
-            )}
+            {checklist}
           </section>
         </>
       )}
 
-      <DeviationCards
-        cards={model.deviations.cards}
-        cardPages={cardPages}
-        perPage={deviationsPerPage}
-        subject={model.front.number}
-        imageUrls={images.urls}
-        title={QUALITY_DEVIATIONS_TITLE}
-        signOff="action"
-        lead={report ? undefined : <DeviationsHeader model={model} logoUrl={images.logoUrl} />}
-        // Nothing to close when nothing was found.
-        closing={report || model.deviations.cards.length === 0 ? undefined : <AllClosed />}
-      />
+      {model.mode === 'checklist' && (
+        <section className="paper-sheet" aria-labelledby={checklistId}>
+          {lead}
+          {checklist}
+          <SignOff title="Checked" />
+        </section>
+      )}
+
+      {model.deviations.kind === 'cards' && (
+        <DeviationCards
+          cards={model.deviations.cards}
+          cardPages={cardPages}
+          perPage={deviationsPerPage}
+          subject={model.front.number}
+          imageUrls={images.urls}
+          title={QUALITY_DEVIATIONS_TITLE}
+          signOff="action"
+          lead={report ? undefined : lead}
+          // Nothing to close when nothing was found.
+          closing={
+            report || model.deviations.cards.length === 0 ? undefined : (
+              <SignOff title="All deviations closed" />
+            )
+          }
+        />
+      )}
+
+      {model.instructions && (
+        <InstructionsSheet
+          sections={model.instructions}
+          checklistTitle={model.checklistTitle}
+          footer={model.footer}
+          imageUrls={images.urls}
+        />
+      )}
     </div>
   );
 }
 
 /**
- * Only deviations: what the pages are about, on the first one: the check, its number, the
- * machine and the check done on it, and how many deviations there are.
+ * Only the checklist or only the deviations: what the pages are about, on the first one: the
+ * check, its number, the machine and the check done on it, and its result or how many deviations
+ * there are.
  */
-function DeviationsHeader({ model, logoUrl }: { model: QualityPrintModel; logoUrl: string }) {
+function LeadHeader({ model, logoUrl }: { model: QualityPrintModel; logoUrl: string }) {
   const { front } = model;
   return (
     <header className="paper-qc-lead">
@@ -113,15 +145,18 @@ function DeviationsHeader({ model, logoUrl }: { model: QualityPrintModel; logoUr
   );
 }
 
-const ALL_CLOSED = ['Name', 'Signature', 'Date'] as const;
+const SIGN_OFF = ['Name', 'Signature', 'Date'] as const;
 
-/** After the last card: signed once every deviation above is closed. */
-function AllClosed() {
+/**
+ * At the end: signed once the checklist is checked ("Checked"), or once every deviation above is
+ * closed ("All deviations closed").
+ */
+function SignOff({ title }: { title: string }) {
   return (
     <div className="paper-qc-closing">
-      <p className="paper-qc-closing-title">All deviations closed</p>
+      <p className="paper-qc-closing-title">{title}</p>
       <div className="paper-qc-sign-row">
-        {ALL_CLOSED.map((label) => (
+        {SIGN_OFF.map((label) => (
           <div key={label} className="paper-signature">
             <span>{label}</span>
           </div>

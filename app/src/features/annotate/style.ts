@@ -122,17 +122,24 @@ export function shapeSpec(annotation: Annotation, size: Size): ShapeSpec {
       };
     case 'freehand':
       return { type: 'Line', config: { ...line, points: toPixels(annotation.points) } };
-    case 'rect':
+    case 'rect': {
+      // Placed by its centre, which it turns about.
+      const width = annotation.w * size.width;
+      const height = annotation.h * size.height;
       return {
         type: 'Rect',
         config: {
           ...line,
-          x: annotation.x * size.width,
-          y: annotation.y * size.height,
-          width: annotation.w * size.width,
-          height: annotation.h * size.height,
+          x: (annotation.x + annotation.w / 2) * size.width,
+          y: (annotation.y + annotation.h / 2) * size.height,
+          width,
+          height,
+          offsetX: width / 2,
+          offsetY: height / 2,
+          rotation: annotation.rotation ?? 0,
         },
       };
+    }
     case 'ellipse':
       return {
         type: 'Ellipse',
@@ -142,6 +149,7 @@ export function shapeSpec(annotation: Annotation, size: Size): ShapeSpec {
           y: (annotation.y + annotation.h / 2) * size.height,
           radiusX: (annotation.w * size.width) / 2,
           radiusY: (annotation.h * size.height) / 2,
+          rotation: annotation.rotation ?? 0,
         },
       };
     case 'text': {
@@ -161,6 +169,8 @@ export function shapeSpec(annotation: Annotation, size: Size): ShapeSpec {
           strokeWidth: fontSize * TEXT_OUTLINE_SHARE,
           fillAfterStrokeEnabled: true,
           lineJoin: 'round',
+          // About its top-left corner, where it was placed.
+          rotation: annotation.rotation ?? 0,
         },
       };
     }

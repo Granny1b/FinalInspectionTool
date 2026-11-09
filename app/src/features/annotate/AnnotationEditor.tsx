@@ -19,7 +19,7 @@ import {
 } from './editorState';
 import { EditorToolbar } from './EditorToolbar';
 import { fitInto } from './geometry';
-import { canRedo, canUndo } from './history';
+import { canRedo, canUndo } from '../../lib/history';
 import { needsRender, savedPhoto } from './photos';
 import { renderAnnotatedJpeg } from './render';
 import { defaultTextSize } from './style';
@@ -120,6 +120,12 @@ export function AnnotationEditor({
       current = false;
     };
   }, [subject]);
+
+  // How far a turned mark reaches depends on the photo's shape: moves and copies keep it on.
+  const aspect = size ? size.width / size.height : null;
+  useEffect(() => {
+    if (aspect) dispatch({ type: 'aspect', aspect });
+  }, [aspect]);
 
   // Closing or reloading the tab would lose the marks: the browser asks first.
   useEffect(() => {

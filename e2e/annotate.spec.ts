@@ -754,7 +754,7 @@ test('a mark is picked with any tool, moved, resized, copied, layered and delete
   await page.mouse.click(...(await onPhoto(page, [0.32, 0.47])));
   await selected('rect');
   await expect(
-    editor(page).getByText('Drag the box to move it, or a handle to resize it.'),
+    editor(page).getByText(/^Drag the box to move it, a square handle to resize it/),
   ).toBeVisible();
   await page.mouse.move(...(await handle(page, [0.5, 0.5], [1, 1])));
   await page.mouse.down();
@@ -811,4 +811,78 @@ test('a mark is picked with any tool, moved, resized, copied, layered and delete
   close(fractions(copy!), [0.33, 0.33, 0.4, 0.3]);
   const nudge = 10 / shownWidth;
   close(fractions(arrow!), [0.1 + nudge, 0.8, 0.3 + nudge, 0.9]);
+});
+
+test('a box is turned by its round handle, saved turned and flattened turned', async ({
+  page,
+  context,
+  published,
+  tracked,
+}) => {
+  await signIn(context, INSPECTOR, ['inspector']);
+  const created = await createInspection(page.request, published, tracked);
+  const { id } = created.inspection;
+  const itemId = published.sections[0]!.items[1]!.id;
+  const [imageId] = await uploadPhotos(page, ['Cabinet']);
+  const box: Annotation = {
+    kind: 'rect',
+    x: 0.3,
+    y: 0.4,
+    w: 0.4,
+    h: 0.2,
+    color: ANNOTATION_COLORS.red,
+  };
+  await save(page.request, created, {
+    [itemId]: { status: 'NOK', photos: [{ imageId: imageId!, annotations: [box] }] },
+  });
+  await page.goto(`/inspections/${id}`);
+  await page.getByRole('tab', { name: /^Deviations/ }).click();
+  await page
+    .locator('article[data-deviation="D-01"]')
+    .getByRole('button', { name: 'Edit photo 1' })
+    .click();
+  await expect(canvas(page)).toBeVisible({ timeout: 20_000 });
+
+  await pick(page, 'Tool', 'Select and move');
+  await page.mouse.click(...(await onPhoto(page, [0.5, 0.5])));
+  await expect(canvas(page)).toHaveAttribute('data-selected-kind', 'rect');
+  await expect(editor(page).getByText(/the round one to turn it/)).toBeVisible();
+
+  // The round handle is 30 px above the middle of the box's top (6 px of padding and 24 out).
+  // Dragged round to the right of the centre, it turns the box a quarter turn clockwise, which
+  // snaps to exactly 90°.
+  const area = (await canvas(page).boundingBox())!;
+  const centre: [number, number] = [area.x + 0.5 * area.width, area.y + 0.5 * area.height];
+  const reach = 0.1 * area.height + 30;
+  await page.mouse.move(centre[0], centre[1] - reach);
+  await page.mouse.down();
+  for (const step of [0.2, 0.4, 0.6, 0.8, 1]) {
+    const turn = (step * Math.PI) / 2;
+    await page.mouse.move(centre[0] + reach * Math.sin(turn), centre[1] - reach * Math.cos(turn), {
+      steps: 3,
+    });
+  }
+  await page.mouse.up();
+
+  await editor(page).getByRole('button', { name: 'Save' }).click();
+  await expect(editor(page)).toBeHidden({ timeout: 30_000 });
+  await expect
+    .poll(
+      async () =>
+        (await stored(page.request, id)).results[itemId]?.photos?.[0]?.renderedImageId ?? null,
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+  const [photo] = (await stored(page.request, id)).results[itemId]!.photos!;
+  // Turned about its centre: the same box, now upright.
+  expect(photo!.annotations).toEqual([{ ...box, rotation: 90 }]);
+
+  // On the 1200 × 900 copy the upright box is 180 px wide round the middle: its left side at
+  // 510 px. Its old left side, at 360 px, is the photo again.
+  const renderedUrl = await readUrl(page, photo!.renderedImageId!);
+  const [red, green] = await pixel(page, renderedUrl, [510 / 1200, 0.5]);
+  expect(red).toBeGreaterThan(170);
+  expect(green).toBeLessThan(90);
+  const [, oldGreen] = await pixel(page, renderedUrl, [0.3, 0.5]);
+  expect(oldGreen).toBeGreaterThan(90);
 });

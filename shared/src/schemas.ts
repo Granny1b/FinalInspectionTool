@@ -79,7 +79,20 @@ const ArrowAnnotationSchema = z.object({
   points: z.array(Fraction),
   color: Color,
 });
-const BoxShape = { x: Fraction, y: Fraction, w: Fraction, h: Fraction, color: Color };
+/**
+ * Degrees clockwise, -180 to 180: a box or ellipse turns about its centre, a label about its
+ * top-left corner (`x`, `y`). Left out when the mark isn't turned, as marks drawn before it were.
+ */
+const Rotation = z.number().min(-180).max(180).optional();
+/** `x`, `y`, `w`, `h`: the box as drawn before it is turned. */
+const BoxShape = {
+  x: Fraction,
+  y: Fraction,
+  w: Fraction,
+  h: Fraction,
+  color: Color,
+  rotation: Rotation,
+};
 const RectAnnotationSchema = z.object({ kind: z.literal('rect'), ...BoxShape });
 const EllipseAnnotationSchema = z.object({ kind: z.literal('ellipse'), ...BoxShape });
 const TextAnnotationSchema = z.object({
@@ -89,6 +102,7 @@ const TextAnnotationSchema = z.object({
   text: z.string().max(500),
   color: Color,
   size: z.number().positive(),
+  rotation: Rotation,
 });
 const FreehandAnnotationSchema = z.object({
   kind: z.literal('freehand'),

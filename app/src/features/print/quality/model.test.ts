@@ -115,6 +115,12 @@ function check(patch: Partial<Inspection> = {}): Inspection {
 }
 
 const report = (patch?: Partial<Inspection>) => qualityCheckPrint(check(patch), 'report', CONTEXT);
+
+/** The cards of a model that has them. */
+function cardsOf(model: QualityPrintModel) {
+  if (model.deviations.kind !== 'cards') throw new Error('This printout has no deviation cards');
+  return model.deviations.cards;
+}
 const values = (fields: { label: string; value: string }[]) =>
   Object.fromEntries(fields.map(({ label, value }) => [label, value]));
 
@@ -202,8 +208,7 @@ describe('a quality check’s entire report', () => {
   });
 
   it('has a card per deviation, NOK rows in checklist order and then the extra ones', () => {
-    const { cards } = model.deviations;
-    expect(model.deviations.kind).toBe('cards');
+    const cards = cardsOf(model);
     expect(cards.map((card) => [card.number, card.ref, card.text])).toEqual([
       ['D-01', '1.a', 'Check and verify safety decals on balancing tubes.'],
       ['D-02', '2.b', 'Door switch works.'],
@@ -224,9 +229,23 @@ describe('a quality check’s entire report', () => {
     expect(cards[2]).toMatchObject({ ref: null, sectionTitle: '', resp: 'Paint', category: '' });
   });
 
-  it('loads the deviation photos only: no guide pictures, no machine photo, no appendix', () => {
-    expect(qualityImageIds(model)).toEqual([id('Rend', 1), id('Phot', 2)]);
-    expect(printoutImageIds(model, { appendix: true })).toEqual([id('Rend', 1), id('Phot', 2)]);
+  it('ends with the instructions as the check has them, how and references with pictures', () => {
+    expect(model.instructions?.map((section) => section.title)).toEqual([
+      'Safety features',
+      'Electrical cabinet',
+    ]);
+    expect(model.instructions?.[0]?.rows[0]).toMatchObject({
+      ref: '1.a',
+      what: 'Check and verify safety decals on balancing tubes.',
+      how: 'Should be visible and not turned inward.',
+      references: ['ISO 12100', 'ISO 7010'],
+    });
+  });
+
+  it('loads the deviation photos and the instructions’ pictures: no machine photo, no appendix', () => {
+    const photos = [id('Rend', 1), id('Phot', 2), id('Gide', 1)];
+    expect(qualityImageIds(model)).toEqual(photos);
+    expect(printoutImageIds(model, { appendix: true })).toEqual(photos);
     expect(appendixCount(model)).toBe(0);
     // Photos: two to a page, as a final report.
     expect(defaultDeviationsPerPage(model)).toBe(2);
@@ -283,8 +302,9 @@ describe('a quality check in progress', () => {
 describe('only the deviations', () => {
   const model = qualityCheckPrint(check(), 'deviations', CONTEXT);
 
-  it('has the short header and the same cards', () => {
+  it('has the short header and the same cards, without the instructions', () => {
     expect(model.mode).toBe('deviations');
+    expect(model.instructions).toBeNull();
     expect(model.header).toEqual([
       { label: 'Machine ID', value: 'Magellan#2' },
       { label: 'Machine model', value: 'RigiMill MG' },
@@ -293,8 +313,8 @@ describe('only the deviations', () => {
       { label: 'Checked by', value: 'Erik Lund, Sam Andersson' },
       { label: 'Deviations', value: '3' },
     ]);
-    expect(model.deviations.cards.map((card) => card.number)).toEqual(['D-01', 'D-02', 'D-03']);
-    expect(model.deviations.cards).toEqual(report().deviations.cards);
+    expect(cardsOf(model).map((card) => card.number)).toEqual(['D-01', 'D-02', 'D-03']);
+    expect(cardsOf(model)).toEqual(cardsOf(report()));
   });
 
   it('is named as the deviations, with the same footer', () => {
@@ -303,6 +323,37 @@ describe('only the deviations', () => {
     expect(
       qualityCheckPrint(check({ state: 'in_progress' }), 'deviations', CONTEXT).fileName,
     ).toMatch(/ – Draft deviations$/);
+  });
+});
+
+describe('only the checklist', () => {
+  const model = qualityCheckPrint(check(), 'checklist', CONTEXT);
+
+  it('has the short header with the result, the same checklist, and no cards or instructions', () => {
+    expect(model.mode).toBe('checklist');
+    expect(values(model.header)).toEqual({
+      'Machine ID': 'Magellan#2',
+      'Machine model': 'RigiMill MG',
+      'Serial number': 'RM-2026-031',
+      Date: '2026-11-06',
+      'Checked by': 'Erik Lund, Sam Andersson',
+      Result: '1 OK · 2 NOK · 1 N/A',
+    });
+    expect(model.sections).toEqual(report().sections);
+    expect(model.deviations).toEqual({ kind: 'none' });
+    expect(model.instructions).toBeNull();
+    expect(qualityImageIds(model)).toEqual([]);
+  });
+
+  it('says how many rows are left while the check is being done, and is named the checklist', () => {
+    const inProgress = qualityCheckPrint(
+      check({ state: 'in_progress', results: { [id('Item', 1)]: { status: 'OK' } } }),
+      'checklist',
+      CONTEXT,
+    );
+    expect(values(inProgress.header)['Result']).toBe('1 OK · 0 NOK · 0 N/A · 3 not filled');
+    expect(inProgress.fileName).toMatch(/ – Draft checklist$/);
+    expect(model.fileName).toBe('QC-2026-0004 Magellan#2 RigiMill MG – Pre start up – Checklist');
   });
 });
 
@@ -326,7 +377,7 @@ describe('deviations closed in the app', () => {
   });
 
   it('print how they were closed instead of empty lines; open ones keep the lines', () => {
-    const [d1, d2, d3] = model.deviations.cards;
+    const [d1, d2, d3] = cardsOf(model);
     expect(d1!.closed).toEqual({
       action: 'New decal, turned outward',
       closedOn: '2026-11-08',
@@ -351,7 +402,7 @@ describe('what a quality check may lack', () => {
       'deviations',
       CONTEXT,
     );
-    expect(model.deviations.cards).toEqual([]);
+    expect(cardsOf(model)).toEqual([]);
     expect(values(model.header)['Deviations']).toBe('0');
     expect(model.front.counts.at(-1)).toEqual({ label: 'Deviations', value: 0 });
     // Without photos four cards share a page, as a final report.
