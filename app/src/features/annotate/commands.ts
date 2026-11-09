@@ -1,3 +1,5 @@
+import { historyKey } from '../../lib/history';
+
 /** The editor's keyboard shortcuts. Escape (deselect, then cancel) is handled by the editor. */
 export type EditorCommand = 'undo' | 'redo' | 'delete' | 'duplicate';
 
@@ -10,10 +12,10 @@ type KeyLike = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 
  */
 export function editorCommand(event: KeyLike): EditorCommand | null {
   if (event.altKey) return null;
+  const step = historyKey(event);
+  if (step) return step;
   const modifier = event.ctrlKey || event.metaKey;
   const key = event.key.toLowerCase();
-  if (modifier && key === 'z') return event.shiftKey ? 'redo' : 'undo';
-  if (modifier && key === 'y' && !event.shiftKey) return 'redo';
   if (modifier && key === 'd' && !event.shiftKey) return 'duplicate';
   if (!modifier && (event.key === 'Delete' || event.key === 'Backspace')) return 'delete';
   return null;

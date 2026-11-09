@@ -1,4 +1,7 @@
-/** Undo/redo as a list of snapshots: states are small (a photo's annotations), so no diffs. */
+/**
+ * Undo/redo as a list of snapshots: states are small (a photo's annotations, a checklist
+ * template's draft) and share what didn't change, so no diffs.
+ */
 export type History<T> = {
   past: readonly T[];
   present: T;
@@ -20,6 +23,15 @@ export function record<T>(history: History<T>, next: T): History<T> {
     present: next,
     future: [],
   };
+}
+
+/**
+ * The present replaced without a new step: more of the same edit (typing on in the same field)
+ * is taken back by one undo. Redo is no longer possible.
+ */
+export function amend<T>(history: History<T>, next: T): History<T> {
+  if (Object.is(next, history.present)) return history;
+  return { past: history.past, present: next, future: [] };
 }
 
 export function undo<T>(history: History<T>): History<T> {
@@ -46,4 +58,18 @@ export function canUndo(history: History<unknown>): boolean {
 
 export function canRedo(history: History<unknown>): boolean {
   return history.future.length > 0;
+}
+
+type KeyLike = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>;
+
+/**
+ * Ctrl+Z undo, Ctrl+Shift+Z or Ctrl+Y redo (⌘ on a Mac). With Alt held nothing matches: Ctrl+Alt
+ * is AltGr on Swedish keyboards (@, {, [ …).
+ */
+export function historyKey(event: KeyLike): 'undo' | 'redo' | null {
+  if (event.altKey || !(event.ctrlKey || event.metaKey)) return null;
+  const key = event.key.toLowerCase();
+  if (key === 'z') return event.shiftKey ? 'redo' : 'undo';
+  if (key === 'y' && !event.shiftKey) return 'redo';
+  return null;
 }

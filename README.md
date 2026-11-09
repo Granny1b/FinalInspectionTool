@@ -329,17 +329,23 @@ has an empty frame of the same size.
 
 In the checklist:
 
-| To                                          | Do                                                                |
-| ------------------------------------------- | ----------------------------------------------------------------- |
-| Add a row below                             | `Enter` in a row; **+ Add row** at the end of a section           |
-| Start a new section's rows                  | `Enter` in its title                                              |
-| Delete an empty row                         | `Backspace` in it (holding it down only empties a row)            |
-| Undo deleting a row or section              | **Undo** at the bottom of the window, until the next such change  |
-| Move between rows                           | `↑` / `↓` from the first or last line of a row                    |
-| Duplicate or delete a row                   | The icons that appear on hover or focus; on a tablet, its **⋯**   |
-| Rename, duplicate, move or delete a section | Its **⋯** menu (deleting a section with rows asks first)          |
-| Move a row or section                       | Drag its handle (⠿, left of it), also between sections            |
-| Move it with the keyboard                   | `Tab` to the handle, `Space`, arrow keys, `Space` (`Esc` cancels) |
+| To                                          | Do                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| Add a row below                             | `Enter` in a row; **+ Add row** at the end of a section             |
+| Start a new section's rows                  | `Enter` in its title                                                |
+| Delete an empty row                         | `Backspace` in it (holding it down only empties a row)              |
+| Undo or redo any change                     | `Ctrl+Z`; `Ctrl+Y` or `Ctrl+Shift+Z`; the ↶ ↷ buttons in the header |
+| Put back the last deleted row or section    | **Undo** at the bottom of the window, until the next such change    |
+| Move between rows                           | `↑` / `↓` from the first or last line of a row                      |
+| Duplicate or delete a row                   | The icons that appear on hover or focus; on a tablet, its **⋯**     |
+| Rename, duplicate, move or delete a section | Its **⋯** menu (deleting a section with rows asks first)            |
+| Move a row or section                       | Drag its handle (⠿, left of it), also between sections              |
+| Move it with the keyboard                   | `Tab` to the handle, `Space`, arrow keys, `Space` (`Esc` cancels)   |
+
+Undo and redo cover every change to the draft (the front page, the checklist's text and
+structure, guides), the last 100 steps, while the editor is open. Typing on in one field is one
+step until a pause of 1.5 s. Each step is autosaved as any change is. A machine's own copy of a
+check has no undo: deleting a row there deletes its result when it is saved.
 
 Numbers (section 3, row 3.c) follow the position and change as rows move; each row keeps its
 identity, which is what later phases key results and statistics on.

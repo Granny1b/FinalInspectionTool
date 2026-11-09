@@ -12,8 +12,8 @@ import {
   type TemplateDraftInput,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Ellipsis, FileDown, Printer, Trash2, Upload } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Ellipsis, FileDown, Printer, Redo2, Trash2, Undo2, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { ActionMenu } from '../../components/ActionMenu';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
@@ -27,6 +27,7 @@ import { useAutosave } from '../../lib/autosave/useAutosave';
 import { useLeaveGuard } from '../../lib/autosave/useLeaveGuard';
 import { useReload } from '../../lib/autosave/useReload';
 import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
+import { canRedo, canUndo, historyKey } from '../../lib/history';
 import { modelName, useSettings } from '../../lib/useSettings';
 import { useScrollPaddingBelow } from '../../lib/useScrollPaddingBelow';
 import { templatePrintHref } from '../print/links';
@@ -35,6 +36,14 @@ import { downloadQualityCheck } from '../qualityChecks/transfer';
 import { Badge } from './Badge';
 import { ChecklistHeading } from './ChecklistHeading';
 import { DeleteTemplateDialog } from './DeleteTemplateDialog';
+import {
+  changedPlace,
+  recordDraft,
+  startDraftHistory,
+  stepDraft,
+  type ChangedPlace,
+  type DraftHistory,
+} from './draftHistory';
 import { TemplateDocument } from './document/TemplateDocument';
 import type { TemplatesPageState } from './listView';
 import { MachineHeader } from './MachineHeader';
@@ -133,15 +142,74 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   const leaveGuard = useLeaveGuard(dirty && !deleted, saveAll, editorDirty && !deleted);
   const reload = useReload(dirty, onReload);
 
-  const update = useCallback(
-    (patch: Partial<TemplateDraftInput>) => {
-      const next = { ...draftRef.current, ...patch };
+  // Every change is a step to undo and redo (Ctrl+Z, Ctrl+Y or the header's buttons), typing on
+  // in the same field one step until a pause. Kept in a ref, as the draft: handlers record into
+  // it before React re-renders; `steps` re-renders the buttons.
+  const historyRef = useRef<DraftHistory | null>(null);
+  historyRef.current ??= startDraftHistory(draft);
+  const [steps, setSteps] = useState({ undo: false, redo: false });
+  // Where the last undo or redo changed the checklist, brought into view once it is drawn.
+  const [revealed, setRevealed] = useState<{ place: ChangedPlace } | null>(null);
+
+  /** The draft as shown and saved from now on. */
+  const apply = useCallback(
+    (next: TemplateDraftInput, history: DraftHistory) => {
+      historyRef.current = history;
       draftRef.current = next;
       setDraft(next);
+      setSteps({ undo: canUndo(history.history), redo: canRedo(history.history) });
       saver.change(next);
     },
     [saver],
   );
+
+  const update = useCallback(
+    (patch: Partial<TemplateDraftInput>) => {
+      const next = { ...draftRef.current, ...patch };
+      apply(next, recordDraft(historyRef.current!, next, Date.now()));
+    },
+    [apply],
+  );
+
+  const step = useCallback(
+    (direction: 'undo' | 'redo') => {
+      const before = historyRef.current!;
+      const after = stepDraft(before, direction);
+      if (after === before) return;
+      apply(after.history.present, after);
+      const place = changedPlace(before.history.present, after.history.present);
+      if (place) setRevealed({ place });
+    },
+    [apply],
+  );
+
+  // Ctrl+Z and Ctrl+Y anywhere on the page, in its text fields too: the draft's own steps, not a
+  // field's (which would leave the draft's history out of step). A dialog (a guide, a photo,
+  // Publish) keeps its keys.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const direction = historyKey(event);
+      if (!direction || event.defaultPrevented) return;
+      if (event.target instanceof Element && event.target.closest('dialog, [role="dialog"]')) {
+        return;
+      }
+      event.preventDefault();
+      step(direction);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [step]);
+
+  useEffect(() => {
+    if (!revealed) return;
+    const { place } = revealed;
+    const selector =
+      place.kind === 'row'
+        ? `[data-item-text="${CSS.escape(place.itemId)}"]`
+        : `[data-section-title="${CSS.escape(place.sectionId)}"]`;
+    // Into view, without taking the focus from where the user is.
+    document.querySelector(selector)?.scrollIntoView({ block: 'nearest' });
+  }, [revealed]);
   const updateSections = useCallback((sections: Section[]) => update({ sections }), [update]);
   // A quality check's template name follows its front page's name, so lists show its title.
   const updateFront = useCallback(
@@ -367,6 +435,24 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             onReload={reload.askReload}
           />
           <div className="flex items-center gap-2">
+            <div role="group" aria-label="History" className="flex items-center gap-1">
+              <StepButton
+                label="Undo"
+                shortcut="Ctrl+Z"
+                inactive={!steps.undo}
+                onClick={() => step('undo')}
+              >
+                <Undo2 size={16} aria-hidden="true" />
+              </StepButton>
+              <StepButton
+                label="Redo"
+                shortcut="Ctrl+Y"
+                inactive={!steps.redo}
+                onClick={() => step('redo')}
+              >
+                <Redo2 size={16} aria-hidden="true" />
+              </StepButton>
+            </div>
             {/* The draft as it prints (a quality check's as its instructions); leaving the editor
                 saves first, like any link. On a phone just the printer, so the header keeps to
                 one row of buttons. Spaced as the inspection's header buttons. */}
@@ -539,6 +625,39 @@ export function TemplateEditor({ loaded, onReload }: Props) {
         noun={quality ? 'quality check' : 'template'}
       />
     </div>
+  );
+}
+
+/**
+ * Undo or Redo: an icon button with its shortcut in the tooltip. `inactive` (aria-disabled, not
+ * disabled) when there is no step, as the photo editor's: a disabled button would drop the focus
+ * when its last step is taken.
+ */
+function StepButton({
+  label,
+  shortcut,
+  inactive,
+  onClick,
+  children,
+}: {
+  label: string;
+  shortcut: string;
+  inactive: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      variant="secondary"
+      aria-label={label}
+      aria-keyshortcuts={shortcut.replace('Ctrl', 'Control')}
+      aria-disabled={inactive || undefined}
+      title={`${label} (${shortcut})`}
+      onClick={inactive ? undefined : onClick}
+      className="px-2.5 aria-disabled:cursor-default aria-disabled:opacity-50"
+    >
+      {children}
+    </Button>
   );
 }
 

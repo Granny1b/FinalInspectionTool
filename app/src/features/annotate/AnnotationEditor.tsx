@@ -19,7 +19,7 @@ import {
 } from './editorState';
 import { EditorToolbar } from './EditorToolbar';
 import { fitInto } from './geometry';
-import { canRedo, canUndo } from './history';
+import { canRedo, canUndo } from '../../lib/history';
 import { needsRender, savedPhoto } from './photos';
 import { renderAnnotatedJpeg } from './render';
 import { defaultTextSize } from './style';

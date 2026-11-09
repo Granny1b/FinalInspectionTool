@@ -53,6 +53,9 @@ export function EditableDocument({
     onOpenGuide: setGuideItemId,
   });
   const { drag, shown, contextProps } = useDocumentDnd(sections, actions);
+  // Offered only while it is gone: the editor's own Undo (Ctrl+Z) may have put it back already,
+  // and putting it back twice would make two of it.
+  const undoable = deleted && !isBack(sections, deleted) ? deleted : null;
 
   const idsKey = shown.map((section) => section.id).join(' ');
   const sectionIds = useMemo(() => (idsKey ? idsKey.split(' ').map(sectionDndId) : []), [idsKey]);
@@ -173,7 +176,7 @@ export function EditableDocument({
       )}
 
       <UndoBar
-        deleted={deleted}
+        deleted={undoable}
         onUndo={(last) => {
           setDeleted(null);
           actions.undoDelete(last);
@@ -182,6 +185,13 @@ export function EditableDocument({
       />
     </div>
   );
+}
+
+/** Whether a deleted row or section is in the checklist again. */
+function isBack(sections: Section[], deleted: Deleted): boolean {
+  return deleted.kind === 'row'
+    ? findRow(sections, deleted.item.id) !== null
+    : findSection(sections, deleted.section.id) >= 0;
 }
 
 /**

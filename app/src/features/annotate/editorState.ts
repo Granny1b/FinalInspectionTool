@@ -5,7 +5,7 @@
  */
 import type { Annotation } from '@modig/shared';
 import { annotationBounds, duplicateOffset, moveAnnotation, type Point } from './geometry';
-import { record, redo, startHistory, undo, type History } from './history';
+import { record, redo, startHistory, undo, type History } from '../../lib/history';
 import { DEFAULT_COLOR, DEFAULT_TOOL, type Tool } from './tools';
 
 /** An annotation with an id that lives as long as the editor: React keys and the selection. */

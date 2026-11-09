@@ -8,7 +8,7 @@ import {
   type EditorAction,
   type EditorState,
 } from './editorState';
-import { canRedo, canUndo } from './history';
+import { canRedo, canUndo } from '../../lib/history';
 import { DEFAULT_COLOR, DEFAULT_TOOL } from './tools';
 
 const { red: RED, cyan: CYAN, yellow: YELLOW } = ANNOTATION_COLORS;
