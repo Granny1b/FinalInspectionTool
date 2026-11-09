@@ -261,7 +261,7 @@ function instructionSections(sections: readonly Section[]): InstructionSection[]
 }
 
 /** Every picture the instructions show, in order, each once. */
-export function instructionImageIds(model: InstructionsModel): string[] {
+export function instructionImageIds(model: Pick<InstructionsModel, 'sections'>): string[] {
   const ids = model.sections.flatMap((section) =>
     section.rows.flatMap((row) => row.pictures.flat().map((picture) => picture.imageId)),
   );

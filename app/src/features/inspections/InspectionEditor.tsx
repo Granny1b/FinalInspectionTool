@@ -584,14 +584,20 @@ export function InspectionEditor({
   }
 
   // What Print / Save PDF offers: an inspection's blank checklist or its report; a quality check's
-  // entire report, only its deviations (to close them at the machine) or its instructions, a
-  // manual for the operator as this check has them (it has no blank form).
+  // entire report (everything), only its checklist, only its deviations (to close them at the
+  // machine) or its instructions, a manual for the operator as this check has them (it has no
+  // blank form).
   const printItems = quality
     ? [
         {
           label: QUALITY_PRINT_MODE_LABELS.report,
           icon: ClipboardCheck,
           onSelect: () => void openPrint(qualityCheckPrintHref(id, { mode: 'report' }, true)),
+        },
+        {
+          label: QUALITY_PRINT_MODE_LABELS.checklist,
+          icon: ClipboardList,
+          onSelect: () => void openPrint(qualityCheckPrintHref(id, { mode: 'checklist' }, true)),
         },
         {
           label: QUALITY_PRINT_MODE_LABELS.deviations,

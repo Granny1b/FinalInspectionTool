@@ -3703,3 +3703,19 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
   is no step (the focus stays on them, as in the photo editor).
 - `lib/history.ts` (moved from the photo editor) is shared: it gained `amend` (more of the same
   step) and `historyKey` (the shortcuts).
+
+## Quality checks: printing all of it, or only the checklist (2026-11-09)
+
+- **Asked for:** "Entire report should be all" (checklist, instructions and deviations), and a
+  way to print only the checklist; Only deviations and Instructions as they are.
+- **Entire report = everything:** the front page with the sign-off, the checklist, the deviation
+  cards, then the instructions. The instructions come last: the checklist and the cards are what
+  is filled in and signed at the machine, the instructions are the manual to look things up in.
+  They print without their own cover, which would repeat the front page, but with their heading
+  and the same blocks as the instructions alone (`InstructionsSheet`, shared). So the entire
+  report now loads the check's guide pictures too.
+- **Only checklist:** the short header of Only deviations, whose last line is the result instead
+  of the deviation count, the checklist, and a _Checked_ sign-off (Name · Signature · Date). No
+  cards, so no "per page" choice. In the menus between Entire report and Only deviations.
+- The modes are `report | checklist | deviations | instructions`; `checklist` leaves the model's
+  `deviations` as `{ kind: 'none' }`, as a checklist printout's blank form has it.

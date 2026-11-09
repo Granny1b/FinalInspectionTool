@@ -232,14 +232,15 @@ test('Preview shows the entire report, and Only deviations the cards with their 
   await expect(front.locator('[data-count="Deviations"]')).toContainText('2');
   await expect(front).toContainText('Deviations closed / approved by');
 
-  // The checklist: what, how, references and the result; a NOK row points to its card.
-  const row = root.locator('[data-row-ref="1.a"]');
+  // The checklist: what, how, references and the result; a NOK row points to its card. (Its row,
+  // not the instructions' at the end, which name the row too.)
+  const row = root.locator('tr[data-row-ref="1.a"]');
   await expect(row).toContainText('Check and verify safety decals on balancing tubes.');
   await expect(row).toContainText('Should be visible and not turned inward.');
   await expect(row).toContainText('ISO 12100 · ISO 7010');
   await expect(row).toContainText('NOK');
   await expect(row).toContainText('D-01 · Major');
-  await expect(root.locator('[data-row-ref="1.b"]')).toContainText('OK');
+  await expect(root.locator('tr[data-row-ref="1.b"]')).toContainText('OK');
 
   // A card per deviation, the extra one too, each to be signed off at the machine.
   const cards = root.locator('[data-deviation-card]');
@@ -282,7 +283,7 @@ test('Preview shows the entire report, and Only deviations the cards with their 
   await expect(previewButton).toBeFocused();
 });
 
-test('the print page prints the entire report and only the deviations, without Word', async ({
+test('the print page prints the entire report, only the checklist and only the deviations, without Word', async ({
   page,
   machine,
 }) => {
@@ -312,7 +313,8 @@ test('the print page prints the entire report and only the deviations, without W
   await expect(page.getByRole('button', { name: /Word/ })).toHaveCount(0);
   await expect(page.getByLabel('Include reference images')).toHaveCount(0);
 
-  // The entire report: front page, checklist, then the deviations on pages of their own.
+  // The entire report: front page, checklist, the deviations on pages of their own, and last the
+  // instructions.
   const report = await printPdf(page, 'quality-check-report');
   expectPages(report, footer);
   expect(report.length).toBeGreaterThanOrEqual(3);
@@ -332,6 +334,37 @@ test('the print page prints the entire report and only the deviations, without W
   }
   // The photo is printed with its card.
   expect(deviationPages.reduce((sum, pdfPage) => sum + pdfPage.images, 0)).toBeGreaterThan(0);
+  const headed = (heading: string) =>
+    report.flatMap((pdfPage, index) =>
+      pdfPage.texts.some((text) => text.text === heading && text.size > 12) ? [index] : [],
+    );
+  const instructionPages = headed('Instructions');
+  expect(instructionPages.length).toBeGreaterThan(0);
+  expect(Math.min(...instructionPages)).toBeGreaterThan(Math.max(...headed('Deviations')));
+
+  // Only the checklist: the short header with the result, the checklist and a sign-off.
+  await what.getByRole('button', { name: 'Only checklist' }).click();
+  await expect(page).toHaveURL(/mode=checklist/);
+  await expect(root).toHaveAttribute('data-print-mode', 'checklist');
+  // No cards, so no choice of how many to a page.
+  await expect(page.getByRole('button', { name: '4 per page' })).toHaveCount(0);
+  const checklist = await printPdf(page, 'quality-check-checklist');
+  expectPages(checklist, footer);
+  expect(checklist.length).toBeLessThan(report.length);
+  const checklistText = checklist.map(pageText).join('');
+  for (const text of [
+    CHECK,
+    MACHINE_ID,
+    'Result',
+    'Checklist',
+    compact('D-01 · Major'),
+    'Checked',
+  ]) {
+    expect(checklistText).toContain(compact(text));
+  }
+  for (const text of ['Sign-off', 'Action taken', 'Instructions']) {
+    expect(checklistText).not.toContain(compact(text));
+  }
 
   // Only the deviations: kept in the address; the header and cards from the first page on.
   await what.getByRole('button', { name: 'Only deviations' }).click();
@@ -373,6 +406,7 @@ test('Print / Save PDF saves and prints the entire report or only the deviations
   await page.getByRole('button', { name: 'Print / Save PDF' }).click();
   await expect(page.getByRole('menuitem')).toHaveText([
     'Entire report',
+    'Only checklist',
     'Only deviations',
     'Instructions',
   ]);

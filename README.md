@@ -448,7 +448,7 @@ the deviation fields and photos, extra deviations, Finalise and Reopen, Delete a
   check, never change it, unless an admin updates it (see [Machines](#machines)).
 - **The page** (`/quality-checks/{id}`): the header with the number and machine, the quality
   check and its revision, the serial number, the save status, **Preview** and **Print / Save
-  PDF** (_Entire report_, _Only deviations_ or _Instructions_, see
+  PDF** (_Entire report_, _Only checklist_, _Only deviations_ or _Instructions_, see
   [Printing a quality check](#printing-a-quality-check)), **Finalise** (or **Reopen**), the
   tabs _Checklist_ and _Deviations (n)_, the progress (`3 / 10 rows filled · 1 NOK`) and _Continue
   at 1.d_.
@@ -794,21 +794,23 @@ only, thin rules. Inter is bundled with the app, so a printout looks the same of
 ### Printing a quality check
 
 A quality check done on a machine prints on the same A4 paper as a final report, black and white
-throughout, to be filed at the machine and signed there. No guide pictures (they are for the app)
-and no Word export or reference images.
+throughout, to be filed at the machine and signed there. Guide pictures only in the instructions
+(the checklist and the cards are for results), and no Word export or reference images.
 
 - **Preview** on the quality check's page shows it at once, unsaved edits included, as on an
   inspection (Escape or **Close** go back, **Print / Save PDF** or Ctrl+P prints what is shown).
-  Its header has **Entire report | Only deviations | Instructions** and **Deviations: 2 per page |
-  4 per page** (not for the instructions); it opens on the entire report.
-- **Print / Save PDF** → _Entire report_, _Only deviations_ or _Instructions_ saves pending changes
+  Its header has **Entire report | Only checklist | Only deviations | Instructions** and
+  **Deviations: 2 per page | 4 per page** (where there are cards); it opens on the entire report.
+- **Print / Save PDF** → _Entire report_, _Only checklist_, _Only deviations_ or _Instructions_
+  saves pending changes
   and opens the print page in a new tab, which prints once everything has loaded. Its toolbar has
   the same choices, kept in the address, and **Rev N** after what is printed.
-- Address: `/quality-checks/{id}/print?mode=report|deviations|instructions[&deviationsPerPage=2|4]`; the
+- Address: `/quality-checks/{id}/print?mode=report|checklist|deviations|instructions[&deviationsPerPage=2|4]`; the
   entire report without a mode. `/inspections/{id}/print` of a quality check leads there (and the
   other way round for a final inspection), with the same choices.
 
-**Entire report.**
+**Entire report.** Everything, in this order: the front page, the checklist, the deviations and
+the instructions.
 
 - **Front page:** the logo and the number (`QC-2026-0004`), the check's title ("Quality check –
   Pre start up"), the company name, "Finalised 2026-11-06 14:32 by Anna Andersson" (or "NOT
@@ -826,6 +828,14 @@ and no Word export or reference images.
   "Not on the checklist", comment, Category, Responsible, photos), 2 or 4 to a page, each with
   lines to fill in at the machine: _Action taken_ (two lines), _Closed on_ and _Signature_. With
   4 to a page the lines run across the whole card. "No deviations recorded." when there are none.
+- **Instructions:** last, as _Instructions_ below prints them but without their cover (the front
+  page already says what they are for): the rows with how, references, time and pictures.
+
+**Only checklist.** The first page starts with the short header of _Only deviations_ (below), its
+last line the result ("15 OK · 2 NOK · 1 N/A", and how many are not filled while the check is
+being done). The checklist follows as in the entire report, then _Checked_ with _Name · Signature
+· Date_. No cards and no instructions. The PDF ends in "– Checklist" ("– Draft checklist" in
+progress).
 
 **Only deviations.** The first page starts with a short header: logo and number, the title, "NOT
 FINALISED – DRAFT REPORT" while it is in progress, then Machine ID, Machine model, Serial number,

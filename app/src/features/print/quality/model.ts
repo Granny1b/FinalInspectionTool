@@ -1,8 +1,9 @@
 /**
  * What a quality check done on a machine prints, worked out from the data alone: the entire
- * report (a front page with the sign-off, the checklist section by section, and a card per
- * deviation with room to sign it off at the machine), or only the deviations under a short
- * header. The printout is filed at the machine and signed there, so both end in places to sign.
+ * report (a front page with the sign-off, the checklist section by section, a card per deviation
+ * with room to sign it off at the machine, and the check's instructions), only the checklist or
+ * only the deviations under a short header, or the instructions alone (instructions.ts). The
+ * printout is filed at the machine and signed there, so each ends in places to sign.
  * Pure, so the rules are unit-tested; the components only lay it out.
  */
 import {
@@ -36,20 +37,27 @@ import {
   type FrontField,
   type PrintContext,
 } from '../model';
-import { checkInstructionsPrint, type InstructionsModel } from './instructions';
+import {
+  checkInstructionsPrint,
+  instructionImageIds,
+  type InstructionSection,
+  type InstructionsModel,
+} from './instructions';
 
 /**
- * `report`: everything. `deviations`: the deviation cards alone, to close them at the machine.
- * `instructions`: the check's rows as a manual for the operator, pictures included
- * (instructions.ts).
+ * `report`: everything: the front page, the checklist, the deviation cards and the instructions.
+ * `checklist`: the checklist alone, with what was recorded. `deviations`: the deviation cards
+ * alone, to close them at the machine. `instructions`: the check's rows as a manual for the
+ * operator, pictures included (instructions.ts).
  */
-export const QUALITY_PRINT_MODES = ['report', 'deviations', 'instructions'] as const;
+export const QUALITY_PRINT_MODES = ['report', 'checklist', 'deviations', 'instructions'] as const;
 export type QualityPrintMode = (typeof QUALITY_PRINT_MODES)[number];
-/** What the check's report prints: everything, or only its deviations. */
+/** What the check's report prints: everything, only its checklist or only its deviations. */
 export type QualityReportMode = Exclude<QualityPrintMode, 'instructions'>;
 /** How the print toolbar, the preview and the Print menu name each mode. */
 export const QUALITY_PRINT_MODE_LABELS: Record<QualityPrintMode, string> = {
   report: 'Entire report',
+  checklist: 'Only checklist',
   deviations: 'Only deviations',
   instructions: 'Instructions',
 };
@@ -113,8 +121,9 @@ export type QualityPrintModel = {
   mode: QualityReportMode;
   front: QualityFrontPage;
   /**
-   * Only deviations: the short header over the first page of cards (Machine ID, Machine model,
-   * Serial number, Date, Checked by, Deviations), "—" for what is empty.
+   * Only the checklist or only the deviations: the short header over the first page (Machine
+   * ID, Machine model, Serial number, Date, Checked by, then the Result or the Deviations), "—"
+   * for what is empty.
    */
   header: FrontField[];
   /** Right of the checklist's heading: "Quality check – Pre start up · Rev 2". */
@@ -122,8 +131,13 @@ export type QualityPrintModel = {
   /** "Rev 2": after the subject in the print toolbar, as a template's printout has it. */
   revisionLabel: string;
   sections: QualityPrintSection[];
-  /** Shaped as a final report's, so the cards are laid out by the same code. */
-  deviations: { kind: 'cards'; cards: DeviationCard[] };
+  /**
+   * Shaped as a final report's, so the cards are laid out by the same code; none when only the
+   * checklist is printed.
+   */
+  deviations: { kind: 'cards'; cards: DeviationCard[] } | { kind: 'none' };
+  /** The entire report ends with the check's instructions, as this check has them. */
+  instructions: InstructionSection[] | null;
   /** Under "Print preview" and "Preview": number, title, machine ID and model. */
   subject: string;
   /** Bottom left of every page. */
@@ -141,7 +155,7 @@ export type QualityPrintContext = PrintContext & {
   followUps?: Readonly<Record<string, FollowUp>>;
 };
 
-/** The entire report, or only its deviations, of a quality check, from its frozen copy. */
+/** The entire report, only its checklist or only its deviations, from the check's frozen copy. */
 export function qualityCheckPrint(
   inspection: Inspection,
   mode: QualityReportMode,
@@ -204,19 +218,31 @@ export function qualityCheckPrint(
       { label: 'Serial number', value: serialNumber || '—' },
       { label: 'Date', value: date || '—' },
       { label: 'Checked by', value: checkedBy || '—' },
-      {
-        label: 'Deviations',
-        // "4 · 1 open" once some are closed: the paper at the machine shows what is left.
-        value:
-          openCount === cards.length
-            ? String(cards.length)
-            : `${cards.length}${SEPARATOR}${openCount} open`,
-      },
+      mode === 'checklist'
+        ? {
+            label: 'Result',
+            // "15 OK · 2 NOK · 1 N/A", and how many are left while the check is being done.
+            value: [
+              `${progress.ok} OK`,
+              `${progress.nok} NOK`,
+              `${progress.filled - progress.ok - progress.nok} N/A`,
+              ...(open > 0 ? [`${open} not filled`] : []),
+            ].join(SEPARATOR),
+          }
+        : {
+            label: 'Deviations',
+            // "4 · 1 open" once some are closed: the paper at the machine shows what is left.
+            value:
+              openCount === cards.length
+                ? String(cards.length)
+                : `${cards.length}${SEPARATOR}${openCount} open`,
+          },
     ],
     checklistTitle: `${title}${SEPARATOR}${revisionLabel}`,
     revisionLabel,
     sections: printSections(sections, inspection.results, deviations),
-    deviations: { kind: 'cards', cards },
+    deviations: mode === 'checklist' ? { kind: 'none' } : { kind: 'cards', cards },
+    instructions: mode === 'report' ? checkInstructionsPrint(inspection, context).sections : null,
     subject: [number, title, machineId, context.modelLabel].filter(Boolean).join(SEPARATOR),
     footer: [
       number,
@@ -238,6 +264,7 @@ export function qualityCheckPrint(
 
 function fileKind(mode: QualityReportMode, finalised: boolean): string {
   if (mode === 'deviations') return finalised ? 'Deviations' : 'Draft deviations';
+  if (mode === 'checklist') return finalised ? 'Checklist' : 'Draft checklist';
   return finalised ? 'Quality check report' : 'Draft report';
 }
 
@@ -286,8 +313,8 @@ function printSections(
 }
 
 /**
- * What a quality check prints in `mode`: its entire report, only its deviations, or its
- * instructions as the check has them.
+ * What a quality check prints in `mode`: its entire report, only its checklist or deviations, or
+ * its instructions as the check has them.
  */
 export function qualityCheckPrintout(
   inspection: Inspection,
@@ -299,10 +326,17 @@ export function qualityCheckPrintout(
     : qualityCheckPrint(inspection, mode, context);
 }
 
-/** Every uploaded image the report shows (the logo aside): the deviation photos, each once. */
+/**
+ * Every uploaded image the report shows (the logo aside), each once: the deviation photos, and
+ * the instructions' pictures in the entire report.
+ */
 export function qualityImageIds(model: QualityPrintModel): string[] {
-  const ids = model.deviations.cards.flatMap((card) => card.photos.map((photo) => photo.imageId));
-  return [...new Set(ids)];
+  const photos =
+    model.deviations.kind === 'cards'
+      ? model.deviations.cards.flatMap((card) => card.photos.map((photo) => photo.imageId))
+      : [];
+  const pictures = model.instructions ? instructionImageIds({ sections: model.instructions }) : [];
+  return [...new Set([...photos, ...pictures])];
 }
 
 /** The card with its closing when the deviation is closed in the app; else as it is. */
