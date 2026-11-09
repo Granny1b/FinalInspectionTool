@@ -121,6 +121,12 @@ export function AnnotationEditor({
     };
   }, [subject]);
 
+  // How far a turned mark reaches depends on the photo's shape: moves and copies keep it on.
+  const aspect = size ? size.width / size.height : null;
+  useEffect(() => {
+    if (aspect) dispatch({ type: 'aspect', aspect });
+  }, [aspect]);
+
   // Closing or reloading the tab would lose the marks: the browser asks first.
   useEffect(() => {
     if (!dirty) return;

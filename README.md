@@ -637,6 +637,7 @@ bottom. Mouse, finger and pen all work.
 | Move a mark                   | Drag it by its line, with any tool; with **Select and move** also by the inside of a box or circle         |
 | Select a mark                 | Click its line (any tool) or its inside (**Select and move**); `Esc` lets go of it                         |
 | Resize a mark                 | Select it, drag a handle: a box or circle by any side or corner, a label or freehand line by a corner      |
+| Turn a mark                   | Select a box, circle, label or freehand line, drag its round handle (it snaps to every 45°)                |
 | Change an arrow               | Select it, drag the dot on either end                                                                      |
 | Nudge a mark                  | Arrow keys move the selected mark a pixel, with `Shift` ten                                                |
 | Copy, layer or delete a mark  | Select it: **Duplicate mark** (`Ctrl+D`), **Bring to front**, **Send to back**, **Delete mark** (`Delete`) |

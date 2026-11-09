@@ -167,6 +167,31 @@ describe('move', () => {
   });
 });
 
+describe('the photo’s shape', () => {
+  // Turned upright on a photo twice as wide as it is high: it reaches 0.3 to 0.7 down.
+  const TURNED: Annotation = { ...BOX, x: 0.4, y: 0.4, w: 0.2, h: 0.2, rotation: 90 };
+
+  it('keeps a turned box on the photo by what it covers there', () => {
+    const state = run(
+      initialEditorState([TURNED]),
+      { type: 'aspect', aspect: 2 },
+      { type: 'move', id: 1, dx: 0, dy: 0.5 },
+    );
+    expect(annotationsOf(state)).toEqual([{ ...TURNED, y: 0.7 }]);
+    // Before the photo is loaded it is taken as square.
+    const square = run(initialEditorState([TURNED]), { type: 'move', id: 1, dx: 0, dy: 0.5 });
+    expect(annotationsOf(square)).toEqual([{ ...TURNED, y: 0.8 }]);
+  });
+
+  it('is no undo step, and ignores nonsense', () => {
+    const state = run(initialEditorState([BOX]), { type: 'aspect', aspect: 4 / 3 });
+    expect(state.aspect).toBeCloseTo(4 / 3);
+    expect(canUndo(state.history)).toBe(false);
+    expect(run(state, { type: 'aspect', aspect: 0 })).toBe(state);
+    expect(run(state, { type: 'aspect', aspect: 4 / 3 })).toBe(state);
+  });
+});
+
 describe('reshape', () => {
   it('gives a mark its resized shape as one step', () => {
     const resized = { ...BOX, w: 0.4, h: 0.1 };
@@ -365,12 +390,21 @@ describe('text labels', () => {
       size: 0.05,
       color: RED,
       value: 'Burr',
+      rotation: 0,
     });
     expect(state.selectedId).toBe(2);
     state = run(state, { type: 'text-change', value: 'Sharp burr' }, { type: 'text-commit' });
     expect(annotationsOf(state)).toEqual([ARROW, { ...LABEL, text: 'Sharp burr' }]);
     state = run(state, { type: 'undo' });
     expect(annotationsOf(state)).toEqual([ARROW, LABEL]);
+  });
+
+  it('types a turned label turned, and keeps its turn', () => {
+    const turned: Annotation = { ...LABEL, rotation: -30 };
+    let state = run(initialEditorState([turned]), { type: 'text-edit', id: 1 });
+    expect(state.text?.rotation).toBe(-30);
+    state = run(state, { type: 'text-change', value: 'Sharp burr' }, { type: 'text-commit' });
+    expect(annotationsOf(state)).toEqual([{ ...turned, text: 'Sharp burr' }]);
   });
 
   it('recolours a label being edited', () => {

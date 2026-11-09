@@ -13,6 +13,7 @@ import {
   MIN_DRAG_PX,
   moveAnnotation,
   moveArrowEnd,
+  normalRotation,
   roundFraction,
   screenDistance,
   shapeFromDrag,
@@ -288,27 +289,56 @@ describe('moveAnnotation', () => {
 });
 
 describe('transformAnnotation', () => {
-  it('resizes a box: its corner moves with the origin, its size with the scale', () => {
-    const box: Annotation = { kind: 'rect', x: 0.2, y: 0.4, w: 0.2, h: 0.1, color: RED };
-    // Dragged by its bottom-right handle to twice the width and three times the height.
-    expect(transformAnnotation(box, { x: -0.2, y: -0.8, scaleX: 2, scaleY: 3 })).toEqual({
-      ...box,
-      x: 0.2,
-      y: 0.4,
-      w: 0.4,
-      h: 0.3,
-    });
+  /** The photo in its own pixels in these tests. */
+  const PHOTO = { width: 1000, height: 500 };
+  const frame = (x: number, y: number, scale = 1, rotation = 0) => ({
+    x,
+    y,
+    scaleX: scale,
+    scaleY: scale,
+    rotation,
   });
 
-  it('scales every point of a freehand line and an arrow', () => {
+  it('resizes a box: its centre moves with the handles, its size with the scale', () => {
+    const box: Annotation = { kind: 'rect', x: 0.2, y: 0.4, w: 0.2, h: 0.1, color: RED };
+    // Dragged by its bottom-right handle to twice the width and three times the height: its
+    // centre went from (300, 225) to (400, 275) pixels.
+    const resized = transformAnnotation(
+      box,
+      { x: 400, y: 275, scaleX: 2, scaleY: 3, rotation: 0 },
+      PHOTO,
+    );
+    expect(resized).toEqual({ ...box, x: 0.2, y: 0.4, w: 0.4, h: 0.3 });
+    expect(resized).not.toHaveProperty('rotation');
+  });
+
+  it('turns a box or an ellipse about its centre, which stays put', () => {
+    const ellipse: Annotation = { kind: 'ellipse', x: 0.2, y: 0.4, w: 0.2, h: 0.1, color: RED };
+    expect(transformAnnotation(ellipse, frame(300, 225, 1, 30), PHOTO)).toEqual({
+      ...ellipse,
+      rotation: 30,
+    });
+    // Turned back to straight, it stores no turn again.
+    expect(
+      transformAnnotation({ ...ellipse, rotation: 30 }, frame(300, 225, 1, 360), PHOTO),
+    ).toEqual(ellipse);
+  });
+
+  it('turns and scales a freehand line’s points into place', () => {
     const stroke: Annotation = { kind: 'freehand', points: [0.1, 0.1, 0.3, 0.2], color: RED };
-    expect(transformAnnotation(stroke, { x: 0.05, y: 0, scaleX: 0.5, scaleY: 0.5 })).toEqual({
+    // Halved and moved 50 px right.
+    expect(transformAnnotation(stroke, frame(50, 0, 0.5), PHOTO)).toEqual({
       ...stroke,
       points: [0.1, 0.05, 0.2, 0.1],
     });
+    // A quarter turn clockwise about its origin, moved to (500, 0): (100, 50) → (450, 100).
+    expect(transformAnnotation(stroke, frame(500, 0, 1, 90), PHOTO)).toEqual({
+      ...stroke,
+      points: [0.45, 0.2, 0.4, 0.6],
+    });
   });
 
-  it('makes a label’s text bigger with its height', () => {
+  it('makes a label’s text bigger with its height, and turns it about its corner', () => {
     const label: Annotation = {
       kind: 'text',
       x: 0.5,
@@ -317,23 +347,79 @@ describe('transformAnnotation', () => {
       size: 0.04,
       color: RED,
     };
-    expect(transformAnnotation(label, { x: -0.25, y: -0.25, scaleX: 1.5, scaleY: 1.5 })).toEqual({
+    expect(transformAnnotation(label, frame(250, 125, 1.5, -30), PHOTO)).toEqual({
       ...label,
-      x: 0.5,
-      y: 0.5,
+      x: 0.25,
+      y: 0.25,
       size: 0.06,
+      rotation: -30,
     });
   });
 
-  it('keeps the result on the photo, rounded', () => {
+  it('keeps an unturned box on the photo, rounded', () => {
     const box: Annotation = { kind: 'ellipse', x: 0.6, y: 0.6, w: 0.3, h: 0.3, color: RED };
-    const resized = transformAnnotation(box, { x: 0.0001, y: 0, scaleX: 1.5, scaleY: 1 / 3 });
-    expect(resized).toEqual({ ...box, x: 0.9001, y: 0.2, w: 0.0999, h: 0.1 });
+    expect(transformAnnotation(box, frame(900, 250, 1.5), PHOTO)).toEqual({
+      ...box,
+      x: 0.675,
+      y: 0.275,
+      w: 0.325,
+      h: 0.45,
+    });
   });
 
   it('treats a broken scale as none', () => {
     const box: Annotation = { kind: 'rect', x: 0.2, y: 0.2, w: 0.2, h: 0.2, color: RED };
-    expect(transformAnnotation(box, { x: 0, y: 0, scaleX: Infinity, scaleY: NaN })).toEqual(box);
+    expect(
+      transformAnnotation(
+        box,
+        { x: 300, y: 150, scaleX: Infinity, scaleY: NaN, rotation: 0 },
+        PHOTO,
+      ),
+    ).toEqual(box);
+  });
+});
+
+describe('normalRotation', () => {
+  it('keeps a turn between -180 and 180, to a tenth of a degree', () => {
+    expect(normalRotation(30)).toBe(30);
+    expect(normalRotation(190)).toBe(-170);
+    expect(normalRotation(-190)).toBe(170);
+    expect(normalRotation(-180)).toBe(180);
+    expect(normalRotation(45.06)).toBe(45.1);
+  });
+
+  it('makes a full turn, almost none or nonsense no turn', () => {
+    expect(normalRotation(360)).toBe(0);
+    expect(normalRotation(-0.04)).toBe(0);
+    expect(Object.is(normalRotation(-0.04), 0)).toBe(true);
+    expect(normalRotation(NaN)).toBe(0);
+  });
+});
+
+describe('the bounds of a turned mark', () => {
+  // A square box in the middle of a photo twice as wide as it is high (0.2 × 0.2 of the photo:
+  // 0.4 × 0.2 on screen).
+  const box = { x: 0.4, y: 0.4, w: 0.2, h: 0.2, color: RED };
+
+  it('reaches as far as its turned corners, on the photo’s own shape', () => {
+    const upright: Annotation = { kind: 'rect', ...box, rotation: 90 };
+    const bounds = annotationBounds(upright, 2);
+    expect(bounds.x0).toBeCloseTo(0.45);
+    expect(bounds.x1).toBeCloseTo(0.55);
+    expect(bounds.y0).toBeCloseTo(0.3);
+    expect(bounds.y1).toBeCloseTo(0.7);
+  });
+
+  it('reaches less far for an ellipse than for its box when turned part way', () => {
+    const rect = annotationBounds({ kind: 'rect', ...box, rotation: 45 }, 2);
+    const ellipse = annotationBounds({ kind: 'ellipse', ...box, rotation: 45 }, 2);
+    expect(ellipse.x0).toBeGreaterThan(rect.x0);
+    expect(ellipse.y1).toBeLessThan(rect.y1);
+  });
+
+  it('is moved only as far as the photo goes', () => {
+    const upright: Annotation = { kind: 'rect', ...box, rotation: 90 };
+    expect(moveAnnotation(upright, 0, 0.5, 2)).toEqual({ ...upright, y: 0.7 });
   });
 });
 
@@ -369,6 +455,23 @@ describe('limitBox', () => {
       ...thin,
       width: 300,
     });
+  });
+
+  it('lets a box turn while its corners stay on the photo', () => {
+    const turning = { ...OLD, rotation: 0.3 };
+    expect(limitBox(OLD, turning, AREA, false)).toEqual(turning);
+    expect(limitBox(turning, { ...turning, width: 300 }, AREA, true)).toEqual({
+      ...turning,
+      width: 300,
+    });
+  });
+
+  it('stops a turn or a turned resize that would take a corner off the photo', () => {
+    const atTop = { ...OLD, y: 10 };
+    expect(limitBox(atTop, { ...atTop, rotation: -0.5 }, AREA, false)).toEqual(atTop);
+    const turned = { ...OLD, rotation: 0.3 };
+    expect(limitBox(turned, { ...turned, width: 2000 }, AREA, false)).toEqual(turned);
+    expect(limitBox(turned, { ...turned, height: MIN_BOX_PX - 1 }, AREA, false)).toEqual(turned);
   });
 
   it('keeps the old box whole when a box with its ratio kept would leave the photo', () => {

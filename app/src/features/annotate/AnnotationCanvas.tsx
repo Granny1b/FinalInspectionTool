@@ -46,13 +46,24 @@ const HIT_PX = 24;
 const SELECTION_COLOR = '#0b7db3';
 
 /**
- * The selection's handles in screen pixels: a square on each corner and side of a box, a dot on
- * each end of an arrow. Larger for a finger than for a mouse, and easier to hit than they look.
+ * The selection's handles in screen pixels: a square on each corner and side of a box and a round
+ * one to turn it, a dot on each end of an arrow. Larger for a finger than for a mouse, and easier
+ * to hit than they look. The turning handle sits `turnOffset` out from the box.
  */
 const HANDLES = {
-  fine: { size: 10, hitStroke: 10, radius: 6, hitRadius: 12 },
-  coarse: { size: 16, hitStroke: 24, radius: 9, hitRadius: 24 },
+  fine: { size: 10, hitStroke: 10, radius: 6, hitRadius: 12, turnOffset: 24 },
+  coarse: { size: 16, hitStroke: 24, radius: 9, hitRadius: 24, turnOffset: 34 },
 } as const;
+
+/** A turn snaps to straight and to every 45° within 5°, so a mark is easily put straight again. */
+const TURN_SNAPS = [0, 45, 90, 135, 180, 225, 270, 315];
+const TURN_SNAP_TOLERANCE = 5;
+/**
+ * Where the turning handle goes, in this order (degrees from the top of the mark): above it,
+ * else below, right or left, the first that is on the photo, so a mark at the top edge can still
+ * be turned.
+ */
+const TURN_HANDLE_PLACES = [0, 180, 90, 270];
 
 const CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const CORNERS_AND_SIDES = [
@@ -68,7 +79,7 @@ type ArrowMark = Extract<Annotation, { kind: 'arrow' }>;
 /**
  * How each kind of mark is resized by its handles. Boxes and circles by any side or corner; a
  * label and a freehand line by their corners keeping their proportions, so text and handwriting
- * never stretch. An arrow has a handle on each end instead.
+ * never stretch. All of them turn. An arrow has a handle on each end instead (which turns it).
  */
 const RESIZING: Record<
   Exclude<Annotation['kind'], 'arrow'>,
@@ -123,7 +134,7 @@ type Props = {
 
 /**
  * The photo with its marks. A press on a mark picks it with any tool: dragging moves it, kept on
- * the photo, and the selected mark has handles to resize it (an arrow, one on each end). Drawing
+ * the photo, and the selected mark has handles to resize and turn it (an arrow, one on each end). Drawing
  * tools only pick a mark by its line, so a box can still be drawn inside another; the select tool
  * also picks a box or circle by its inside. A press anywhere else clears the selection and, with
  * a drawing tool, draws the next mark (mouse, finger or pen). Pointer positions become fractions
@@ -158,6 +169,8 @@ export function AnnotationCanvas({
   const stage = useRef<KonvaStage>(null);
   const transformer = useRef<KonvaTransformer>(null);
   const groups = useRef(new Map<number, KonvaGroup>());
+  /** The handles are turning the mark, not resizing it. */
+  const turning = useRef(false);
   const selecting = tool === 'select' && !disabled;
   const scale = { x: shown.width / size.width, y: shown.height / size.height };
   const hiddenId = text?.id ?? null;
@@ -174,12 +187,26 @@ export function AnnotationCanvas({
         : selected.annotation
       : null;
 
-  // The handles follow the selected mark, also after it moved or changed. An arrow has its own.
+  // The handles follow the selected mark, also after it moved or changed. They hold its shapes
+  // (its dark outline, if it has one, and the mark), not its group, so they turn with it. An
+  // arrow has its own.
   const handled = resizing ? selected?.id : undefined;
   useEffect(() => {
-    const node = handled === undefined ? undefined : groups.current.get(handled);
-    transformer.current?.nodes(node ? [node] : []);
-    transformer.current?.forceUpdate();
+    const tr = transformer.current;
+    if (!tr) return;
+    const group = handled === undefined ? undefined : groups.current.get(handled);
+    tr.nodes(group ? group.getChildren().slice() : []);
+    if (!group) return;
+    // The turning handle where it is on the photo, so it can be reached.
+    const room = { x0: 0, y0: 0, x1: shown.width, y1: shown.height };
+    for (const angle of TURN_HANDLE_PLACES) {
+      tr.rotateAnchorAngle(angle);
+      tr.forceUpdate();
+      const at = tr.findOne('.rotater')?.getAbsolutePosition();
+      if (at && at.x >= room.x0 && at.x <= room.x1 && at.y >= room.y0 && at.y <= room.y1) return;
+    }
+    tr.rotateAnchorAngle(TURN_HANDLE_PLACES[0]!);
+    tr.forceUpdate();
   }, [handled, items, shown]);
 
   function position(event: PointerEvent<HTMLElement>): Point {
@@ -293,7 +320,7 @@ export function AnnotationCanvas({
   /** Keeps a dragged mark on the photo (positions in screen pixels). */
   function boundMove(annotation: Annotation, target: Vector2d): Vector2d {
     const move = clampMove(
-      annotationBounds(annotation),
+      annotationBounds(annotation, size.width / size.height),
       target.x / shown.width,
       target.y / shown.height,
     );
@@ -301,20 +328,31 @@ export function AnnotationCanvas({
   }
 
   /**
-   * A resize is done: the group was scaled and moved as a whole. Store that in the annotation's
-   * own coordinates and put the group back, as after a drag.
+   * A resize or turn is done: the handles scaled, turned and moved the mark's shapes. Store that
+   * in the annotation's own coordinates and draw the shapes from it again, unscaled, so the line
+   * keeps its width.
    */
   function onTransformEnd() {
-    const node = transformer.current?.nodes()[0];
-    if (!node || !selected) return;
-    const resized = transformAnnotation(selected.annotation, {
-      x: node.x() / size.width,
-      y: node.y() / size.height,
-      scaleX: node.scaleX(),
-      scaleY: node.scaleY(),
-    });
-    node.setAttrs({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
-    onReshape(selected.id, resized);
+    const nodes = transformer.current?.nodes() ?? [];
+    const mark = nodes.at(-1);
+    if (!mark || !selected) return;
+    // Konva's turn leaves crumbs in the scale (a box 0.05 % smaller): a turn keeps the size.
+    const changed = transformAnnotation(
+      selected.annotation,
+      {
+        x: mark.x(),
+        y: mark.y(),
+        scaleX: turning.current ? 1 : mark.scaleX(),
+        scaleY: turning.current ? 1 : mark.scaleY(),
+        rotation: mark.rotation(),
+      },
+      size,
+    );
+    const specs = shapeSpecs(changed, size);
+    nodes.forEach((node, index) =>
+      node.setAttrs({ ...specs[index]?.config, scaleX: 1, scaleY: 1 }),
+    );
+    onReshape(selected.id, changed);
   }
 
   /** Back from typing a label: the keys go to the editor again. */
@@ -407,12 +445,18 @@ export function AnnotationCanvas({
             resizeEnabled={Boolean(resizing)}
             enabledAnchors={resizing?.anchors ?? []}
             keepRatio={resizing?.keepRatio ?? false}
-            rotateEnabled={false}
+            rotateEnabled={Boolean(resizing)}
+            rotationSnaps={TURN_SNAPS}
+            rotationSnapTolerance={TURN_SNAP_TOLERANCE}
+            rotateAnchorOffset={handles.turnOffset}
             flipEnabled={false}
             // Handles on the mark's outline, not its line's outer edge: a box including the line
             // would scale the outline by a little less than the handle moved.
             ignoreStroke
             boundBoxFunc={(old, next) => limitBox(old, next, shown, resizing?.keepRatio ?? false)}
+            onTransformStart={() => {
+              turning.current = transformer.current?.getActiveAnchor() === 'rotater';
+            }}
             onTransformEnd={onTransformEnd}
             borderStroke={SELECTION_COLOR}
             borderStrokeWidth={1.5}
@@ -423,7 +467,11 @@ export function AnnotationCanvas({
             anchorStrokeWidth={1.5}
             anchorFill="#ffffff"
             anchorCornerRadius={2}
-            anchorStyleFunc={(anchor: KonvaRect) => anchor.hitStrokeWidth(handles.hitStroke)}
+            anchorStyleFunc={(anchor: KonvaRect) => {
+              anchor.hitStrokeWidth(handles.hitStroke);
+              // The turning handle is round, the others square.
+              if (anchor.hasName('rotater')) anchor.cornerRadius(handles.size / 2);
+            }}
           />
           {shownArrow &&
             (['tail', 'tip'] as const).map((end) => {

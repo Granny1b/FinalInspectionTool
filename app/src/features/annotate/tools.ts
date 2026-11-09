@@ -28,10 +28,10 @@ export const TOOL_HINTS: Record<Tool, string> = {
 /** The line under the photo while a mark is selected: what its handles do. */
 export const SELECTED_HINTS: Record<Annotation['kind'], string> = {
   arrow: 'Drag the arrow to move it, or a dot to move that end.',
-  rect: 'Drag the box to move it, or a handle to resize it.',
-  ellipse: 'Drag the circle to move it, or a handle to resize it.',
-  text: 'Drag the label to move it, or a corner to resize it. Double-click to change the text.',
-  freehand: 'Drag the line to move it, or a corner to resize it.',
+  rect: 'Drag the box to move it, a square handle to resize it, the round one to turn it.',
+  ellipse: 'Drag the circle to move it, a square handle to resize it, the round one to turn it.',
+  text: 'Drag the label to move it, a corner to resize it, the round handle to turn it. Double-click to change the text.',
+  freehand: 'Drag the line to move it, a corner to resize it, the round handle to turn it.',
 };
 
 /** The colours in the order the picker shows them: brief §5.4's four, with green after red. */

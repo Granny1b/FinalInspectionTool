@@ -47,16 +47,44 @@ describe('shapeSpec', () => {
     });
   });
 
-  it('draws a rectangle from its corner and size', () => {
+  it('draws a rectangle of its size, placed by its centre', () => {
     const spec = shapeSpec(
       { kind: 'rect', x: 0.25, y: 0.5, w: 0.5, h: 0.25, color: ANNOTATION_COLORS.cyan },
       PHOTO,
     );
     expect(spec).toMatchObject({
       type: 'Rect',
-      config: { x: 400, y: 600, width: 800, height: 300, stroke: ANNOTATION_COLORS.cyan },
+      config: {
+        x: 800,
+        y: 750,
+        width: 800,
+        height: 300,
+        offsetX: 400,
+        offsetY: 150,
+        rotation: 0,
+        stroke: ANNOTATION_COLORS.cyan,
+      },
     });
     expect(spec.config.fill).toBeUndefined();
+  });
+
+  it('turns a box and an ellipse about their centre, a label about its corner', () => {
+    const box = { x: 0.25, y: 0.5, w: 0.5, h: 0.25, color: RED, rotation: 30 };
+    expect(shapeSpec({ kind: 'rect', ...box }, PHOTO).config).toMatchObject({
+      x: 800,
+      y: 750,
+      rotation: 30,
+    });
+    expect(shapeSpec({ kind: 'ellipse', ...box }, PHOTO).config).toMatchObject({
+      x: 800,
+      y: 750,
+      rotation: 30,
+    });
+    const label = shapeSpec(
+      { kind: 'text', x: 0.5, y: 0.25, text: 'Burr', color: RED, size: 0.05, rotation: -90 },
+      PHOTO,
+    );
+    expect(label.config).toMatchObject({ x: 800, y: 300, rotation: -90 });
   });
 
   it('draws an ellipse inside its box (Konva places it by its centre)', () => {

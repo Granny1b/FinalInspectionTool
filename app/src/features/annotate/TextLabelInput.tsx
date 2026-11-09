@@ -40,6 +40,9 @@ export function TextLabelInput({ draft, shown, onChange, onCommit, onDone }: Pro
         top: draft.at.y * shown.height,
         fontSize: draft.size * shown.height,
         color: draft.color,
+        // A turned label is typed turned, about its corner as it is drawn.
+        transform: draft.rotation ? `rotate(${draft.rotation}deg)` : undefined,
+        transformOrigin: 'top left',
       }}
       className="absolute m-0 [field-sizing:content] min-w-[4ch] rounded-xs border-0 bg-scrim/25 p-0 leading-[1.1] font-bold outline-2 outline-offset-4 outline-white/90 outline-dashed [text-shadow:0_0_3px_rgb(0_0_0/0.9)]"
     />
