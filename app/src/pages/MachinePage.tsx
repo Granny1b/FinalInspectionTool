@@ -9,6 +9,7 @@ import { Callout } from '../components/Callout';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { LoadError, PageLoading } from '../components/PageStates';
+import { DeleteInspectionDialog } from '../features/inspections/DeleteInspectionDialog';
 import { useInspections } from '../features/inspections/queries';
 import { CheckSection } from '../features/machines/MachineChecks';
 import {
@@ -78,7 +79,9 @@ type Dialog =
   | { kind: 'link' }
   | { kind: 'delete' }
   | { kind: 'update'; check: MachineCheck }
-  | { kind: 'remove'; check: MachineCheck };
+  | { kind: 'remove'; check: MachineCheck }
+  /** A started check, deleted with what was recorded on it (admins). */
+  | { kind: 'delete-check'; check: MachineCheck };
 
 function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => void }) {
   const { machine, checks } = loaded.detail;
@@ -111,7 +114,10 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
     nextId: nextCheck(checks),
     onStart: flow.start,
     onUpdate: (check: MachineCheck) => setDialog({ kind: 'update', check }),
-    onRemove: (check: MachineCheck) => setDialog({ kind: 'remove', check }),
+    onRemove: (check: MachineCheck) => {
+      remove.reset();
+      setDialog({ kind: check.state === 'not_started' ? 'remove' : 'delete-check', check });
+    },
   };
 
   return (
@@ -260,6 +266,31 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
             });
           }}
           onCancel={closeDialog}
+        />
+      )}
+      {dialog?.kind === 'delete-check' && (
+        <DeleteInspectionDialog
+          kind={dialog.check.kind}
+          number={dialog.check.number ?? checkTitle(dialog.check)}
+          machine={machine.machineName}
+          finalised={dialog.check.state === 'finalised'}
+          busy={remove.isPending}
+          error={remove.error}
+          onDelete={() => {
+            const check = dialog.check;
+            remove.mutate(check.id, {
+              onSuccess: () => {
+                closeDialog();
+                setNotice(`${check.number ?? checkTitle(check)} was deleted.`);
+              },
+            });
+          }}
+          // It is read just before it is deleted, so only a save in that instant gets here.
+          onReload={() => {
+            closeDialog();
+            onReload();
+          }}
+          onClose={closeDialog}
         />
       )}
       {dialog?.kind === 'delete' && (

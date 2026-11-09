@@ -218,8 +218,10 @@ where the app opens.
   **Final inspection**, a card each: its state (_Not started_, _In progress_ with the rows filled,
   _Finalised_), number, deviations open and closed (a link to them), where its copy came from
   ("Based on Pre start up rev 3 · 2 rows added, 1 removed") and **Start** or **Open**. The next
-  check to do has the blue Start. Admins also get each check's ⋯ (**Edit checklist**, **Remove
-  from machine** for one not started) and, when its template has a newer published revision,
+  check to do has the blue Start. Admins also get each check's ⋯ (**Edit checklist**; **Remove
+  from machine** for one not started; **Delete quality check** or **Delete final inspection** for
+  one started or finalised, after asking: what was recorded on it goes too, and **Add check**
+  can add it again as a new copy) and, when its template has a newer published revision,
   "Rev 4 available · this machine has rev 3" with **Update…**.
 - **Start** gives the check its number (`QC-2026-0004`, `FI-2026-0042`) and fills in its front
   page from the machine: Machine ID, model and serial number, today's date, and you as Checked by

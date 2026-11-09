@@ -3719,3 +3719,21 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
   cards, so no "per page" choice. In the menus between Entire report and Only deviations.
 - The modes are `report | checklist | deviations | instructions`; `checklist` leaves the model's
   `deviations` as `{ kind: 'none' }`, as a checklist printout's blank form has it.
+
+## Machines: admins delete a started check from the machine's page (2026-11-09)
+
+- **Asked for:** delete quality checks assigned to a machine even when started, asking first,
+  admins only.
+- **The check's ⋯ on the machine's page has Delete quality check** (Delete final inspection for
+  the final inspection) once it is started or finalised; one not started keeps Remove from
+  machine. A check's own page already had its admins-only Delete; this puts it where the machine's
+  checks are managed.
+- **The same dialog and delete as on the check's page** (`DeleteInspectionDialog`,
+  `DELETE /api/inspections/{id}`, admins only on the server): "Delete QC-2026-0004?", what goes
+  (its deviation photos and records; Insights stops counting it; can't be undone), and for a
+  finalised final inspection that its report may have been sent. Cancel keeps it. The check is
+  read just before it is deleted (as Remove from machine), so only a save in that instant meets a
+  conflict, which offers Reload. Afterwards "QC-2026-0004 was deleted." and the card is gone; Add
+  check can add the quality check again, as a new copy with a new number.
+- The final inspection gets the same item: it is the machine's other check, and an admin could
+  delete it from its own page already.

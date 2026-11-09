@@ -21,7 +21,7 @@ import { basedOnText, checklistHref, checkTitle, updateAvailable, updateText } f
 
 type Props = {
   checks: readonly MachineCheck[];
-  /** Admins edit a check's checklist, update it and remove one not started. */
+  /** Admins edit a check's checklist, update it, and remove or delete it. */
   isAdmin: boolean;
   /** The check being started, if any. */
   starting: string | null;
@@ -29,6 +29,7 @@ type Props = {
   nextId?: string | null;
   onStart: (check: MachineCheck) => void;
   onUpdate: (check: MachineCheck) => void;
+  /** Remove a check not started from the machine, or delete one started (the page asks first). */
   onRemove: (check: MachineCheck) => void;
   /**
    * The machine's page (the default): admins also see an available update and each check's
@@ -113,16 +114,18 @@ function CheckCard({
               },
             ]
           : []),
-        ...(notStarted
-          ? [
-              {
-                label: 'Remove from machine',
-                icon: Trash2,
-                danger: true,
-                onSelect: () => onRemove(check),
-              },
-            ]
-          : []),
+        // Not started: off the machine (Add check brings it back). Started: deleted with what was
+        // recorded on it, after asking.
+        {
+          label: notStarted
+            ? 'Remove from machine'
+            : check.kind === 'quality'
+              ? 'Delete quality check'
+              : 'Delete final inspection',
+          icon: Trash2,
+          danger: true,
+          onSelect: () => onRemove(check),
+        },
       ]
     : [];
 
