@@ -71,3 +71,16 @@ export function savedPhoto(photo: {
       : {}),
   };
 }
+
+/**
+ * Each photo's key while the list is reordered: its image id, which a photo keeps when it is
+ * moved or marked up again ("#2" after a repeat, which only hand-made data could have).
+ */
+export function photoKeys(photos: readonly AnnotatedImage[]): string[] {
+  const seen = new Map<string, number>();
+  return photos.map(({ imageId }) => {
+    const count = (seen.get(imageId) ?? 0) + 1;
+    seen.set(imageId, count);
+    return count === 1 ? imageId : `${imageId}#${count}`;
+  });
+}

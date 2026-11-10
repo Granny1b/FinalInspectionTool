@@ -3737,3 +3737,26 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
   check can add the quality check again, as a new copy with a new number.
 - The final inspection gets the same item: it is the machine's other check, and an admin could
   delete it from its own page already.
+
+## Guides: dragging pictures into order (2026-11-10)
+
+- **Asked for:** drag pictures to change their order when building checks (the quality check's
+  Pictures dialog; final inspection guides share it).
+- **A handle per picture (⠿, top left, opposite the ×),** not the whole tile: a click on a picture
+  still opens it for drawing, and its verdict and caption stay plain controls. The handle moves
+  the picture with a mouse or a finger (`touch-action: none` on it, 4 px before a drag starts) or
+  with the keys (Space, arrows, Space; Escape cancels), as the checklist's rows move. Its verdict
+  and caption go with it. Shown only with two pictures or more.
+- **`AnnotatedPhotos` takes `reorderable`**, which only the guide editor sets: a deviation has at
+  most two photos, and their order has no meaning there. Tiles are keyed by image id while
+  sortable (`photoKeys`), so a moved tile keeps its inputs.
+- **The keys stay with the move inside the dialog.** The guide editor stops every key at its edge
+  (nothing behind a modal reacts to its keys), which also stopped them reaching dnd-kit, which
+  listens on the document. While a picture is moved, the list's root carries `data-sorting`, set
+  the moment the move starts (not after React re-renders, which was too late for the next key),
+  and the dialog lets those keys through: Escape then cancels the move, not the dialog.
+- **Announcements are made inside the dialog** (dnd-kit's live region in the list, not at the end
+  of `<body>`): a modal dialog hides everything outside it from screen readers. They name places:
+  "Picture 3 is over place 1 of 3."
+- The dragged picture is lifted on the dialog's background with a ring and a shadow, so the tile
+  under it doesn't show through.

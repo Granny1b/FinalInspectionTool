@@ -85,6 +85,9 @@ export function GuideEditor({
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDialogElement>) {
+    // While a picture is being moved with the keys, they are the move's (dnd-kit listens on the
+    // document): Escape cancels the move, not this dialog.
+    if (event.target instanceof Element && event.target.closest('[data-sorting]')) return;
     // Nothing behind the modal reacts to its keys.
     event.stopPropagation();
     // Escape is this dialog's only when it comes from its own content: the dialogs it opens
@@ -170,6 +173,7 @@ export function GuideEditor({
               noun={wording.noun}
               layout="grid"
               acceptAnywhere
+              reorderable
               onDirtyChange={setPhotoDirty}
               renderDetails={(_photo, index) => {
                 const image = draft.images[index];

@@ -470,3 +470,92 @@ test('leaving the template editor while the guide editor has changes asks first'
     (await savedDraft(page.request, template.id)).sections[0]!.items[1]!.guide,
   ).toBeUndefined();
 });
+
+test('an admin changes the order of a guide’s images by dragging them, or with the keys', async ({
+  page,
+  context,
+  browser,
+  templates,
+}) => {
+  await signIn(context, ADMIN, ['admin']);
+  const upload = async (label: string) =>
+    uploadPhoto(page.request, await testPhoto(browser, { width: 1200, height: 900, label }));
+  const [first, second, third] = await Promise.all(['First', 'Second', 'Third'].map(upload));
+  const guide: Guide = {
+    images: [
+      { imageId: first!, caption: 'First', annotations: [], verdict: 'good' },
+      { imageId: second!, caption: 'Second', annotations: [], verdict: 'bad' },
+      { imageId: third!, caption: 'Third', annotations: [], verdict: 'info' },
+    ],
+  };
+  const template = templates(
+    await createTemplate('E2E guides – order', false, { sections: checklist(guide) }),
+  );
+  const row = template.sections[0]!.items[1]!;
+  await page.goto(`/templates/${template.id}`);
+  await page.locator(`#row-${row.id}`).hover();
+  await page.getByRole('button', { name: 'Edit guide, row 1.b' }).click();
+  const dialog = guideEditor(page);
+  const captions = async () =>
+    Promise.all(
+      [1, 2, 3].map((n) =>
+        dialog.getByRole('textbox', { name: `Caption, image ${n}` }).inputValue(),
+      ),
+    );
+  await expect.poll(captions).toEqual(['First', 'Second', 'Third']);
+
+  // The third dragged by its handle onto the first: it goes first, with its verdict and caption.
+  // Exactly: "Remove image 3" holds "move image 3" too.
+  const handle = (n: number) =>
+    dialog.getByRole('button', { name: `Move image ${n}`, exact: true });
+  const from = (await handle(3).boundingBox())!;
+  const to = (await dialog.getByRole('button', { name: /^Edit image 1/ }).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 15 });
+  await page.mouse.up();
+  await expect.poll(captions).toEqual(['Third', 'First', 'Second']);
+  await expect(
+    dialog.getByRole('group', { name: 'Verdict, image 1' }).getByRole('radio', { name: 'Info' }),
+  ).toBeChecked();
+
+  // With the keys: Space on a handle, an arrow, Space; each once the last is announced (the
+  // move measures the tiles first). Escape cancels a move, and only the move.
+  // In the dialog: outside it, a modal dialog hides everything from screen readers.
+  const announced = dialog.locator('[id^="DndLiveRegion"]');
+  await handle(1).focus();
+  await page.keyboard.press('Space');
+  await expect(announced).toHaveText('Image 1 is over place 1 of 3.');
+  // dnd-kit listens for the arrows from its next tick on.
+  await nextFrames(page);
+  await page.keyboard.press('ArrowRight');
+  await expect(announced).toHaveText('Image 1 is over place 2 of 3.');
+  await page.keyboard.press('Space');
+  await expect(announced).toHaveText('Image 1 moved to place 2 of 3.');
+  await expect.poll(captions).toEqual(['First', 'Third', 'Second']);
+  await handle(3).focus();
+  await page.keyboard.press('Space');
+  await expect(announced).toHaveText('Image 3 is over place 3 of 3.');
+  await nextFrames(page);
+  await page.keyboard.press('ArrowLeft');
+  await expect(announced).toHaveText('Image 3 is over place 2 of 3.');
+  await page.keyboard.press('Escape');
+  await expect(announced).toHaveText('Moving cancelled. Image 3 is back in its place.');
+  await expect(dialog).toBeVisible();
+  await expect.poll(captions).toEqual(['First', 'Third', 'Second']);
+
+  // Saved in that order, each image with its own verdict.
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+  await expect
+    .poll(async () =>
+      (await savedDraft(page.request, template.id)).sections[0]!.items[1]!.guide?.images.map(
+        (image) => [image.caption, image.verdict],
+      ),
+    )
+    .toEqual([
+      ['First', 'good'],
+      ['Third', 'info'],
+      ['Second', 'bad'],
+    ]);
+});

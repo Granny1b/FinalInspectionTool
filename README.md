@@ -683,7 +683,11 @@ and drawn on with arrows, boxes and labels in the same editor as deviation photo
   on the dialog, also while typing. Text pasted into the description or a caption stays text, also
   when it comes from Excel or Word with a picture of itself. A new image opens in the photo editor straight away; a click
   on an image opens it again, its **×** removes it (after asking). Under each image: Good / Bad /
-  Info (a new one starts as Info, saying nothing until it is marked) and its caption.
+  Info (a new one starts as Info, saying nothing until it is marked) and its caption. Its **⠿**
+  (top left) drags it to another place, verdict and caption with it, with a mouse or a finger;
+  with the keyboard, `Space` on the ⠿, the arrow keys, `Space` to drop (`Esc` cancels the move,
+  not the dialog). The order is the order inspectors see and that prints. A quality check's
+  pictures work the same way.
 - **Saving.** **Save** puts the guide into the draft, which saves itself like any other change.
   **Cancel** or `Esc` asks before discarding changes, and so does leaving the page while the
   guide editor has changes. **Remove guide** (after asking) takes the guide off the row. A guide

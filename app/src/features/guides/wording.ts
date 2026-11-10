@@ -38,7 +38,7 @@ export const FINAL_GUIDE_WORDING: GuideWording = {
     'What good looks like, e.g. “Every screw has an unbroken paint mark from head to plate.”',
   imagesHeading: 'Reference images',
   imagesHint:
-    'Mark each one Good, Bad or Info. Click an image to draw arrows, boxes and labels on it. Paste or drop an image anywhere here to add it.',
+    'Mark each one Good, Bad or Info. Click an image to draw arrows, boxes and labels on it; drag its ⠿ to change the order. Paste or drop an image anywhere here to add it.',
   noun: 'image',
   listLabel: (rowRef) => `Images of the guide for ${rowRef}`,
   verdicts: GUIDE_VERDICT_LABELS,
@@ -57,7 +57,7 @@ export const QUALITY_GUIDE_WORDING: GuideWording = {
   descriptionPlaceholder: 'Where to find it, tolerances, what to do if it is wrong…',
   imagesHeading: 'Pictures',
   imagesHint:
-    'Mark each one Should look like this, Should not look like this or Info. Click a picture to draw arrows, boxes and labels on it. Paste or drop a picture anywhere here to add it.',
+    'Mark each one Should look like this, Should not look like this or Info. Click a picture to draw arrows, boxes and labels on it; drag its ⠿ to change the order. Paste or drop a picture anywhere here to add it.',
   noun: 'picture',
   listLabel: (rowRef) => `Pictures of row ${rowRef}`,
   verdicts: QUALITY_VERDICT_LABELS,

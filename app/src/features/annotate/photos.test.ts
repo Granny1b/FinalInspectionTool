@@ -1,6 +1,13 @@
 import type { AnnotatedImage, Annotation } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
-import { firstImageFile, needsRender, pastesText, savedPhoto, shownImageId } from './photos';
+import {
+  firstImageFile,
+  needsRender,
+  pastesText,
+  photoKeys,
+  savedPhoto,
+  shownImageId,
+} from './photos';
 
 const ARROW: Annotation = { kind: 'arrow', points: [0.1, 0.1, 0.5, 0.5], color: '#E02424' };
 const BOX: Annotation = { kind: 'rect', x: 0.2, y: 0.2, w: 0.3, h: 0.3, color: '#E02424' };
@@ -120,5 +127,20 @@ describe('savedPhoto', () => {
     expect(
       savedPhoto({ imageId: PHOTO_ID, caption: '', annotations: [], renderedImageId: RENDER_ID }),
     ).toEqual({ imageId: PHOTO_ID, annotations: [] });
+  });
+});
+
+describe('photoKeys', () => {
+  const photo = (imageId: string) => ({ imageId, annotations: [] });
+
+  it('keys each photo by its image id, which it keeps when moved', () => {
+    expect(photoKeys([photo('Imag000000000001'), photo('Imag000000000002')])).toEqual([
+      'Imag000000000001',
+      'Imag000000000002',
+    ]);
+  });
+
+  it('tells repeats apart', () => {
+    expect(photoKeys([photo('A'), photo('B'), photo('A')])).toEqual(['A', 'B', 'A#2']);
   });
 });
