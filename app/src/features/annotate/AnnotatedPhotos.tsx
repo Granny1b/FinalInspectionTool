@@ -1,15 +1,39 @@
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DndContextProps,
+  type DragEndEvent,
+  type KeyboardSensorOptions,
+  type PointerSensorOptions,
+  type UniqueIdentifier,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  rectSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { AnnotatedImage } from '@modig/shared';
 import clsx from 'clsx';
-import { ImageOff, ImagePlus, LoaderCircle, X } from 'lucide-react';
+import { GripVertical, ImageOff, ImagePlus, LoaderCircle, X } from 'lucide-react';
 import {
   lazy,
   Suspense,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ClipboardEvent,
+  type CSSProperties,
   type DragEvent,
   type ReactNode,
 } from 'react';
@@ -18,7 +42,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useImageUrl } from '../../lib/images';
 import type { EditorSubject } from './AnnotationEditor';
 import { EditorLoadBoundary } from './EditorLoadBoundary';
-import { canDecode, firstImageFile, pastesText, shownImageId } from './photos';
+import { canDecode, firstImageFile, pastesText, photoKeys, shownImageId } from './photos';
 import { PhotoViewer } from './PhotoViewer';
 import { startUpload } from './upload';
 
@@ -62,7 +86,17 @@ type Props = {
   acceptAnywhere?: boolean;
   /** The open editor has marks or a caption not saved yet (for the page's leave guard). */
   onDirtyChange?: (dirty: boolean) => void;
+  /**
+   * Each tile gets a handle that drags it to another place (the guide editor's pictures): with a
+   * mouse or a finger, or Space and the arrow keys. While one is moved, the list's root carries
+   * `data-sorting`, so a dialog around it leaves its keys (Escape cancels the move) alone.
+   */
+  reorderable?: boolean;
 };
+
+/** A few pixels of movement before a drag starts, so a press on a handle stays a press. */
+const POINTER_OPTIONS: PointerSensorOptions = { activationConstraint: { distance: 4 } };
+const KEYBOARD_OPTIONS: KeyboardSensorOptions = { coordinateGetter: sortableKeyboardCoordinates };
 
 /** The photo open in the editor: its place in the list (null while it is being added). */
 type Editing = { index: number | null; subject: EditorSubject };
@@ -82,6 +116,7 @@ export function AnnotatedPhotos({
   renderDetails,
   acceptAnywhere = false,
   onDirtyChange,
+  reorderable = false,
 }: Props) {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [viewing, setViewing] = useState<number | null>(null);
@@ -97,6 +132,46 @@ export function AnnotatedPhotos({
   const full = photos.length >= max;
   // Paste and drop only add photos while no dialog of this list is open.
   const accepting = editable && editing === null && removing === null;
+  // One photo has no other place to go.
+  const sortable = editable && reorderable && photos.length > 1;
+  const keys = useMemo(() => photoKeys(photos), [photos]);
+  // Set on the list's root the moment a move starts, not after React re-renders: a dialog around
+  // it must leave the very next key (an arrow, Escape) to the move.
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const setSorting = (on: boolean) => {
+    if (on) root?.setAttribute('data-sorting', '');
+    else root?.removeAttribute('data-sorting');
+  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, POINTER_OPTIONS),
+    useSensor(KeyboardSensor, KEYBOARD_OPTIONS),
+  );
+  // What a screen reader hears while a photo is moved: places, not image ids.
+  const accessibility = useMemo<DndContextProps['accessibility']>(() => {
+    const place = (id: UniqueIdentifier) => keys.indexOf(String(id)) + 1;
+    const announcements: Announcements = {
+      onDragStart: ({ active }) => `Picked up ${words.name} ${place(active.id)}.`,
+      onDragOver: ({ active, over }) =>
+        over
+          ? `${words.title} ${place(active.id)} is over place ${place(over.id)} of ${keys.length}.`
+          : `${words.title} ${place(active.id)} is not over a place.`,
+      onDragEnd: ({ active, over }) =>
+        over
+          ? `${words.title} ${place(active.id)} moved to place ${place(over.id)} of ${keys.length}.`
+          : `${words.title} ${place(active.id)} is back in its place.`,
+      onDragCancel: ({ active }) =>
+        `Moving cancelled. ${words.title} ${place(active.id)} is back in its place.`,
+    };
+    return {
+      announcements,
+      // In the list, not at the end of <body>: in a modal dialog (the guide editor) everything
+      // outside it is hidden from screen readers, announcements too.
+      container: root ?? undefined,
+      screenReaderInstructions: {
+        draggable: `To move a ${words.name}, press Space or Enter on its handle, move it with the arrow keys, then press Space or Enter to drop it, or Escape to cancel.`,
+      },
+    };
+  }, [keys, words, root]);
 
   // Fetch the editor in the background, so it opens at once when a photo is added. If that
   // fails (offline), opening it tries again and EditorLoadBoundary reports it.
@@ -207,6 +282,15 @@ export function AnnotatedPhotos({
     addRef.current?.focus();
   }
 
+  /** A photo dropped in another place: the list in its new order. */
+  function onSortEnd({ active, over }: DragEndEvent) {
+    setSorting(false);
+    const from = keys.indexOf(String(active.id));
+    const to = over ? keys.indexOf(String(over.id)) : -1;
+    if (from < 0 || to < 0 || from === to) return;
+    onChange?.(arrayMove(photos, from, to));
+  }
+
   function onDragOver(event: DragEvent<HTMLDivElement>) {
     if (!accepting || !event.dataTransfer.types.includes('Files')) return;
     event.preventDefault();
@@ -231,8 +315,27 @@ export function AnnotatedPhotos({
   }
 
   const tile = layout === 'row' ? 'w-40' : 'min-w-0';
+  const thumbnailProps = (photo: AnnotatedImage, index: number): ThumbnailProps => ({
+    photo,
+    index,
+    words,
+    className: tile,
+    action: editable ? 'Edit' : 'View',
+    onOpen: () =>
+      editable ? setEditing({ index, subject: { kind: 'stored', photo } }) : setViewing(index),
+    onRemove: editable ? () => setRemoving(index) : undefined,
+    details: renderDetails?.(photo, index),
+  });
+  const tiles = photos.map((photo, index) =>
+    sortable ? (
+      <SortableThumbnail key={keys[index]} id={keys[index]!} {...thumbnailProps(photo, index)} />
+    ) : (
+      <Thumbnail key={`${index}-${photo.imageId}`} {...thumbnailProps(photo, index)} />
+    ),
+  );
   return (
     <div
+      ref={setRoot}
       data-annotated-photos=""
       onDragEnter={onDragOver}
       onDragOver={onDragOver}
@@ -251,23 +354,22 @@ export function AnnotatedPhotos({
             : 'grid grid-cols-[repeat(auto-fill,minmax(11.5rem,1fr))] gap-x-4 gap-y-5',
         )}
       >
-        {photos.map((photo, index) => (
-          <Thumbnail
-            key={`${index}-${photo.imageId}`}
-            photo={photo}
-            index={index}
-            words={words}
-            className={tile}
-            action={editable ? 'Edit' : 'View'}
-            onOpen={() =>
-              editable
-                ? setEditing({ index, subject: { kind: 'stored', photo } })
-                : setViewing(index)
-            }
-            onRemove={editable ? () => setRemoving(index) : undefined}
-            details={renderDetails?.(photo, index)}
-          />
-        ))}
+        {sortable ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            accessibility={accessibility}
+            onDragStart={() => setSorting(true)}
+            onDragEnd={onSortEnd}
+            onDragCancel={() => setSorting(false)}
+          >
+            <SortableContext items={keys} strategy={rectSortingStrategy}>
+              {tiles}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          tiles
+        )}
         {editable && !full && (
           <li className={tile}>
             <button
@@ -351,6 +453,34 @@ export function AnnotatedPhotos({
   );
 }
 
+/** A tile that can be dragged to another place by its handle. */
+function SortableThumbnail({ id, ...props }: ThumbnailProps & { id: string }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+  return (
+    <Thumbnail
+      {...props}
+      tileRef={setNodeRef}
+      // Lifted over the others while it moves.
+      tileStyle={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        ...(isDragging && { position: 'relative', zIndex: 10 }),
+      }}
+      dragging={isDragging}
+      handleRef={setActivatorNodeRef}
+      handleProps={{ ...attributes, ...listeners }}
+    />
+  );
+}
+
 type ThumbnailProps = {
   photo: AnnotatedImage;
   index: number;
@@ -361,6 +491,13 @@ type ThumbnailProps = {
   onRemove?: () => void;
   /** Replaces the caption under the tile. */
   details: ReactNode;
+  /** In a list that can be reordered (SortableThumbnail): the tile's place and its handle. */
+  tileRef?: (node: HTMLElement | null) => void;
+  tileStyle?: CSSProperties;
+  dragging?: boolean;
+  handleRef?: (node: HTMLElement | null) => void;
+  /** Present when the tile can be moved: it then has a drag handle. */
+  handleProps?: Record<string, unknown>;
 };
 
 /** A photo as a 4:3 tile (its flattened copy when it has marks), with its caption under it. */
@@ -373,11 +510,24 @@ function Thumbnail({
   onOpen,
   onRemove,
   details,
+  tileRef,
+  tileStyle,
+  dragging = false,
+  handleRef,
+  handleProps,
 }: ThumbnailProps) {
   const url = useImageUrl(shownImageId(photo));
   const name = `${action} ${words.name} ${index + 1}`;
   return (
-    <li className={className} data-photo={index}>
+    <li
+      ref={tileRef}
+      style={tileStyle}
+      className={clsx(
+        className,
+        dragging && 'rounded-md bg-overlay shadow-lg ring-2 ring-brand-500',
+      )}
+      data-photo={index}
+    >
       <div className="relative">
         <button
           type="button"
@@ -401,6 +551,20 @@ function Thumbnail({
             <LoaderCircle size={18} aria-hidden="true" className="animate-spin text-ink-400" />
           )}
         </button>
+        {handleProps && (
+          // Top left, as the remove button is top right. Not draggable as a whole, so a click on
+          // the photo still opens it and its verdict and caption stay usable.
+          <button
+            ref={handleRef}
+            type="button"
+            {...handleProps}
+            aria-label={`Move ${words.name} ${index + 1}`}
+            title={`Drag to move ${words.name} ${index + 1}`}
+            className="absolute top-1 left-1 flex size-7 cursor-grab touch-none items-center justify-center rounded-full bg-scrim/65 text-white transition-colors hover:bg-scrim/85 active:cursor-grabbing"
+          >
+            <GripVertical size={14} aria-hidden="true" />
+          </button>
+        )}
         {onRemove && (
           <button
             type="button"
