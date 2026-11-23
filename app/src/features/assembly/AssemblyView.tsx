@@ -13,7 +13,7 @@ import {
 } from '@modig/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, CircleCheck, LoaderCircle, Search, Undo2, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { formatDateTime } from '../../lib/format';
 import { GuideViewer } from '../guides/GuideViewer';
@@ -87,6 +87,7 @@ export function AssemblyView({ sections, issues, signing }: Props) {
       .filter((task) => task.steps.length > 0);
   }, [sections, filter, hideSigned, signOffs]);
   const filtering = isFiltering(filter) || (hideSigned && signing !== undefined);
+  const current = useCurrentTask(tasks);
   const viewing = picturesOf === null ? null : findStep(sections, picturesOf);
 
   if (sections.length === 0) {
@@ -185,6 +186,7 @@ export function AssemblyView({ sections, issues, signing }: Props) {
           sections={sections}
           filtering={filtering}
           progress={progress?.tasks}
+          currentId={current}
         />
         <div className="min-w-0">
           {tasks.map((task) => (
@@ -224,6 +226,45 @@ export function AssemblyView({ sections, issues, signing }: Props) {
       )}
     </>
   );
+}
+
+/** How far below the top of the window a task's heading counts as reached (the sticky headers). */
+const READING_LINE = 140;
+
+/**
+ * The task being read: the last one whose heading has reached the top of the window, or the
+ * first while none has. Followed as anything scrolls (the page, or a container around it).
+ */
+function useCurrentTask(tasks: readonly ShownTask[]): string | null {
+  const [current, setCurrent] = useState<string | null>(null);
+  const idsKey = tasks.map((task) => task.section.id).join(' ');
+  useEffect(() => {
+    const ids = idsKey ? idsKey.split(' ') : [];
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      let reached: string | null = ids[0] ?? null;
+      for (const id of ids) {
+        const element = document.getElementById(`section-${id}`);
+        if (element && element.getBoundingClientRect().top <= READING_LINE) reached = id;
+      }
+      setCurrent(reached);
+    };
+    // Once per frame however many scroll events arrive.
+    const onScroll = () => {
+      frame ||= requestAnimationFrame(measure);
+    };
+    onScroll();
+    // Captured, so a scrolling container's events count too (they don't bubble).
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('scroll', onScroll, { capture: true });
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [idsKey]);
+  return current;
 }
 
 /** Asks before a whole task's remaining steps are signed in one go. */
@@ -300,13 +341,30 @@ function TaskOutline({
   sections,
   filtering,
   progress,
+  currentId,
 }: {
   tasks: ShownTask[];
   sections: Section[];
   filtering: boolean;
   /** On a machine: how far each task has come. */
   progress?: TaskProgress[] | undefined;
+  /** The task being read: the one at the top of the window. */
+  currentId: string | null;
 }) {
+  // The list scrolls on its own when it is longer than the window: the task being read is kept
+  // in sight in it, without moving the page.
+  const listRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const nav = listRef.current?.parentElement;
+    const link = currentId
+      ? listRef.current?.querySelector<HTMLElement>(`[data-task-link="${CSS.escape(currentId)}"]`)
+      : null;
+    if (!nav || !link || nav.scrollHeight <= nav.clientHeight) return;
+    const box = nav.getBoundingClientRect();
+    const at = link.getBoundingClientRect();
+    if (at.top < box.top) nav.scrollTop -= box.top - at.top + 8;
+    else if (at.bottom > box.bottom) nav.scrollTop += at.bottom - box.bottom + 8;
+  }, [currentId]);
   const of = (sectionId: string) => progress?.find((entry) => entry.sectionId === sectionId);
   return (
     <nav
@@ -319,12 +377,23 @@ function TaskOutline({
           {formatMinutes(totalMinutes(sections))}
         </span>
       </p>
-      <ol className="flex flex-wrap gap-1 @min-[60rem]:block @min-[60rem]:space-y-0.5">
+      <ol
+        ref={listRef}
+        className="flex flex-wrap gap-1 @min-[60rem]:block @min-[60rem]:space-y-0.5"
+      >
         {tasks.map(({ section, index, steps }) => (
           <li key={section.id}>
             <a
               href={`#section-${section.id}`}
-              className="max-@min-[60rem]:border max-@min-[60rem]:border-ink-200 flex items-baseline gap-2 rounded-md px-2 py-1.5 text-sm text-ink-700 transition-colors hover:bg-ink-100 hover:text-ink-900"
+              data-task-link={section.id}
+              // The task being read stands out: a filled row with a bar at its edge.
+              aria-current={section.id === currentId ? 'location' : undefined}
+              className={clsx(
+                'max-@min-[60rem]:border flex items-baseline gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                section.id === currentId
+                  ? 'max-@min-[60rem]:border-brand-600 bg-brand-50 font-semibold text-brand-800 shadow-[inset_3px_0_0_var(--color-brand-600)]'
+                  : 'max-@min-[60rem]:border-ink-200 text-ink-700 hover:bg-ink-100 hover:text-ink-900',
+              )}
             >
               {of(section.id)?.done ? (
                 <CircleCheck
@@ -340,7 +409,7 @@ function TaskOutline({
               <span
                 className={clsx(
                   'min-w-0 flex-1 truncate',
-                  of(section.id)?.done && 'font-medium text-ok-fg',
+                  of(section.id)?.done && section.id !== currentId && 'font-medium text-ok-fg',
                 )}
               >
                 {section.title || 'Untitled task'}

@@ -3897,3 +3897,17 @@ often not the signer's: they wanted a small field next to the sign-off to overri
   "Sign the whole task" signs with those.
 - **With a shared login, Undo is everyone's on that login:** a sign-off belongs to the account it
   was signed from, which is all the app can know. The initials still say who.
+
+## Assembly: the task being read is marked in the list of tasks (2026-11-23)
+
+The user wanted to see clearly, in the list on the left, which task they are in while scrolling a
+long instruction.
+
+- **The current task is the last one whose heading has passed the top of the window** (140 px
+  down, under the sticky headers), measured once per frame on any scroll (captured on the
+  document, as the page's scroller is a container). Its row in the list is filled, bold, with a
+  bar at its edge and `aria-current="location"`. In Read view and on a machine alike.
+- **The list keeps that row in sight** when it is longer than the window and scrolls on its own,
+  by moving the list's own scroll, never the page's.
+- Checked in the browser on the 363-step HHV instruction (scrolling and jumping by the links);
+  no end-to-end test, since the test instructions are too short to scroll.
