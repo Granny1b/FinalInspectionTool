@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
-import { memo, useId } from 'react';
+import { memo, useId, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ActionMenu } from '../../components/ActionMenu';
 import { Button, ButtonLink } from '../../components/Button';
@@ -240,30 +240,36 @@ type SectionProps = Omit<Props, 'checks'> & {
   checks: readonly MachineCheck[];
   /** What to say without any. */
   empty: string;
+  /** The section's id, for the page's overview to jump to. */
+  id?: string;
+  /** At the end of the heading's line: the button that adds a check of this kind. */
+  action?: ReactNode;
 };
 
 /** "Quality checks (5)" over their cards; "Final inspection" over its card. */
-export function CheckSection({ kind, checks, empty, ...props }: SectionProps) {
+export function CheckSection({ kind, checks, empty, id, action, ...props }: SectionProps) {
   const titleId = useId();
   const ofKind = checks.filter((check) => check.kind === kind);
   return (
-    <section aria-labelledby={titleId}>
-      <h2
-        id={titleId}
-        className="mb-3 flex items-center gap-2 text-base font-semibold text-ink-900"
-      >
-        {kind === 'quality' ? (
-          <>
-            Quality checks
-            <span className="text-sm font-normal text-ink-500 tabular-nums">
-              {ofKind.filter((check) => check.state === 'finalised').length} / {ofKind.length}{' '}
-              finalised
-            </span>
-          </>
-        ) : (
-          'Final inspection'
-        )}
-      </h2>
+    <section id={id} aria-labelledby={titleId} className="scroll-mt-24">
+      <div className="mb-3 flex min-h-9 flex-wrap items-center justify-between gap-2">
+        <h2 id={titleId} className="flex items-center gap-2 text-base font-semibold text-ink-900">
+          {kind === 'quality' ? (
+            <>
+              Quality checks
+              {ofKind.length > 0 && (
+                <span className="text-sm font-normal text-ink-500 tabular-nums">
+                  {ofKind.filter((check) => check.state === 'finalised').length} / {ofKind.length}{' '}
+                  finalised
+                </span>
+              )}
+            </>
+          ) : (
+            'Final inspection'
+          )}
+        </h2>
+        {action}
+      </div>
       {ofKind.length > 0 ? (
         <CheckCards checks={ofKind} {...props} />
       ) : (

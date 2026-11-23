@@ -9,10 +9,13 @@ import {
   blobNames,
   CONTAINERS,
   MachineAssemblySchema,
+  newId,
   type AssemblySignOffs,
+  type Machine,
   type MachineAssembly,
+  type Template,
 } from '@modig/shared';
-import { ConflictError, NotFoundError, PreconditionFailedError } from './http';
+import { BadRequestError, ConflictError, NotFoundError, PreconditionFailedError } from './http';
 import {
   containerClient,
   ensureStorage,
@@ -21,7 +24,7 @@ import {
   writeJson,
   type WriteConditions,
 } from './storage';
-import { loadTemplate } from './templates';
+import { loadLatestPublished, loadTemplate } from './templates';
 
 const { machineAssemblies: container } = CONTAINERS;
 
@@ -77,6 +80,50 @@ function readSignOffs(machineId: string, id: string) {
     blobNames.machineAssemblySignOffs(machineId, id),
     AssemblySignOffsSchema,
   );
+}
+
+/**
+ * The published assembly instruction a machine is to get a copy of, checked: it exists, is an
+ * assembly instruction, is published and is of the machine's model.
+ */
+export async function assemblyRevision(
+  machine: Pick<Machine, 'modelCode'>,
+  templateId: string,
+): Promise<Template> {
+  const template = await loadTemplate(templateId);
+  if (!template || template.draft.kind !== 'assembly') {
+    throw new NotFoundError('This assembly instruction does not exist.');
+  }
+  const revision = await loadLatestPublished(template);
+  if (!revision) {
+    throw new ConflictError(`Publish “${template.draft.name || 'the instruction'}” first.`);
+  }
+  if (revision.modelCode !== machine.modelCode) {
+    throw new BadRequestError(`“${revision.name}” is not an instruction of this machine's model.`);
+  }
+  return revision;
+}
+
+/** The machine's own copy of that revision, not signed yet. */
+export function newMachineAssembly(
+  machineId: string,
+  revision: Template,
+  by: string,
+): MachineAssembly {
+  const now = new Date().toISOString();
+  return {
+    id: newId(),
+    machineRef: machineId,
+    templateId: revision.id,
+    templateRevision: revision.revision,
+    name: revision.name,
+    modelCode: revision.modelCode,
+    sections: revision.sections,
+    createdAt: now,
+    createdBy: by,
+    updatedAt: now,
+    updatedBy: by,
+  };
 }
 
 /** A change that lost to another one this many times in a row gives up (503 to the caller). */

@@ -3911,3 +3911,32 @@ long instruction.
   by moving the list's own scroll, never the page's.
 - Checked in the browser on the 363-step HHV instruction (scrolling and jumping by the links);
   no end-to-end test, since the test instructions are too short to scroll.
+
+## Machines: making one and its page, a UI pass (2026-11-23)
+
+The user asked for creating a machine and a machine's page to be more logical, better designed and
+easier to follow.
+
+- **New machine is three numbered steps** (model, the machine, what it gets), with the third
+  shown as a placeholder until a model is picked, so the order is visible from the start. The
+  hints say what a field is for, not how the data model works.
+- **What the machine gets is grouped as the build goes:** Assembly, Quality checks, Final
+  inspection, each with its own label and, when the model has none published, a line saying so.
+  A quality check is listed by its name under "Quality checks" (not "Quality check – …" on every
+  line). A line under the form says what will be made ("The machine gets 1 assembly instruction
+  and 4 checks.").
+- **Assembly instructions are bound when the machine is made** (`assemblyTemplateIds` on
+  `POST /api/machines`, default none): binding was only possible afterwards, on the machine's
+  page, which made "start an HHV" two trips. Checked before anything is written, like the checks.
+- **A model with only an assembly instruction can be made a machine of.** The list of models
+  required a final inspection template, so the HHV (instruction only) was not offered at all.
+- **A machine's page starts with a build overview:** three tiles in build order with their state
+  and a jump to their section. It answers "where is this machine" before the lists below.
+- **Each section adds its own kind** (Add instruction, Add quality check, Add final inspection),
+  replacing one "Add check" in the page's header that covered two kinds and not the third. A
+  button shows only when the model has something published the machine lacks; otherwise the empty
+  section says nothing is published yet.
+- **The status badge speaks of assembly when there are no checks yet** ("In assembly", "Assembly
+  completed") instead of "No checks yet" on a machine that is being built.
+- **Not done:** the machines list has no assembly column (it would read every machine's
+  sign-offs per listing); the other pages were left as they are.

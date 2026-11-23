@@ -12,14 +12,19 @@ import { LoadError, PageLoading } from '../components/PageStates';
 import { DeleteInspectionDialog } from '../features/inspections/DeleteInspectionDialog';
 import { useInspections } from '../features/inspections/queries';
 import { MachineAssemblySection } from '../features/machineAssembly/MachineAssemblySection';
+import { useMachineAssemblies } from '../features/machineAssembly/queries';
+import { Badge } from '../features/templates/Badge';
+import { useTemplates } from '../features/templates/queries';
 import { CheckSection } from '../features/machines/MachineChecks';
 import {
   AddCheckDialog,
   EditMachineDialog,
   LinkInspectionDialog,
 } from '../features/machines/MachineDialogs';
+import { MachineOverview } from '../features/machines/MachineOverview';
+import { MACHINE_SECTIONS } from '../features/machines/sections';
 import { MachineStatusBadge } from '../features/machines/MachineStatus';
-import { checkTitle, nextCheck } from '../features/machines/model';
+import { checkChoices, checkTitle, nextCheck } from '../features/machines/model';
 import {
   useDeleteMachine,
   useMachine,
@@ -76,7 +81,7 @@ export function MachinePage() {
 
 type Dialog =
   | { kind: 'edit' }
-  | { kind: 'add' }
+  | { kind: 'add'; of: 'quality' | 'final' }
   | { kind: 'link' }
   | { kind: 'delete' }
   | { kind: 'update'; check: MachineCheck }
@@ -108,6 +113,19 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
   });
   const model = modelName(settings.data?.machineModels, machine.modelCode);
   const closeDialog = () => setDialog(null);
+  // What the overview and the sections' Add buttons go by: the machine's assembly instructions,
+  // and the model's published checks the machine doesn't have yet.
+  const assemblies = useMachineAssemblies(machine.id);
+  const templates = useTemplates();
+  const missing = checkChoices(templates.data ?? [], machine.modelCode).filter(
+    (choice) => !checks.some((check) => check.templateId === choice.templateId),
+  );
+  const assemblySteps = (assemblies.data ?? []).reduce((sum, entry) => sum + entry.steps, 0);
+  const assemblySigned = (assemblies.data ?? []).reduce((sum, entry) => sum + entry.signed, 0);
+  const canAdd = {
+    quality: missing.some((choice) => choice.kind === 'quality'),
+    final: missing.some((choice) => choice.kind === 'final'),
+  };
   const sectionProps = {
     checks,
     isAdmin,
@@ -131,7 +149,16 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
             <h1 className="text-2xl font-semibold tracking-tight wrap-anywhere text-ink-900">
               {machine.machineName}
             </h1>
-            <MachineStatusBadge progress={progress} />
+            {/* Without checks yet, its assembly says where it is. */}
+            {checks.length === 0 && assemblySteps > 0 ? (
+              assemblySigned === assemblySteps ? (
+                <Badge tone="ok">Assembly completed</Badge>
+              ) : (
+                <Badge tone="brand">In assembly</Badge>
+              )
+            ) : (
+              <MachineStatusBadge progress={progress} />
+            )}
           </div>
           <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-500">
             <span>{model}</span>
@@ -148,10 +175,6 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
               Edit
             </Button>
           )}
-          <Button variant="secondary" onClick={() => setDialog({ kind: 'add' })}>
-            <Plus size={16} aria-hidden="true" />
-            Add check
-          </Button>
           {isAdmin && (
             <ActionMenu
               label="Machine actions"
@@ -209,16 +232,48 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
         )}
       </div>
 
-      <div className="space-y-10">
-        <MachineAssemblySection machine={machine} isAdmin={isAdmin} />
+      <MachineOverview assemblies={assemblies.data} checks={checks} />
+
+      <div className="mt-10 space-y-10">
+        <MachineAssemblySection
+          id={MACHINE_SECTIONS.assembly}
+          machine={machine}
+          isAdmin={isAdmin}
+        />
         <CheckSection
+          id={MACHINE_SECTIONS.quality}
           kind="quality"
-          empty="No quality checks on this machine. Add one with Add check."
+          empty={
+            canAdd.quality
+              ? 'No quality checks on this machine yet. Add one with Add quality check.'
+              : 'No quality checks on this machine, and none is published for its model yet.'
+          }
+          action={
+            canAdd.quality && (
+              <Button variant="secondary" onClick={() => setDialog({ kind: 'add', of: 'quality' })}>
+                <Plus size={16} aria-hidden="true" />
+                Add quality check
+              </Button>
+            )
+          }
           {...sectionProps}
         />
         <CheckSection
+          id={MACHINE_SECTIONS.final}
           kind="final"
-          empty="No final inspection on this machine yet. Add it with Add check."
+          empty={
+            canAdd.final
+              ? 'No final inspection on this machine yet. Add it with Add final inspection.'
+              : 'No final inspection on this machine, and none is published for its model yet.'
+          }
+          action={
+            canAdd.final && (
+              <Button variant="secondary" onClick={() => setDialog({ kind: 'add', of: 'final' })}>
+                <Plus size={16} aria-hidden="true" />
+                Add final inspection
+              </Button>
+            )
+          }
           {...sectionProps}
         />
       </div>
@@ -235,6 +290,7 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
         <AddCheckDialog
           machine={machine}
           checks={checks}
+          kind={dialog.of}
           onAdded={(title) => setNotice(`${title} was added. It is not started yet.`)}
           onClose={closeDialog}
         />

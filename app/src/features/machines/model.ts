@@ -224,9 +224,32 @@ export function checkChoices(
       ];
 }
 
+/** A published assembly instruction a machine can be bound to. */
+export type AssemblyChoice = { templateId: string; title: string; revision: number };
+
+/** The published assembly instructions of `modelCode`, by name. */
+export function assemblyChoices(
+  templates: readonly TemplateSummary[],
+  modelCode: string,
+): AssemblyChoice[] {
+  return templates
+    .filter(
+      (template) =>
+        template.kind === 'assembly' &&
+        template.publishedRevision !== null &&
+        (template.publishedModelCode ?? template.modelCode) === modelCode,
+    )
+    .map((template) => ({
+      templateId: template.id,
+      title: template.publishedName ?? template.name,
+      revision: template.publishedRevision!,
+    }))
+    .sort((a, b) => BY_NAME.compare(a.title, b.title));
+}
+
 /**
- * The machine models a machine can be made of, by name: those with a final inspection template
- * and something published to copy (its final inspection, or a quality check).
+ * The machine models a machine can be made of, by name: those with something published for a
+ * machine to get (an assembly instruction, a quality check or the final inspection).
  */
 export function machineModels(
   templates: readonly TemplateSummary[],
@@ -234,16 +257,39 @@ export function machineModels(
 ): MachineModel[] {
   const codes = new Set(
     templates
-      .filter((template) => template.kind === 'final')
+      .filter((template) => template.kind === 'final' || template.kind === 'assembly')
       .map((template) => template.publishedModelCode ?? template.modelCode),
   );
   return [...codes]
-    .filter((code) => checkChoices(templates, code).length > 0)
+    .filter(
+      (code) =>
+        checkChoices(templates, code).length > 0 || assemblyChoices(templates, code).length > 0,
+    )
     .map((code) => ({ code, name: modelName(models, code) }))
     .sort((a, b) => BY_NAME.compare(a.name, b.name));
 }
 
 const BY_NAME = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
+
+/**
+ * "1 assembly instruction, 3 quality checks and the final inspection": what a machine of a model
+ * gets, as a sentence; "Nothing published yet" for none of it.
+ */
+export function contentsText(
+  assemblies: number,
+  checks: readonly Pick<CheckChoice, 'kind'>[],
+): string {
+  const quality = checks.filter((choice) => choice.kind === 'quality').length;
+  const parts = [
+    assemblies > 0 && `${assemblies} assembly instruction${assemblies === 1 ? '' : 's'}`,
+    quality > 0 && `${quality} quality check${quality === 1 ? '' : 's'}`,
+    checks.some((choice) => choice.kind === 'final') && 'the final inspection',
+  ].filter((part) => part !== false);
+  if (parts.length === 0) return 'Nothing published yet';
+  const text =
+    parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 /** "3 quality checks and the final inspection", for a machine's checks as a sentence. */
 export function choicesText(choices: readonly Pick<CheckChoice, 'kind'>[]): string {

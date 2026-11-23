@@ -65,7 +65,12 @@ import {
   withMachineFront,
   writeMachine,
 } from '../lib/machines';
-import { deleteAssembliesOf } from '../lib/machineAssemblies';
+import {
+  assemblyRevision,
+  deleteAssembliesOf,
+  newMachineAssembly,
+  writeMachineAssembly,
+} from '../lib/machineAssemblies';
 import { loadSettings } from '../lib/settings';
 import { loadAllTemplates } from '../lib/templates';
 
@@ -120,7 +125,9 @@ export const createMachine = endpoint({ role: 'inspector' }, async (req, context
   const known =
     settings?.machineModels.some((model) => model.code === body.modelCode) ||
     templates.some(
-      (template) => template.draft.kind === 'final' && template.draft.modelCode === body.modelCode,
+      (template) =>
+        (template.draft.kind === 'final' || template.draft.kind === 'assembly') &&
+        template.draft.modelCode === body.modelCode,
     );
   if (!known) throw new BadRequestError(`Unknown machine model "${body.modelCode}".`);
   const taken = machineNameTaken(machines, body.machineName);
@@ -137,7 +144,27 @@ export const createMachine = endpoint({ role: 'inspector' }, async (req, context
     updatedBy: user.email,
   };
   const revisions = await Promise.all(body.templateIds.map((id) => checkTemplate(machine, id)));
+  const instructions = await Promise.all(
+    body.assemblyTemplateIds.map((id) => assemblyRevision(machine, id)),
+  );
   const etag = await writeMachine(machine, { ifNoneMatch: '*' });
+  // Its assembly instructions, as its checks: one that fails to be written is logged and left
+  // out, and can be added on the machine's page.
+  const bound = await Promise.allSettled(
+    instructions.map((revision) =>
+      writeMachineAssembly(newMachineAssembly(machine.id, revision, user.email), {
+        ifNoneMatch: '*',
+      }),
+    ),
+  );
+  bound.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      context.warn(
+        `Machine ${machine.id}: its copy of ${body.assemblyTemplateIds[index]} could not be written`,
+        result.reason,
+      );
+    }
+  });
   const written = await Promise.allSettled(
     revisions.map((revision) =>
       storeMachineCheck(newMachineCheck(machine, revision, settings, user.email)),

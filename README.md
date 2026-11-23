@@ -1821,6 +1821,13 @@ machine (who, when, status, actual time) is not part of it yet.
 
 ## Assembly on a machine
 
+- **A new machine** is made in three numbered steps: its model, its Machine ID and serial number,
+  and what it gets, grouped as the build goes: assembly instructions, quality checks, final
+  inspection, all ticked to start with. A model needs only something published (an assembly
+  instruction is enough) to be offered.
+- **A machine's page** opens with its build at a glance: Assembly, Quality checks and Final
+  inspection, each saying how far it has come (green when done) and jumping to its section. Each
+  section has its own add button, shown when the model has something published to add.
 - **Binding:** a machine's page has an **Assembly** section. **Add instruction** offers the
   published assembly instructions of the machine's model; the machine gets its own copy of the
   latest revision. A machine has each instruction once. Admins remove one (with its sign-offs)

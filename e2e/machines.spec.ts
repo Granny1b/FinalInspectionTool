@@ -124,16 +124,16 @@ test('an inspector makes a machine with the checks ticked and starts one, filled
   await page.getByRole('radio', { name: new RegExp(`^${model.code}`) }).check();
   // Every published check of the model, ticked: its quality checks in their order, then the final
   // inspection.
-  const checks = page.getByRole('region', { name: 'Checks' }).getByRole('checkbox');
+  const checks = page.getByRole('region', { name: 'What the machine gets' }).getByRole('checkbox');
   await expect(checks).toHaveCount(3);
   for (const box of await checks.all()) await expect(box).toBeChecked();
-  await expect(page.getByRole('region', { name: 'Checks' })).toContainText(
-    /Quality check – Frame.*Quality check – Pre start up.*Final inspection/s,
+  await expect(page.getByRole('region', { name: 'What the machine gets' })).toContainText(
+    /Quality checks.*Frame.*Pre start up.*Final inspection/s,
   );
   await page.getByRole('button', { name: 'Select none' }).click();
   for (const box of await checks.all()) await expect(box).not.toBeChecked();
   await page.getByRole('button', { name: 'Select all' }).click();
-  await page.getByRole('checkbox', { name: /Quality check – Frame/ }).uncheck();
+  await page.getByRole('checkbox', { name: 'Frame' }).uncheck();
 
   // The Machine ID and serial number are needed.
   await page.getByRole('button', { name: 'Create machine' }).click();
@@ -374,8 +374,8 @@ test('an admin orders a model’s quality checks; machines get them in that orde
   await page.reload();
   await expect(titles).toHaveText(['Quality check – Pre start up', 'Quality check – Frame']);
   await page.goto(`/machines/new?model=${model.code}`);
-  await expect(page.getByRole('region', { name: 'Checks' })).toContainText(
-    /Quality check – Pre start up.*Quality check – Frame.*Final inspection/s,
+  await expect(page.getByRole('region', { name: 'What the machine gets' })).toContainText(
+    /Quality checks.*Pre start up.*Frame.*Final inspection/s,
   );
 });
 

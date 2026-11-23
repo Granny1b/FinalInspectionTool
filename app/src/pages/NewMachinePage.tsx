@@ -4,7 +4,7 @@ import {
   type TemplateSummary,
 } from '@modig/shared';
 import clsx from 'clsx';
-import { Factory, LoaderCircle } from 'lucide-react';
+import { ClipboardCheck, Factory, LoaderCircle, ShieldCheck, Wrench } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { BackLink } from '../components/BackLink';
@@ -13,16 +13,17 @@ import { ChoiceCard } from '../components/ChoiceCard';
 import { EmptyState } from '../components/EmptyState';
 import { Field, INPUT } from '../components/Field';
 import { PageHeader } from '../components/PageHeader';
+import { StepNumber } from '../components/StepNumber';
 import { LoadError, PageLoading } from '../components/PageStates';
 import { MachineIdField } from '../features/inspections/FrontPageFields';
 import { FRONT_FIELD_IDS } from '../features/inspections/issues';
 import { CheckPicker } from '../features/machines/CheckPicker';
 import {
+  assemblyChoices,
   checkChoices,
-  choicesText,
+  contentsText,
   machineHref,
   machineModels,
-  type CheckChoice,
 } from '../features/machines/model';
 import { useCreateMachine } from '../features/machines/queries';
 import { useTemplates } from '../features/templates/queries';
@@ -54,8 +55,8 @@ export function NewMachinePage() {
     body = (
       <EmptyState
         icon={Factory}
-        title="No machine model has a template yet"
-        hint="A machine gets copies of its model’s quality checks and final inspection. A Quality admin sets them up under Templates."
+        title="Nothing is published for any machine model yet"
+        hint="A machine gets copies of its model’s assembly instructions, quality checks and final inspection. An admin writes and publishes them under Assembly and Templates."
         action={
           <ButtonLink to="/templates" variant="secondary">
             Go to templates
@@ -73,7 +74,7 @@ export function NewMachinePage() {
       <div className="mt-2">
         <PageHeader
           title="New machine"
-          description="Its model, its Machine ID and serial number, and the checks it gets."
+          description="Three steps: pick the model, name the machine, and choose what it gets."
         />
       </div>
       {body}
@@ -95,7 +96,10 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
     return models.length === 1 ? (models[0]?.code ?? null) : null;
   });
   const choices = modelCode ? checkChoices(templates, modelCode) : [];
-  const [ticked, setTicked] = useState<Set<string>>(() => allOf(choices));
+  const instructions = modelCode ? assemblyChoices(templates, modelCode) : [];
+  const [ticked, setTicked] = useState<Set<string>>(
+    () => new Set(modelCode ? offered(templates, modelCode) : []),
+  );
   const [machineName, setMachineName] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
   // Errors show after the first attempt, then follow the fields as they are fixed.
@@ -107,6 +111,9 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
         modelCode,
         // In the order offered.
         templateIds: choices
+          .filter((choice) => ticked.has(choice.templateId))
+          .map((choice) => choice.templateId),
+        assemblyTemplateIds: instructions
           .filter((choice) => ticked.has(choice.templateId))
           .map((choice) => choice.templateId),
       }
@@ -121,7 +128,7 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
 
   function pickModel(code: string) {
     setModelCode(code);
-    setTicked(allOf(checkChoices(templates, code)));
+    setTicked(new Set(offered(templates, code)));
   }
 
   function submit(event: FormEvent) {
@@ -154,13 +161,17 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
     <form onSubmit={submit} noValidate className="space-y-6">
       <ChoiceCard
         name="model"
+        step={1}
         title="Machine model"
-        hint="Its checks are copies of this model’s quality checks and final inspection."
+        hint="What is built. The machine gets this model’s assembly instructions and checks."
         error={errors.model}
         options={models.map((model) => ({
           value: model.code,
           label: model.name,
-          detail: choicesText(checkChoices(templates, model.code)),
+          detail: contentsText(
+            assemblyChoices(templates, model.code).length,
+            checkChoices(templates, model.code),
+          ),
         }))}
         value={modelCode}
         onChange={pickModel}
@@ -170,11 +181,16 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
         className="rounded-lg border border-ink-200 bg-surface"
       >
         <div className="border-b border-ink-200 px-5 pt-3.5 pb-3.5">
-          <h2 id="machine-fields" className="text-sm font-semibold text-ink-900">
-            Machine
+          <h2
+            id="machine-fields"
+            className="flex items-center gap-2.5 text-sm font-semibold text-ink-900"
+          >
+            <StepNumber step={2} />
+            The machine
           </h2>
-          <p className="mt-0.5 text-xs text-ink-500">
-            Its checks show them on their front pages; change them here on the machine.
+          <p className="mt-0.5 pl-[2.125rem] text-xs text-ink-500">
+            How this machine is known. Both are shown on its checks and reports, and can be changed
+            later on the machine’s page.
           </p>
         </div>
         <div className="grid gap-x-4 gap-y-4 p-5 sm:grid-cols-2">
@@ -198,14 +214,60 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
           </Field>
         </div>
       </section>
-      {modelCode && <CheckPicker choices={choices} value={ticked} onChange={setTicked} />}
+      {modelCode ? (
+        <CheckPicker
+          step={3}
+          value={ticked}
+          onChange={setTicked}
+          groups={[
+            {
+              label: 'Assembly',
+              icon: Wrench,
+              items: instructions,
+              empty: 'No assembly instruction is published for this model yet.',
+            },
+            {
+              label: 'Quality checks',
+              icon: ShieldCheck,
+              items: choices.filter((choice) => choice.kind === 'quality'),
+              empty: 'No quality check is published for this model yet.',
+            },
+            {
+              label: 'Final inspection',
+              icon: ClipboardCheck,
+              items: choices.filter((choice) => choice.kind === 'final'),
+              empty: 'The final inspection of this model is not published yet.',
+            },
+          ]}
+        />
+      ) : (
+        <section className="rounded-lg border border-dashed border-ink-300 px-5 py-3.5">
+          <h2 className="flex items-center gap-2.5 text-sm font-semibold text-ink-500">
+            <span
+              aria-hidden="true"
+              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink-200 text-xs font-semibold text-ink-600 tabular-nums"
+            >
+              3
+            </span>
+            What the machine gets
+          </h2>
+          <p className="mt-0.5 pl-[2.125rem] text-xs text-ink-500">
+            Pick the machine model first: its assembly instructions and checks are listed here.
+          </p>
+        </section>
+      )}
 
       {create.isError && !taken && (
         <p role="alert" className="text-sm font-medium text-nok-fg">
           {errorMessage(create.error)}
         </p>
       )}
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+        {request && (
+          <p className="mr-auto min-w-0 text-sm text-ink-600">
+            {gets(request.assemblyTemplateIds.length, request.templateIds.length)}
+          </p>
+        )}
         <ButtonLink to="/machines" variant="secondary">
           Cancel
         </ButtonLink>
@@ -220,8 +282,22 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
   );
 }
 
-function allOf(choices: readonly CheckChoice[]): Set<string> {
-  return new Set(choices.map((choice) => choice.templateId));
+/** Everything a machine of the model can get: all of it is ticked to start with. */
+function offered(templates: readonly TemplateSummary[], modelCode: string): string[] {
+  return [...assemblyChoices(templates, modelCode), ...checkChoices(templates, modelCode)].map(
+    (choice) => choice.templateId,
+  );
+}
+
+/** "The machine gets 1 assembly instruction and 4 checks.", under the form. */
+function gets(instructions: number, checks: number): string {
+  const parts = [
+    instructions > 0 && `${instructions} assembly instruction${instructions === 1 ? '' : 's'}`,
+    checks > 0 && `${checks} check${checks === 1 ? '' : 's'}`,
+  ].filter((part) => part !== false);
+  return parts.length === 0
+    ? 'Nothing is ticked: the machine starts empty.'
+    : `The machine gets ${parts.join(' and ')}.`;
 }
 
 /** What is missing, by field: the model, then the shared schema's rules. */

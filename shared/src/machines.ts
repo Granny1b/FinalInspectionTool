@@ -81,6 +81,15 @@ export const CreateMachineRequestSchema = z.object({
     .array(IdSchema)
     .max(100)
     .refine((ids) => new Set(ids).size === ids.length, 'Each check can be copied once.'),
+  /**
+   * The model's published assembly instructions to bind to the machine as it is made (it can get
+   * them later too, on its page). None when left out.
+   */
+  assemblyTemplateIds: z
+    .array(IdSchema)
+    .max(20)
+    .refine((ids) => new Set(ids).size === ids.length, 'Each instruction can be bound once.')
+    .default([]),
 });
 export type CreateMachineRequest = z.infer<typeof CreateMachineRequestSchema>;
 

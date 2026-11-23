@@ -212,7 +212,8 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   ).toBeVisible();
   await page.getByRole('link', { name: 'New machine' }).click();
   await page.getByRole('radio', { name: new RegExp(`^${machine.model}`) }).check();
-  await expect(page.getByRole('checkbox', { name: new RegExp(CHECK) })).toBeChecked();
+  // Listed under Quality checks by its own name.
+  await expect(page.getByRole('checkbox', { name: 'Pre start up' })).toBeChecked();
   const create = page.getByRole('button', { name: 'Create machine' });
   await create.click();
   await expect(page.getByText('Machine ID is required')).toBeVisible();
