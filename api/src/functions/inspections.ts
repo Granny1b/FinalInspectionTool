@@ -76,6 +76,10 @@ export const createInspection = endpoint({ role: 'inspector' }, async (req, _con
   const template = await loadTemplate(body.templateId);
   if (!template) throw templateNotFound();
   const kind = template.draft.kind;
+  // Refused before a number is taken: it can never succeed, so it is no conflict.
+  if (kind === 'assembly') {
+    throw new BadRequestError('An assembly instruction can’t be used for an inspection.');
+  }
   const front = createFront(kind, body);
   const revision = await loadLatestPublished(template);
   if (!revision) {

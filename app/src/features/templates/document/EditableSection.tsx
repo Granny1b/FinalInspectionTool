@@ -1,14 +1,26 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { sectionNumber, type Section } from '@modig/shared';
+import { formatMinutes, sectionNumber, stepsMinutes, type Section } from '@modig/shared';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Copy, ListPlus, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Copy,
+  ListPlus,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { memo, useId, useMemo, type KeyboardEvent, type ReactNode } from 'react';
 import { ActionMenu } from '../../../components/ActionMenu';
+import { AssemblyRow } from '../../assembly/AssemblyRow';
+import { stepCountText } from '../../assembly/wording';
 import { ROW_LIST, SECTION_BAR } from '../../qualityChecks/layout';
 import { sectionStats } from '../../qualityChecks/stats';
 import { QualityRow } from '../../qualityChecks/QualityRow';
+import { documentWords, type DocumentVariant } from './variant';
 import { bodyDndId, rowDndId, sectionDndId, type DragData } from './dnd';
 import { EditableRow } from './EditableRow';
 import { GRID, HEADER_FILL, ISSUE_OUTLINE, REF_CELL, SECTION_HEADER, TEXT_CELL } from './layout';
@@ -16,6 +28,9 @@ import { rowCountText } from './ops';
 import { ColumnLabels, DragHandle, IssueNote } from './parts';
 import type { DocumentActions } from './useDocumentActions';
 import type { DragKind } from './useDocumentDnd';
+
+/** A folded task's rows: none to sort among. */
+const NO_ROWS: string[] = [];
 
 const ADD_BUTTON =
   'inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900';
@@ -34,12 +49,15 @@ type Props = {
    */
   dragKind: DragKind;
   actions: DocumentActions;
-  /** A final inspection's sheet, or a quality check's rows as cards. */
+  /** A final inspection's sheet, a quality check's rows as cards, or an assembly task's steps. */
   variant: DocumentVariant;
+  /**
+   * An assembly instruction's task, folded to its header: its steps are not drawn at all, so an
+   * instruction of hundreds of steps opens and types fast. `onToggleFold` shows the fold button.
+   */
+  folded?: boolean;
+  onToggleFold?: ((sectionId: string) => void) | undefined;
 };
-
-/** A final inspection template's checklist, or a quality check's. */
-export type DocumentVariant = 'final' | 'quality';
 
 export const EditableSection = memo(function EditableSection({
   section,
@@ -51,8 +69,13 @@ export const EditableSection = memo(function EditableSection({
   dragKind,
   actions,
   variant,
+  folded = false,
+  onToggleFold,
 }: Props) {
-  const quality = variant === 'quality';
+  const assembly = variant === 'assembly';
+  // An assembly task is drawn as a quality check's section: a band over cards.
+  const quality = variant === 'quality' || assembly;
+  const words = documentWords(variant);
   const activeType = dragKind;
   const sectionData: DragData = { type: 'section', sectionId: section.id };
   const {
@@ -98,11 +121,11 @@ export const EditableSection = memo(function EditableSection({
   const titleInput = (
     <input
       data-section-title={section.id}
-      aria-label={`Section ${number} title`}
+      aria-label={`${words.Section} ${number} title`}
       aria-invalid={issues ? true : undefined}
       aria-describedby={issues ? issueId : undefined}
       maxLength={200}
-      placeholder="Section title"
+      placeholder={`${words.Section} title`}
       value={section.title}
       onChange={(event) => actions.setTitle(section.id, event.target.value)}
       onKeyDown={onTitleKeyDown}
@@ -111,7 +134,7 @@ export const EditableSection = memo(function EditableSection({
   );
   const menu = (
     <ActionMenu
-      label={`Section ${number} actions`}
+      label={`${words.Section} ${number} actions`}
       triggerData={{ 'data-section-menu': section.id }}
       items={[
         {
@@ -158,7 +181,7 @@ export const EditableSection = memo(function EditableSection({
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
-          label={`Move section ${number}`}
+          label={`Move ${words.section} ${number}`}
           className={clsx(
             'top-2',
             dragKind
@@ -169,10 +192,31 @@ export const EditableSection = memo(function EditableSection({
         {quality ? (
           // A band over the section's cards: number, title, its size and time, and its menu.
           <div className={clsx(SECTION_BAR, issues ? 'bg-inherit' : HEADER_FILL)}>
-            <span className="pl-2 text-sm font-semibold text-ink-900 tabular-nums">{number}</span>
+            {onToggleFold ? (
+              <button
+                type="button"
+                aria-expanded={!folded}
+                aria-label={`${folded ? 'Show' : 'Hide'} the steps of task ${number}`}
+                title={folded ? 'Show the steps' : 'Hide the steps'}
+                data-section-fold={section.id}
+                onClick={() => onToggleFold(section.id)}
+                className="ml-1 flex h-8 items-center gap-0.5 rounded-md pr-1 pl-0.5 text-sm font-semibold text-ink-900 tabular-nums transition-colors hover:bg-ink-200"
+              >
+                <ChevronDown
+                  size={14}
+                  aria-hidden="true"
+                  className={clsx('text-ink-500 transition-transform', folded && '-rotate-90')}
+                />
+                {number}
+              </button>
+            ) : (
+              <span className="pl-2 text-sm font-semibold text-ink-900 tabular-nums">{number}</span>
+            )}
             <div className="flex min-w-0 items-center">{titleInput}</div>
             <span className="col-start-2 row-start-2 px-2 pb-2 text-xs text-ink-500 tabular-nums @min-[36rem]:col-start-3 @min-[36rem]:row-start-1 @min-[36rem]:pb-0">
-              {sectionStats(section.items)}
+              {assembly
+                ? `${stepCountText(rowCount)} · ${formatMinutes(stepsMinutes(section.items))}`
+                : sectionStats(section.items)}
             </span>
             <div className="col-start-3 row-start-1 flex justify-end pr-1 @min-[36rem]:col-start-4">
               {menu}
@@ -197,13 +241,50 @@ export const EditableSection = memo(function EditableSection({
         {issues && <IssueNote id={issueId} messages={issues} />}
       </div>
 
-      <div ref={setBodyRef} className={clsx(collapsed && 'hidden')}>
-        <SortableContext id={section.id} items={rowIds} strategy={verticalListSortingStrategy}>
-          {quality
-            ? rowCount > 0 && (
-                <ol className={ROW_LIST}>
-                  {section.items.map((item, rowIndex) => (
-                    <QualityRow
+      <div ref={setBodyRef} className={clsx((collapsed || folded) && 'hidden')}>
+        <SortableContext
+          id={section.id}
+          items={folded ? NO_ROWS : rowIds}
+          strategy={verticalListSortingStrategy}
+        >
+          {folded
+            ? null
+            : assembly
+              ? rowCount > 0 && (
+                  <ol className={ROW_LIST}>
+                    {section.items.map((item, rowIndex) => (
+                      <AssemblyRow
+                        key={item.id}
+                        item={item}
+                        sectionId={section.id}
+                        sectionIndex={index}
+                        rowIndex={rowIndex}
+                        issues={itemIssues.get(item.id)}
+                        dragKind={dragKind}
+                        actions={actions}
+                      />
+                    ))}
+                  </ol>
+                )
+              : quality
+                ? rowCount > 0 && (
+                    <ol className={ROW_LIST}>
+                      {section.items.map((item, rowIndex) => (
+                        <QualityRow
+                          key={item.id}
+                          item={item}
+                          sectionId={section.id}
+                          sectionIndex={index}
+                          rowIndex={rowIndex}
+                          issues={itemIssues.get(item.id)}
+                          dragKind={dragKind}
+                          actions={actions}
+                        />
+                      ))}
+                    </ol>
+                  )
+                : section.items.map((item, rowIndex) => (
+                    <EditableRow
                       key={item.id}
                       item={item}
                       sectionId={section.id}
@@ -214,31 +295,30 @@ export const EditableSection = memo(function EditableSection({
                       actions={actions}
                     />
                   ))}
-                </ol>
-              )
-            : section.items.map((item, rowIndex) => (
-                <EditableRow
-                  key={item.id}
-                  item={item}
-                  sectionId={section.id}
-                  sectionIndex={index}
-                  rowIndex={rowIndex}
-                  issues={itemIssues.get(item.id)}
-                  dragKind={dragKind}
-                  actions={actions}
-                />
-              ))}
         </SortableContext>
         {/* An empty section offers Add row in its empty state, where its rows will go. */}
         {rowCount === 0 ? (
           <EmptyRows
             dropping={activeType === 'row'}
             quality={quality}
-            addRow={<AddRowButton sectionId={section.id} number={number} actions={actions} />}
+            row={words.row}
+            addRow={
+              <AddRowButton
+                sectionId={section.id}
+                number={number}
+                actions={actions}
+                variant={variant}
+              />
+            }
           />
         ) : (
           <div className={quality ? 'mt-1.5' : 'mt-1.5 ml-9'}>
-            <AddRowButton sectionId={section.id} number={number} actions={actions} />
+            <AddRowButton
+              sectionId={section.id}
+              number={number}
+              actions={actions}
+              variant={variant}
+            />
           </div>
         )}
       </div>
@@ -251,21 +331,24 @@ function AddRowButton({
   sectionId,
   number,
   actions,
+  variant,
 }: {
   sectionId: string;
   number: number;
   actions: DocumentActions;
+  variant: DocumentVariant;
 }) {
+  const words = documentWords(variant);
   return (
     <button
       type="button"
       data-add-row={sectionId}
       onClick={() => actions.addRow(sectionId)}
-      aria-label={`Add row to section ${number}`}
+      aria-label={`Add ${words.row} to ${words.section} ${number}`}
       className={ADD_BUTTON}
     >
       <Plus size={15} aria-hidden="true" />
-      Add row
+      Add {words.row}
     </button>
   );
 }
@@ -279,11 +362,14 @@ function AddRowButton({
 function EmptyRows({
   dropping,
   quality,
+  row,
   addRow,
 }: {
   dropping: boolean;
   /** Under a quality check's section band, with no sheet lines. */
   quality: boolean;
+  /** "row", or "step" in an assembly instruction. */
+  row: string;
   addRow: ReactNode;
 }) {
   return (
@@ -301,11 +387,11 @@ function EmptyRows({
             className={clsx('shrink-0', dropping ? 'text-brand-600' : 'text-ink-400')}
           />
           {dropping ? (
-            <span className="font-medium text-brand-800">Drop the row here</span>
+            <span className="font-medium text-brand-800">Drop the {row} here</span>
           ) : (
             <span>
-              <span className="font-medium text-ink-700">No rows yet.</span> Add the first
-              {quality ? ' row' : ' checkpoint'}, or drag rows here.
+              <span className="font-medium text-ink-700">No {row}s yet.</span> Add the first
+              {quality ? ` ${row}` : ' checkpoint'}, or drag {row}s here.
             </span>
           )}
         </p>

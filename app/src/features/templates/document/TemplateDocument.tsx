@@ -1,8 +1,9 @@
 import type { PublishIssue, Section } from '@modig/shared';
 import { useMemo, type JSX } from 'react';
+import { AssemblyView } from '../../assembly/AssemblyView';
 import { QualityChecklistView } from '../../qualityChecks/QualityChecklistView';
 import { EditableDocument } from './EditableDocument';
-import type { DocumentVariant } from './EditableSection';
+import type { DocumentVariant } from './variant';
 import { indexIssues } from './issues';
 import { SHEET } from './layout';
 import { ReadOnlyDocument } from './ReadOnlyDocument';
@@ -57,6 +58,8 @@ export function TemplateDocument({
             variant={variant}
             protectedRows={protectedRows}
           />
+        ) : variant === 'assembly' ? (
+          <AssemblyView sections={sections} issues={issueIndex} />
         ) : variant === 'quality' ? (
           <QualityChecklistView sections={sections} issues={issueIndex} />
         ) : (

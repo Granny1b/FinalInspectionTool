@@ -2,6 +2,8 @@ import { createBrowserRouter, Navigate } from 'react-router';
 import { AppShell } from './components/AppShell';
 import { RequireRole } from './components/RequireRole';
 import { RouteError } from './components/RouteError';
+import { AssemblyInstructionPage } from './pages/AssemblyInstructionPage';
+import { AssemblyPage } from './pages/AssemblyPage';
 import { AdminOnly } from './features/insights/report/AdminOnly';
 import { ChecklistEditPage } from './pages/ChecklistEditPage';
 import { PrintShell } from './features/print/PrintShell';
@@ -61,6 +63,14 @@ export const router = createBrowserRouter([
       {
         path: 'templates/:id/quality-checks/:qcId/revisions/:revision',
         element: <TemplateRevisionPage />,
+      },
+      // Assembly instructions: the list, one (the editor for admins, else its latest revision)
+      // and a published revision of one.
+      { path: 'assembly', element: <AssemblyPage /> },
+      { path: 'assembly/:id', element: <AssemblyInstructionPage /> },
+      {
+        path: 'assembly/:id/revisions/:revision',
+        element: <TemplateRevisionPage key="assembly" assembly />,
       },
       {
         element: <RequireRole role="admin" />,

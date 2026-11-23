@@ -152,7 +152,7 @@ async function doneInspection(request: APIRequestContext, template: Template) {
   return InspectionSchema.parse(await finalised.json());
 }
 
-test('the sidebar has Final inspection, Quality check, Setup and, for admins, Admin', async ({
+test('the sidebar has Final inspection, Quality check, Assembly, Setup and, for admins, Admin', async ({
   page,
   context,
 }) => {
@@ -162,6 +162,7 @@ test('the sidebar has Final inspection, Quality check, Setup and, for admins, Ad
   const groups = [
     ['Final inspection', ['Inspections', 'Deviations']],
     ['Quality check', ['Quality checks', 'Deviations']],
+    ['Assembly', ['Instructions']],
     ['Setup', ['Templates']],
     ['Admin', ['Insights', 'Settings']],
   ] as const;
@@ -170,7 +171,7 @@ test('the sidebar has Final inspection, Quality check, Setup and, for admins, Ad
     await expect(list.getByRole('link')).toHaveText([...links]);
   }
   // In this order, under Machines, which has no label of its own.
-  await expect(nav.getByRole('list')).toHaveCount(5);
+  await expect(nav.getByRole('list')).toHaveCount(6);
   await expect(nav.getByRole('list').first()).toHaveAccessibleName('Machines');
   await expect(nav.locator('p')).toHaveText(groups.map(([label]) => label));
   await expect(nav.getByRole('link', { name: 'Quality checks' })).toHaveAttribute(
@@ -190,6 +191,7 @@ test('the sidebar has Final inspection, Quality check, Setup and, for admins, Ad
   await expect(mainNav(page).locator('p')).toHaveText([
     'Final inspection',
     'Quality check',
+    'Assembly',
     'Setup',
   ]);
 });

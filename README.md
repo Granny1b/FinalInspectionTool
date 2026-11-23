@@ -103,6 +103,19 @@ Added after the six phases:
   "Done"), a Machine filter in Insights and the deviation log by machine. See
   [Machines](#machines).
 
+- **Assembly instructions.** _Assembly → Instructions_ in the sidebar: how each machine model is
+  built, as tasks of steps, each step with its pictures, instructions, department, estimated time,
+  part numbers, bolt list and documents (links, or paths on the file server to copy). Admins write
+  them in the template editor and publish them in revisions; everyone reads the latest one, with a
+  search and a department filter. Exported and imported as JSON, several files at once, and made
+  from the Excel assembly sheet with a script. See [Assembly instructions](#assembly-instructions).
+
+- **Take a photo live.** Wherever pictures are added (a quality check's rows, guides, deviation
+  photos, assembly steps) there is **Take photo** next to **Add photo**: the device's camera
+  shows its picture in the app, one click takes it, and it opens in the same editor as a chosen
+  file. The browser asks for the camera the first time; a tablet's back camera is used first, with
+  **Other camera** to turn it round.
+
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
 ## Prerequisites
@@ -1758,3 +1771,44 @@ overwrites), ~10 000 blob write/list operations and ~50 000 reads per month.
 That is far below the 50 SEK/month target: even ten times the usage (10 GB, 100 000 writes,
 500 000 reads) comes to about 9 SEK. Add 25 % VAT if it is not reclaimed. No resource has a fixed
 monthly fee, so the cost only grows with stored data and traffic.
+
+## Assembly instructions
+
+An assembly instruction is the build of a machine model written as **tasks** of **steps**
+("Task 1 → 1.3 Mount Base tend 80065 & 82053"). A model may have several ("HHV-3 24-Tools
+scheme"). It replaces the Excel assembly sheet's instruction columns; signing off the work on one
+machine (who, when, status, actual time) is not part of it yet.
+
+- **Reading** (`/assembly`, everyone): the published instructions by machine model. One opens as
+  its tasks with each step a card: its pictures (a click shows them large), what to do, the
+  instructions, department and time, the bolts as a table, the part numbers and assy, and its
+  documents. A web address opens in a new tab; a path on the file server (`\\SRV102\…`) is
+  shown with **Copy path**, since a browser may not open it from a web page. The search box looks
+  in everything of a step (text, part numbers, bolts, assy, documents); the department chips show
+  one department's steps.
+- **Writing** (admins): the same page is the editor. Tasks fold to their headers (an instruction
+  of more than 40 steps opens folded). `Enter` in a task's title starts its steps and `Enter` in a
+  step adds the next. A step's **Details** hold its department, time (minutes; "1,5 h" is read
+  too), assy, part numbers, bolts and documents. Bolts and documents are typed or pasted a line
+  each: `8 pcs MC6S M8x25`, and a link or a path, optionally `Name | path`. Pictures are added and
+  marked up as in a quality check. Undo, drag and drop, autosave, Publish and the revision history
+  are the template editor's.
+- **JSON** (`modig-final-inspection/assembly-instruction`, version 1): **Export JSON** in the
+  editor's ⋯ menu; **Import JSON** on the Assembly page takes one file or many, lists each with
+  its name to change, and makes a new draft of each for the machine model chosen (a new model can
+  be named there). Files can be written by hand or by a script: no ids, a bolt as text or as
+  `{ quantity, designation }`, a document as text or as `{ label, target }`. See
+  [`seed/examples/assembly-instruction.json`](seed/examples/assembly-instruction.json). Pictures
+  are referenced by id and come along only within the same installation.
+- **From the Excel sheet:**
+
+  ```bash
+  npm run assembly:convert -- HHV_assembly.xlsx HHV-3.json --model HHV3 --model-name "HHV 3"
+  ```
+
+  reads the sheet with the "Working steps" column: a row with only "Arbetsmoment" filled starts a
+  task; the bolt list is the note on the "List of bolts" cell; documents are the links of
+  "Instructions" and "Assy drawings" as server paths; "Comments" become the step's instructions
+  (`--no-comments` leaves them out). A Department that is none of the departments (a supplier's
+  name) becomes "External company", with the supplier named in the step's instructions. The
+  sign-off columns and the Swedish text are left behind.

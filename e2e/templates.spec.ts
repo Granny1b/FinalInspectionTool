@@ -776,7 +776,9 @@ test.describe('an admin', () => {
       const dialog = page.getByRole('dialog', { name: 'New template' });
       // One template per model: models that have one are not offered.
       const list = await page.request.get('/api/templates');
-      for (const { modelCode } of TemplateListSchema.parse(await list.json())) {
+      // A model's final inspection template takes it; its assembly instructions don't.
+      for (const { modelCode, kind } of TemplateListSchema.parse(await list.json())) {
+        if (kind !== 'final') continue;
         await expect(dialog.getByRole('option', { name: `(${modelCode})` })).toHaveCount(0);
       }
       // Delete what the test creates, even if a step after the click fails.

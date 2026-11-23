@@ -130,6 +130,9 @@ export async function checkTemplate(
 ): Promise<Template> {
   const template = await loadTemplate(templateId);
   if (!template) throw templateNotFound();
+  if (template.draft.kind === 'assembly') {
+    throw new BadRequestError('An assembly instruction is not a check of a machine.');
+  }
   const revision = await loadLatestPublished(template);
   if (!revision) {
     throw new ConflictError(

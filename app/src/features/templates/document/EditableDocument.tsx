@@ -1,17 +1,21 @@
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { rowRef, sectionNumber, type Section } from '@modig/shared';
+import { rowRef, sectionNumber, stepDepartments, stepRef, type Section } from '@modig/shared';
 import clsx from 'clsx';
 import { GripVertical, ListChecks, Plus, Undo2, X } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../../../components/Button';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { useSettings } from '../../../lib/useSettings';
+import { DEPARTMENTS_LIST_ID } from '../../assembly/AssemblyRow';
+import { ASSEMBLY_GUIDE_WORDING } from '../../assembly/wording';
 import { guideRow } from '../../guides/guide';
 import { GuideEditor } from '../../guides/GuideEditor';
 import { FINAL_GUIDE_WORDING, QUALITY_GUIDE_WORDING } from '../../guides/wording';
 import { sectionDndId } from './dnd';
-import { EditableSection, type DocumentVariant } from './EditableSection';
+import { EditableSection } from './EditableSection';
+import { documentWords, type DocumentVariant } from './variant';
 import type { IssueIndex } from './issues';
 import { findRow, findSection, rowCountText } from './ops';
 import { useDocumentActions, type Deleted } from './useDocumentActions';
@@ -36,6 +40,8 @@ export function EditableDocument({
   protectedRows,
 }: Props) {
   const quality = variant === 'quality';
+  const assembly = variant === 'assembly';
+  const words = documentWords(variant);
   const rootRef = useRef<HTMLDivElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [confirmingRow, setConfirmingRow] = useState<string | null>(null);
@@ -51,7 +57,40 @@ export function EditableDocument({
     confirmRowDelete: setConfirmingRow,
     onDeleted: setDeleted,
     onOpenGuide: setGuideItemId,
+    assembly,
   });
+  // An assembly instruction's tasks fold to their headers. A long one (the build of a whole
+  // machine, hundreds of steps) opens folded, so the page draws only the tasks being worked on.
+  const [foldedIds, setFoldedIds] = useState<ReadonlySet<string>>(() =>
+    assembly && sections.reduce((count, section) => count + section.items.length, 0) > LONG
+      ? new Set(sections.map((section) => section.id))
+      : new Set(),
+  );
+  const toggleFold = useCallback(
+    (sectionId: string) =>
+      setFoldedIds((current) => {
+        const next = new Set(current);
+        if (!next.delete(sectionId)) next.add(sectionId);
+        return next;
+      }),
+    [],
+  );
+  // A task with a publish problem in one of its steps is shown, so the problem can be gone to.
+  const withIssues = useMemo(
+    () =>
+      new Set(
+        sections
+          .filter((section) => section.items.some((item) => issues.items.has(item.id)))
+          .map((section) => section.id),
+      ),
+    [sections, issues],
+  );
+  const settings = useSettings();
+  const departmentsKey = assembly
+    ? [...new Set([...(settings.data?.responsibles ?? []), ...stepDepartments(sections)])].join(
+        '\n',
+      )
+    : '';
   const { drag, shown, contextProps } = useDocumentDnd(sections, actions);
   // Offered only while it is gone: the editor's own Undo (Ctrl+Z) may have put it back already,
   // and putting it back twice would make two of it.
@@ -72,15 +111,17 @@ export function EditableDocument({
           <div className="mx-auto flex size-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
             <ListChecks size={20} strokeWidth={1.75} aria-hidden="true" />
           </div>
-          <h2 className="mt-4 text-base font-semibold text-ink-900">No sections yet</h2>
+          <h2 className="mt-4 text-base font-semibold text-ink-900">No {words.section}s yet</h2>
           <p className="mx-auto mt-1.5 max-w-sm text-sm text-balance text-ink-500">
-            {quality
-              ? 'Sections group the rows, like “Safety features” or “Markings”. Add the first one to start the quality check.'
-              : 'Sections group the checkpoints, like “Loading area” or “Electrical cabinets”. Add the first one to start the checklist.'}
+            {assembly
+              ? 'Tasks group the steps of the build, like “Task 1” or “Mount the base”. Add the first one to start the instruction.'
+              : quality
+                ? 'Sections group the rows, like “Safety features” or “Markings”. Add the first one to start the quality check.'
+                : 'Sections group the checkpoints, like “Loading area” or “Electrical cabinets”. Add the first one to start the checklist.'}
           </p>
           <Button data-add-section="" onClick={actions.addSection} className="mt-6">
             <Plus size={16} aria-hidden="true" />
-            Add section
+            Add {words.section}
           </Button>
         </div>
       ) : (
@@ -99,6 +140,8 @@ export function EditableDocument({
                   dragKind={drag?.kind ?? null}
                   actions={actions}
                   variant={variant}
+                  folded={assembly && foldedIds.has(section.id) && !withIssues.has(section.id)}
+                  onToggleFold={assembly ? toggleFold : undefined}
                 />
               ))}
             </SortableContext>
@@ -118,16 +161,16 @@ export function EditableDocument({
             className="mt-10 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-dashed border-ink-300 text-sm font-medium text-ink-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-800"
           >
             <Plus size={16} aria-hidden="true" />
-            Add section
+            Add {words.section}
           </button>
         </>
       )}
 
       {deletingSection && (
         <ConfirmDialog
-          title={`Delete section ${sectionNumber(deleting)}?`}
-          message={sectionDeleteMessage(deletingSection, protectedRows)}
-          confirmLabel="Delete section"
+          title={`Delete ${words.section} ${sectionNumber(deleting)}?`}
+          message={sectionDeleteMessage(deletingSection, protectedRows, assembly)}
+          confirmLabel={`Delete ${words.section}`}
           onConfirm={() => {
             setConfirmingDelete(null);
             actions.removeSection(deletingSection.id);
@@ -162,7 +205,7 @@ export function EditableDocument({
 
       {guideItemId !== null && guiding && (
         <GuideEditor
-          rowRef={guiding.ref}
+          rowRef={assembly ? (stepRefOf(sections, guideItemId) ?? guiding.ref) : guiding.ref}
           rowText={guiding.text}
           guide={guiding.guide}
           onSave={(guide) => {
@@ -171,8 +214,25 @@ export function EditableDocument({
           }}
           onCancel={() => setGuideItemId(null)}
           onDirtyChange={onEditorDirtyChange}
-          wording={quality ? QUALITY_GUIDE_WORDING : FINAL_GUIDE_WORDING}
+          wording={
+            assembly
+              ? ASSEMBLY_GUIDE_WORDING
+              : quality
+                ? QUALITY_GUIDE_WORDING
+                : FINAL_GUIDE_WORDING
+          }
         />
+      )}
+
+      {assembly && (
+        <datalist id={DEPARTMENTS_LIST_ID}>
+          {departmentsKey
+            .split('\n')
+            .filter(Boolean)
+            .map((department) => (
+              <option key={department} value={department} />
+            ))}
+        </datalist>
       )}
 
       <UndoBar
@@ -185,6 +245,15 @@ export function EditableDocument({
       />
     </div>
   );
+}
+
+/** From this many steps on, an assembly instruction opens with its tasks folded. */
+const LONG = 40;
+
+/** "3.12" for a step, by its id. */
+function stepRefOf(sections: Section[], itemId: string): string | null {
+  const at = findRow(sections, itemId);
+  return at ? stepRef(at.sectionIndex, at.rowIndex) : null;
 }
 
 /** Whether a deleted row or section is in the checklist again. */
@@ -201,9 +270,11 @@ function isBack(sections: Section[], deleted: Deleted): boolean {
 function sectionDeleteMessage(
   section: Section,
   protectedRows: ReadonlySet<string> | undefined,
+  assembly = false,
 ): string {
-  const what = `“${section.title || 'Untitled section'}” and its ${
-    section.items.length === 1 ? 'row' : `${section.items.length} rows`
+  const row = assembly ? 'step' : 'row';
+  const what = `“${section.title || (assembly ? 'Untitled task' : 'Untitled section')}” and its ${
+    section.items.length === 1 ? row : `${section.items.length} ${row}s`
   }`;
   if (!protectedRows) {
     return `${what} will be removed from the draft. Published revisions are not affected.`;

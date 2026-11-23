@@ -9,8 +9,10 @@ import {
   TemplateDetailSchema,
   TemplateListSchema,
   TemplateSchema,
+  type CreateAssemblyRequest,
   type CreateQualityCheckRequest,
   type CreateTemplateRequest,
+  type ImportAssemblyRequest,
   type ImportQualityCheckRequest,
   type ImportTemplateRequest,
   type PublishIssue,
@@ -83,8 +85,22 @@ export function qualityChecksOf(
   return list.filter((template) => template.kind === 'quality' && template.parentId === parentId);
 }
 
-/** The editor of a template: a final inspection's, or a quality check's under its machine. */
+/** The assembly instructions of a list, of every machine model. */
+export function assemblyInstructions(list: readonly TemplateSummary[]): TemplateSummary[] {
+  return list.filter((template) => template.kind === 'assembly');
+}
+
+/** An assembly instruction: its editor for admins, its latest revision for everyone else. */
+export function assemblyHref(id: string): string {
+  return `/assembly/${id}`;
+}
+
+/**
+ * The editor of a template: a final inspection's, a quality check's under its machine, or an
+ * assembly instruction's.
+ */
 export function templateHref(template: Pick<TemplateSummary, 'id' | 'kind' | 'parentId'>): string {
+  if (template.kind === 'assembly') return assemblyHref(template.id);
   return template.kind === 'quality' && template.parentId
     ? qualityCheckHref(template.parentId, template.id)
     : `/templates/${template.id}`;
@@ -142,7 +158,7 @@ export function useCreateTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (
-      request: CreateTemplateRequest | CreateQualityCheckRequest,
+      request: CreateTemplateRequest | CreateQualityCheckRequest | CreateAssemblyRequest,
     ): Promise<LoadedTemplate> => {
       const { data, etag } = withEtag(
         await apiFetch('/api/templates', {
@@ -164,7 +180,7 @@ export function useCreateTemplate() {
 function opened(
   queryClient: QueryClient,
   created: LoadedTemplate,
-  request: { newModel?: unknown } | { kind: 'quality' },
+  request: { newModel?: unknown } | { kind: 'quality' | 'assembly' },
 ) {
   queryClient.setQueryData(templateKeys.detail(created.detail.draft.id), created);
   return Promise.all([
@@ -186,7 +202,7 @@ export function useImportTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (
-      request: ImportTemplateRequest | ImportQualityCheckRequest,
+      request: ImportTemplateRequest | ImportQualityCheckRequest | ImportAssemblyRequest,
     ): Promise<{ loaded: LoadedTemplate; droppedImages: number }> => {
       const { data, etag } = withEtag(
         await apiFetch('/api/templates/import', {

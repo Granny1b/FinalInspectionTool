@@ -13,6 +13,11 @@ type Props = {
   onOpen: () => void;
   /** Editable: a row without pictures offers to add them. */
   editable: boolean;
+  /**
+   * An assembly instruction's step: its pictures show how it is done, so they say nothing of
+   * should and should not, and it is a step, not a row.
+   */
+  step?: boolean;
 };
 
 /** "3 pictures", "1 picture". */
@@ -26,17 +31,22 @@ function pictureCountText(count: number): string {
  * them all with the row's more information. Without pictures it says there is information, or,
  * to an admin, offers to add pictures.
  */
-export function PictureTile({ guide, rowRef, onOpen, editable }: Props) {
+export function PictureTile({ guide, rowRef, onOpen, editable, step = false }: Props) {
   const images = guide?.images ?? [];
   const first = images[0];
   const url = useImageUrl(first ? shownImageId(first) : undefined);
   const more = images.length - 1;
 
+  const row = step ? 'step' : 'row';
+  // A step's picture says which it is only when it shows a right or a wrong way.
+  const marked = first !== undefined && !(step && first.verdict === 'info');
   const label = first
-    ? `Pictures of row ${rowRef}: ${pictureCountText(images.length)}, the first one ${QUALITY_VERDICT_LABELS[first.verdict].toLowerCase()}${guide?.description ? ', and more information' : ''}`
-    : guide?.description
+    ? `Pictures of ${row} ${rowRef}: ${pictureCountText(images.length)}${
+        marked ? `, the first one ${QUALITY_VERDICT_LABELS[first.verdict].toLowerCase()}` : ''
+      }${guide?.description && !step ? ', and more information' : ''}`
+    : guide?.description && !step
       ? `More information about row ${rowRef}`
-      : `Add pictures to row ${rowRef}`;
+      : `Add pictures to ${row} ${rowRef}`;
 
   const frame =
     'relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md transition-colors';
@@ -52,12 +62,12 @@ export function PictureTile({ guide, rowRef, onOpen, editable }: Props) {
         className={clsx(
           frame,
           'flex-col gap-1 px-1 text-center text-xs font-medium',
-          guide?.description
+          guide?.description && !step
             ? 'border border-ink-200 bg-ink-50 text-ink-600 hover:border-ink-400'
             : 'border border-dashed border-ink-400 bg-surface text-ink-600 hover:border-brand-500 hover:bg-brand-50 hover:text-brand-700',
         )}
       >
-        {guide?.description ? (
+        {guide?.description && !step ? (
           <>
             <Info size={18} aria-hidden="true" className="shrink-0" />
             <span className="max-[22rem]:sr-only">Information</span>
@@ -96,15 +106,17 @@ export function PictureTile({ guide, rowRef, onOpen, editable }: Props) {
         <LoaderCircle size={18} aria-hidden="true" className="animate-spin text-ink-400" />
       )}
       {/* The verdict as a symbol: its words are in the label and the pictures' dialog. */}
-      <span
-        data-verdict={first.verdict}
-        className={clsx(
-          'absolute bottom-1 left-1 flex size-5.5 items-center justify-center rounded-full shadow-sm ring-1 ring-inset',
-          VERDICT_TONES[first.verdict],
-        )}
-      >
-        <Icon size={13} strokeWidth={3} aria-hidden="true" />
-      </span>
+      {marked && (
+        <span
+          data-verdict={first.verdict}
+          className={clsx(
+            'absolute bottom-1 left-1 flex size-5.5 items-center justify-center rounded-full shadow-sm ring-1 ring-inset',
+            VERDICT_TONES[first.verdict],
+          )}
+        >
+          <Icon size={13} strokeWidth={3} aria-hidden="true" />
+        </span>
+      )}
       {more > 0 && (
         <span className="absolute right-1 bottom-1 flex h-5.5 items-center rounded-full bg-scrim/70 px-1.5 text-[0.6875rem] font-semibold text-white tabular-nums">
           +{more}

@@ -1,0 +1,37 @@
+{
+  "format": "modig-final-inspection/assembly-instruction",
+  "version": 1,
+  "instruction": {
+    "name": "Example build",
+    "modelCode": "HHV3",
+    "modelName": "HHV 3",
+    "tasks": [
+      {
+        "title": "Task 1",
+        "steps": [
+          {
+            "text": "Mount Base tend 80065 & 82053",
+            "description": "Tighten crosswise.",
+            "department": "Mechanics",
+            "minutes": 10,
+            "partNumbers": ["80065", "82053"],
+            "assyNumber": "82265",
+            "assyName": "Base, HHV3",
+            "fasteners": ["8 pcs MC6S M8x25", { "quantity": 8, "designation": "TBRSB M8 FZB" }],
+            "documents": [
+              "\\\\SRV102\\share\\Instructions\\Base.pdf",
+              "Assy drawing | K:\\Ritningsarkiv\\82265.pdf",
+              { "label": "Supplier manual", "target": "https://example.com/manual.pdf" }
+            ]
+          },
+          {
+            "text": "Install Bracket shelf U2 in the machine",
+            "department": "Mechanics",
+            "minutes": 40,
+            "fromPreAssembly": true
+          }
+        ]
+      }
+    ]
+  }
+}

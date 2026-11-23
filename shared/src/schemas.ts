@@ -183,6 +183,53 @@ export const MAX_REFERENCES = 20;
 /** The most hours a row's time may say. */
 export const MAX_ROW_HOURS = 999;
 
+// Assembly instructions: what a step needs besides its text and pictures.
+
+/** At most this many fasteners, part numbers and documents on a step. */
+export const MAX_FASTENERS = 60;
+export const MAX_PART_NUMBERS = 50;
+export const MAX_STEP_DOCUMENTS = 20;
+/** The most minutes a step's estimated time may say. */
+export const MAX_STEP_MINUTES = 99_999;
+
+/** One line of a step's bolt list: "8 pcs MC6S M8x25". */
+export const FastenerSchema = z.object({
+  quantity: z.number().int().min(1).max(9999).optional(),
+  /** "MC6S M8x25", with whatever else belongs to it ("12.9", "Loctite 243"). */
+  designation: z.string().trim().min(1).max(200),
+});
+export type Fastener = z.infer<typeof FastenerSchema>;
+
+/**
+ * A document a step points to: an instruction or an assembly drawing. `target` is a web address
+ * (opened as a link) or a path on the file server, "\\SRV102\…\82423-02.pdf" (browsers
+ * don't open those from a web page, so it is shown to be copied).
+ */
+export const StepDocumentSchema = z.object({
+  label: z.string().trim().max(200).optional(),
+  target: z.string().trim().min(1).max(1000),
+});
+export type StepDocument = z.infer<typeof StepDocumentSchema>;
+
+export const PartNumberSchema = z.string().trim().min(1).max(100);
+
+/** An assembly instruction's step: each field is left out when empty. */
+export const AssemblyStepSchema = z.object({
+  /** Who does the step, e.g. "Mechanics" (from the Responsible list). */
+  department: z.string().max(200).optional(),
+  /** The estimated time, in minutes. */
+  minutes: z.number().int().min(0).max(MAX_STEP_MINUTES).optional(),
+  /** The parts come ready from pre-assembly. */
+  fromPreAssembly: z.boolean().optional(),
+  fasteners: z.array(FastenerSchema).max(MAX_FASTENERS).optional(),
+  partNumbers: z.array(PartNumberSchema).max(MAX_PART_NUMBERS).optional(),
+  /** The assembly the parts are found in: its number ("82265") and name ("Base, HHV3"). */
+  assyNumber: z.string().max(100).optional(),
+  assyName: z.string().max(200).optional(),
+  documents: z.array(StepDocumentSchema).max(MAX_STEP_DOCUMENTS).optional(),
+});
+export type AssemblyStep = z.infer<typeof AssemblyStepSchema>;
+
 export const ItemSchema = z.object({
   /** STABLE forever – survives renumbering, rewording and new revisions. KPIs group by it. */
   id: IdSchema,
@@ -202,6 +249,11 @@ export const ItemSchema = z.object({
   references: z.array(ReferenceSchema).max(MAX_REFERENCES).optional(),
   /** Quality checks only: the time the check takes, in hours (one decimal). */
   timeHours: z.number().min(0).max(MAX_ROW_HOURS).optional(),
+  /**
+   * Assembly instructions only: who does the step, in how long, with which bolts, parts and
+   * documents. The step itself is `text`, its pictures and further instructions the `guide`.
+   */
+  assembly: AssemblyStepSchema.optional(),
 });
 export type Item = z.infer<typeof ItemSchema>;
 
@@ -217,10 +269,13 @@ export const TemplateStatusSchema = z.enum(['draft', 'published']);
 export type TemplateStatus = z.infer<typeof TemplateStatusSchema>;
 
 /**
- * What a template is: a machine model's final inspection checklist, or one of its quality checks
- * (in-process checks along the build, such as "Quality check – Pre start up").
+ * What a template is: a machine model's final inspection checklist, one of its quality checks
+ * (in-process checks along the build, such as "Quality check – Pre start up"), or an assembly
+ * instruction for the model (its build as tasks of steps, "HHV-3 24-Tools scheme"). An assembly
+ * instruction belongs to its model (`modelCode`), not to a final inspection template: a model is
+ * built before anyone writes its final inspection.
  */
-export const TEMPLATE_KINDS = ['final', 'quality'] as const;
+export const TEMPLATE_KINDS = ['final', 'quality', 'assembly'] as const;
 export const TemplateKindSchema = z.enum(TEMPLATE_KINDS);
 export type TemplateKind = z.infer<typeof TemplateKindSchema>;
 
@@ -356,8 +411,9 @@ export type InspectionState = z.infer<typeof InspectionStateSchema>;
  * the kind of the template it was made from. Inspections stored before quality checks could be
  * done have none: they are final inspections.
  */
-export const InspectionKindSchema = TemplateKindSchema;
-export type InspectionKind = TemplateKind;
+export const INSPECTION_KINDS = ['final', 'quality'] as const;
+export const InspectionKindSchema = z.enum(INSPECTION_KINDS);
+export type InspectionKind = (typeof INSPECTION_KINDS)[number];
 
 /** "FI-2026-0042" for a final inspection, "QC-2026-0007" for a quality check. */
 export const INSPECTION_NUMBER_PATTERN = /^(FI|QC)-\d{4}-\d{4,}$/;

@@ -13,6 +13,7 @@ import {
   QualityCheckOrderSchema,
   TemplateSchema,
   totalHours,
+  totalMinutes,
   type Section,
   type Template,
   type TemplateDetail,
@@ -133,6 +134,11 @@ export async function loadSummaries(): Promise<TemplateSummary[]> {
           sectionTitles: draft.sections.map((section) => section.title),
           totalHours: totalHours(draft.sections),
           ...(position !== undefined && position >= 0 && { position }),
+        }),
+        // An assembly instruction's card: its tasks and the estimated time of its steps.
+        ...(draft.kind === 'assembly' && {
+          sectionTitles: draft.sections.map((section) => section.title),
+          totalMinutes: totalMinutes(draft.sections),
         }),
         updatedAt: draft.updatedAt,
         updatedBy: draft.updatedBy,

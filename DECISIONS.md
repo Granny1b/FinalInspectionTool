@@ -3760,3 +3760,82 @@ Nine new registrations (30 in all, below the 40 that trouble SWA): `machines` (G
   "Picture 3 is over place 1 of 3."
 - The dragged picture is lifted on the dialog's background with a ring and a shadow, so the tile
   under it doesn't show through.
+
+## Assembly instructions (2026-11-23)
+
+The user's production Excel sheet for the HHV assembly (363 steps in 12 "Tasks", with bolts,
+parts, assy, documents, department and times) should live in the app, readable for inspectors and
+easy to write for admins, with JSON import and export for making them in batches. Agreed scope:
+the instruction (write, read, import/export); signing off the work on a machine comes later.
+English only; file-server paths must be easy to paste and to copy.
+
+- **A third kind of template, `assembly`.** Drafts, autosave with ETags, publishing in revisions,
+  the history, delete, pictures with marks, undo and drag and drop are the template's, so nothing
+  of them was written again. A task is a section, a step a row; the step's pictures and
+  instructions are its `guide` (description = instructions), and the rest is a new optional
+  `Item.assembly` (`department`, `minutes`, `fromPreAssembly`, `fasteners`, `partNumbers`,
+  `assyNumber`, `assyName`, `documents`), each field left out when empty.
+- **It belongs to a machine model, not to a final inspection template** (no `parentId`): a model
+  is built before its final inspection is written, and the HHV has no template yet. A model may
+  have several. Its model is fixed when it is made; create and import can add a new model to the
+  settings (`newModel`), as templates do.
+- **`InspectionKind` is no longer `TemplateKind`.** Inspections stay `final | quality`; creating
+  an inspection or a machine's check from an assembly instruction is refused with 400.
+- **Steps are numbered, not lettered** (`stepRef`: "3.12"): a task has up to 84 steps, and
+  "3.cf" reads badly.
+- **Time is whole minutes**, as in the sheet; shown as "1 h 30 min".
+- **Bolts and documents are typed as lines of text and stored structured.** One line a bolt
+  (`parseFastenerLine` reads "8 pcs - M6S M8x25", "24 Pcs …", "K6SF M6x16 9st"), one line a
+  document (a link or a path, quotes from "Copy as path" dropped, optional `Name | path`). A
+  pasted Excel note is the usual input, and a text box takes it whole; the field shows the list as
+  read when it is left. Fasteners have a quantity and a designation only: torque or Loctite goes
+  in the designation or the instructions.
+- **A server path is shown with Copy path, not as a link.** Browsers refuse `file://` links from
+  an https page; pretending otherwise would be a dead link. Web addresses open in a new tab.
+  Uploading PDFs into the app was left out (the images container serves JPEG only).
+- **Department is free text with the settings' Responsible list as suggestions** (a datalist):
+  the sheet's departments (Metrology, Start-up, Packaging) are not all in that list, and an import
+  must not depend on the settings.
+- **The editor folds tasks, and does not draw a folded task's steps.** An instruction of more
+  than 40 steps opens folded: 363 step cards with their inputs are too many to draw at once. A
+  task with a publish problem in a step is shown. A step's details fold into one summary line; a
+  new step opens with them.
+- **The file is its own format (`…/assembly-instruction` v1) and lenient**: tasks and steps
+  without ids (an import always makes new ones), bolts and documents as text or objects,
+  `exportedAt` and `modelCode` optional, so files can be generated. Each of the three imports
+  refuses the others' files with where they belong.
+- **Import takes several files**, one request each, one after another; a new model is sent with
+  the first only. A failed one can be tried again without importing the others twice.
+- **`seed/assembly-xlsx-to-json.ts`** converts the Excel sheet. The bolt lists are the notes on
+  the "List of bolts" cells (34 of them); Excel's threaded comments are conversations and are
+  skipped; the totals row (a formula in the step column) is no step. A Department that is not one
+  of the company's (the user: "BGM - Pitch error compensation" and "Skylt-reklam") becomes
+  "External company", the supplier's name kept as the first line of the step's instructions. The
+  workbook itself is not in the repository (it carries names in its comments).
+- **Not done:** block and level (planning columns), printing and Word export, a link from a
+  "Do QC check" step to the model's quality check, per-machine sign-off (which needs per-step
+  saves: several departments tick at once).
+- **Tests:** shared (`assembly.test.ts`), api (`assembly.test.ts`), seed
+  (`parse-assembly-workbook.test.ts`), e2e (`assembly.spec.ts`: write, publish, read as
+  inspector, export, import of several files). The sidebar test expects the Assembly group; the
+  "models without a template" test now counts final inspection templates only.
+
+## Taking a photo live (2026-11-23)
+
+The user wanted to take a quality check's pictures on the spot, not only upload ones taken
+beforehand, if it cost little.
+
+- **One dialog in the one place photos are added** (`annotate/CameraDialog.tsx`, opened from
+  `AnnotatedPhotos`): quality check rows, guides, deviation photos and assembly steps all get it.
+  It hands the photo on as a JPEG `File` to the same `add` a chosen file goes through, so
+  resizing, upload and the annotation editor are untouched. Nothing is stored differently.
+- **`getUserMedia`, not `<input capture>`.** `capture` only works on phones and tablets (where the
+  file picker already offers the camera); the live dialog also works on a PC with a webcam. The
+  tile is shown only where the browser has the API (a secure page). The site's
+  `Permissions-Policy` already allowed `camera=(self)`.
+- **Back camera first** (`facingMode: environment`, ideal 1920×1440); "Other camera" when the
+  device reports more than one. The stream is stopped when the dialog closes or the camera turns.
+- **A refused or missing camera is explained in the dialog** (not allowed, none found, in use);
+  Add photo beside it still works.
+- **Tests:** `e2e/camera.spec.ts` with Chromium's fake camera (taken, edited, saved in the draft)
+  and a refused camera.

@@ -7,6 +7,7 @@ import { templatePrintHref } from '../features/print/links';
 import { Badge } from '../features/templates/Badge';
 import { PublishedTemplateView } from '../features/templates/PublishedTemplateView';
 import {
+  assemblyHref,
   parseRevision,
   qualityCheckHref,
   qualityChecksHref,
@@ -20,10 +21,11 @@ import { modelName, useSettings } from '../lib/useSettings';
 
 /**
  * /templates/:id/revisions/:revision, and a quality check's at
- * /templates/:id/quality-checks/:qcId/revisions/:revision — one published revision, read-only
- * (from the revision history).
+ * /templates/:id/quality-checks/:qcId/revisions/:revision, and an assembly instruction's at
+ * /assembly/:id/revisions/:revision — one published revision, read-only (from the revision
+ * history).
  */
-export function TemplateRevisionPage() {
+export function TemplateRevisionPage({ assembly = false }: { assembly?: boolean }) {
   const { id = '', qcId, revision: param = '' } = useParams();
   const templateId = qcId ?? id;
   const isAdmin = hasRole(useCurrentUser().roles, 'admin');
@@ -52,6 +54,14 @@ export function TemplateRevisionPage() {
 
   const { kind, parentId } = revision.data;
   // Each kind at its own address.
+  if ((kind === 'assembly') !== assembly) {
+    return (
+      <Navigate
+        to={`${kind === 'assembly' ? assemblyHref(templateId) : `/templates/${templateId}`}/revisions/${number}`}
+        replace
+      />
+    );
+  }
   if (kind === 'quality' && parentId && (!qcId || parentId !== id)) {
     return (
       <Navigate to={`${qualityCheckHref(parentId, templateId)}/revisions/${number}`} replace />
@@ -72,6 +82,23 @@ export function TemplateRevisionPage() {
   );
   const description = `Revision ${number}, read-only: a published revision never changes.`;
 
+  if (kind === 'assembly') {
+    const model = modelName(settings.data?.machineModels, revision.data.modelCode);
+    return (
+      <PublishedTemplateView
+        template={revision.data}
+        top={
+          <BackLink
+            to={assemblyHref(templateId)}
+            label={isAdmin ? 'Back to the editor' : 'Back to the instruction'}
+          />
+        }
+        title={revision.data.name || 'Untitled assembly instruction'}
+        description={`${model} · ${description}`}
+        badges={badges}
+      />
+    );
+  }
   if (kind === 'quality' && parentId) {
     const machine = templates.data?.find((template) => template.id === parentId);
     const machineName = modelName(

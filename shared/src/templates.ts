@@ -4,6 +4,7 @@
  * Used by the API (to enforce) and the editor (to show problems before the user hits Publish).
  */
 import { z } from 'zod';
+import { AssemblyExportSchema, cleanAssemblyStep, stepRef } from './assembly';
 import { rowRef } from './numbering';
 import {
   IdSchema,
@@ -77,8 +78,26 @@ export const CreateQualityCheckRequestSchema = z.object({
 });
 export type CreateQualityCheckRequest = z.infer<typeof CreateQualityCheckRequestSchema>;
 
-/** Everything POST /api/templates accepts: a final inspection template or a quality check. */
+/**
+ * POST /api/templates with `kind: 'assembly'`: a new, empty assembly instruction for a machine
+ * model (one of the settings', or `newModel`, added to them first). A model may have several.
+ */
+export const CreateAssemblyRequestSchema = z
+  .object({
+    kind: z.literal('assembly'),
+    name: TemplateNameSchema,
+    modelCode: ModelCodeSchema,
+    newModel: MachineModelSchema.optional(),
+  })
+  .refine(newModelMatches.check, { ...newModelMatches.params, path: ['newModel', 'code'] });
+export type CreateAssemblyRequest = z.infer<typeof CreateAssemblyRequestSchema>;
+
+/**
+ * Everything POST /api/templates accepts: a final inspection template, a quality check or an
+ * assembly instruction.
+ */
 export const CreateAnyTemplateRequestSchema = z.union([
+  CreateAssemblyRequestSchema,
   CreateQualityCheckRequestSchema,
   CreateTemplateRequestSchema,
 ]);
@@ -111,8 +130,24 @@ export const ImportQualityCheckRequestSchema = z.object({
 });
 export type ImportQualityCheckRequest = z.infer<typeof ImportQualityCheckRequestSchema>;
 
+/**
+ * POST /api/templates/import with `kind: 'assembly'`: a new assembly instruction draft from an
+ * assembly instruction file (assembly.ts), for the model and under the name the admin chose.
+ */
+export const ImportAssemblyRequestSchema = z
+  .object({
+    kind: z.literal('assembly'),
+    name: TemplateNameSchema,
+    modelCode: ModelCodeSchema,
+    newModel: MachineModelSchema.optional(),
+    file: AssemblyExportSchema,
+  })
+  .refine(newModelMatches.check, { ...newModelMatches.params, path: ['newModel', 'code'] });
+export type ImportAssemblyRequest = z.infer<typeof ImportAssemblyRequestSchema>;
+
 /** Everything POST /api/templates/import accepts. */
 export const ImportAnyTemplateRequestSchema = z.union([
+  ImportAssemblyRequestSchema,
   ImportQualityCheckRequestSchema,
   ImportTemplateRequestSchema,
 ]);
@@ -154,10 +189,15 @@ export const TemplateSummarySchema = z.object({
   itemCount: z.number().int().min(0),
   /** The draft's cover photo, for the card view. */
   coverImageId: IdSchema.optional(),
-  /** Quality checks only, from the draft: the front page, the section titles and the time. */
+  /**
+   * Quality checks only, from the draft: the front page and the time. The section titles are an
+   * assembly instruction's too (its tasks).
+   */
   quality: QualityFrontSchema.optional(),
   sectionTitles: z.array(z.string()).optional(),
   totalHours: z.number().min(0).optional(),
+  /** Assembly instructions only, from the draft: the estimated time of all steps, in minutes. */
+  totalMinutes: z.number().min(0).optional(),
   /**
    * Quality checks only: its place among its machine model's quality checks (0 first), as an
    * admin ordered them. Left out for one not ordered yet, which comes after them by title.
@@ -268,31 +308,44 @@ export function validateForPublish(template: {
 }): PublishIssue[] {
   const issues: PublishIssue[] = [];
   const quality = template.kind === 'quality';
+  // An assembly instruction's sections are its tasks and its rows their steps.
+  const assembly = template.kind === 'assembly';
   // A quality check's title follows from the name on its front page.
   if (quality && !template.quality?.name.trim()) {
     issues.push({ target: { kind: 'template' }, message: 'The quality check needs a name.' });
   } else if (!quality && !template.name.trim()) {
-    issues.push({ target: { kind: 'template' }, message: 'The template needs a name.' });
+    issues.push({
+      target: { kind: 'template' },
+      message: assembly ? 'The assembly instruction needs a name.' : 'The template needs a name.',
+    });
   }
   if (template.sections.length === 0) {
-    issues.push({ target: { kind: 'template' }, message: 'Add at least one section.' });
+    issues.push({
+      target: { kind: 'template' },
+      message: assembly ? 'Add at least one task.' : 'Add at least one section.',
+    });
   } else if (template.sections.every((section) => section.items.length === 0)) {
-    issues.push({ target: { kind: 'template' }, message: 'Add at least one row.' });
+    issues.push({
+      target: { kind: 'template' },
+      message: assembly ? 'Add at least one step.' : 'Add at least one row.',
+    });
   }
   template.sections.forEach((section, sectionIndex) => {
     if (!section.title.trim()) {
       issues.push({
         target: { kind: 'section', sectionId: section.id },
-        message: `Section ${sectionIndex + 1} needs a title.`,
+        message: `${assembly ? 'Task' : 'Section'} ${sectionIndex + 1} needs a title.`,
       });
     }
     section.items.forEach((item, rowIndex) => {
       if (!item.text.trim()) {
         issues.push({
           target: { kind: 'item', sectionId: section.id, itemId: item.id },
-          message: quality
-            ? `Row ${rowRef(sectionIndex, rowIndex)} needs “What to check”.`
-            : `Row ${rowRef(sectionIndex, rowIndex)} is empty.`,
+          message: assembly
+            ? `Step ${stepRef(sectionIndex, rowIndex)} needs its text.`
+            : quality
+              ? `Row ${rowRef(sectionIndex, rowIndex)} needs “What to check”.`
+              : `Row ${rowRef(sectionIndex, rowIndex)} is empty.`,
         });
       }
     });
@@ -335,6 +388,8 @@ function publishedContent(t: TemplateContent): string {
         i.how || null,
         i.references?.length ? i.references : null,
         i.timeHours ?? null,
+        // An assembly step's fields, in one key order, with the empty ones left out.
+        cleanAssemblyStep(i.assembly) ?? null,
       ]),
     ]),
   ]);

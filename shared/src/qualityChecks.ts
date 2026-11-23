@@ -4,6 +4,7 @@
  * inspection template (`parentId`), with a front page of its own and rows that say what to check,
  * how, against which references and in how much time. Pure helpers shared by the API and the app.
  */
+import { cleanAssemblyStep } from './assembly';
 import type { Item, QualityFront } from './schemas';
 
 /** A new quality check's department until an admin picks another (the Quality department's). */
@@ -79,6 +80,7 @@ export function rowHasContent(item: Item): boolean {
     item.guide ||
     item.how?.trim() ||
     item.references?.length ||
-    item.timeHours !== undefined,
+    item.timeHours !== undefined ||
+    cleanAssemblyStep(item.assembly),
   );
 }
