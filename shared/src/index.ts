@@ -15,3 +15,4 @@ export * from './qualityChecks';
 export * from './deviationLog';
 export * from './checklistMerge';
 export * from './machines';
+export * from './machineAssembly';

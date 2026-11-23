@@ -14,6 +14,7 @@ import { InsightsReportPage } from './pages/InsightsReportPage';
 import { InspectionPage } from './pages/InspectionPage';
 import { InspectionPrintPage } from './pages/InspectionPrintPage';
 import { InspectionsPage } from './pages/InspectionsPage';
+import { MachineAssemblyPage } from './pages/MachineAssemblyPage';
 import { MachinePage } from './pages/MachinePage';
 import { MachinesPage } from './pages/MachinesPage';
 import { NewMachinePage } from './pages/NewMachinePage';
@@ -38,6 +39,8 @@ export const router = createBrowserRouter([
       { path: 'machines', element: <MachinesPage /> },
       { path: 'machines/new', element: <NewMachinePage /> },
       { path: 'machines/:id', element: <MachinePage /> },
+      // An assembly instruction bound to the machine, signed off step by step.
+      { path: 'machines/:id/assembly/:assemblyId', element: <MachineAssemblyPage /> },
       { path: 'inspections', element: <InspectionsPage /> },
       // A check is started on a machine: pick the machine, then its check.
       { path: 'inspections/new', element: <StartCheckPage key="final" kind="final" /> },

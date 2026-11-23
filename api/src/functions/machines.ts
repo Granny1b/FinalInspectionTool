@@ -65,6 +65,7 @@ import {
   withMachineFront,
   writeMachine,
 } from '../lib/machines';
+import { deleteAssembliesOf } from '../lib/machineAssemblies';
 import { loadSettings } from '../lib/settings';
 import { loadAllTemplates } from '../lib/templates';
 
@@ -204,6 +205,8 @@ export const deleteMachine = endpoint({ role: 'admin' }, async (req, context) =>
     await deleteInspection(current.data, current.etag, context);
   }
   await deleteMachineBlob(id, ifMatch);
+  // Its assembly instructions and their sign-offs go with it.
+  await deleteAssembliesOf(id, context);
   return { status: 204 };
 });
 
