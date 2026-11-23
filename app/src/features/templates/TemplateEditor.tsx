@@ -12,10 +12,11 @@ import {
   type TemplateDraftInput,
 } from '@modig/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Ellipsis, FileDown, Printer, Redo2, Trash2, Undo2, Upload } from 'lucide-react';
+import { BookOpen, Ellipsis, FileDown, Printer, Redo2, Trash2, Undo2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { ActionMenu } from '../../components/ActionMenu';
+import { BackLink } from '../../components/BackLink';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { Button, ButtonLink } from '../../components/Button';
 import { Callout } from '../../components/Callout';
@@ -30,6 +31,8 @@ import { useUploadTracking } from '../../lib/autosave/useUploadTracking';
 import { canRedo, canUndo, historyKey } from '../../lib/history';
 import { modelName, useSettings } from '../../lib/useSettings';
 import { useScrollPaddingBelow } from '../../lib/useScrollPaddingBelow';
+import { AssemblySettingsCard } from '../assembly/AssemblySettingsCard';
+import { downloadAssembly } from '../assembly/transfer';
 import { templatePrintHref } from '../print/links';
 import { QUALITY_NAME_ID, QualityFrontCard } from '../qualityChecks/QualityFrontCard';
 import { downloadQualityCheck } from '../qualityChecks/transfer';
@@ -49,6 +52,7 @@ import type { TemplatesPageState } from './listView';
 import { MachineHeader } from './MachineHeader';
 import { PublishDialog, type FlushResult } from './PublishDialog';
 import {
+  assemblyHref,
   fetchTemplate,
   finalTemplates,
   publishDraft,
@@ -92,6 +96,9 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   const id = loaded.detail.draft.id;
   const { kind, parentId } = loaded.detail.draft;
   const quality = kind === 'quality';
+  const assembly = kind === 'assembly';
+  /** What this is called in the dialogs and menus. */
+  const noun = assembly ? 'assembly instruction' : quality ? 'quality check' : 'template';
   const queryClient = useQueryClient();
   const settings = useSettings();
   const templates = useTemplates();
@@ -315,9 +322,10 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   );
   const title = quality
     ? qualityCheckTitle(draft.quality ?? newQualityFront(EMPTY_TITLE)) || 'Untitled quality check'
-    : draft.name.trim() || 'Untitled template';
-  // Under its machine's heading on the Final inspection tab; the page's heading for a quality check.
-  const Title = quality ? 'h1' : 'h2';
+    : draft.name.trim() || `Untitled ${noun}`;
+  // Under its machine's heading on the Final inspection tab; the page's heading for a quality
+  // check and for an assembly instruction.
+  const Title = quality || assembly ? 'h1' : 'h2';
   const machine = templates.data?.find((template) => template.id === parentId);
   const machineName = modelName(
     settings.data?.machineModels,
@@ -362,12 +370,17 @@ export function TemplateEditor({ loaded, onReload }: Props) {
       deleted: draftRef.current.name.trim(),
       ...(deletedChecks.current > 0 && { qualityChecks: deletedChecks.current }),
     };
-    const back = quality && parentId ? qualityChecksHref(parentId) : '/templates';
+    const back = assembly
+      ? '/assembly'
+      : quality && parentId
+        ? qualityChecksHref(parentId)
+        : '/templates';
     void navigate(back, { replace: true, state });
-  }, [deleted, navigate, quality, parentId]);
+  }, [deleted, navigate, quality, assembly, parentId]);
 
   function exportJson() {
     if (quality) return downloadQualityCheck(draftRef.current, machineName);
+    if (assembly) return downloadAssembly(draftRef.current, machineName);
     const model = settings.data?.machineModels.find(
       (candidate) => candidate.code === draftRef.current.modelCode,
     );
@@ -385,6 +398,8 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             { to: qualityChecksHref(parentId), label: 'Quality checks' },
           ]}
         />
+      ) : assembly ? (
+        <BackLink to="/assembly" label="Assembly instructions" />
       ) : (
         <MachineHeader
           templateId={id}
@@ -456,33 +471,50 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             {/* The draft as it prints (a quality check's as its instructions); leaving the editor
                 saves first, like any link. On a phone just the printer, so the header keeps to
                 one row of buttons. Spaced as the inspection's header buttons. */}
-            <ButtonLink variant="secondary" to={templatePrintHref(id)} className="max-sm:px-2.5">
-              <Printer size={16} aria-hidden="true" />
-              <span className="max-sm:sr-only">
-                {quality ? 'Print instructions' : 'Print preview'}
-              </span>
-            </ButtonLink>
+            {assembly ? (
+              // An assembly instruction is read on a screen: the latest revision as everyone
+              // sees it, once there is one.
+              latestRevision !== null && (
+                <ButtonLink
+                  variant="secondary"
+                  to={`${assemblyHref(id)}/revisions/${latestRevision}`}
+                  className="max-sm:px-2.5"
+                >
+                  <BookOpen size={16} aria-hidden="true" />
+                  <span className="max-sm:sr-only">Read view</span>
+                </ButtonLink>
+              )
+            ) : (
+              <ButtonLink variant="secondary" to={templatePrintHref(id)} className="max-sm:px-2.5">
+                <Printer size={16} aria-hidden="true" />
+                <span className="max-sm:sr-only">
+                  {quality ? 'Print instructions' : 'Print preview'}
+                </span>
+              </ButtonLink>
+            )}
             {/* Nothing to publish when the draft equals the latest revision (the badges say so). */}
             <Button onClick={openPublish} disabled={!unpublished || conflict}>
               <Upload size={16} aria-hidden="true" />
               Publish
             </Button>
             <ActionMenu
-              label={quality ? 'Quality check actions' : 'Template actions'}
+              label={actionsLabel(kind)}
               triggerData={{ 'data-template-menu': '' }}
               trigger={
                 <>
                   <Ellipsis size={16} aria-hidden="true" />
-                  <span className="sr-only">
-                    {quality ? 'Quality check actions' : 'Template actions'}
-                  </span>
+                  <span className="sr-only">{actionsLabel(kind)}</span>
                 </>
               }
               items={[
                 // The draft as shown, unsaved changes included.
                 { label: 'Export JSON', icon: FileDown, onSelect: exportJson },
                 {
-                  label: quality ? 'Delete quality check' : 'Delete template',
+                  label: assembly
+                    ? 'Delete instruction'
+                    : quality
+                      ? 'Delete quality check'
+                      : 'Delete template',
                   icon: Trash2,
                   danger: true,
                   onSelect: () => {
@@ -530,7 +562,11 @@ export function TemplateEditor({ loaded, onReload }: Props) {
               }}
             >
               <strong className="font-semibold">Published revision {published}.</strong>
-              {quality ? ' Inspectors see it from now on.' : ' New inspections use it from now on.'}
+              {assembly
+                ? ' Everyone reads it from now on.'
+                : quality
+                  ? ' Inspectors see it from now on.'
+                  : ' New inspections use it from now on.'}
             </Callout>
           </div>
         )}
@@ -547,6 +583,16 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             nameError={checking && nameBlank ? 'The quality check needs a name.' : undefined}
             onChange={updateFront}
           />
+        ) : assembly ? (
+          <AssemblySettingsCard
+            name={draft.name}
+            modelName={machineName}
+            modelCode={draft.modelCode}
+            revision={server.revision}
+            sections={draft.sections}
+            nameError={checking && nameBlank ? 'The assembly instruction needs a name.' : undefined}
+            onChange={update}
+          />
         ) : (
           <TemplateSettingsCard
             name={draft.name}
@@ -561,18 +607,31 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           />
         )}
         <RevisionHistory
-          basePath={quality && parentId ? qualityCheckHref(parentId, id) : `/templates/${id}`}
+          basePath={
+            assembly
+              ? assemblyHref(id)
+              : quality && parentId
+                ? qualityCheckHref(parentId, id)
+                : `/templates/${id}`
+          }
           revisions={server.revisions}
           emptyText={
-            quality
-              ? 'Not published yet. Publishing creates revision 1.'
-              : 'Not published yet. Publishing creates revision 1, which new inspections then use.'
+            assembly
+              ? 'Not published yet. Publishing creates revision 1, which everyone can then read.'
+              : quality
+                ? 'Not published yet. Publishing creates revision 1.'
+                : 'Not published yet. Publishing creates revision 1, which new inspections then use.'
           }
         />
       </div>
 
       <section aria-labelledby="checklist-title" className="mt-10">
-        <ChecklistHeading id="checklist-title" sections={draft.sections} withTime={quality} />
+        <ChecklistHeading
+          id="checklist-title"
+          sections={draft.sections}
+          withTime={quality}
+          assembly={assembly}
+        />
         <TemplateDocument
           sections={draft.sections}
           onChange={updateSections}
@@ -589,7 +648,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           nameBlank={nameBlank}
           nameFieldId={quality ? QUALITY_NAME_ID : TEMPLATE_NAME_ID}
           description={
-            quality
+            quality || assembly
               ? 'A published revision can’t be changed: later edits go into the next one.'
               : undefined
           }
@@ -619,13 +678,17 @@ export function TemplateEditor({ loaded, onReload }: Props) {
         />
       )}
       {reload.dialog}
-      <LeaveDialog
-        guard={leaveGuard}
-        conflict={conflict}
-        noun={quality ? 'quality check' : 'template'}
-      />
+      <LeaveDialog guard={leaveGuard} conflict={conflict} noun={noun} />
     </div>
   );
+}
+
+function actionsLabel(kind: Template['kind']): string {
+  return kind === 'assembly'
+    ? 'Instruction actions'
+    : kind === 'quality'
+      ? 'Quality check actions'
+      : 'Template actions';
 }
 
 /**

@@ -1,6 +1,7 @@
 import {
   rowHasContent,
   rowRef,
+  stepRef,
   sectionNumber,
   type Guide,
   type Item,
@@ -96,6 +97,8 @@ type Options = {
   /** A delete that can be undone, or null once the structure changes otherwise. */
   onDeleted: (deleted: Deleted | null) => void;
   onOpenGuide: (itemId: string) => void;
+  /** An assembly instruction: its sections are tasks and its rows steps ("Step 1.3 deleted"). */
+  assembly?: boolean | undefined;
 };
 
 /**
@@ -112,6 +115,7 @@ export function useDocumentActions({
   confirmRowDelete,
   onDeleted,
   onOpenGuide,
+  assembly = false,
 }: Options): DocumentActions {
   const latest = useRef({
     sections,
@@ -168,7 +172,12 @@ export function useDocumentActions({
       // Nothing worth an undo in an empty, untitled section.
       const deleted: Deleted | null =
         section.items.length > 0 || section.title.trim()
-          ? { kind: 'section', label: `Section ${sectionNumber(index)}`, index, section }
+          ? {
+              kind: 'section',
+              label: `${assembly ? 'Task' : 'Section'} ${sectionNumber(index)}`,
+              index,
+              section,
+            }
           : null;
       restructure(
         deleteSection(sections, sectionId),
@@ -192,7 +201,9 @@ export function useDocumentActions({
         undoable && rowHasContent(item)
           ? {
               kind: 'row',
-              label: `Row ${rowRef(at.sectionIndex, at.rowIndex)}`,
+              label: assembly
+                ? `Step ${stepRef(at.sectionIndex, at.rowIndex)}`
+                : `Row ${rowRef(at.sectionIndex, at.rowIndex)}`,
               sectionId: section.id,
               index: at.rowIndex,
               item,
@@ -296,7 +307,7 @@ export function useDocumentActions({
       // Not a change of structure: the undo of the last delete stays on offer.
       setGuide: (itemId, guide) => commit(setRowGuide(current(), itemId, guide)),
     };
-  }, [rootRef]);
+  }, [rootRef, assembly]);
 }
 
 /** Finds the element for a focus request inside the document and focuses it. */

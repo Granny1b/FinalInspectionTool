@@ -9,6 +9,7 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
+  Wrench,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -46,6 +47,8 @@ const NAV_GROUPS: NavGroupItems[] = [
       { to: '/deviations/quality', label: 'Deviations', icon: ListChecks },
     ],
   },
+  // How the machines are built: the assembly instructions, read by everyone.
+  { label: 'Assembly', items: [{ to: '/assembly', label: 'Instructions', icon: Wrench }] },
   { label: 'Setup', items: [{ to: '/templates', label: 'Templates', icon: LayoutTemplate }] },
 ];
 const ADMIN_NAV: NavItem[] = [

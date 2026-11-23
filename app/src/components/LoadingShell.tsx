@@ -29,6 +29,7 @@ export function LoadingShell() {
           {[
             { label: 'w-28', links: ['w-11/12', 'w-3/4'] },
             { label: 'w-24', links: ['w-4/5', 'w-3/4'] },
+            { label: 'w-16', links: ['w-3/4'] },
             { label: 'w-12', links: ['w-full'] },
           ].map(({ label, links }) => (
             <div key={label} className="mt-5">

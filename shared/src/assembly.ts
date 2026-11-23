@@ -201,9 +201,11 @@ export function parsePartNumbers(text: string): string[] {
  */
 export function cleanAssemblyStep(step: AssemblyStep | undefined): AssemblyStep | undefined {
   if (!step) return undefined;
-  const department = step.department?.trim();
-  const assyNumber = step.assyNumber?.trim();
-  const assyName = step.assyName?.trim();
+  // As typed (a space at the end while the next word is on its way); blank is none.
+  const text = (value: string | undefined) => (value?.trim() ? value : undefined);
+  const department = text(step.department);
+  const assyNumber = text(step.assyNumber);
+  const assyName = text(step.assyName);
   const clean: AssemblyStep = {
     ...(department && { department }),
     ...(step.minutes !== undefined && { minutes: step.minutes }),
@@ -335,7 +337,7 @@ export function assemblyFileSections(
       const images = step.images ?? [];
       const assembly = cleanAssemblyStep(
         AssemblyStepSchema.parse({
-          department: step.department,
+          department: step.department?.trim(),
           minutes: step.minutes,
           fromPreAssembly: step.fromPreAssembly,
           fasteners: step.fasteners
@@ -344,8 +346,8 @@ export function assemblyFileSections(
             )
             .filter((fastener) => fastener !== null),
           partNumbers: step.partNumbers,
-          assyNumber: step.assyNumber,
-          assyName: step.assyName,
+          assyNumber: step.assyNumber?.trim(),
+          assyName: step.assyName?.trim(),
           documents: step.documents
             ?.map((document) =>
               typeof document === 'string' ? parseDocumentLine(document) : document,

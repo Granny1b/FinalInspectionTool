@@ -12,13 +12,15 @@ type Props = {
   choice: ModelChoice;
   context: ModelContext;
   onChange: (choice: ModelChoice) => void;
+  /** Under the select when a model of the settings is chosen; "one template per model" if left out. */
+  existingHint?: string;
 };
 
 /**
  * The machine model of a new template: a model without a template, or "New machine model…" with
  * its name and code (suggested from the name), added to the settings with the template.
  */
-export function MachineModelFields({ choice, context, onChange }: Props) {
+export function MachineModelFields({ choice, context, onChange, existingHint }: Props) {
   const isNew = choice.selected === NEW_MODEL;
   // Taken or malformed values show at once; empty fields just keep Create disabled.
   const problems = modelProblems(choice, context, { required: false });
@@ -29,7 +31,7 @@ export function MachineModelFields({ choice, context, onChange }: Props) {
         hint={
           isNew
             ? 'A model launched since: it is added to the machine models in Settings.'
-            : 'Each machine model has one template.'
+            : (existingHint ?? 'Each machine model has one template.')
         }
       >
         {(control) => (

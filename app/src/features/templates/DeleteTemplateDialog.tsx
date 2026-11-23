@@ -32,7 +32,8 @@ export function DeleteTemplateDialog({
   onClose,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const quality = kind === 'quality';
+  // Neither a quality check nor an assembly instruction has inspections or checks of its own.
+  const quality = kind !== 'final';
   const history =
     revisions === 0
       ? 'Its draft'
@@ -76,7 +77,13 @@ export function DeleteTemplateDialog({
         </Button>
         <Button variant="danger" onClick={onDelete} disabled={busy}>
           {busy && <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />}
-          {busy ? 'Deleting…' : quality ? 'Delete quality check' : 'Delete template'}
+          {busy
+            ? 'Deleting…'
+            : kind === 'assembly'
+              ? 'Delete instruction'
+              : quality
+                ? 'Delete quality check'
+                : 'Delete template'}
         </Button>
       </div>
     </Dialog>

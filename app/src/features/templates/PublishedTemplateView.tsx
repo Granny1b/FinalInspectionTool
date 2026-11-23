@@ -38,6 +38,7 @@ export function PublishedTemplateView({
 }: Props) {
   const settings = useSettings();
   const quality = template.kind === 'quality';
+  const assembly = template.kind === 'assembly';
   const actions = (
     <>
       {badges}
@@ -67,13 +68,18 @@ export function PublishedTemplateView({
           <div className="flex flex-wrap items-center gap-2">{actions}</div>
         </div>
       )}
-      {quality ? (
+      {assembly ? null : quality ? (
         <PublishedQualityFront template={template} />
       ) : (
         <PublishedFrontPage template={template} models={settings.data?.machineModels} />
       )}
-      <section aria-labelledby="checklist-title" className="mt-10">
-        <ChecklistHeading id="checklist-title" sections={template.sections} withTime={quality} />
+      <section aria-labelledby="checklist-title" className={assembly ? undefined : 'mt-10'}>
+        <ChecklistHeading
+          id="checklist-title"
+          sections={template.sections}
+          withTime={quality}
+          assembly={assembly}
+        />
         <TemplateDocument sections={template.sections} variant={template.kind} />
       </section>
     </>

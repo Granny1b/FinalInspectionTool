@@ -9,6 +9,7 @@ import { Badge } from '../features/templates/Badge';
 import { MachineHeader } from '../features/templates/MachineHeader';
 import { PublishedTemplateView } from '../features/templates/PublishedTemplateView';
 import {
+  assemblyHref,
   qualityCheckHref,
   templateHref,
   useTemplateDetail,
@@ -41,7 +42,7 @@ export function DraftEditor({
   parentId,
 }: {
   id: string;
-  kind: 'final' | 'quality';
+  kind: 'final' | 'quality' | 'assembly';
   parentId?: string;
 }) {
   const query = useTemplateDetail(id);
@@ -67,7 +68,12 @@ export function DraftEditor({
       />
     );
   }
-  const noun = kind === 'quality' ? 'quality check' : 'template';
+  const noun =
+    kind === 'assembly'
+      ? 'assembly instruction'
+      : kind === 'quality'
+        ? 'quality check'
+        : 'template';
   if (query.isPending) return <PageLoading label={`Loading the ${noun}…`} />;
   if (isMissing(query.error)) return <TemplateNotFound what={noun} />;
   return (
@@ -103,6 +109,7 @@ function LatestRevision({ id }: { id: string }) {
   if (summary.kind === 'quality' && summary.parentId) {
     return <Navigate to={qualityCheckHref(summary.parentId, summary.id)} replace />;
   }
+  if (summary.kind === 'assembly') return <Navigate to={assemblyHref(summary.id)} replace />;
   const header = (
     <MachineHeader
       templateId={id}

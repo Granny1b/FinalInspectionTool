@@ -110,8 +110,8 @@ describe('time, parts and numbers', () => {
     expect(cleanAssemblyStep({ department: ' ', fasteners: [], fromPreAssembly: false })).toBe(
       undefined,
     );
-    expect(cleanAssemblyStep({ department: ' Mechanics ', minutes: 0 })).toEqual({
-      department: 'Mechanics',
+    expect(cleanAssemblyStep({ department: 'Mechanics ', minutes: 0 })).toEqual({
+      department: 'Mechanics ',
       minutes: 0,
     });
   });
@@ -238,10 +238,10 @@ describe('an assembly instruction as a template', () => {
 
   it('sees a changed step field as a change, and an empty one as none', () => {
     const base = { name: 'HHV-3', modelCode: 'HHV3', sections };
-    const changed = structuredClone(sections);
+    const changed = JSON.parse(JSON.stringify(sections)) as Section[];
     changed[0]!.items[0]!.assembly!.minutes = 20;
     expect(sameTemplateContent(base, { ...base, sections: changed })).toBe(false);
-    const blank = structuredClone(sections);
+    const blank = JSON.parse(JSON.stringify(sections)) as Section[];
     blank[0]!.items[1]!.assembly = { department: '', fasteners: [] };
     expect(sameTemplateContent(base, { ...base, sections: blank })).toBe(true);
   });

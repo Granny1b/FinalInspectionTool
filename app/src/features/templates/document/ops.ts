@@ -7,7 +7,14 @@
  * fresh ids. An unknown id, or a move to where the row already is, returns the input array itself,
  * so callers can skip a pointless save with `next === sections`.
  */
-import { newId, type Guide, type Item, type Section } from '@modig/shared';
+import {
+  cleanAssemblyStep,
+  newId,
+  type AssemblyStep,
+  type Guide,
+  type Item,
+  type Section,
+} from '@modig/shared';
 
 /** Where a row ends up: the target section and its index there, counted without the moved row. */
 export type RowPosition = { sectionId: string; index: number };
@@ -146,6 +153,8 @@ export type RowFields = {
   how?: string | undefined;
   references?: string[] | undefined;
   timeHours?: number | undefined;
+  /** An assembly instruction's step: the fields to change; an emptied one is left out. */
+  assembly?: Partial<AssemblyStep> | undefined;
 };
 
 /**
@@ -167,9 +176,15 @@ export function setRowFields(sections: Section[], itemId: string, patch: RowFiel
       delete next.timeHours;
       if (patch.timeHours !== undefined) next.timeHours = patch.timeHours;
     }
+    if (patch.assembly) {
+      const step = cleanAssemblyStep({ ...item.assembly, ...patch.assembly });
+      delete next.assembly;
+      if (step) next.assembly = step;
+    }
     const same =
       next.how === item.how &&
       next.timeHours === item.timeHours &&
+      JSON.stringify(next.assembly ?? null) === JSON.stringify(item.assembly ?? null) &&
       JSON.stringify(next.references ?? null) === JSON.stringify(item.references ?? null);
     return same ? item : next;
   });
