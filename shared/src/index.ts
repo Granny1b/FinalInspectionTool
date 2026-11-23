@@ -10,6 +10,7 @@ export * from './insights';
 export * from './people';
 export * from './settings';
 export * from './templateTransfer';
+export * from './assembly';
 export * from './qualityChecks';
 export * from './deviationLog';
 export * from './checklistMerge';

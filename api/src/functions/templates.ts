@@ -2,12 +2,14 @@
  * Templates (brief §5.2, §8): list, create, import and delete templates, read and save a
  * template's draft. Publishing and published revisions are in template-revisions.ts. A quality
  * check is a template too (`kind: 'quality'`, under its machine's final inspection template):
- * the same routes create, import, save and delete it.
+ * the same routes create, import, save and delete it. So is an assembly instruction
+ * (`kind: 'assembly'`, for a machine model, which may have several).
  *
  *   GET    /api/templates         inspector  TemplateSummary[]
- *   POST   /api/templates         admin      CreateTemplateRequest | CreateQualityCheckRequest
- *                                            → 201 TemplateDetail + ETag
- *   POST   /api/templates/import  admin      ImportTemplateRequest | ImportQualityCheckRequest
+ *   POST   /api/templates         admin      CreateTemplateRequest | CreateQualityCheckRequest |
+ *                                            CreateAssemblyRequest → 201 TemplateDetail + ETag
+ *   POST   /api/templates/import  admin      ImportTemplateRequest | ImportQualityCheckRequest |
+ *                                            ImportAssemblyRequest
  *                                            → 201 ImportTemplateResponse + ETag
  *   GET    /api/templates/{id}    admin      TemplateDetail + ETag
  *   PUT    /api/templates/{id}    admin      If-Match, TemplateDraftInput
@@ -20,6 +22,7 @@
  */
 import { app, type HttpRequest } from '@azure/functions';
 import {
+  assemblyFileSections,
   blobNames,
   checklistIds,
   CONTAINERS,
@@ -36,6 +39,7 @@ import {
   TemplateSchema,
   withAvailableImages,
   withNewIds,
+  type ImportAssemblyRequest,
   type ImportQualityCheckRequest,
   type ImportTemplateResponse,
   type MachineModel,
@@ -87,7 +91,18 @@ export const listTemplates = endpoint({ role: 'inspector' }, async () =>
 export const createTemplate = endpoint({ role: 'admin' }, async (req, _context, user) => {
   const body = await readJsonBody(req, CreateAnyTemplateRequestSchema);
   let created: { draft: Template; etag: string };
-  if (body.kind === 'quality') {
+  if (body.kind === 'assembly') {
+    const { name, modelCode, newModel } = body;
+    await prepareAssemblyModel(modelCode, newModel, user.email);
+    created = await writeNewDraft({
+      kind: 'assembly',
+      name,
+      modelCode,
+      // The editor starts from an empty state with "+ Add task".
+      sections: [],
+      updatedBy: user.email,
+    });
+  } else if (body.kind === 'quality') {
     const machine = await loadMachine(body.parentId);
     created = await writeNewDraft({
       kind: 'quality',
@@ -123,6 +138,7 @@ export const createTemplate = endpoint({ role: 'admin' }, async (req, _context, 
  */
 export const importTemplate = endpoint({ role: 'admin' }, async (req, _context, user) => {
   const body = await readJsonBody(req, ImportAnyTemplateRequestSchema);
+  if (body.kind === 'assembly') return importAssembly(body, user.email);
   if (body.kind === 'quality') return importQualityCheck(body, user.email);
   const { name, modelCode, newModel, file } = body;
   const { coverImageId, sections } = file.template;
@@ -191,6 +207,34 @@ async function importQualityCheck(body: ImportQualityCheckRequest, by: string) {
   return json(201, imported, etagHeader(etag));
 }
 
+/**
+ * A new assembly instruction draft from an assembly instruction file, for the model and under the
+ * name the admin chose. A file's tasks and steps have no ids: each gets a new one. Pictures this
+ * installation doesn't have are left out, as for a template.
+ */
+async function importAssembly(body: ImportAssemblyRequest, by: string) {
+  const { name, modelCode, newModel, file } = body;
+  const sections = assemblyFileSections(file);
+  const stored = await storedImages(templateImageIds({ sections }));
+  const { template: checklist, dropped } = withAvailableImages({ sections }, stored);
+  // Last, so a refused import never adds a machine model.
+  await prepareAssemblyModel(modelCode, newModel, by);
+  const { draft, etag } = await writeNewDraft({
+    kind: 'assembly',
+    name,
+    modelCode,
+    sections: checklist.sections,
+    updatedBy: by,
+  });
+  const imported: ImportTemplateResponse = {
+    draft,
+    revisions: [],
+    hasUnpublishedChanges: true,
+    droppedImages: dropped,
+  };
+  return json(201, imported, etagHeader(etag));
+}
+
 export const getTemplate = endpoint({ role: 'admin' }, async (req) => {
   const found = await loadDetail(idParam(req));
   if (!found) throw templateNotFound();
@@ -227,8 +271,11 @@ export const saveTemplate = endpoint({ role: 'admin' }, async (req, _context, us
           // Its name follows its front page; a front page left out stays as it was.
           ...withQuality(quality ?? current.draft.quality ?? newQualityFront(EMPTY_FRONT)),
         }
-      : // A final inspection template has no front page of a quality check.
-        content),
+      : kind === 'assembly'
+        ? // An assembly instruction keeps the model it was written for.
+          { ...content, modelCode: current.draft.modelCode }
+        : // A final inspection template has no front page of a quality check.
+          content),
     status: 'draft',
     revision: nextRevision(current.revisions),
     updatedAt: new Date().toISOString(),
@@ -399,6 +446,30 @@ async function prepareModel(
   }
   // Checked inside the conditional write, so an admin adding the same model meanwhile is a 409
   // here rather than a second template for their model.
+  await updateSettings((settings) => {
+    const conflict = newModelConflict(settings.machineModels, newModel);
+    if (conflict) throw new ConflictError(conflict.message);
+    return { ...settings, machineModels: [...settings.machineModels, newModel] };
+  }, by);
+}
+
+/**
+ * The model of a new assembly instruction: one of the settings', or `newModel`, added to them
+ * first (409 when its code or name is taken). A model may have any number of instructions, with
+ * or without a final inspection template.
+ */
+async function prepareAssemblyModel(
+  modelCode: string,
+  newModel: MachineModel | undefined,
+  by: string,
+): Promise<void> {
+  if (!newModel) {
+    const settings = await loadSettings();
+    if (!settings?.machineModels.some((model) => model.code === modelCode)) {
+      throw new BadRequestError(`Unknown machine model "${modelCode}".`);
+    }
+    return;
+  }
   await updateSettings((settings) => {
     const conflict = newModelConflict(settings.machineModels, newModel);
     if (conflict) throw new ConflictError(conflict.message);
