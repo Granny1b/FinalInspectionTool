@@ -43,6 +43,7 @@ export async function resetStorage(): Promise<void> {
     CONTAINERS.templates,
     CONTAINERS.inspections,
     CONTAINERS.followUps,
+    CONTAINERS.machineAssemblies,
     CONTAINERS.machines,
   ]) {
     const container = containerClient(name);

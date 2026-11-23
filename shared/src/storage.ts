@@ -12,6 +12,8 @@
  *   follow-ups/{inspectionId}.json           its deviations' follow-up: open or closed, the action
  *   machines/{machineId}.json                a machine being built (its checks are inspections)
  *   config/quality-check-orders/{templateId}.json  the order of a machine model's quality checks
+ *   machine-assemblies/{machineId}/{id}.json           an assembly instruction bound to a machine
+ *   machine-assemblies/{machineId}/{id}.signoffs.json  who signed which of its steps, and when
  *
  * Table `deviations`: one row per deviation (KPI source).
  */
@@ -31,6 +33,11 @@ export const CONTAINERS = {
    * are inspections that name it (`machineRef`).
    */
   machines: 'machines',
+  /**
+   * The assembly instructions bound to machines, under each machine's id: the machine's copy of
+   * the instruction, and beside it the sign-offs of its steps (machineAssembly.ts).
+   */
+  machineAssemblies: 'machine-assemblies',
 } as const;
 export type ContainerName = (typeof CONTAINERS)[keyof typeof CONTAINERS];
 
@@ -61,6 +68,11 @@ export const blobNames = {
    * template is `templateId`, as admins drag them on its Quality checks tab.
    */
   qualityCheckOrder: (templateId: string) => `quality-check-orders/${templateId}.json`,
+  /** In `machine-assemblies/`: a machine's copy of an assembly instruction, and its sign-offs. */
+  machineAssembly: (machineId: string, id: string) => `${machineId}/${id}.json`,
+  machineAssemblySignOffs: (machineId: string, id: string) => `${machineId}/${id}.signoffs.json`,
+  /** Matches a copy's blob name under its machine (not its sign-offs) and captures its id. */
+  machineAssemblyPattern: /^[A-Za-z0-9]+\/([A-Za-z0-9]+)\.json$/,
 } as const;
 
 /** Table Storage keys for a deviation row (brief §4). */

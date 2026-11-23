@@ -44,6 +44,7 @@ var containerNames = [
   'config'
   'follow-ups'
   'machines'
+  'machine-assemblies'
 ]
 var deviationsTableName = 'deviations'
 
