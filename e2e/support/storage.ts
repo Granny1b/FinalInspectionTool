@@ -390,4 +390,12 @@ export async function deleteMachines(ids: readonly string[]): Promise<void> {
   await Promise.all(
     ids.map((id) => machines.getBlobClient(blobNames.machine(id)).deleteIfExists()),
   );
+  // Their assembly instructions and sign-offs, which the app deletes with a machine.
+  const assemblies = storage.getContainerClient(CONTAINERS.machineAssemblies);
+  if (!(await assemblies.exists())) return;
+  for (const id of ids) {
+    for await (const blob of assemblies.listBlobsFlat({ prefix: `${id}/` })) {
+      await assemblies.getBlobClient(blob.name).deleteIfExists();
+    }
+  }
 }

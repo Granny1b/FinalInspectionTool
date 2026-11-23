@@ -116,6 +116,12 @@ Added after the six phases:
   file. The browser asks for the camera the first time; a tablet's back camera is used first, with
   **Other camera** to turn it round.
 
+- **Assembly on a machine.** An assembly instruction is bound to a machine on the machine's page
+  (**Add instruction**), and its steps are signed off there as the work is done: with initials,
+  and the time and the signed-in account behind them. A task turns green when all its steps are
+  signed, and the machine's page shows how far each instruction has come. See
+  [Assembly on a machine](#assembly-on-a-machine).
+
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
 ## Prerequisites
@@ -1812,3 +1818,25 @@ machine (who, when, status, actual time) is not part of it yet.
   (`--no-comments` leaves them out). A Department that is none of the departments (a supplier's
   name) becomes "External company", with the supplier named in the step's instructions. The
   sign-off columns and the Swedish text are left behind.
+
+## Assembly on a machine
+
+- **Binding:** a machine's page has an **Assembly** section. **Add instruction** offers the
+  published assembly instructions of the machine's model; the machine gets its own copy of the
+  latest revision. A machine has each instruction once. Admins remove one (with its sign-offs)
+  from its ⋯ menu.
+- **Signing:** the instruction opens as it is read, with **Sign as done** on every step.
+  **Signing as** holds the initials (the signed-in user's to start with, remembered on the
+  device; one to five letters or digits). A signed step turns green and shows "Done · SA" with
+  the date and time; the tooltip names the account it was signed from. **Sign the whole task**
+  signs a task's remaining steps after asking. A task with every step signed is green and says
+  Completed, in the list of tasks too; the bar at the top fills, and the whole instruction says
+  Completed when everything is signed. "Only steps not signed yet" hides what is done.
+- **Taking back:** **Undo** on a signed step, for the one who signed it; an admin can take back
+  anyone's.
+- **Several people at once:** each sign-off is merged on the server, so people signing on
+  different screens never overwrite each other; an open page shows the others' sign-offs within
+  20 seconds. A step two people sign keeps the first sign-off.
+- **A newer revision:** when the instruction is published again, the machine's page and the
+  instruction say so, and **Update to Rev N** brings the changes to that machine. What is signed
+  stays signed.

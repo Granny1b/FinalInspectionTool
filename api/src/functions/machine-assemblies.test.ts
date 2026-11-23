@@ -292,9 +292,7 @@ describe('a newer revision, and removing', () => {
     expect((await call(getMachineAssembly, at)).status).toBe(404);
     expect(await loadSignOffs(machineId, assembly.id)).toEqual({});
 
-    const second = await bound().catch(() => null);
-    // Another machine of the same name can't be made: bind to the first one again instead.
-    expect(second).toBeNull();
+    // Bound again, it goes with its machine when that is deleted.
     const template = instruction();
     await storeTemplate(template, [1]);
     await call(addMachineAssembly, {

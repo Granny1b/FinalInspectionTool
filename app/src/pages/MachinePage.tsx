@@ -11,6 +11,7 @@ import { EmptyState } from '../components/EmptyState';
 import { LoadError, PageLoading } from '../components/PageStates';
 import { DeleteInspectionDialog } from '../features/inspections/DeleteInspectionDialog';
 import { useInspections } from '../features/inspections/queries';
+import { MachineAssemblySection } from '../features/machineAssembly/MachineAssemblySection';
 import { CheckSection } from '../features/machines/MachineChecks';
 import {
   AddCheckDialog,
@@ -209,6 +210,7 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
       </div>
 
       <div className="space-y-10">
+        <MachineAssemblySection machine={machine} isAdmin={isAdmin} />
         <CheckSection
           kind="quality"
           empty="No quality checks on this machine. Add one with Add check."

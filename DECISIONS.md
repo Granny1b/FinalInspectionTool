@@ -3839,3 +3839,47 @@ beforehand, if it cost little.
   Add photo beside it still works.
 - **Tests:** `e2e/camera.spec.ts` with Chromium's fake camera (taken, edited, saved in the draft)
   and a refused camera.
+
+## Assembly on a machine: binding and sign-off (2026-11-23)
+
+The user wanted to bind an assembly instruction to a machine being built ("I start an HHV"), sign
+tasks off with initials, see clearly in green what is completed, and have the date saved and shown
+subtly.
+
+- **Steps are signed; a task is completed when all its steps are.** "Task" could mean the sheet's
+  Task (a section) or a row. Signing steps covers both: the Excel sheet signed rows, and **Sign
+  the whole task** signs a task's remaining steps in one confirmed click for those who sign per
+  task.
+- **A machine's assembly is its own document, not an inspection.** `machine-assemblies/
+{machineId}/{id}.json` is the machine's copy of the instruction's latest published revision;
+  `{id}.signoffs.json` beside it maps step ids to `{ initials, by, at }`. An inspection would have
+  brought numbers, states, deviations and Insights along, none of which an assembly has. Under the
+  machine's id, so a machine's assemblies are one prefix listing and go with the machine.
+- **Sign-offs are apart from the copy and merged on the server** (`changeSignOffs`: read, change,
+  write over that version, again on a conflict, up to six times). The page never sends the whole
+  document, so several departments signing at once can't lose each other's work, which a
+  whole-document save with If-Match would have turned into constant conflicts. The answer to
+  every sign carries everyone's sign-offs; an open page also refetches every 20 s.
+- **The first sign-off stands.** Signing a step someone has signed changes nothing (and "sign the
+  whole task" skips those), so a sign-off's initials and time are never silently replaced.
+- **Initials are typed; the account and the time are not.** Initials are what people recognise on
+  the floor (and a shared tablet may be signed in as someone else); the signed-in email and the
+  server's time are stored with them and shown in the tooltip and next to the initials. The
+  field starts as the user's initials and is remembered per device.
+- **Taking back is the signer's, or an admin's** (403 otherwise). A mistake must be undoable
+  without an admin, but not by anyone.
+- **Everyone signed in can bind and sign** (inspectors), as they make machines and start checks;
+  removing an instruction from a machine, with its sign-offs, is the admins'.
+- **Updating to a newer revision replaces the copy and keeps the sign-offs.** A step keeps its id
+  through revisions, so no merge is needed; a sign-off of a step the new revision dropped stays
+  stored but no longer counts. Unlike a machine's checklists, the copy can't be edited per
+  machine.
+- **Green means signed:** a signed step's card, a completed task's header and its entry in the
+  list of tasks, the progress panel and the machine's card use the `ok` colours, with a check and
+  the word, never colour alone.
+- **Not done:** binding when the machine is made (it is added on its page), actual time per step,
+  comments from the floor, the machines list showing assembly progress, printing.
+- **Infra:** a new container, `machine-assemblies` (Bicep; created on demand like the others).
+- **Tests:** shared (`machineAssembly.test.ts`), api (`machine-assemblies.test.ts`, including
+  three people signing at once), e2e (`machine-assembly.spec.ts`: bound, signed by two people,
+  taken back, completed).

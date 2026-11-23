@@ -1,8 +1,10 @@
 import clsx from 'clsx';
-import { CircleAlert, CircleCheck, X, type LucideIcon } from 'lucide-react';
+import { CircleAlert, CircleCheck, Info, X, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-const TONES: Record<'error' | 'success', { box: string; icon: LucideIcon }> = {
+const TONES: Record<'error' | 'success' | 'info', { box: string; icon: LucideIcon }> = {
+  /** Something to know or to do, not a problem: a newer revision to update to. */
+  info: { box: 'border-brand-200 bg-brand-50 text-brand-800', icon: Info },
   error: { box: 'border-nok-border bg-nok-bg text-nok-fg', icon: CircleAlert },
   success: { box: 'border-ok-border bg-ok-bg text-ok-fg', icon: CircleCheck },
 };
