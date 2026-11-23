@@ -112,8 +112,12 @@ function Assembly({ machineId, detail }: { machineId: string; detail: MachineAss
     return {
       signOffs,
       initials: valid.success ? valid.data : '',
-      onSign: (itemIds) => {
-        if (valid.success) run(itemIds, { action: 'sign', itemIds, initials: valid.data });
+      onSign: (itemIds, typed) => {
+        // Initials typed next to a step are the ones to sign with from then on.
+        const chosen = typed === undefined ? valid : InitialsSchema.safeParse(typed);
+        if (!chosen.success) return;
+        if (typed !== undefined) setInitials(chosen.data);
+        run(itemIds, { action: 'sign', itemIds, initials: chosen.data });
       },
       onUnsign: (itemId) => run([itemId], { action: 'unsign', itemIds: [itemId] }),
       canUnsign: (signOff) => isAdmin || signOff.by.toLowerCase() === email,

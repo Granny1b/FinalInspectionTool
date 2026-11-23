@@ -3883,3 +3883,17 @@ subtly.
 - **Tests:** shared (`machineAssembly.test.ts`), api (`machine-assemblies.test.ts`, including
   three people signing at once), e2e (`machine-assembly.spec.ts`: bound, signed by two people,
   taken back, completed).
+
+## Sign-off: initials next to the button (2026-11-23)
+
+The user may give production one generic login, so the initials of the signed-in account are
+often not the signer's: they wanted a small field next to the sign-off to override them easily.
+
+- **Each unsigned step has its own initials field beside Sign as done.** It shows the initials
+  the page signs with and is overtyped in place; what is typed stays in that field (no other step
+  re-renders per keystroke) until the step is signed. Signing with typed initials makes them the
+  page's (and the device's remembered) initials, so the next person only retypes when they differ.
+- **"Signing as" at the top stays** as where the current initials show and can be set once;
+  "Sign the whole task" signs with those.
+- **With a shared login, Undo is everyone's on that login:** a sign-off belongs to the account it
+  was signed from, which is all the app can know. The initials still say who.

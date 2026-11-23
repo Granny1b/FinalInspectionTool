@@ -1,6 +1,7 @@
 import {
   assemblyProgress,
   formatMinutes,
+  InitialsSchema,
   stepRef,
   stepsMinutes,
   totalMinutes,
@@ -39,8 +40,11 @@ export type Signing = {
   signOffs: AssemblySignOffs;
   /** The initials steps are signed with; '' while none are entered (signing then asks for them). */
   initials: string;
-  /** Sign these steps as done. */
-  onSign: (itemIds: string[]) => void;
+  /**
+   * Sign these steps as done: with `initials` when the field next to a step's button was changed
+   * (they then become the ones to sign with), else with the ones above.
+   */
+  onSign: (itemIds: string[], initials?: string) => void;
   /** Take a step's sign-off back. */
   onUnsign: (itemId: string) => void;
   /** Whether the user may take this sign-off back (their own; an admin anyone's). */
@@ -476,6 +480,67 @@ function TaskSection({
   );
 }
 
+/**
+ * A step's sign-off: a small field with the initials to sign with, and the button. The field
+ * starts as the initials last signed with on this device (the signed-in user's at first) and can
+ * be overtyped for this sign-off, as on a tablet several people share; Enter in it signs too.
+ */
+function SignField({
+  stepRef: ref,
+  itemId,
+  busy,
+  signing,
+}: {
+  stepRef: string;
+  itemId: string;
+  busy: boolean;
+  signing: Signing;
+}) {
+  // What was typed here; null shows the initials the page signs with.
+  const [typed, setTyped] = useState<string | null>(null);
+  const text = typed ?? signing.initials;
+  const initials = InitialsSchema.safeParse(text);
+  const sign = () => {
+    if (!initials.success || busy) return;
+    signing.onSign([itemId], initials.data);
+    setTyped(null);
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        aria-label={`Initials for step ${ref}`}
+        aria-invalid={text !== '' && !initials.success ? true : undefined}
+        autoComplete="off"
+        autoCapitalize="characters"
+        spellCheck={false}
+        maxLength={5}
+        placeholder="Initials"
+        value={text}
+        onChange={(event) => setTyped(event.target.value.toLocaleUpperCase('sv'))}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') sign();
+        }}
+        className="h-10 w-20 rounded-md border border-ink-500/80 bg-surface px-2 text-center text-sm font-semibold tracking-wide text-ink-900 shadow-xs placeholder:font-normal placeholder:tracking-normal placeholder:text-ink-500 hover:border-ink-600 focus-visible:border-brand-600 focus-visible:outline-1 focus-visible:outline-offset-0 aria-invalid:border-nok-fg dark:border-ink-400"
+      />
+      <button
+        type="button"
+        disabled={busy || !initials.success}
+        aria-label={`Sign step ${ref} as done`}
+        title={initials.success ? undefined : 'Enter your initials first'}
+        onClick={sign}
+        className="inline-flex h-10 items-center gap-2 rounded-md bg-ok-fg px-4 text-sm font-semibold text-white shadow-xs transition-opacity hover:opacity-90 disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none dark:text-ink-50"
+      >
+        {busy ? (
+          <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />
+        ) : (
+          <Check size={16} strokeWidth={3} aria-hidden="true" />
+        )}
+        Sign as done
+      </button>
+    </div>
+  );
+}
+
 function StepCard({
   item,
   stepLabel: ref,
@@ -582,21 +647,7 @@ function StepCard({
                   )}
                 </>
               ) : (
-                <button
-                  type="button"
-                  disabled={busy || !signing.initials}
-                  aria-label={`Sign step ${ref} as done`}
-                  title={signing.initials ? undefined : 'Enter your initials at the top first'}
-                  onClick={() => signing.onSign([item.id])}
-                  className="inline-flex h-10 items-center gap-2 rounded-md bg-ok-fg px-4 text-sm font-semibold text-white shadow-xs transition-opacity hover:opacity-90 disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none dark:text-ink-50"
-                >
-                  {busy ? (
-                    <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />
-                  ) : (
-                    <Check size={16} strokeWidth={3} aria-hidden="true" />
-                  )}
-                  Sign as done
-                </button>
+                <SignField stepRef={ref} itemId={item.id} busy={busy} signing={signing} />
               )}
             </div>
           )}

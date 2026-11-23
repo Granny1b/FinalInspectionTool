@@ -103,9 +103,14 @@ test('an instruction is bound to a machine and signed off until it is completed'
   await signIn(other, INSPECTOR, ['inspector']);
   const second = await other.newPage();
   await second.goto(page.url());
-  await second.getByLabel('Signing as').fill('lcs');
-  await expect(second.getByLabel('Signing as')).toHaveValue('LCS');
+  // The field next to the button starts as theirs and is overtyped for someone else; the
+  // initials signed with are then the ones the other steps offer.
+  await expect(second.getByLabel('Initials for step 1.2')).toHaveValue('SA');
+  await second.getByLabel('Initials for step 1.2').fill('lcs');
+  await expect(second.getByLabel('Initials for step 1.2')).toHaveValue('LCS');
   await second.getByRole('button', { name: 'Sign step 1.2 as done' }).click();
+  await expect(second.getByLabel('Signing as')).toHaveValue('LCS');
+  await expect(second.getByLabel('Initials for step 2.1')).toHaveValue('LCS');
   const task = second.getByRole('button', { name: /Base/ });
   await expect(task).toContainText('Completed');
   await expect(task).toContainText('2 of 2 signed');

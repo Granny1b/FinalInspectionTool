@@ -1825,9 +1825,11 @@ machine (who, when, status, actual time) is not part of it yet.
   published assembly instructions of the machine's model; the machine gets its own copy of the
   latest revision. A machine has each instruction once. Admins remove one (with its sign-offs)
   from its ⋯ menu.
-- **Signing:** the instruction opens as it is read, with **Sign as done** on every step.
-  **Signing as** holds the initials (the signed-in user's to start with, remembered on the
-  device; one to five letters or digits). A signed step turns green and shows "Done · SA" with
+- **Signing:** the instruction opens as it is read, with **Sign as done** on every step and a
+  small initials field next to it. The field starts as the initials last signed with on the device
+  (the signed-in user's at first; one to five letters or digits) and can be overtyped for that
+  sign-off, as when several people share one login or tablet; `Enter` in it signs. The initials
+  signed with become the ones offered next, and **Signing as** at the top shows them. A signed step turns green and shows "Done · SA" with
   the date and time; the tooltip names the account it was signed from. **Sign the whole task**
   signs a task's remaining steps after asking. A task with every step signed is green and says
   Completed, in the list of tasks too; the bar at the top fills, and the whole instruction says
