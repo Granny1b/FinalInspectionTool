@@ -106,7 +106,7 @@ export function ImportAssemblyDialog({ picked, models, onClose }: Props) {
       }
       onClose={onClose}
       busy={running}
-      className="w-[min(42rem,calc(100vw-2rem))]"
+      className="sm:w-[min(42rem,calc(100vw-2rem))]"
     >
       <form onSubmit={(event) => void run(event)} className="mt-6 space-y-5">
         {count > 0 && !started && (
