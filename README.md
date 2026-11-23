@@ -110,6 +110,12 @@ Added after the six phases:
   search and a department filter. Exported and imported as JSON, several files at once, and made
   from the Excel assembly sheet with a script. See [Assembly instructions](#assembly-instructions).
 
+- **Take a photo live.** Wherever pictures are added (a quality check's rows, guides, deviation
+  photos, assembly steps) there is **Take photo** next to **Add photo**: the device's camera
+  shows its picture in the app, one click takes it, and it opens in the same editor as a chosen
+  file. The browser asks for the camera the first time; a tablet's back camera is used first, with
+  **Other camera** to turn it round.
+
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
 ## Prerequisites

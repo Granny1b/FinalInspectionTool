@@ -3819,3 +3819,23 @@ English only; file-server paths must be easy to paste and to copy.
   (`parse-assembly-workbook.test.ts`), e2e (`assembly.spec.ts`: write, publish, read as
   inspector, export, import of several files). The sidebar test expects the Assembly group; the
   "models without a template" test now counts final inspection templates only.
+
+## Taking a photo live (2026-11-23)
+
+The user wanted to take a quality check's pictures on the spot, not only upload ones taken
+beforehand, if it cost little.
+
+- **One dialog in the one place photos are added** (`annotate/CameraDialog.tsx`, opened from
+  `AnnotatedPhotos`): quality check rows, guides, deviation photos and assembly steps all get it.
+  It hands the photo on as a JPEG `File` to the same `add` a chosen file goes through, so
+  resizing, upload and the annotation editor are untouched. Nothing is stored differently.
+- **`getUserMedia`, not `<input capture>`.** `capture` only works on phones and tablets (where the
+  file picker already offers the camera); the live dialog also works on a PC with a webcam. The
+  tile is shown only where the browser has the API (a secure page). The site's
+  `Permissions-Policy` already allowed `camera=(self)`.
+- **Back camera first** (`facingMode: environment`, ideal 1920×1440); "Other camera" when the
+  device reports more than one. The stream is stopped when the dialog closes or the camera turns.
+- **A refused or missing camera is explained in the dialog** (not allowed, none found, in use);
+  Add photo beside it still works.
+- **Tests:** `e2e/camera.spec.ts` with Chromium's fake camera (taken, edited, saved in the draft)
+  and a refused camera.

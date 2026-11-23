@@ -84,3 +84,8 @@ export function photoKeys(photos: readonly AnnotatedImage[]): string[] {
     return count === 1 ? imageId : `${imageId}#${count}`;
   });
 }
+
+/** Whether this browser can show a camera at all (a secure page with the media devices API). */
+export function cameraAvailable(): boolean {
+  return typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
+}

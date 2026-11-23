@@ -22,7 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { AnnotatedImage } from '@modig/shared';
 import clsx from 'clsx';
-import { GripVertical, ImageOff, ImagePlus, LoaderCircle, X } from 'lucide-react';
+import { Camera, GripVertical, ImageOff, ImagePlus, LoaderCircle, X } from 'lucide-react';
 import {
   lazy,
   Suspense,
@@ -41,8 +41,16 @@ import { flushSync } from 'react-dom';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useImageUrl } from '../../lib/images';
 import type { EditorSubject } from './AnnotationEditor';
+import { CameraDialog } from './CameraDialog';
 import { EditorLoadBoundary } from './EditorLoadBoundary';
-import { canDecode, firstImageFile, pastesText, photoKeys, shownImageId } from './photos';
+import {
+  cameraAvailable,
+  canDecode,
+  firstImageFile,
+  pastesText,
+  photoKeys,
+  shownImageId,
+} from './photos';
 import { PhotoViewer } from './PhotoViewer';
 import { startUpload } from './upload';
 
@@ -121,6 +129,9 @@ export function AnnotatedPhotos({
   const [editing, setEditing] = useState<Editing | null>(null);
   const [viewing, setViewing] = useState<number | null>(null);
   const [removing, setRemoving] = useState<number | null>(null);
+  // The device's camera, live (CameraDialog), where the browser has one to offer.
+  const [camera, setCamera] = useState(false);
+  const cameraRef = useRef<HTMLButtonElement>(null);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -131,7 +142,7 @@ export function AnnotatedPhotos({
   const editable = onChange !== undefined;
   const full = photos.length >= max;
   // Paste and drop only add photos while no dialog of this list is open.
-  const accepting = editable && editing === null && removing === null;
+  const accepting = editable && editing === null && removing === null && !camera;
   // One photo has no other place to go.
   const sortable = editable && reorderable && photos.length > 1;
   const keys = useMemo(() => photoKeys(photos), [photos]);
@@ -393,6 +404,20 @@ export function AnnotatedPhotos({
             </button>
           </li>
         )}
+        {editable && !full && cameraAvailable() && (
+          <li className={tile}>
+            <button
+              ref={cameraRef}
+              type="button"
+              onClick={() => setCamera(true)}
+              className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-ink-400 bg-surface text-ink-700 transition-colors hover:border-brand-500 hover:bg-brand-50 hover:text-brand-700"
+            >
+              <Camera size={18} aria-hidden="true" className="mb-0.5" />
+              <span className="text-xs font-medium">Take {words.name}</span>
+              <span className="text-[0.6875rem] text-ink-500">with the camera</span>
+            </button>
+          </li>
+        )}
       </ul>
       {editable && (
         <input
@@ -431,6 +456,13 @@ export function AnnotatedPhotos({
             />
           </Suspense>
         </EditorLoadBoundary>
+      )}
+      {camera && (
+        <CameraDialog
+          noun={words.name}
+          onCapture={(file) => void add(file)}
+          onClose={() => setCamera(false)}
+        />
       )}
       {viewing !== null && photos[viewing] && (
         <PhotoViewer
