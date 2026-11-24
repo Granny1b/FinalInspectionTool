@@ -84,8 +84,9 @@ export function FollowUpActions({ target, pending, onChange, className }: Props)
 }
 
 const PILLS: Record<FollowUpStatus, { tone: string; icon: typeof CircleDot }> = {
-  open: { tone: 'bg-brand-50 text-brand-700 ring-brand-200', icon: CircleDot },
-  closed: { tone: 'bg-ok-bg text-ok-fg ring-ok-border', icon: CircleCheck },
+  // Quiet: a soft fill and no outline, so a page of open ones is calm to look down.
+  open: { tone: 'bg-brand-50 text-brand-700', icon: CircleDot },
+  closed: { tone: 'bg-ok-bg text-ok-fg', icon: CircleCheck },
 };
 
 /** "Open" or "Closed", in words with an icon, never by colour alone. */
@@ -94,7 +95,7 @@ export function StatusPill({ status }: { status: FollowUpStatus }) {
   return (
     <span
       className={clsx(
-        'inline-flex h-6 items-center gap-1 rounded-full pr-2.5 pl-2 text-xs font-semibold whitespace-nowrap ring-1 ring-inset',
+        'inline-flex h-6 items-center gap-1 rounded-full pr-2.5 pl-2 text-xs font-medium whitespace-nowrap',
         tone,
       )}
     >

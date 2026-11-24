@@ -3992,3 +3992,19 @@ chose **Modig Production**.
   the document's name; the sidebar group "Final inspection"; the repository, the file formats'
   `modig-final-inspection/…` identifiers (files already exported must keep importing) and the
   Azure resource names.
+
+## Deviation log: a calmer page (2026-11-24)
+
+The user found the deviation log cluttered and hard to read at a glance, and asked for something
+softer on the eyes. Nothing was removed; the same facts carry less ink.
+
+- **The summary is one card, not three boxes and a row of chips:** each number with its label and
+  detail beside it, hairlines between, and "Open by responsible" under a hairline in the same
+  card. A zero is grey, so the eye goes to what there is. Chips are filled softly, no outlines.
+- **A machine's header is quieter:** the model on its own line, then the checks its deviations
+  come from as a small list, a line each, with "In progress" as plain text where it was a badge
+  beside every number.
+- **The table has small uppercase labels and no grey header bar;** a deviation's id is grey (it is
+  for looking up, the text is what is read), responsible, category and date are a size smaller and
+  grey, and the status and severity pills have a soft fill without an outline.
+- The log's tests (roles and texts) pass unchanged.
