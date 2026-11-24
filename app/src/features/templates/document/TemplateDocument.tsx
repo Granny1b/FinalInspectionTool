@@ -1,6 +1,7 @@
 import type { PublishIssue, Section } from '@modig/shared';
 import { useMemo, type JSX } from 'react';
 import { AssemblyView } from '../../assembly/AssemblyView';
+import type { FlagTarget } from '../../changeRequests/FlagStepDialog';
 import { QualityChecklistView } from '../../qualityChecks/QualityChecklistView';
 import { EditableDocument } from './EditableDocument';
 import type { DocumentVariant } from './variant';
@@ -26,6 +27,8 @@ export type TemplateDocumentProps = {
    * one asks first, as its result goes with it.
    */
   protectedRows?: ReadonlySet<string>;
+  /** Read-only assembly instruction: where its steps are flagged for change from. */
+  flagFor?: FlagTarget | undefined;
 };
 
 /**
@@ -43,6 +46,7 @@ export function TemplateDocument({
   onEditorDirtyChange,
   variant = 'final',
   protectedRows,
+  flagFor,
 }: TemplateDocumentProps): JSX.Element {
   const issueIndex = useMemo(() => indexIssues(issues ?? []), [issues]);
   return (
@@ -59,7 +63,7 @@ export function TemplateDocument({
             protectedRows={protectedRows}
           />
         ) : variant === 'assembly' ? (
-          <AssemblyView sections={sections} issues={issueIndex} />
+          <AssemblyView sections={sections} issues={issueIndex} flagFor={flagFor} />
         ) : variant === 'quality' ? (
           <QualityChecklistView sections={sections} issues={issueIndex} />
         ) : (

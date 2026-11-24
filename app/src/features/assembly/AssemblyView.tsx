@@ -12,10 +12,20 @@ import {
   type TaskProgress,
 } from '@modig/shared';
 import clsx from 'clsx';
-import { Check, ChevronDown, CircleCheck, LoaderCircle, Search, Undo2, X } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  CircleCheck,
+  Flag,
+  LoaderCircle,
+  Search,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { formatDateTime } from '../../lib/format';
+import { FlagStepDialog, type FlagTarget } from '../changeRequests/FlagStepDialog';
 import { GuideViewer } from '../guides/GuideViewer';
 import { PictureTile } from '../qualityChecks/PictureTile';
 import type { IssueIndex } from '../templates/document/issues';
@@ -59,6 +69,11 @@ type Props = {
   sections: Section[];
   issues: IssueIndex;
   signing?: Signing | undefined;
+  /**
+   * Where a step is flagged for change from (the instruction, and the machine when on one):
+   * every step then has a small flag button that opens a form for what is wrong.
+   */
+  flagFor?: FlagTarget | undefined;
 };
 
 /**
@@ -66,7 +81,7 @@ type Props = {
  * instructions, bolts, parts and documents). A search box and the departments narrow it to the
  * steps someone needs; the list of tasks jumps to one. A step's picture opens its pictures large.
  */
-export function AssemblyView({ sections, issues, signing }: Props) {
+export function AssemblyView({ sections, issues, signing, flagFor }: Props) {
   const [filter, setFilter] = useState<StepFilter>(NO_FILTER);
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
   const [picturesOf, setPicturesOf] = useState<string | null>(null);
@@ -74,6 +89,10 @@ export function AssemblyView({ sections, issues, signing }: Props) {
   // On a machine: only the steps still to sign.
   const [hideSigned, setHideSigned] = useState(false);
   const [signingTask, setSigningTask] = useState<string | null>(null);
+  // The step being flagged for change, and whether one was just sent.
+  const [flagging, setFlagging] = useState<string | null>(null);
+  const [flagSent, setFlagSent] = useState(false);
+  const flagged = flagging === null ? null : findStep(sections, flagging);
   const signOffs = signing?.signOffs;
   const progress = useMemo(
     () => (signOffs ? assemblyProgress(sections, signOffs) : null),
@@ -200,6 +219,7 @@ export function AssemblyView({ sections, issues, signing }: Props) {
               issues={issues}
               onOpenPictures={setPicturesOf}
               signing={signing}
+              onFlag={flagFor ? setFlagging : undefined}
               progress={progress?.tasks.find((entry) => entry.sectionId === task.section.id)}
               onSignTask={() => setSigningTask(task.section.id)}
             />
@@ -207,6 +227,36 @@ export function AssemblyView({ sections, issues, signing }: Props) {
         </div>
       </div>
 
+      {flagFor && flagging !== null && flagged && (
+        <FlagStepDialog
+          target={flagFor}
+          itemId={flagging}
+          stepRef={flagged.ref}
+          stepText={flagged.item.text}
+          onSent={() => setFlagSent(true)}
+          onClose={() => setFlagging(null)}
+        />
+      )}
+      {flagSent && (
+        // At the bottom of the window, as the undo of a delete: said where the eyes are.
+        <div
+          role="status"
+          className="pointer-events-none fixed inset-x-0 bottom-6 z-30 flex justify-center px-4"
+        >
+          <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-ok-border bg-ok-bg py-2 pr-1.5 pl-4 text-sm font-medium text-ok-fg shadow-lg">
+            <CircleCheck size={16} aria-hidden="true" />
+            Sent to the admins. Thank you.
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setFlagSent(false)}
+              className="flex size-8 items-center justify-center rounded-md hover:bg-ok-border/40"
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
       {signing && signingTask !== null && (
         <SignTaskDialog
           sections={sections}
@@ -437,6 +487,7 @@ function TaskSection({
   issues,
   onOpenPictures,
   signing,
+  onFlag,
   progress,
   onSignTask,
 }: {
@@ -447,6 +498,7 @@ function TaskSection({
   issues: IssueIndex;
   onOpenPictures: (itemId: string) => void;
   signing?: Signing | undefined;
+  onFlag?: ((itemId: string) => void) | undefined;
   progress?: TaskProgress | undefined;
   onSignTask: () => void;
 }) {
@@ -528,6 +580,7 @@ function TaskSection({
                 issues={issues.items.get(item.id)}
                 onOpenPictures={() => onOpenPictures(item.id)}
                 signing={signing}
+                onFlag={onFlag ? () => onFlag(item.id) : undefined}
               />
             ))}
             {signing && progress && !done && progress.steps - progress.signed > 1 && (
@@ -616,6 +669,7 @@ function StepCard({
   issues,
   onOpenPictures,
   signing,
+  onFlag,
 }: {
   item: Item;
   /** "1.3" */
@@ -623,6 +677,8 @@ function StepCard({
   issues: string[] | undefined;
   onOpenPictures: () => void;
   signing?: Signing | undefined;
+  /** Opens the form to say what is wrong with the step. */
+  onFlag?: (() => void) | undefined;
 }) {
   const step = item.assembly ?? {};
   const signOff = signing?.signOffs[item.id];
@@ -660,14 +716,27 @@ function StepCard({
         )}
         <div className="min-w-0 space-y-3">
           <div>
-            <p className="flex items-baseline gap-2.5">
-              <span className="shrink-0 text-sm font-semibold text-brand-700 tabular-nums">
-                {ref}
-              </span>
-              <span className="min-w-0 text-base leading-6 font-semibold wrap-break-word text-ink-900">
-                {item.text || <span className="font-normal text-ink-500">Empty step</span>}
-              </span>
-            </p>
+            <div className="flex items-start gap-2">
+              <p className="flex min-w-0 flex-1 items-baseline gap-2.5">
+                <span className="shrink-0 text-sm font-semibold text-brand-700 tabular-nums">
+                  {ref}
+                </span>
+                <span className="min-w-0 text-base leading-6 font-semibold wrap-break-word text-ink-900">
+                  {item.text || <span className="font-normal text-ink-500">Empty step</span>}
+                </span>
+              </p>
+              {onFlag && (
+                <button
+                  type="button"
+                  onClick={onFlag}
+                  aria-label={`Something is wrong with step ${ref}`}
+                  title="Something wrong? Tell the admins"
+                  className="-mt-1 -mr-1 flex size-8 shrink-0 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink-100 hover:text-nok-fg pointer-coarse:size-10"
+                >
+                  <Flag size={15} aria-hidden="true" />
+                </button>
+              )}
+            </div>
             <StepFacts step={step} className="mt-2" />
           </div>
           {description && (

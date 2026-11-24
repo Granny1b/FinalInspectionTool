@@ -16,3 +16,4 @@ export * from './deviationLog';
 export * from './checklistMerge';
 export * from './machines';
 export * from './machineAssembly';
+export * from './changeRequests';

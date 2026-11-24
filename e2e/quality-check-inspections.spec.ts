@@ -164,7 +164,8 @@ test('the sidebar has Final inspection, Quality check, Assembly, Setup and, for 
     ['Quality check', ['Quality checks', 'Deviations']],
     ['Assembly', ['Instructions']],
     ['Setup', ['Templates']],
-    ['Admin', ['Insights', 'Settings']],
+    // Change requests may carry a count of open ones after its name.
+    ['Admin', [/^Change requests/, 'Insights', 'Settings']],
   ] as const;
   for (const [label, links] of groups) {
     const list = nav.getByRole('list', { name: label });

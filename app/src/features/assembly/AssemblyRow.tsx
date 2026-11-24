@@ -17,15 +17,13 @@ import clsx from 'clsx';
 import { ChevronDown, Copy, Images, Trash2 } from 'lucide-react';
 import { memo, useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ActionMenu } from '../../components/ActionMenu';
+import { useSettings } from '../../lib/useSettings';
 import { PictureTile } from '../qualityChecks/PictureTile';
 import { rowDndId, type DragData } from '../templates/document/dnd';
 import { DragHandle, IssueNote } from '../templates/document/parts';
 import { caretAtEdge, swallowHeldBackspace } from '../templates/document/rowKeys';
 import type { DocumentActions } from '../templates/document/useDocumentActions';
 import type { DragKind } from '../templates/document/useDocumentDnd';
-
-/** The id of the <datalist> of departments the document renders once for all its steps. */
-export const DEPARTMENTS_LIST_ID = 'assembly-departments';
 
 type Props = {
   item: Item;
@@ -233,15 +231,10 @@ export const AssemblyRow = memo(function AssemblyRow({
             >
               <Labelled label="Department">
                 {(id) => (
-                  <input
+                  <DepartmentSelect
                     id={id}
-                    list={DEPARTMENTS_LIST_ID}
-                    autoComplete="off"
-                    maxLength={200}
-                    placeholder="Mechanics"
                     value={step.department ?? ''}
-                    onChange={(event) => set({ department: event.target.value })}
-                    className={clsx(BOX, 'h-8')}
+                    onChange={(department) => set({ department })}
                   />
                 )}
               </Labelled>
@@ -336,6 +329,40 @@ function summary(step: AssemblyStep): string {
     step.fromPreAssembly ? 'from pre-assembly' : '',
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : 'Department, time, parts, bolts, documents';
+}
+
+/**
+ * The step's department: one of the settings' Responsible list (the departments), or none. One
+ * the step has that is not in the list (an imported instruction's, or one removed since) stays
+ * chosen, marked as such, until another is picked.
+ */
+function DepartmentSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (department: string) => void;
+}) {
+  const departments = useSettings().data?.responsibles ?? [];
+  const unlisted = value.trim() !== '' && !departments.includes(value);
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className={clsx(BOX, 'h-8')}
+    >
+      <option value="">Not set</option>
+      {unlisted && <option value={value}>{value} (not in the list)</option>}
+      {departments.map((department) => (
+        <option key={department} value={department}>
+          {department}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 function Labelled({ label, children }: { label: string; children: (id: string) => ReactNode }) {

@@ -3940,3 +3940,41 @@ easier to follow.
   completed") instead of "No checks yet" on a machine that is being built.
 - **Not done:** the machines list has no assembly column (it would read every machine's
   sign-offs per listing); the other pages were left as they are.
+
+## Assembly: department as a dropdown, and change requests (2026-11-24)
+
+### Department
+
+The user could not change an imported step's department: the field was a text box with
+suggestions (a datalist), and a browser only suggests what matches the text already in the box, so
+"Mechanics" offered nothing but itself.
+
+- **Department is a `<select>` of the settings' Responsible list**, with "Not set". A value not in
+  the list (an import's "Mechanics" where the list says "Mechanical", or one removed since) stays
+  chosen and is marked "(not in the list)", as a deviation's Responsible is; it goes when another
+  is picked. Files and the API still take any text, so imports don't depend on the settings.
+
+### Change requests
+
+The user wanted inspectors to flag a row of an instruction for change with a very small form, and
+admins to get them as tickets in a new panel under Admin.
+
+- **One blob per request, `config/change-requests/{id}.json`**, in the existing config container:
+  no new container to provision. Each records the instruction, the step's id, and the step as it
+  read (instruction name, revision, task, "1.2", text) so it is understood after the step changes
+  or goes; the machine too when flagged while signing on one (then the machine's copy is what was
+  read).
+- **Everyone signed in can flag; the list is the admins'** (`GET` and the open count are 403 for
+  inspectors). A reader gets "Sent to the admins" and no list of their own: kept very small, as
+  asked.
+- **"Notification" is a count on the sidebar's link** (Admin → Change requests), refreshed every
+  minute, and the page's Open tab. No email: the app sends none.
+- **Open → Fixed, with who, when and an optional note; Reopen; Delete.** Fixing a request does not
+  publish anything: the page says the change reaches readers when the instruction is published.
+- **"Open the step" goes to the editor at that step** (`/assembly/{id}#row-{itemId}`): the editor
+  unfolds the step's task, scrolls to it and focuses its text. A step deleted since just opens
+  the editor.
+- **Only assembly instructions for now**: the flag sits on the instruction's reader. Checklist
+  rows could get the same later.
+- **Tests:** api (`change-requests.test.ts`), e2e (`change-requests.spec.ts`: flagged by an
+  inspector, opened and fixed by an admin). The sidebar test expects the new Admin link.

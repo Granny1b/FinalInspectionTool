@@ -5,6 +5,7 @@ import { RouteError } from './components/RouteError';
 import { AssemblyInstructionPage } from './pages/AssemblyInstructionPage';
 import { AssemblyPage } from './pages/AssemblyPage';
 import { AdminOnly } from './features/insights/report/AdminOnly';
+import { ChangeRequestsPage } from './pages/ChangeRequestsPage';
 import { ChecklistEditPage } from './pages/ChecklistEditPage';
 import { PrintShell } from './features/print/PrintShell';
 import { DeviationLogPage } from './pages/DeviationLogPage';
@@ -78,6 +79,8 @@ export const router = createBrowserRouter([
       {
         element: <RequireRole role="admin" />,
         children: [
+          // Steps of assembly instructions flagged for change: the admins' tickets.
+          { path: 'change-requests', element: <ChangeRequestsPage /> },
           { path: 'insights', element: <InsightsPage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],

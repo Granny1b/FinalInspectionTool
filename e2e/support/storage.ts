@@ -399,3 +399,19 @@ export async function deleteMachines(ids: readonly string[]): Promise<void> {
     }
   }
 }
+
+/** Deletes the change requests made on these assembly instructions (a test's flagged steps). */
+export async function deleteChangeRequestsOf(templateIds: readonly string[]): Promise<void> {
+  if (!(await config.exists())) return;
+  for await (const blob of config.listBlobsFlat({ prefix: blobNames.changeRequestPrefix })) {
+    const content = await config
+      .getBlobClient(blob.name)
+      .downloadToBuffer()
+      .catch(() => null);
+    if (!content) continue;
+    const request = JSON.parse(content.toString('utf8')) as { templateId?: string };
+    if (request.templateId && templateIds.includes(request.templateId)) {
+      await config.getBlobClient(blob.name).deleteIfExists();
+    }
+  }
+}
