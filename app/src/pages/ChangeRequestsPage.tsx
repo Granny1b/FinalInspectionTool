@@ -25,7 +25,7 @@ import { LoadError, PageLoading } from '../components/PageStates';
 import { useChangeRequestAction, useChangeRequests } from '../features/changeRequests/queries';
 import { matchesChangeRequest } from '../features/changeRequests/search';
 import { Badge } from '../features/templates/Badge';
-import { assemblyHref } from '../features/templates/queries';
+import { assemblyEditHref, assemblyHref, useTemplates } from '../features/templates/queries';
 import { errorMessage } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import { usePersonName } from '../lib/usePeople';
@@ -227,7 +227,13 @@ function RequestCard({
   const settings = useSettings();
   const open = request.status === 'open';
   // The step in the editor: its task unfolds and the step comes into view.
-  const editorHref = `${assemblyHref(request.templateId)}#row-${request.itemId}`;
+  const templates = useTemplates();
+  // Under the model's machine template; where a model has none yet, where it is read.
+  const editor = assemblyEditHref(templates.data ?? [], {
+    id: request.templateId,
+    modelCode: request.modelCode,
+  });
+  const editorHref = `${editor ?? assemblyHref(request.templateId)}#row-${request.itemId}`;
   return (
     <li
       className={clsx(

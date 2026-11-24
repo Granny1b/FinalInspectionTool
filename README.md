@@ -137,6 +137,12 @@ Added after the six phases:
   **Copy path**), instructions, inspections and quality checks, templates. A hit leads to its
   exact place: a step opens on that step, an assy number opens the instruction on its steps.
 
+- **Machine templates.** A template opens on a landing page (**Overview**) with the machine
+  model, the template's name and its picture, and what is kept under it; then a tab each, in the
+  order of a build: **Assembly** (the model's assembly instructions, written here), **Quality
+  checks** and **Final inspection**. _Assembly → Instructions_ in the sidebar is where the
+  published instructions are read, by everyone; **Edit** there takes an admin to the template.
+
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
 ## Prerequisites

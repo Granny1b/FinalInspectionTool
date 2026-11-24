@@ -200,7 +200,7 @@ export function buildHits(data: SearchData): Hit[] {
         href:
           quality && template.parentId
             ? `/templates/${template.parentId}/quality-checks/${template.id}`
-            : `/templates/${template.id}`,
+            : `/templates/${template.id}/overview`,
         text: hay(template.name, model, template.modelCode),
       });
     }

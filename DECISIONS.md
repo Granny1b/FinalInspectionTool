@@ -4091,3 +4091,40 @@ this" too easy to miss: a small black caption under each picture.
 - It is the one figure every printout shares (`GuideImage`): a quality check's and an assembly
   instruction's printed instructions and a final inspection's reference appendix (Good / Bad).
 - The texts are unchanged, so the print tests (which read the PDFs) pass as they were.
+
+## Machine templates: a landing page, and instructions under them (2026-11-24)
+
+The user wanted assembly instructions under Templates as a third tab, and a landing page where
+the machine model, the template's name and its picture are set, shared by everything kept under
+the template: "we basically make a machine template, and under that we keep all the editable
+data".
+
+- **The machine template is the model's final inspection template, as it was** (quality checks
+  already hang under it, and it already holds the model, the name and the cover). No new kind of
+  document and nothing to migrate: the landing page edits the same draft.
+- **Four tabs, each an address:** Overview (`/templates/:id/overview`), Assembly
+  (`/templates/:id/assembly`), Quality checks, Final inspection (`/templates/:id`, unchanged, so
+  old links work). The list, New template and Import JSON open the landing page.
+- **Overview and Final inspection are two parts of one editor** (`TemplateEditor`'s `part`): the
+  landing page shows the name, model and cover and three tiles for what the template holds; the
+  Final inspection tab shows the checklist and its revisions. One draft, one autosave, one
+  Publish, so nothing about saving or publishing was written twice. A change to the name or
+  picture is part of that draft and reaches new inspections when it is published, as before.
+- **An instruction is found under a template by its model** (`modelCode`), not by a parent id:
+  it keeps belonging to its model, the files and the API are unchanged, and instructions written
+  before this need nothing done to them. The cost: changing a template's model (rare, and a taken
+  model can't be chosen) leaves its instructions with the old model.
+- **Writing moved, reading stayed.** Instructions are created, imported and edited on the
+  Assembly tab (`/templates/:id/assembly/:instructionId`); the model is the template's, so the
+  dialogs no longer ask for one. `/assembly` and `/assembly/:id` are the published instructions to
+  read, for admins too, with **Edit** leading to the template. This also ends the confusion of an
+  admin landing in a draft where a reader saw the published revision.
+- **A model with instructions but no machine template** (the HHV, written before this) is listed
+  on the Templates page under "Assembly instructions without a machine template" with **Set up
+  machine template**: one click makes it (named after the model), and its instructions are on
+  its Assembly tab. They stay readable meanwhile.
+- **Change requests open the step in the editor under the template;** the search's template hits
+  open the landing page.
+- **Tests:** the template, guide and assembly end-to-end tests follow the new addresses (a
+  template opens on its landing page; the checklist is on the Final inspection tab; instructions
+  are made on the Assembly tab).

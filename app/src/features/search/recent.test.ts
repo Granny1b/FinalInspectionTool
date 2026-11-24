@@ -11,6 +11,9 @@ describe('recentKindOf', () => {
     expect(recentKindOf('/quality-checks/abc123')).toBe('quality');
     expect(recentKindOf('/templates/abc123')).toBe('template');
     expect(recentKindOf('/templates/abc123/quality-checks/def456')).toBe('template');
+    expect(recentKindOf('/templates/abc123/overview')).toBe('template');
+    expect(recentKindOf('/templates/abc123/assembly/def456')).toBe('template');
+    expect(recentKindOf('/templates/abc123/assembly')).toBeNull();
   });
 
   it('leaves lists, forms and admin pages out', () => {

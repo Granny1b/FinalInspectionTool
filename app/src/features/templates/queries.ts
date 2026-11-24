@@ -90,9 +90,55 @@ export function assemblyInstructions(list: readonly TemplateSummary[]): Template
   return list.filter((template) => template.kind === 'assembly');
 }
 
-/** An assembly instruction: its editor for admins, its latest revision for everyone else. */
+/** An assembly instruction to read: its latest published revision, for everyone. */
 export function assemblyHref(id: string): string {
   return `/assembly/${id}`;
+}
+
+/** A machine template's landing page: its model, name and picture, and what it holds. */
+export function templateOverviewHref(templateId: string): string {
+  return `/templates/${templateId}/overview`;
+}
+
+/** A machine template's Assembly tab: the model's assembly instructions, where they are written. */
+export function templateAssemblyHref(templateId: string): string {
+  return `/templates/${templateId}/assembly`;
+}
+
+/** An assembly instruction's editor, under its model's machine template (admins). */
+export function assemblyEditorHref(templateId: string, instructionId: string): string {
+  return `${templateAssemblyHref(templateId)}/${instructionId}`;
+}
+
+/**
+ * The machine template of a model: its final inspection template, which holds the model, the
+ * name and the picture, and under which its quality checks and assembly instructions are kept.
+ */
+export function machineTemplateOf(
+  list: readonly TemplateSummary[],
+  modelCode: string,
+): TemplateSummary | undefined {
+  return list.find((template) => template.kind === 'final' && template.modelCode === modelCode);
+}
+
+/** The assembly instructions of a model. */
+export function assemblyInstructionsOf(
+  list: readonly TemplateSummary[],
+  modelCode: string,
+): TemplateSummary[] {
+  return assemblyInstructions(list).filter((template) => template.modelCode === modelCode);
+}
+
+/**
+ * Where an assembly instruction is edited: under its model's machine template, or null when the
+ * model has none yet (it is set up on the Templates page first).
+ */
+export function assemblyEditHref(
+  list: readonly TemplateSummary[],
+  instruction: Pick<TemplateSummary, 'id' | 'modelCode'>,
+): string | null {
+  const parent = machineTemplateOf(list, instruction.modelCode);
+  return parent ? assemblyEditorHref(parent.id, instruction.id) : null;
 }
 
 /**

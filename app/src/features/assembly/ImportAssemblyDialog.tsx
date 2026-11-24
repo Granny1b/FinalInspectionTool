@@ -7,22 +7,16 @@ import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
 import { INPUT } from '../../components/Field';
 import { errorMessage } from '../../lib/api';
-import { MachineModelFields } from '../templates/MachineModelFields';
-import {
-  initialChoice,
-  resolvedModel,
-  type ModelChoice,
-  type ModelContext,
-} from '../templates/modelChoice';
-import { assemblyHref, useImportTemplate } from '../templates/queries';
-import { ASSEMBLY_MODEL_HINT } from './models';
+import { assemblyEditorHref, useImportTemplate } from '../templates/queries';
+import type { AssemblyMachine } from './models';
 import type { PickedFile } from './transfer';
 import { stepCountText, taskCountText } from './wording';
 
 type Props = {
   /** The chosen files, read and checked (transfer.ts): instructions, and files that are none. */
   picked: PickedFile[];
-  models: ModelContext;
+  /** The machine template they are imported under: its model is the instructions'. */
+  machine: AssemblyMachine;
   onClose: () => void;
 };
 
@@ -35,51 +29,38 @@ type Outcome =
 
 /**
  * Import JSON for assembly instructions, one file or many at once: each file becomes a new,
- * unpublished draft for the machine model chosen here, under the name in its line (the file's to
+ * unpublished draft for the machine template's model, under the name in its line (the file's to
  * start with). A file that is no assembly instruction is listed with the reason and left out.
  * They are imported one after another; each line then says how it went and links to its draft.
  */
-export function ImportAssemblyDialog({ picked, models, onClose }: Props) {
+export function ImportAssemblyDialog({ picked, machine, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const importing = useImportTemplate();
   const good = picked.flatMap((entry, index) => ('file' in entry ? [{ ...entry, index }] : []));
   const bad = picked.filter((entry) => 'error' in entry);
-  const first = good[0]?.file.instruction;
-  const [choice, setChoice] = useState<ModelChoice>(() =>
-    initialChoice(
-      models,
-      first?.modelCode ? { code: first.modelCode, name: first.modelName } : undefined,
-    ),
-  );
   const [names, setNames] = useState<Record<number, string>>(() =>
     Object.fromEntries(good.map(({ index, file }) => [index, file.instruction.name])),
   );
   const [outcomes, setOutcomes] = useState<Record<number, Outcome>>({});
   const [running, setRunning] = useState(false);
-  const model = resolvedModel(choice, models);
   const started = Object.keys(outcomes).length > 0;
   const finished = started && !running;
   const left = good.filter(({ index }) => outcomes[index]?.status !== 'done');
-  const ready = model !== null && left.every(({ index }) => names[index]?.trim());
+  const ready = left.every(({ index }) => names[index]?.trim());
 
   async function run(event: FormEvent) {
     event.preventDefault();
-    if (!model || !ready) return;
+    if (!ready) return;
     setRunning(true);
-    const { modelName: _name, newModel, modelCode } = model;
-    // A new machine model is added with the first instruction; the others then find it there.
-    let addModel = newModel;
     for (const { index, file } of left) {
       setOutcomes((current) => ({ ...current, [index]: { status: 'importing' } }));
       try {
         const { loaded, droppedImages } = await importing.mutateAsync({
           kind: 'assembly',
           name: (names[index] ?? '').trim(),
-          modelCode,
-          ...(addModel && { newModel: addModel }),
+          modelCode: machine.modelCode,
           file,
         });
-        addModel = undefined;
         setOutcomes((current) => ({
           ...current,
           [index]: { status: 'done', id: loaded.detail.draft.id, droppedImages },
@@ -102,21 +83,13 @@ export function ImportAssemblyDialog({ picked, models, onClose }: Props) {
       description={
         count === 0
           ? 'None of the chosen files can be imported.'
-          : `${count === 1 ? 'It becomes a new draft' : `Each of the ${count} files becomes a new draft`} for the machine model chosen here. Pictures come along only if they are stored in this installation.`
+          : `${count === 1 ? 'It becomes a new draft' : `Each of the ${count} files becomes a new draft`} for ${machine.modelName}. Pictures come along only if they are stored in this installation.`
       }
       onClose={onClose}
       busy={running}
       className="sm:w-[min(42rem,calc(100vw-2rem))]"
     >
       <form onSubmit={(event) => void run(event)} className="mt-6 space-y-5">
-        {count > 0 && !started && (
-          <MachineModelFields
-            choice={choice}
-            context={models}
-            onChange={setChoice}
-            existingHint={ASSEMBLY_MODEL_HINT}
-          />
-        )}
         <ul className="space-y-2">
           {good.map(({ index, fileName, file }) => {
             const outcome = outcomes[index] ?? { status: 'waiting' };
@@ -140,7 +113,7 @@ export function ImportAssemblyDialog({ picked, models, onClose }: Props) {
                     <span className="min-w-0">
                       Imported as{' '}
                       <Link
-                        to={assemblyHref(outcome.id)}
+                        to={assemblyEditorHref(machine.templateId, outcome.id)}
                         className="font-medium text-brand-700 underline underline-offset-2"
                       >
                         {names[index]}

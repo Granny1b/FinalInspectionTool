@@ -7,6 +7,7 @@ import { LoadError, PageLoading } from '../components/PageStates';
 import { templatePrintHref } from '../features/print/links';
 import { Badge } from '../features/templates/Badge';
 import { MachineHeader } from '../features/templates/MachineHeader';
+import { MachineTemplateTiles } from '../features/templates/MachineTemplateTiles';
 import { PublishedTemplateView } from '../features/templates/PublishedTemplateView';
 import {
   assemblyHref,
@@ -25,10 +26,14 @@ import { useCurrentUser } from '../lib/useMe';
  * /templates/:id — a machine's Final inspection tab: admins edit the draft; inspectors see the
  * latest published revision. A quality check's id leads to its own page.
  */
-export function TemplateEditorPage() {
+export function TemplateEditorPage({ part = 'checklist' }: { part?: 'overview' | 'checklist' }) {
   const { id = '' } = useParams();
   const isAdmin = hasRole(useCurrentUser().roles, 'admin');
-  return isAdmin ? <DraftEditor id={id} kind="final" /> : <LatestRevision id={id} />;
+  return isAdmin ? (
+    <DraftEditor id={id} kind="final" part={part} />
+  ) : (
+    <LatestRevision id={id} part={part} />
+  );
 }
 
 /**
@@ -40,10 +45,13 @@ export function DraftEditor({
   id,
   kind,
   parentId,
+  part,
 }: {
   id: string;
   kind: 'final' | 'quality' | 'assembly';
   parentId?: string;
+  /** A machine template's landing page, or its Final inspection tab. */
+  part?: 'overview' | 'checklist';
 }) {
   const query = useTemplateDetail(id);
   // Bumped by Reload, so the editor starts over from the freshly loaded draft.
@@ -59,6 +67,7 @@ export function DraftEditor({
       <TemplateEditor
         key={`${id}:${opened}`}
         loaded={query.data}
+        part={part}
         onReload={async () => {
           const result = await query.refetch();
           if (result.isError) return false;
@@ -87,7 +96,7 @@ export function DraftEditor({
 }
 
 /** Inspectors work from published revisions only; drafts are the admins' business. */
-function LatestRevision({ id }: { id: string }) {
+function LatestRevision({ id, part }: { id: string; part: 'overview' | 'checklist' }) {
   const templates = useTemplates();
   const summary = templates.data?.find((template) => template.id === id);
   const latest = summary?.publishedRevision ?? null;
@@ -115,9 +124,30 @@ function LatestRevision({ id }: { id: string }) {
       templateId={id}
       modelCode={summary.modelCode}
       coverImageId={summary.coverImageId}
-      tab="final"
+      tab={part === 'overview' ? 'overview' : 'final'}
     />
   );
+  if (part === 'overview') {
+    // The landing page, read-only: what the machine template is and what it holds.
+    return (
+      <>
+        {header}
+        <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+          <div className="rounded-lg border border-ink-200 bg-surface p-5">
+            <h2 className="text-xl font-semibold tracking-tight text-ink-900">
+              {summary.publishedName ?? (summary.name || 'Untitled template')}
+            </h2>
+            <p className="mt-1.5 text-sm text-ink-500">
+              {latest === null
+                ? 'Not published yet: an admin is still preparing it.'
+                : `Final inspection published as revision ${latest}.`}
+            </p>
+          </div>
+          <MachineTemplateTiles templateId={id} modelCode={summary.modelCode} />
+        </div>
+      </>
+    );
+  }
   if (latest === null) {
     return (
       <>

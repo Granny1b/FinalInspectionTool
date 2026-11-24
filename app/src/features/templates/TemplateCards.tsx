@@ -8,6 +8,7 @@ import { usePersonName } from '../../lib/usePeople';
 import { modelName } from '../../lib/useSettings';
 import { Badge, PublishedBadge, QualityChecksBadge } from './Badge';
 import { qualityCheckNames } from './qualityCheckList';
+import { templateOverviewHref } from './queries';
 
 type Props = {
   /** The final inspection templates, one per machine model. */
@@ -44,7 +45,7 @@ export function TemplateCards({ templates, qualityChecks, models, showDrafts }: 
             <div className="min-w-0 px-4 pt-3.5">
               <h2 className="text-sm font-semibold text-ink-900">
                 <Link
-                  to={`/templates/${template.id}`}
+                  to={templateOverviewHref(template.id)}
                   className="outline-none after:absolute after:inset-0"
                 >
                   {template.name || 'Untitled template'}

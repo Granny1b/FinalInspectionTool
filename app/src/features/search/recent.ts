@@ -127,7 +127,10 @@ export function recentKindOf(pathname: string): RecentKind | null {
     [new RegExp(`^/assembly/${id}(/revisions/\\d+)?$`), 'instruction'],
     [new RegExp(`^/inspections/(?!new$)${id}$`), 'final'],
     [new RegExp(`^/quality-checks/(?!new$)${id}$`), 'quality'],
-    [new RegExp(`^/templates/${id}(/quality-checks/${id})?$`), 'template'],
+    [
+      new RegExp(`^/templates/${id}(/overview|/assembly/${id}|/quality-checks/${id})?$`),
+      'template',
+    ],
   ];
   return patterns.find(([pattern]) => pattern.test(pathname))?.[1] ?? null;
 }

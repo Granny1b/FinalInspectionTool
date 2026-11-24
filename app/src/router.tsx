@@ -2,7 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router';
 import { AppShell } from './components/AppShell';
 import { RequireRole } from './components/RequireRole';
 import { RouteError } from './components/RouteError';
-import { AssemblyInstructionPage } from './pages/AssemblyInstructionPage';
+import { AssemblyEditorPage, AssemblyInstructionPage } from './pages/AssemblyInstructionPage';
 import { AssemblyPage } from './pages/AssemblyPage';
 import { AdminOnly } from './features/insights/report/AdminOnly';
 import { ChangeRequestsPage } from './pages/ChangeRequestsPage';
@@ -24,6 +24,7 @@ import { QualityCheckPage } from './pages/QualityCheckPage';
 import { QualityChecksPage } from './pages/QualityChecksPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { StartCheckPage } from './pages/StartCheckPage';
+import { TemplateAssemblyPage } from './pages/TemplateAssemblyPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { TemplatePrintPage } from './pages/TemplatePrintPage';
 import { TemplateRevisionPage } from './pages/TemplateRevisionPage';
@@ -59,7 +60,15 @@ export const router = createBrowserRouter([
       { path: 'deviations/quality', element: <DeviationLogPage key="quality" kind="quality" /> },
       { path: 'templates', element: <TemplatesPage /> },
       // Admins get the editor, inspectors the latest published revision (decided in the page).
-      { path: 'templates/:id', element: <TemplateEditorPage /> },
+      // A machine template: its landing page (model, name, picture), then what is kept under it.
+      {
+        path: 'templates/:id/overview',
+        element: <TemplateEditorPage key="overview" part="overview" />,
+      },
+      { path: 'templates/:id/assembly', element: <TemplateAssemblyPage /> },
+      { path: 'templates/:id/assembly/:instructionId', element: <AssemblyEditorPage /> },
+      // Its Final inspection tab.
+      { path: 'templates/:id', element: <TemplateEditorPage key="checklist" /> },
       { path: 'templates/:id/revisions/:revision', element: <TemplateRevisionPage /> },
       // A machine's quality checks: its Quality checks tab, one quality check, a revision of one.
       { path: 'templates/:id/quality-checks', element: <QualityChecksPage /> },

@@ -5,26 +5,37 @@ import { Link } from 'react-router';
 import { BackLink } from '../../components/BackLink';
 import { useImageUrl } from '../../lib/images';
 import { modelName, useSettings } from '../../lib/useSettings';
-import { qualityChecksHref, qualityChecksOf, useTemplates } from './queries';
+import {
+  assemblyInstructionsOf,
+  qualityChecksHref,
+  qualityChecksOf,
+  templateAssemblyHref,
+  templateOverviewHref,
+  useTemplates,
+} from './queries';
 
 type Props = {
-  /** The machine's final inspection template. */
+  /** The machine template: its model's final inspection template. */
   templateId: string;
   modelCode: string;
   coverImageId: string | undefined;
   /** The tab shown under the header. */
-  tab: 'final' | 'quality';
+  tab: 'overview' | 'assembly' | 'quality' | 'final';
 };
 
 /**
- * A machine's page: "← Templates", its cover, its model's name (the page's heading) and the two
- * tabs, Final inspection and Quality checks (n). The tabs are links to two addresses, so Back and
- * a shared link land on the same tab.
+ * A machine template's page: "← Templates", its cover, its model's name (the page's heading) and
+ * its tabs: Overview (the model, name and picture everything under it shares), then what is kept
+ * under it in the order of a build: Assembly (n), Quality checks (n) and Final inspection. The
+ * tabs are links to their own addresses, so Back and a shared link land on the same tab.
  */
 export function MachineHeader({ templateId, modelCode, coverImageId, tab }: Props) {
   const templates = useTemplates();
   const settings = useSettings();
-  const count = templates.data ? qualityChecksOf(templates.data, templateId).length : null;
+  const checks = templates.data ? qualityChecksOf(templates.data, templateId).length : null;
+  const instructions = templates.data
+    ? assemblyInstructionsOf(templates.data, modelCode).length
+    : null;
   const name = modelName(settings.data?.machineModels, modelCode);
   return (
     <div>
@@ -36,37 +47,51 @@ export function MachineHeader({ templateId, modelCode, coverImageId, tab }: Prop
             {name}
           </h1>
           <p className="mt-0.5 text-sm text-ink-500">
-            {name === modelCode ? '' : `${modelCode} · `}Final inspection and quality checks
+            {name === modelCode ? '' : `${modelCode} · `}Machine template: assembly, quality checks
+            and final inspection
           </p>
         </div>
       </div>
       <nav aria-label="Checklists of this machine" className="mt-5 border-b border-ink-200">
-        <ul className="-mb-px flex gap-6">
-          <TabLink to={`/templates/${templateId}`} current={tab === 'final'}>
-            Final inspection
+        <ul className="-mb-px flex flex-wrap gap-x-6">
+          <TabLink to={templateOverviewHref(templateId)} current={tab === 'overview'}>
+            Overview
+          </TabLink>
+          <TabLink to={templateAssemblyHref(templateId)} current={tab === 'assembly'}>
+            Assembly
+            <Count count={instructions} />
           </TabLink>
           <TabLink to={qualityChecksHref(templateId)} current={tab === 'quality'}>
             Quality checks
-            {count !== null && (
-              <>
-                <span
-                  aria-hidden="true"
-                  className={clsx(
-                    'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums',
-                    count > 0
-                      ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200 ring-inset'
-                      : 'bg-ink-100 text-ink-600',
-                  )}
-                >
-                  {count}
-                </span>
-                <span className="sr-only"> ({count})</span>
-              </>
-            )}
+            <Count count={checks} />
+          </TabLink>
+          <TabLink to={`/templates/${templateId}`} current={tab === 'final'}>
+            Final inspection
           </TabLink>
         </ul>
       </nav>
     </div>
+  );
+}
+
+/** How many a tab holds, as a small badge; "(n)" for screen readers. */
+function Count({ count }: { count: number | null }) {
+  if (count === null) return null;
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className={clsx(
+          'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums',
+          count > 0
+            ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200 ring-inset'
+            : 'bg-ink-100 text-ink-600',
+        )}
+      >
+        {count}
+      </span>
+      <span className="sr-only"> ({count})</span>
+    </>
   );
 }
 

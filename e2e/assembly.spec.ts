@@ -9,6 +9,7 @@ import {
   ASSEMBLY_EXPORT_FORMAT,
   AssemblyExportSchema,
   TemplateDetailSchema,
+  TemplateListSchema,
   type AssemblyExportInput,
 } from '@modig/shared';
 import { expect, test as base, type Page } from '@playwright/test';
@@ -50,6 +51,14 @@ function file(name: string): AssemblyExportInput {
   };
 }
 
+/** The machine template of RigiMill MG (seeded): its instructions are written under it. */
+async function machineTemplate(page: Page): Promise<string> {
+  const list = TemplateListSchema.parse(await (await page.request.get('/api/templates')).json());
+  const template = list.find((entry) => entry.kind === 'final' && entry.modelCode === 'RMMG');
+  expect(template, 'the seeded RigiMill MG template').toBeDefined();
+  return template!.id;
+}
+
 const upload = (name: string, content: unknown) => ({
   name,
   mimeType: 'application/json',
@@ -65,6 +74,8 @@ test('an admin writes an assembly instruction and publishes it; an inspector rea
   test.setTimeout(120_000);
   await signIn(context, ADMIN, ['admin']);
   const name = `E2E build ${testInfo.workerIndex}-${Date.now()}`;
+  // Instructions are written under the model's machine template, on its Assembly tab; the
+  // sidebar's Assembly is where the published ones are read, and sends an admin there.
   await page.goto('/');
   await page
     .getByRole('navigation', { name: 'Main' })
@@ -73,13 +84,27 @@ test('an admin writes an assembly instruction and publishes it; an inspector rea
   await expect(
     page.getByRole('heading', { level: 1, name: 'Assembly instructions' }),
   ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New instruction' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Write or edit in Templates' })).toBeVisible();
 
+  const machine = await machineTemplate(page);
+  await page.goto(`/templates/${machine}/overview`);
+  await page
+    .getByRole('navigation', { name: 'Checklists of this machine' })
+    .getByRole('link', { name: /^Assembly/ })
+    .click();
   await page.getByRole('button', { name: 'New instruction' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'New assembly instruction' });
-  await dialog.getByLabel('Machine model').selectOption('RMMG');
+  // The model is the machine template's: only the name is asked.
+  await expect(dialog.getByLabel('Machine model')).toHaveCount(0);
   await dialog.getByLabel('Name').fill(name);
   await dialog.getByRole('button', { name: 'Create instruction' }).click();
-  await page.waitForURL(/\/assembly\/[A-Za-z0-9]{16}$/);
+  await page.waitForURL(new RegExp(`/templates/${machine}/assembly/[A-Za-z0-9]{16}$`));
+  await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link')).toHaveText([
+    'Templates',
+    'RigiMill MG',
+    'Assembly',
+  ]);
   const id = page.url().split('/').at(-1)!;
   made.push(id);
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
@@ -185,10 +210,9 @@ test('an admin imports several assembly instruction files at once', async ({
 }, testInfo) => {
   await signIn(context, ADMIN, ['admin']);
   const stamp = `${testInfo.workerIndex}-${Date.now()}`;
-  await page.goto('/assembly');
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'Assembly instructions' }),
-  ).toBeVisible();
+  const machine = await machineTemplate(page);
+  await page.goto(`/templates/${machine}/assembly`);
+  await expect(page.getByRole('heading', { level: 1, name: 'RigiMill MG' })).toBeVisible();
   await page
     .locator('input[type=file]')
     .setInputFiles([
@@ -197,7 +221,7 @@ test('an admin imports several assembly instruction files at once', async ({
       upload('template.json', { format: 'modig-final-inspection/template', version: 1 }),
     ]);
   const dialog = page.getByRole('dialog', { name: 'Import assembly instructions' });
-  await expect(dialog.getByLabel('Machine model')).toHaveValue('RMMG');
+  await expect(dialog).toContainText('becomes a new draft for RigiMill MG');
   await expect(dialog.getByText('“template.json” can’t be imported.')).toBeVisible();
   await expect(dialog.getByText('It is a final inspection template file.')).toBeVisible();
   await dialog.getByRole('button', { name: 'Import 2 instructions' }).click();
