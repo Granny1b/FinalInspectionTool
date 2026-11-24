@@ -14,7 +14,6 @@ import { Link } from 'react-router';
 import { modelName } from '../../lib/useSettings';
 import { machineHref } from '../machines/model';
 import { SeverityBadge } from '../inspections/DeviationCard';
-import { StateBadge } from '../inspections/StateBadge';
 import { FollowUpActions, StatusPill } from './FollowUpActions';
 import { deviationsTabHref, type LogGroup } from './model';
 
@@ -42,10 +41,10 @@ export function LogGroupCard({ kind, group, models, today, pending, onFollowUp }
   return (
     <section
       aria-labelledby={titleId}
-      className="@container rounded-lg border border-ink-200 bg-surface"
+      className="@container overflow-hidden rounded-lg border border-ink-200 bg-surface"
     >
       {/* Not a <header>: it isn't the page's. */}
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-ink-200 px-4 py-3.5 sm:px-5">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 px-4 pt-4 pb-3 sm:px-5">
         <div className="min-w-0 flex-1">
           <h2 id={titleId} className="text-base font-semibold wrap-break-word text-ink-900">
             {group.machineRef ? (
@@ -64,36 +63,37 @@ export function LogGroupCard({ kind, group, models, today, pending, onFollowUp }
             </span>
           </h2>
           {/* Spaced, not separated by dots: on a phone a dot would dangle at a line's start. */}
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
+          <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-500">
             {group.checkName && <span className="text-ink-700">{group.checkName}</span>}
             <span>{modelName(models, group.modelCode)}</span>
+          </p>
+          {/* Where its deviations come from, a line each: quiet, as it is only for looking up. */}
+          <ul className="mt-2 space-y-0.5 text-xs text-ink-500">
             {group.inspections.map((inspection) => (
-              <span key={inspection.id} className="inline-flex items-center gap-x-2">
+              <li key={inspection.id} className="flex flex-wrap items-baseline gap-x-2.5">
                 <Link
                   to={deviationsTabHref(kind, inspection.id)}
-                  className="font-medium text-brand-700 underline-offset-2 hover:underline"
+                  className="font-medium text-ink-700 tabular-nums underline-offset-2 hover:text-brand-700 hover:underline"
                 >
                   {inspection.number}
                 </Link>
-                {inspection.checkName && (
-                  <span className="text-ink-700">{inspection.checkName}</span>
-                )}
+                {inspection.checkName && <span>{inspection.checkName}</span>}
                 <span className="tabular-nums">{inspection.date}</span>
-                {!inspection.finalised && <StateBadge state="in_progress" />}
-              </span>
+                {!inspection.finalised && <span>In progress</span>}
+              </li>
             ))}
-          </p>
+          </ul>
         </div>
         <div className="w-full shrink-0 sm:w-44">
-          <p className="text-xs text-ink-600 tabular-nums sm:text-right">
-            <span className={clsx(group.open > 0 && 'font-semibold text-ink-900')}>
+          <p className="text-xs text-ink-500 tabular-nums sm:text-right">
+            <span className={clsx(group.open > 0 && 'font-medium text-ink-800')}>
               {group.open} open
             </span>
             {' · '}
             {group.closed} closed
           </p>
           {/* The words say it; the bar shows it at a glance. */}
-          <div aria-hidden="true" className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100">
+          <div aria-hidden="true" className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink-100">
             <div
               className="h-full rounded-full bg-ok-fg"
               style={{ width: `${Math.round(closedShare * 100)}%` }}
@@ -102,26 +102,27 @@ export function LogGroupCard({ kind, group, models, today, pending, onFollowUp }
         </div>
       </div>
 
-      <table className="hidden w-full text-left text-sm @min-[58rem]:table">
-        <thead className="border-b border-ink-200 bg-ink-50 text-xs text-ink-500">
+      <table className="hidden w-full border-t border-ink-100 text-left text-sm @min-[58rem]:table">
+        {/* Small quiet labels, no fill: the rows are what is read. */}
+        <thead className="text-[0.6875rem] tracking-wide text-ink-500 uppercase">
           <tr>
-            <th scope="col" className="py-2 pr-3 pl-5 font-medium">
+            <th scope="col" className="pt-3 pr-3 pb-1 pl-5 font-medium">
               Deviation
             </th>
-            <th scope="col" className="w-28 px-3 py-2 font-medium">
+            <th scope="col" className="w-28 px-3 pt-3 pb-1 font-medium">
               Responsible
             </th>
-            <th scope="col" className="w-32 px-3 py-2 font-medium">
+            <th scope="col" className="w-32 px-3 pt-3 pb-1 font-medium">
               Category
             </th>
-            <th scope="col" className="w-28 px-3 py-2 font-medium">
+            <th scope="col" className="w-28 px-3 pt-3 pb-1 font-medium">
               Found
             </th>
-            <th scope="col" className="w-34 px-3 py-2 font-medium">
+            <th scope="col" className="w-34 px-3 pt-3 pb-1 font-medium">
               Status
             </th>
             {/* Room for Edit and Reopen… side by side. */}
-            <th scope="col" className="w-48 py-2 pr-5 pl-3 font-medium">
+            <th scope="col" className="w-48 pt-3 pr-5 pb-1 pl-3 font-medium">
               <span className="sr-only">Follow-up</span>
             </th>
           </tr>
@@ -132,8 +133,12 @@ export function LogGroupCard({ kind, group, models, today, pending, onFollowUp }
               <td className="py-3.5 pr-3 pl-5">
                 <DeviationText kind={kind} entry={entry} />
               </td>
-              <td className="px-3 py-3.5 wrap-break-word text-ink-700">{entry.resp || '—'}</td>
-              <td className="px-3 py-3.5 wrap-break-word text-ink-700">{entry.category || '—'}</td>
+              <td className="px-3 py-3.5 text-[0.8125rem] wrap-break-word text-ink-600">
+                {entry.resp || '—'}
+              </td>
+              <td className="px-3 py-3.5 text-[0.8125rem] wrap-break-word text-ink-600">
+                {entry.category || '—'}
+              </td>
               <td className="px-3 py-3.5">
                 <Found entry={entry} today={today} />
               </td>
@@ -197,17 +202,17 @@ function DeviationText({ kind, entry }: { kind: InspectionKind; entry: Deviation
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <Link
           to={deviationsTabHref(kind, entry.inspectionId, entry.key)}
-          className="text-xs font-semibold text-brand-700 tabular-nums underline-offset-2 hover:underline"
+          className="text-xs text-ink-500 tabular-nums underline-offset-2 hover:text-brand-700 hover:underline"
         >
           {deviationLogId(entry)}
         </Link>
-        <SeverityBadge severity={entry.severity} className="h-5 px-2" />
+        <SeverityBadge severity={entry.severity} className="h-5 px-2 font-medium ring-0" />
       </div>
-      <p className="mt-1 leading-5 font-medium wrap-break-word text-ink-900">
+      <p className="mt-1.5 leading-5 font-medium wrap-break-word text-ink-900">
         {deviationDescription(entry) || <span className="font-normal text-ink-500">No text</span>}
       </p>
       {entry.comment && (
-        <p className="mt-0.5 leading-5 wrap-break-word whitespace-pre-line text-ink-600">
+        <p className="mt-0.5 text-[0.8125rem] leading-5 wrap-break-word whitespace-pre-line text-ink-500">
           {entry.comment}
         </p>
       )}
@@ -235,7 +240,9 @@ function Found({
   const overdue = isOverdue(entry, today);
   return (
     <>
-      <span className="whitespace-nowrap text-ink-700 tabular-nums">{entry.foundOn}</span>
+      <span className="text-[0.8125rem] whitespace-nowrap text-ink-600 tabular-nums">
+        {entry.foundOn}
+      </span>
       {entry.status === 'open' && days > 0 && (
         <span
           className={clsx(

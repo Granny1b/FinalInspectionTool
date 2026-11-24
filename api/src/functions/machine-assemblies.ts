@@ -20,7 +20,6 @@ import {
   hasRole,
   IdSchema,
   machineAssemblySummary,
-  newId,
   SignStepsRequestSchema,
   UnsignStepsRequestSchema,
   withoutSignOffs,
@@ -36,11 +35,12 @@ import {
   ForbiddenError,
   idParam,
   json,
-  NotFoundError,
   readJsonBody,
 } from '../lib/http';
 import {
   assemblyNotFound,
+  assemblyRevision,
+  newMachineAssembly,
   changeSignOffs,
   deleteMachineAssembly,
   latestRevisionOf,
@@ -78,36 +78,12 @@ export const addMachineAssembly = endpoint({ role: 'inspector' }, async (req, _c
   const { templateId } = await readJsonBody(req, AddMachineAssemblyRequestSchema);
   const machine = await loadMachine(machineId);
   if (!machine) throw machineNotFound();
-  const template = await loadTemplate(templateId);
-  if (!template || template.draft.kind !== 'assembly') {
-    throw new NotFoundError('This assembly instruction does not exist.');
-  }
-  const revision = await loadLatestPublished(template);
-  if (!revision) {
-    throw new ConflictError(`Publish “${template.draft.name || 'the instruction'}” first.`);
-  }
-  if (revision.modelCode !== machine.data.modelCode) {
-    throw new BadRequestError(`“${revision.name}” is not an instruction of this machine's model.`);
-  }
+  const revision = await assemblyRevision(machine.data, templateId);
   const existing = (await loadMachineAssemblies(machineId)).find(
     (assembly) => assembly.templateId === templateId,
   );
   if (existing) throw new ConflictError(`This machine already has “${existing.name}”.`);
-
-  const now = new Date().toISOString();
-  const assembly: MachineAssembly = {
-    id: newId(),
-    machineRef: machineId,
-    templateId,
-    templateRevision: revision.revision,
-    name: revision.name,
-    modelCode: revision.modelCode,
-    sections: revision.sections,
-    createdAt: now,
-    createdBy: user.email,
-    updatedAt: now,
-    updatedBy: user.email,
-  };
+  const assembly = newMachineAssembly(machineId, revision, user.email);
   await writeMachineAssembly(assembly, { ifNoneMatch: '*' });
   const detail: MachineAssemblyDetail = {
     assembly,

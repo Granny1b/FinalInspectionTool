@@ -20,9 +20,10 @@ export function LogSummary({ summary, resp, onResp }: Props) {
   const total = summary.open + summary.closed;
   const chipsId = useId();
   return (
-    <div className="space-y-4">
-      {/* Each tile spans three rows of the grid (label, value, detail), as Insights' tiles. */}
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-6">
+    // One quiet card rather than three boxes and a row of chips: the numbers side by side, and
+    // under a hairline who the open ones are for.
+    <div className="rounded-lg border border-ink-200 bg-surface">
+      <dl className="grid grid-cols-1 divide-y divide-ink-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <Tile
           label="Open"
           value={summary.open}
@@ -53,12 +54,11 @@ export function LogSummary({ summary, resp, onResp }: Props) {
           value={summary.overdue}
           detail={summary.overdue > 0 ? 'Found over a month ago' : 'None waiting that long'}
           alert={summary.overdue > 0}
-          className="col-span-2 sm:col-span-1"
         />
       </dl>
       {summary.openByResp.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <p id={chipsId} className="text-xs font-medium text-ink-500">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-ink-100 px-5 py-3">
+          <p id={chipsId} className="text-xs text-ink-500">
             Open by responsible
           </p>
           <ul aria-labelledby={chipsId} className="flex flex-wrap gap-1.5">
@@ -72,10 +72,10 @@ export function LogSummary({ summary, resp, onResp }: Props) {
                     aria-pressed={pressed}
                     onClick={() => onResp(pressed ? undefined : value)}
                     className={clsx(
-                      'inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium ring-1 transition-colors ring-inset pointer-coarse:h-9',
+                      'inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors pointer-coarse:h-9',
                       pressed
-                        ? 'bg-brand-600 text-white ring-brand-600'
-                        : 'bg-surface text-ink-700 ring-ink-200 hover:bg-ink-50 hover:ring-ink-300',
+                        ? 'bg-brand-600 text-white'
+                        : 'bg-ink-100 text-ink-700 hover:bg-ink-200',
                     )}
                   >
                     {entry.resp || 'Not assigned'}
@@ -103,33 +103,26 @@ function Tile({
   value,
   detail,
   alert = false,
-  className,
 }: {
   label: string;
   value: number;
   detail: ReactNode;
   /** Something to act on: the number in red. */
   alert?: boolean;
-  className?: string;
 }) {
   return (
-    <div
-      className={clsx(
-        'row-span-3 grid grid-rows-subgrid gap-y-0 rounded-lg border bg-surface px-4 py-3 sm:px-5 sm:py-4',
-        alert ? 'border-nok-border' : 'border-ink-200',
-        className,
-      )}
-    >
-      <dt className="text-sm text-ink-500">{label}</dt>
+    // The number, with its label and a line of detail beside it.
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 px-5 py-4">
+      <dt className="col-start-2 row-start-1 text-sm font-medium text-ink-700">{label}</dt>
       <dd
         className={clsx(
-          'mt-1.5 text-2xl font-semibold tracking-tight sm:text-3xl',
-          alert ? 'text-nok-fg' : 'text-ink-900',
+          'col-start-1 row-span-2 row-start-1 min-w-10 text-3xl font-semibold tracking-tight tabular-nums',
+          alert ? 'text-nok-fg' : value === 0 ? 'text-ink-400' : 'text-ink-900',
         )}
       >
         {value}
       </dd>
-      <dd className="mt-1 text-xs text-ink-500">{detail}</dd>
+      <dd className="col-start-2 row-start-2 text-xs text-ink-500">{detail}</dd>
     </div>
   );
 }

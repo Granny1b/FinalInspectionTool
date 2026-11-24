@@ -122,7 +122,7 @@ test.describe('an anonymous visitor', () => {
   test('sees the sign-in page in the theme picked in the app', async ({ page }) => {
     await storeTheme(page, 'dark');
     await page.goto('/login.html');
-    await expect(page.getByRole('heading', { name: 'Final Inspection' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Production' })).toBeVisible();
     await expect(html(page)).toHaveAttribute('data-theme', 'dark');
     await expect(page.locator('body')).toHaveCSS('background-color', DARK_CANVAS);
     // The logo with a white wordmark, behind the page's one logo image.
@@ -134,7 +134,7 @@ test.describe('an anonymous visitor', () => {
 
     test('sees the sign-in page dark when nothing is picked', async ({ page }) => {
       await page.goto('/login.html');
-      await expect(page.getByRole('heading', { name: 'Final Inspection' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Production' })).toBeVisible();
       await expect(html(page)).not.toHaveAttribute('data-theme');
       await expect(page.locator('body')).toHaveCSS('background-color', DARK_CANVAS);
     });

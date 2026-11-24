@@ -132,3 +132,40 @@ test('an instruction is bound to a machine and signed off until it is completed'
   await expect(section.getByText('Completed')).toBeVisible();
   await expect(section.getByText('3 of 3 steps signed')).toBeVisible();
 });
+
+test('a new machine gets its model’s assembly instruction when it is made', async ({
+  page,
+  context,
+  made,
+}) => {
+  await signIn(context, ADMIN, ['admin']);
+  await page.goto('/machines');
+  const name = `E2E build ${Date.now()}`;
+  made.templates.push(await publishInstruction(page, 'RMMG', name));
+
+  // Three numbered steps: the model, the machine, and what it gets, the instruction ticked.
+  await page.goto('/machines/new?model=RMMG');
+  const gets = page.getByRole('region', { name: 'What the machine gets' });
+  await expect(
+    gets.getByRole('group', { name: 'Assembly' }).getByRole('checkbox', { name }),
+  ).toBeChecked();
+  const machineName = uniqueMachineId('E2E-NEW');
+  await page.getByLabel('Machine ID').fill(machineName);
+  await page.getByLabel('Serial number').fill('2002');
+  await page.getByRole('button', { name: 'Create machine' }).click();
+  await page.waitForURL(/\/machines\/[A-Za-z0-9]{16}$/);
+  made.machines.push(page.url().split('/').at(-1)!);
+
+  // Its page: the build at a glance, and the instruction in its Assembly section.
+  await expect(page.getByRole('heading', { level: 1, name: machineName })).toBeVisible();
+  const overview = page.getByRole('navigation', { name: 'Build overview' });
+  await expect(overview.getByRole('link')).toHaveText([
+    // Every published instruction of the model is ticked, this one among them.
+    /1\. Assembly.*0 of \d+ steps signed/,
+    /2\. Quality checks/,
+    /3\. Final inspection/,
+  ]);
+  await expect(
+    page.getByRole('region', { name: 'Assembly' }).getByRole('link', { name }),
+  ).toBeVisible();
+});

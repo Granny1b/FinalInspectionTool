@@ -3911,3 +3911,100 @@ long instruction.
   by moving the list's own scroll, never the page's.
 - Checked in the browser on the 363-step HHV instruction (scrolling and jumping by the links);
   no end-to-end test, since the test instructions are too short to scroll.
+
+## Machines: making one and its page, a UI pass (2026-11-23)
+
+The user asked for creating a machine and a machine's page to be more logical, better designed and
+easier to follow.
+
+- **New machine is three numbered steps** (model, the machine, what it gets), with the third
+  shown as a placeholder until a model is picked, so the order is visible from the start. The
+  hints say what a field is for, not how the data model works.
+- **What the machine gets is grouped as the build goes:** Assembly, Quality checks, Final
+  inspection, each with its own label and, when the model has none published, a line saying so.
+  A quality check is listed by its name under "Quality checks" (not "Quality check – …" on every
+  line). A line under the form says what will be made ("The machine gets 1 assembly instruction
+  and 4 checks.").
+- **Assembly instructions are bound when the machine is made** (`assemblyTemplateIds` on
+  `POST /api/machines`, default none): binding was only possible afterwards, on the machine's
+  page, which made "start an HHV" two trips. Checked before anything is written, like the checks.
+- **A model with only an assembly instruction can be made a machine of.** The list of models
+  required a final inspection template, so the HHV (instruction only) was not offered at all.
+- **A machine's page starts with a build overview:** three tiles in build order with their state
+  and a jump to their section. It answers "where is this machine" before the lists below.
+- **Each section adds its own kind** (Add instruction, Add quality check, Add final inspection),
+  replacing one "Add check" in the page's header that covered two kinds and not the third. A
+  button shows only when the model has something published the machine lacks; otherwise the empty
+  section says nothing is published yet.
+- **The status badge speaks of assembly when there are no checks yet** ("In assembly", "Assembly
+  completed") instead of "No checks yet" on a machine that is being built.
+- **Not done:** the machines list has no assembly column (it would read every machine's
+  sign-offs per listing); the other pages were left as they are.
+
+## Assembly: department as a dropdown, and change requests (2026-11-24)
+
+### Department
+
+The user could not change an imported step's department: the field was a text box with
+suggestions (a datalist), and a browser only suggests what matches the text already in the box, so
+"Mechanics" offered nothing but itself.
+
+- **Department is a `<select>` of the settings' Responsible list**, with "Not set". A value not in
+  the list (an import's "Mechanics" where the list says "Mechanical", or one removed since) stays
+  chosen and is marked "(not in the list)", as a deviation's Responsible is; it goes when another
+  is picked. Files and the API still take any text, so imports don't depend on the settings.
+
+### Change requests
+
+The user wanted inspectors to flag a row of an instruction for change with a very small form, and
+admins to get them as tickets in a new panel under Admin.
+
+- **One blob per request, `config/change-requests/{id}.json`**, in the existing config container:
+  no new container to provision. Each records the instruction, the step's id, and the step as it
+  read (instruction name, revision, task, "1.2", text) so it is understood after the step changes
+  or goes; the machine too when flagged while signing on one (then the machine's copy is what was
+  read).
+- **Everyone signed in can flag; the list is the admins'** (`GET` and the open count are 403 for
+  inspectors). A reader gets "Sent to the admins" and no list of their own: kept very small, as
+  asked.
+- **"Notification" is a count on the sidebar's link** (Admin → Change requests), refreshed every
+  minute, and the page's Open tab. No email: the app sends none.
+- **Open → Fixed, with who, when and an optional note; Reopen; Delete.** Fixing a request does not
+  publish anything: the page says the change reaches readers when the instruction is published.
+- **"Open the step" goes to the editor at that step** (`/assembly/{id}#row-{itemId}`): the editor
+  unfolds the step's task, scrolls to it and focuses its text. A step deleted since just opens
+  the editor.
+- **Only assembly instructions for now**: the flag sits on the instruction's reader. Checklist
+  rows could get the same later.
+- **Tests:** api (`change-requests.test.ts`), e2e (`change-requests.spec.ts`: flagged by an
+  inspector, opened and fixed by an admin). The sidebar test expects the new Admin link.
+
+## The app is called Modig Production (2026-11-24)
+
+It was "Modig Final Inspection", from when final inspections were all it did. It now also holds
+assembly instructions, sign-off on machines, quality checks and change requests, and the user
+chose **Modig Production**.
+
+- Changed where the app names itself: `APP_NAME` (page titles), the sign-in page ("Production"
+  under the logo, with a line saying what it covers), the no-access page, the invitation text and
+  the API's no-access message.
+- **Not changed:** the printed and Word final inspection report, whose title "Final Inspection" is
+  the document's name; the sidebar group "Final inspection"; the repository, the file formats'
+  `modig-final-inspection/…` identifiers (files already exported must keep importing) and the
+  Azure resource names.
+
+## Deviation log: a calmer page (2026-11-24)
+
+The user found the deviation log cluttered and hard to read at a glance, and asked for something
+softer on the eyes. Nothing was removed; the same facts carry less ink.
+
+- **The summary is one card, not three boxes and a row of chips:** each number with its label and
+  detail beside it, hairlines between, and "Open by responsible" under a hairline in the same
+  card. A zero is grey, so the eye goes to what there is. Chips are filled softly, no outlines.
+- **A machine's header is quieter:** the model on its own line, then the checks its deviations
+  come from as a small list, a line each, with "In progress" as plain text where it was a badge
+  beside every number.
+- **The table has small uppercase labels and no grey header bar;** a deviation's id is grey (it is
+  for looking up, the text is what is read), responsible, category and date are a size smaller and
+  grey, and the status and severity pills have a soft fill without an outline.
+- The log's tests (roles and texts) pass unchanged.

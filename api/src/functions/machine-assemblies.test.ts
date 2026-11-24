@@ -181,6 +181,49 @@ describe('binding an assembly instruction to a machine', () => {
   });
 });
 
+describe('a machine made with its assembly instructions', () => {
+  const make = (body: Record<string, unknown>) =>
+    createMachine(
+      request({
+        principal: sam,
+        method: 'POST',
+        body: JSON.stringify({
+          machineName: 'Magellan#2',
+          serialNumber: '1002',
+          templateIds: [],
+          ...body,
+        }),
+      }),
+      context(),
+    );
+
+  it('binds the ticked instructions, also for a model without a final inspection', async () => {
+    // IM has no final inspection template: an instruction is enough to make a machine of it.
+    const template = instruction({ modelCode: 'IM', name: 'IM build' });
+    await storeTemplate(template, [1]);
+    const response = await make({ modelCode: 'IM', assemblyTemplateIds: [template.id] });
+    expect(response.status).toBe(201);
+    const { id } = MachineDetailSchema.parse(response.jsonBody).machine;
+    const list = MachineAssemblyListSchema.parse(
+      (await call(listMachineAssemblies, { id })).jsonBody,
+    );
+    expect(list).toEqual([expect.objectContaining({ name: 'IM build', steps: 3, signed: 0 })]);
+  });
+
+  it('makes nothing when an instruction is another model’s or unpublished', async () => {
+    const other = instruction({ modelCode: 'IM' });
+    await storeTemplate(other, [1]);
+    const refused = await make({ modelCode: 'RMMG', assemblyTemplateIds: [other.id] });
+    expect(refused.status).toBe(400);
+    // The Machine ID is still free: the machine was not made.
+    const template = instruction();
+    await storeTemplate(template, [1]);
+    expect((await make({ modelCode: 'RMMG', assemblyTemplateIds: [template.id] })).status).toBe(
+      201,
+    );
+  });
+});
+
 describe('signing steps', () => {
   it('records the initials, the account and the time, and the first sign-off stands', async () => {
     const { machineId, assembly, steps } = await bound();

@@ -25,6 +25,8 @@ import {
 type Props = {
   machine: Machine;
   isAdmin: boolean;
+  /** The section's id, for the page's overview to jump to. */
+  id?: string;
 };
 
 /**
@@ -32,7 +34,7 @@ type Props = {
  * once every step is signed), and Add instruction to bind another of the model's. Admins remove
  * one, with its sign-offs.
  */
-export function MachineAssemblySection({ machine, isAdmin }: Props) {
+export function MachineAssemblySection({ machine, isAdmin, id }: Props) {
   const titleId = useId();
   const assemblies = useMachineAssemblies(machine.id);
   const templates = useTemplates();
@@ -49,8 +51,8 @@ export function MachineAssemblySection({ machine, isAdmin }: Props) {
   );
 
   return (
-    <section aria-labelledby={titleId}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <section id={id} aria-labelledby={titleId} className="scroll-mt-24">
+      <div className="mb-3 flex min-h-9 flex-wrap items-center justify-between gap-2">
         <h2 id={titleId} className="text-base font-semibold text-ink-900">
           Assembly
         </h2>

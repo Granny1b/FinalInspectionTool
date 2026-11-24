@@ -80,7 +80,12 @@ export function PublishedTemplateView({
           withTime={quality}
           assembly={assembly}
         />
-        <TemplateDocument sections={template.sections} variant={template.kind} />
+        <TemplateDocument
+          sections={template.sections}
+          variant={template.kind}
+          // A step of an assembly instruction can be flagged as wrong by whoever reads it.
+          flagFor={assembly ? { templateId: template.id } : undefined}
+        />
       </section>
     </>
   );

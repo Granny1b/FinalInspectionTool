@@ -122,6 +122,12 @@ Added after the six phases:
   signed, and the machine's page shows how far each instruction has come. See
   [Assembly on a machine](#assembly-on-a-machine).
 
+- **Change requests.** Anyone reading an assembly instruction (in Read view or while signing on a
+  machine) can flag a step as wrong: a small flag on the step opens a short form for what should
+  change. Admins find them under _Admin → Change requests_, with the number open in the sidebar:
+  each names the instruction, the step and the machine it was flagged on, opens the step in the
+  editor, and is marked fixed (with an optional note), reopened or deleted.
+
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
 ## Prerequisites
@@ -1794,7 +1800,7 @@ machine (who, when, status, actual time) is not part of it yet.
   one department's steps.
 - **Writing** (admins): the same page is the editor. Tasks fold to their headers (an instruction
   of more than 40 steps opens folded). `Enter` in a task's title starts its steps and `Enter` in a
-  step adds the next. A step's **Details** hold its department, time (minutes; "1,5 h" is read
+  step adds the next. A step's **Details** hold its department (picked from the Responsible list in Settings), time (minutes; "1,5 h" is read
   too), assy, part numbers, bolts and documents. Bolts and documents are typed or pasted a line
   each: `8 pcs MC6S M8x25`, and a link or a path, optionally `Name | path`. Pictures are added and
   marked up as in a quality check. Undo, drag and drop, autosave, Publish and the revision history
@@ -1821,6 +1827,13 @@ machine (who, when, status, actual time) is not part of it yet.
 
 ## Assembly on a machine
 
+- **A new machine** is made in three numbered steps: its model, its Machine ID and serial number,
+  and what it gets, grouped as the build goes: assembly instructions, quality checks, final
+  inspection, all ticked to start with. A model needs only something published (an assembly
+  instruction is enough) to be offered.
+- **A machine's page** opens with its build at a glance: Assembly, Quality checks and Final
+  inspection, each saying how far it has come (green when done) and jumping to its section. Each
+  section has its own add button, shown when the model has something published to add.
 - **Binding:** a machine's page has an **Assembly** section. **Add instruction** offers the
   published assembly instructions of the machine's model; the machine gets its own copy of the
   latest revision. A machine has each instruction once. Admins remove one (with its sign-offs)

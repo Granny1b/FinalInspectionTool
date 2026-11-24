@@ -53,6 +53,9 @@ export async function resetStorage(): Promise<void> {
   for await (const blob of config.listBlobsFlat({ prefix: 'quality-check-orders/' })) {
     await config.deleteBlob(blob.name);
   }
+  for await (const blob of config.listBlobsFlat({ prefix: blobNames.changeRequestPrefix })) {
+    await config.deleteBlob(blob.name);
+  }
   await config.getBlobClient(blobNames.settings).deleteIfExists();
   await config.getBlobClient(blobNames.people).deleteIfExists();
   await config.getBlobClient(blobNames.inspectionCounter).deleteIfExists();

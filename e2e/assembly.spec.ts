@@ -96,7 +96,7 @@ test('an admin writes an assembly instruction and publishes it; an inspector rea
 
   // A new step's details are open: a pasted bolt list and a server path are read as typed.
   const first = page.locator('li', { has: page.getByLabel('Step 1.1', { exact: true }) });
-  await first.getByLabel('Department').fill('Mechanics');
+  await first.getByLabel('Department').selectOption('Mechanical');
   await first.getByLabel('Estimated time (min)').fill('1,5 h');
   await first.getByLabel('Part numbers').fill('80065, 82053');
   await first.getByLabel('Bolts').fill('8 pcs - M6S M8x25\n8 pcs - TBRSB M8 FZB\n');
@@ -121,7 +121,7 @@ test('an admin writes an assembly instruction and publishes it; an inspector rea
     text: 'Mount Base tend 80065 & 82053',
     guide: { description: 'Tighten crosswise.' },
     assembly: {
-      department: 'Mechanics',
+      department: 'Mechanical',
       minutes: 90,
       partNumbers: ['80065', '82053'],
       fasteners: [

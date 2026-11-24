@@ -57,7 +57,7 @@ export function MachinesPage() {
     <>
       <PageHeader
         title="Machines"
-        description="The machines being built, each with its own quality checks and final inspection."
+        description="The machines being built, each with its own assembly instructions, quality checks and final inspection."
         actions={newMachine}
       />
       {isAdmin && <FromInspections />}

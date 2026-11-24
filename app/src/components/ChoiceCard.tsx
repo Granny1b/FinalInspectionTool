@@ -1,4 +1,6 @@
+import clsx from 'clsx';
 import { useId, type ReactNode } from 'react';
+import { StepNumber } from './StepNumber';
 
 export type ChoiceOption = { value: string; label: string; detail: ReactNode };
 
@@ -14,6 +16,8 @@ type Props = {
   autoFocus?: boolean;
   /** Under the options, inside the card (a link to make what is missing). */
   footer?: ReactNode;
+  /** Its place in a form of numbered steps, shown before the title. */
+  step?: number;
 };
 
 /**
@@ -31,6 +35,7 @@ export function ChoiceCard({
   onChange,
   autoFocus = true,
   footer,
+  step,
 }: Props) {
   const hintId = useId();
   const errorId = useId();
@@ -43,11 +48,17 @@ export function ChoiceCard({
       className="min-w-0 rounded-lg border border-ink-200 bg-surface"
     >
       <legend className="float-left w-full px-5 pt-3.5">
-        <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
+        <h2 className="flex items-center gap-2.5 text-sm font-semibold text-ink-900">
+          {step !== undefined && <StepNumber step={step} />}
+          {title}
+        </h2>
       </legend>
       <p
         id={hintId}
-        className="clear-left border-b border-ink-200 px-5 pt-0.5 pb-3.5 text-xs text-ink-500"
+        className={clsx(
+          'clear-left border-b border-ink-200 px-5 pt-0.5 pb-3.5 text-xs text-ink-500',
+          step !== undefined && 'pl-[3.375rem]',
+        )}
       >
         {hint}
       </p>

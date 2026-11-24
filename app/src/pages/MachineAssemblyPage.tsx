@@ -246,7 +246,12 @@ function Assembly({ machineId, detail }: { machineId: string; detail: MachineAss
 
       <div className="@container mt-6">
         <div className={SHEET}>
-          <AssemblyView sections={assembly.sections} issues={NO_ISSUES} signing={signing} />
+          <AssemblyView
+            sections={assembly.sections}
+            issues={NO_ISSUES}
+            signing={signing}
+            flagFor={{ templateId: assembly.templateId, machineId }}
+          />
         </div>
       </div>
     </div>

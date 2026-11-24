@@ -4,6 +4,7 @@ import {
   ChartColumn,
   ClipboardCheck,
   Factory,
+  Flag,
   LayoutTemplate,
   ListChecks,
   LogOut,
@@ -15,13 +16,15 @@ import {
 } from 'lucide-react';
 import { useId } from 'react';
 import { NavLink } from 'react-router';
+import { useOpenChangeRequests } from '../features/changeRequests/queries';
 import { signOutUrl } from '../lib/auth';
 import { NAV_ITEM_HEIGHT, USER_PANEL, USER_PANEL_ROW } from './layout';
 import { Logo } from './Logo';
 import { RoleBadge } from './RoleBadge';
 import { ThemeToggle } from './ThemeToggle';
 
-type NavItem = { to: string; label: string; icon: LucideIcon };
+/** `count` is shown as a badge when above zero: something waiting there (open change requests). */
+type NavItem = { to: string; label: string; icon: LucideIcon; count?: number };
 type NavGroupItems = { label: string; items: NavItem[] };
 
 /** First, without a group label: the machines being built, where their checks are started. */
@@ -52,6 +55,8 @@ const NAV_GROUPS: NavGroupItems[] = [
   { label: 'Setup', items: [{ to: '/templates', label: 'Templates', icon: LayoutTemplate }] },
 ];
 const ADMIN_NAV: NavItem[] = [
+  // Steps of assembly instructions that readers flagged as wrong, for the admins to fix.
+  { to: '/change-requests', label: 'Change requests', icon: Flag },
   { to: '/insights', label: 'Insights', icon: ChartColumn },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -69,6 +74,11 @@ type Props = {
  * drawer, whose theme controls stay in step (one store, lib/theme.ts).
  */
 export function Sidebar({ me, onNavigate, onClose }: Props) {
+  const isAdmin = hasRole(me.roles, 'admin');
+  const open = useOpenChangeRequests(isAdmin).data ?? 0;
+  const adminNav = ADMIN_NAV.map((item) =>
+    item.to === '/change-requests' ? { ...item, count: open } : item,
+  );
   return (
     // A landmark, so the user panel (and Sign out) is reachable by landmark navigation too.
     <aside aria-label="Sidebar" className="flex h-full flex-col bg-surface">
@@ -97,8 +107,8 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
             className={GROUP_GAP}
           />
         ))}
-        {hasRole(me.roles, 'admin') && (
-          <NavGroup label="Admin" items={ADMIN_NAV} onNavigate={onNavigate} className={GROUP_GAP} />
+        {isAdmin && (
+          <NavGroup label="Admin" items={adminNav} onNavigate={onNavigate} className={GROUP_GAP} />
         )}
       </nav>
 
@@ -145,7 +155,7 @@ type NavListProps = {
 function NavList({ items, onNavigate, labelledBy, label }: NavListProps) {
   return (
     <ul className="space-y-0.5" aria-labelledby={labelledBy} aria-label={label}>
-      {items.map(({ to, label, icon: Icon }) => (
+      {items.map(({ to, label, icon: Icon, count = 0 }) => (
         <li key={to}>
           {/* NavLink sets aria-current="page" on the active link. */}
           <NavLink
@@ -171,6 +181,12 @@ function NavList({ items, onNavigate, labelledBy, label }: NavListProps) {
                   )}
                 />
                 {label}
+                {count > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-nok-solid px-1.5 text-xs font-semibold text-white tabular-nums">
+                    {count}
+                    <span className="sr-only"> open</span>
+                  </span>
+                )}
               </>
             )}
           </NavLink>

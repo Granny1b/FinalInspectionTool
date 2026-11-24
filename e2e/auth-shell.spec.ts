@@ -16,7 +16,7 @@ test.describe('anonymous visitor', () => {
     test(`is sent from ${path} to the sign-in page`, async ({ page }) => {
       await page.goto(path);
       await expect(page).toHaveURL(/\/login\.html$/);
-      await expect(page.getByRole('heading', { name: 'Final Inspection' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Production' })).toBeVisible();
     });
   }
 
@@ -189,7 +189,7 @@ test.describe('signed in', () => {
       // The invitation to pass on: the app's address and the account to sign in with.
       const invitation = page.getByRole('dialog', { name: 'Petra Persson can sign in now' });
       await expect(invitation.getByLabel('Invitation to send')).toHaveValue(
-        `Hi Petra,\n\nYou now have access to Modig Final Inspection as an inspector.\n\n` +
+        `Hi Petra,\n\nYou now have access to Modig Production as an inspector.\n\n` +
           `Open ${baseURL}/ and sign in with your Microsoft account ${personEmail}.`,
       );
       await expect(invitation.getByRole('link', { name: 'Open in email' })).toHaveAttribute(
@@ -286,7 +286,7 @@ test.describe('signed in', () => {
     await page.getByRole('link', { name: 'Sign out' }).filter({ visible: true }).click();
 
     await expect(page).toHaveURL(/\/login\.html$/);
-    await expect(page.getByRole('heading', { name: 'Final Inspection' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Production' })).toBeVisible();
     expect(await hasSession(context)).toBe(false);
   });
 
@@ -300,7 +300,7 @@ test.describe('signed in', () => {
     await page.getByRole('link', { name: 'Sign out and use another account' }).click();
 
     await expect(page).toHaveURL(/\/login\.html$/);
-    await expect(page.getByRole('heading', { name: 'Final Inspection' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Production' })).toBeVisible();
     expect(await hasSession(context)).toBe(false);
   });
 });

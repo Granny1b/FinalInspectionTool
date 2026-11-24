@@ -1,5 +1,6 @@
 import {
   UpdateMachineRequestSchema,
+  type InspectionKind,
   type InspectionSummary,
   type Machine,
   type MachineCheck,
@@ -120,6 +121,8 @@ export function EditMachineDialog({ machine, etag, onReload, onClose }: EditProp
 type AddProps = {
   machine: Machine;
   checks: readonly MachineCheck[];
+  /** Only quality checks, or only the final inspection; both when left out. */
+  kind?: InspectionKind | undefined;
   onAdded: (title: string) => void;
   onClose: () => void;
 };
@@ -128,14 +131,16 @@ type AddProps = {
  * Another check: one of the model's published checks the machine doesn't have (not ticked when it
  * was made, or published since), copied as it is published now.
  */
-export function AddCheckDialog({ machine, checks, onAdded, onClose }: AddProps) {
+export function AddCheckDialog({ machine, checks, kind, onAdded, onClose }: AddProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const templates = useTemplates();
   const add = useAddCheck(machine.id);
   const has = new Set(checks.map((check) => check.templateId));
   const choices = checkChoices(templates.data ?? [], machine.modelCode).filter(
-    (choice) => !has.has(choice.templateId),
+    (choice) => !has.has(choice.templateId) && (!kind || choice.kind === kind),
   );
+  const what =
+    kind === 'quality' ? 'quality check' : kind === 'final' ? 'final inspection' : 'check';
   const [picked, setPicked] = useState<string | null>(null);
   const close = () => dialogRef.current?.close();
   const legendId = useId();
@@ -155,8 +160,8 @@ export function AddCheckDialog({ machine, checks, onAdded, onClose }: AddProps) 
   return (
     <Dialog
       dialogRef={dialogRef}
-      title="Add a check"
-      description={`A copy of the check as it is published now, for ${machine.machineName} only.`}
+      title={kind === 'final' ? 'Add the final inspection' : `Add a ${what}`}
+      description={`A copy of the ${what} as it is published now, for ${machine.machineName} only.`}
       onClose={onClose}
       busy={add.isPending}
     >
@@ -165,7 +170,7 @@ export function AddCheckDialog({ machine, checks, onAdded, onClose }: AddProps) 
           <p className="text-sm text-ink-500">Loading the checks…</p>
         ) : choices.length === 0 ? (
           <p className="text-sm text-ink-600">
-            This machine has every published check of its model already.
+            This machine has every published {what} of its model already.
           </p>
         ) : (
           <fieldset aria-labelledby={legendId}>
@@ -211,7 +216,7 @@ export function AddCheckDialog({ machine, checks, onAdded, onClose }: AddProps) 
               {add.isPending && (
                 <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />
               )}
-              {add.isPending ? 'Adding…' : 'Add check'}
+              {add.isPending ? 'Adding…' : 'Add to machine'}
             </Button>
           )}
         </div>

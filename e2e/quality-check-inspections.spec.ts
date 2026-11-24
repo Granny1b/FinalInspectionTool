@@ -164,7 +164,8 @@ test('the sidebar has Final inspection, Quality check, Assembly, Setup and, for 
     ['Quality check', ['Quality checks', 'Deviations']],
     ['Assembly', ['Instructions']],
     ['Setup', ['Templates']],
-    ['Admin', ['Insights', 'Settings']],
+    // Change requests may carry a count of open ones after its name.
+    ['Admin', [/^Change requests/, 'Insights', 'Settings']],
   ] as const;
   for (const [label, links] of groups) {
     const list = nav.getByRole('list', { name: label });
@@ -212,7 +213,8 @@ test('an inspector starts a quality check, marks its rows on the cards and final
   ).toBeVisible();
   await page.getByRole('link', { name: 'New machine' }).click();
   await page.getByRole('radio', { name: new RegExp(`^${machine.model}`) }).check();
-  await expect(page.getByRole('checkbox', { name: new RegExp(CHECK) })).toBeChecked();
+  // Listed under Quality checks by its own name.
+  await expect(page.getByRole('checkbox', { name: 'Pre start up' })).toBeChecked();
   const create = page.getByRole('button', { name: 'Create machine' });
   await create.click();
   await expect(page.getByText('Machine ID is required')).toBeVisible();

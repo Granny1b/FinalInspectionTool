@@ -1,14 +1,12 @@
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { rowRef, sectionNumber, stepDepartments, stepRef, type Section } from '@modig/shared';
+import { rowRef, sectionNumber, stepRef, type Section } from '@modig/shared';
 import clsx from 'clsx';
 import { GripVertical, ListChecks, Plus, Undo2, X } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../../../components/Button';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
-import { useSettings } from '../../../lib/useSettings';
-import { DEPARTMENTS_LIST_ID } from '../../assembly/AssemblyRow';
 import { ASSEMBLY_GUIDE_WORDING } from '../../assembly/wording';
 import { guideRow } from '../../guides/guide';
 import { GuideEditor } from '../../guides/GuideEditor';
@@ -61,11 +59,20 @@ export function EditableDocument({
   });
   // An assembly instruction's tasks fold to their headers. A long one (the build of a whole
   // machine, hundreds of steps) opens folded, so the page draws only the tasks being worked on.
+  // A link to one step ("…#row-{id}", from a change request): its task is shown, and the step
+  // brought into view once it is drawn.
+  const [linked] = useState(() => linkedRow(sections));
   const [foldedIds, setFoldedIds] = useState<ReadonlySet<string>>(() =>
     assembly && sections.reduce((count, section) => count + section.items.length, 0) > LONG
-      ? new Set(sections.map((section) => section.id))
+      ? new Set(sections.map((section) => section.id).filter((id) => id !== linked?.sectionId))
       : new Set(),
   );
+  useEffect(() => {
+    if (!linked) return;
+    const row = document.getElementById(`row-${linked.itemId}`);
+    row?.scrollIntoView({ block: 'center' });
+    row?.querySelector<HTMLElement>('[data-item-text]')?.focus({ preventScroll: true });
+  }, [linked]);
   const toggleFold = useCallback(
     (sectionId: string) =>
       setFoldedIds((current) => {
@@ -85,12 +92,6 @@ export function EditableDocument({
       ),
     [sections, issues],
   );
-  const settings = useSettings();
-  const departmentsKey = assembly
-    ? [...new Set([...(settings.data?.responsibles ?? []), ...stepDepartments(sections)])].join(
-        '\n',
-      )
-    : '';
   const { drag, shown, contextProps } = useDocumentDnd(sections, actions);
   // Offered only while it is gone: the editor's own Undo (Ctrl+Z) may have put it back already,
   // and putting it back twice would make two of it.
@@ -224,17 +225,6 @@ export function EditableDocument({
         />
       )}
 
-      {assembly && (
-        <datalist id={DEPARTMENTS_LIST_ID}>
-          {departmentsKey
-            .split('\n')
-            .filter(Boolean)
-            .map((department) => (
-              <option key={department} value={department} />
-            ))}
-        </datalist>
-      )}
-
       <UndoBar
         deleted={undoable}
         onUndo={(last) => {
@@ -245,6 +235,15 @@ export function EditableDocument({
       />
     </div>
   );
+}
+
+/** The row the address names with "#row-{id}", and its section, if it is in the document. */
+function linkedRow(sections: Section[]): { itemId: string; sectionId: string } | null {
+  const match = /^#row-([A-Za-z0-9]+)$/.exec(window.location.hash);
+  const itemId = match?.[1];
+  const section =
+    itemId && sections.find((entry) => entry.items.some((item) => item.id === itemId));
+  return itemId && section ? { itemId, sectionId: section.id } : null;
 }
 
 /** From this many steps on, an assembly instruction opens with its tasks folded. */

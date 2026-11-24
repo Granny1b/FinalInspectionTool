@@ -12,6 +12,7 @@
  *   follow-ups/{inspectionId}.json           its deviations' follow-up: open or closed, the action
  *   machines/{machineId}.json                a machine being built (its checks are inspections)
  *   config/quality-check-orders/{templateId}.json  the order of a machine model's quality checks
+ *   config/change-requests/{id}.json               a step of an instruction flagged for change
  *   machine-assemblies/{machineId}/{id}.json           an assembly instruction bound to a machine
  *   machine-assemblies/{machineId}/{id}.signoffs.json  who signed which of its steps, and when
  *
@@ -68,6 +69,9 @@ export const blobNames = {
    * template is `templateId`, as admins drag them on its Quality checks tab.
    */
   qualityCheckOrder: (templateId: string) => `quality-check-orders/${templateId}.json`,
+  /** In `config/`: a step of an assembly instruction someone flagged for change. */
+  changeRequest: (id: string) => `change-requests/${id}.json`,
+  changeRequestPrefix: 'change-requests/',
   /** In `machine-assemblies/`: a machine's copy of an assembly instruction, and its sign-offs. */
   machineAssembly: (machineId: string, id: string) => `${machineId}/${id}.json`,
   machineAssemblySignOffs: (machineId: string, id: string) => `${machineId}/${id}.signoffs.json`,

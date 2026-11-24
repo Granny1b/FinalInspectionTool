@@ -107,11 +107,11 @@ describe('invitation', () => {
 
   it("has the app's address and the Microsoft account to sign in with", () => {
     expect(invitation(erik, 'https://inspection.modig.se/')).toEqual({
-      subject: 'Your access to Modig Final Inspection',
+      subject: 'Your access to Modig Production',
       body: [
         'Hi Erik,',
         '',
-        'You now have access to Modig Final Inspection as an inspector.',
+        'You now have access to Modig Production as an inspector.',
         '',
         'Open https://inspection.modig.se/ and sign in with your Microsoft account erik.lund@modig.se.',
       ].join('\n'),
