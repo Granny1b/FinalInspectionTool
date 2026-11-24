@@ -126,7 +126,9 @@ Added after the six phases:
   machine) can flag a step as wrong: a small flag on the step opens a short form for what should
   change. Admins find them under _Admin → Change requests_, with the number open in the sidebar:
   each names the instruction, the step and the machine it was flagged on, opens the step in the
-  editor, and is marked fixed (with an optional note), reopened or deleted.
+  editor, and is marked fixed (with an optional note), reopened or deleted. A search box
+  finds requests, open and fixed alike, by what was wrong, what was done, the step, instruction,
+  machine, person or date.
 
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 

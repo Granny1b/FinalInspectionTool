@@ -119,4 +119,17 @@ test('an inspector flags a step as wrong; an admin opens it and marks it fixed',
   const fixed = page.getByRole('listitem').filter({ hasText: message });
   await expect(fixed).toContainText('Washers added in rev 2.');
   await expect(fixed.getByRole('button', { name: 'Reopen' })).toBeVisible();
+
+  // Searchable, open and fixed alike: by what was done, from the Open tab too.
+  await page.getByRole('tab', { name: /Open/ }).click();
+  const search = page.getByLabel('Search the change requests');
+  await search.fill(`washers ADDED ${name.split(' ').at(-1)}`);
+  await expect(page.getByRole('tab', { name: /Fixed/ })).toContainText('1');
+  await expect(page.getByText('None of them is open')).toBeVisible();
+  await page.getByRole('button', { name: 'Show all 1' }).click();
+  await expect(page.getByRole('listitem').filter({ hasText: message })).toBeVisible();
+  await search.fill('nothing says this zzqq');
+  await expect(page.getByRole('heading', { name: 'No change requests match' })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear the search' }).click();
+  await expect(search).toHaveValue('');
 });

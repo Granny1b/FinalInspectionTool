@@ -4008,3 +4008,14 @@ softer on the eyes. Nothing was removed; the same facts carry less ink.
   for looking up, the text is what is read), responsible, category and date are a size smaller and
   grey, and the status and severity pills have a soft fill without an outline.
 - The log's tests (roles and texts) pass unchanged.
+
+## Change requests: search (2026-11-24)
+
+The user wanted to find older fixes easily.
+
+- **One search box over open and fixed alike**, every word of it needed: the message, what was
+  done, the step (number, text, task), the instruction and its model, the machine, who flagged and
+  fixed it (names and emails) and the days ("2026-11"). In the browser: the page already has
+  every request.
+- **The tabs count what the search found, and there is an All tab.** A search made on Open that
+  only finds fixed ones says so and offers to show them, instead of an empty page.

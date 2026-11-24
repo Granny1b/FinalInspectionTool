@@ -1,6 +1,16 @@
 import { type ChangeRequest } from '@modig/shared';
 import clsx from 'clsx';
-import { Check, CircleCheck, Flag, LoaderCircle, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import {
+  Check,
+  CircleCheck,
+  Flag,
+  LoaderCircle,
+  Pencil,
+  RotateCcw,
+  Search,
+  SearchX,
+  Trash2,
+} from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { ActionMenu } from '../components/ActionMenu';
@@ -13,6 +23,7 @@ import { INPUT } from '../components/Field';
 import { PageHeader } from '../components/PageHeader';
 import { LoadError, PageLoading } from '../components/PageStates';
 import { useChangeRequestAction, useChangeRequests } from '../features/changeRequests/queries';
+import { matchesChangeRequest } from '../features/changeRequests/search';
 import { Badge } from '../features/templates/Badge';
 import { assemblyHref } from '../features/templates/queries';
 import { errorMessage } from '../lib/api';
@@ -20,7 +31,8 @@ import { formatDateTime } from '../lib/format';
 import { usePersonName } from '../lib/usePeople';
 import { modelName, useSettings } from '../lib/useSettings';
 
-type Shown = 'open' | 'fixed';
+type Shown = 'open' | 'fixed' | 'all';
+const SHOWN_LABELS: Record<Shown, string> = { open: 'Open', fixed: 'Fixed', all: 'All' };
 
 /**
  * /change-requests (admins): the steps of assembly instructions that readers flagged as wrong.
@@ -33,6 +45,9 @@ export function ChangeRequestsPage() {
   const [shown, setShown] = useState<Shown>('open');
   const [fixing, setFixing] = useState<ChangeRequest | null>(null);
   const [deleting, setDeleting] = useState<ChangeRequest | null>(null);
+  const [query, setQuery] = useState('');
+  const personName = usePersonName();
+  const settings = useSettings();
 
   if (requests.isPending) return <PageLoading label="Loading the change requests…" />;
   if (requests.isError) {
@@ -45,11 +60,20 @@ export function ChangeRequestsPage() {
       />
     );
   }
-  const counts = {
-    open: requests.data.filter((request) => request.status === 'open').length,
-    fixed: requests.data.filter((request) => request.status === 'fixed').length,
+  // The search goes through open and fixed alike: the tabs then say how many of each it found.
+  const searching = query.trim() !== '';
+  const found = requests.data.filter((request) =>
+    matchesChangeRequest(request, query, {
+      person: personName,
+      model: (code) => modelName(settings.data?.machineModels, code),
+    }),
+  );
+  const counts: Record<Shown, number> = {
+    open: found.filter((request) => request.status === 'open').length,
+    fixed: found.filter((request) => request.status === 'fixed').length,
+    all: found.length,
   };
-  const list = requests.data.filter((request) => request.status === shown);
+  const list = shown === 'all' ? found : found.filter((request) => request.status === shown);
 
   return (
     <>
@@ -57,8 +81,23 @@ export function ChangeRequestsPage() {
         title="Change requests"
         description="Steps of assembly instructions that someone flagged as wrong. Change the instruction, publish it, then mark the request fixed."
       />
-      <div role="tablist" aria-label="Show" className="mb-5 flex gap-1.5">
-        {(['open', 'fixed'] as const).map((status) => (
+      <div className="relative mb-4 max-w-xl">
+        <Search
+          size={16}
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-500"
+        />
+        <input
+          type="search"
+          aria-label="Search the change requests"
+          placeholder="Search: what was wrong, the step, instruction, machine, who, date…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          className={clsx(INPUT, 'h-10 pl-9')}
+        />
+      </div>
+      <div role="tablist" aria-label="Show" className="mb-5 flex flex-wrap gap-1.5">
+        {(['open', 'fixed', 'all'] as const).map((status) => (
           <button
             key={status}
             type="button"
@@ -72,7 +111,7 @@ export function ChangeRequestsPage() {
                 : 'border-ink-300 bg-surface text-ink-700 hover:border-ink-400 hover:bg-ink-50',
             )}
           >
-            {status === 'open' ? 'Open' : 'Fixed'}
+            {SHOWN_LABELS[status]}
             <span className="text-xs text-ink-500 tabular-nums">{counts[status]}</span>
           </button>
         ))}
@@ -86,14 +125,49 @@ export function ChangeRequestsPage() {
         </div>
       )}
 
-      {list.length === 0 ? (
+      {/* Announced, so a screen reader hears what a search left. */}
+      {searching && (
+        <p role="status" className="mb-3 text-xs text-ink-500">
+          {found.length === 0
+            ? 'No change requests match.'
+            : `${found.length} change request${found.length === 1 ? '' : 's'} match: ${counts.open} open, ${counts.fixed} fixed.`}
+        </p>
+      )}
+      {list.length === 0 && searching ? (
         <EmptyState
-          icon={shown === 'open' ? CircleCheck : Flag}
-          title={shown === 'open' ? 'Nothing to fix' : 'Nothing fixed yet'}
+          icon={SearchX}
+          title={found.length === 0 ? 'No change requests match' : `None of them is ${shown}`}
           hint={
+            found.length === 0
+              ? 'Try other words: part of what was wrong, a part number, a machine, a name or a date like 2026-11.'
+              : `The search found ${found.length}, under ${shown === 'open' ? 'Fixed' : 'Open'}.`
+          }
+          action={
+            found.length === 0 ? (
+              <Button variant="secondary" onClick={() => setQuery('')}>
+                Clear the search
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={() => setShown('all')}>
+                Show all {found.length}
+              </Button>
+            )
+          }
+        />
+      ) : list.length === 0 ? (
+        <EmptyState
+          icon={shown === 'fixed' ? Flag : CircleCheck}
+          title={
             shown === 'open'
-              ? 'When someone flags a step of an assembly instruction as wrong, it is listed here.'
-              : 'Requests marked fixed are kept here.'
+              ? 'Nothing to fix'
+              : shown === 'fixed'
+                ? 'Nothing fixed yet'
+                : 'No change requests yet'
+          }
+          hint={
+            shown === 'fixed'
+              ? 'Requests marked fixed are kept here.'
+              : 'When someone flags a step of an assembly instruction as wrong, it is listed here.'
           }
         />
       ) : (
