@@ -153,6 +153,8 @@ test('the search leads to an assy’s steps, to a step and to a drawing, and off
   await expect(recent).toContainText('Assembly instruction');
   await recent.click();
   await expect(read).toHaveURL(new RegExp(`/assembly/${templateId}/revisions/1`));
+  // The search has closed behind the hit before it is opened again.
+  await expect(read.getByRole('dialog', { name: 'Search' })).toHaveCount(0);
 
   // Nothing found says so.
   await read.keyboard.press('Control+k');

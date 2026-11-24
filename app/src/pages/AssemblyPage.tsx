@@ -69,10 +69,9 @@ export function AssemblyPage() {
           title="No assembly instructions published yet"
           hint={
             isAdmin
-              ? 'They are written under a machine’s template: Templates, the machine model, then its Assembly tab. Published ones are listed here to read.'
+              ? 'They are written under a machine’s template (the button above): Templates, the machine model, then its Assembly tab. Published ones are listed here to read.'
               : 'They will be listed here once they are published.'
           }
-          action={toTemplates || undefined}
         />
       ) : (
         <div className="space-y-10">
