@@ -6,11 +6,13 @@
 import {
   IMAGE_JPEG_QUALITY,
   IMAGE_MAX_EDGE_PX,
-  ImageReadUrlResponseSchema,
+  IMAGE_URLS_MAX,
+  ImageReadUrlsResponseSchema,
   ImageUploadUrlResponseSchema,
+  type ImageReadUrlsRequest,
 } from '@modig/shared';
 import { queryOptions, skipToken, useQuery } from '@tanstack/react-query';
-import { apiFetch } from './api';
+import { apiFetch, ApiRequestError } from './api';
 
 /** A failure with a message meant for the user. */
 export class ImageError extends Error {
@@ -134,8 +136,10 @@ export function isTimeout(failure: unknown): boolean {
   return failure instanceof DOMException && failure.name === 'TimeoutError';
 }
 
-/** Read URLs expire after about 15 minutes; a fresh one is fetched before that. */
-const READ_URL_STALE_MS = 10 * 60_000;
+/** A read URL is asked for again this long before it expires. */
+const READ_URL_MARGIN_MS = 5 * 60_000;
+/** An unused read URL is kept this long: less than the shortest time one is valid (an hour). */
+const READ_URL_KEEP_MS = 30 * 60_000;
 
 /** A short-lived URL to show an uploaded image; idle without an id. */
 export function useImageUrl(imageId: string | undefined) {
@@ -146,16 +150,65 @@ export function useImageUrl(imageId: string | undefined) {
 export function imageUrlQuery(imageId: string | undefined) {
   return queryOptions({
     queryKey: ['images', imageId, 'url'],
-    queryFn: imageId
-      ? async ({ signal }) =>
-          (
-            await apiFetch(`/api/images/${encodeURIComponent(imageId)}/url`, {
-              schema: ImageReadUrlResponseSchema,
-              signal,
-            })
-          ).data.url
-      : skipToken,
-    staleTime: READ_URL_STALE_MS,
-    gcTime: READ_URL_STALE_MS,
+    queryFn: imageId ? () => readUrl(imageId) : skipToken,
+    // Fresh until shortly before the URL expires. The API gives everyone the same URL for an
+    // image for hours, so the browser keeps the picture itself between visits.
+    staleTime: () =>
+      imageId ? Math.max(0, (expiries.get(imageId) ?? 0) - Date.now() - READ_URL_MARGIN_MS) : 0,
+    gcTime: READ_URL_KEEP_MS,
   });
+}
+
+/** When each read URL fetched expires (epoch ms), for the query's stale time. */
+const expiries = new Map<string, number>();
+
+type Waiting = { resolve: (url: string) => void; reject: (reason: unknown) => void };
+let waiting = new Map<string, Waiting[]>();
+let scheduled = false;
+
+/**
+ * The read URL of an image. A page asks for all of its pictures at once (an instruction has
+ * hundreds), so the ids asked for within a moment go to the API in one request, not one each.
+ */
+function readUrl(imageId: string): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    waiting.set(imageId, [...(waiting.get(imageId) ?? []), { resolve, reject }]);
+    if (scheduled) return;
+    scheduled = true;
+    setTimeout(() => {
+      const batch = waiting;
+      waiting = new Map();
+      scheduled = false;
+      const ids = [...batch.keys()];
+      for (let start = 0; start < ids.length; start += IMAGE_URLS_MAX) {
+        void fetchReadUrls(ids.slice(start, start + IMAGE_URLS_MAX), batch);
+      }
+    }, 10);
+  });
+}
+
+async function fetchReadUrls(imageIds: string[], batch: Map<string, Waiting[]>): Promise<void> {
+  try {
+    const { data } = await apiFetch('/api/images/urls', {
+      method: 'POST',
+      body: { imageIds } satisfies ImageReadUrlsRequest,
+      schema: ImageReadUrlsResponseSchema,
+    });
+    for (const imageId of imageIds) {
+      const found = data.urls[imageId];
+      if (found) expiries.set(imageId, Date.parse(found.expiresAt));
+      for (const { resolve, reject } of batch.get(imageId) ?? []) {
+        if (found) resolve(found.url);
+        else {
+          reject(
+            new ApiRequestError(404, { error: 'not_found', message: 'This image does not exist.' }),
+          );
+        }
+      }
+    }
+  } catch (failure) {
+    for (const imageId of imageIds) {
+      for (const { reject } of batch.get(imageId) ?? []) reject(failure);
+    }
+  }
 }

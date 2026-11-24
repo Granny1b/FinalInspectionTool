@@ -194,7 +194,7 @@ test.describe('signed in', () => {
       );
       await expect(invitation.getByRole('link', { name: 'Open in email' })).toHaveAttribute(
         'href',
-        `mailto:${personEmail}?subject=Your%20access%20to%20Modig%20Final%20Inspection&body=` +
+        `mailto:${personEmail}?subject=Your%20access%20to%20Modig%20Production&body=` +
           encodeURIComponent(await invitation.getByLabel('Invitation to send').inputValue()),
       );
       await invitation.getByRole('button', { name: 'Done' }).click();

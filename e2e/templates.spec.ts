@@ -59,6 +59,12 @@ async function openEditor(page: Page, template: Template): Promise<void> {
   await expect(page.getByRole('heading', { level: 2, name: template.name })).toBeVisible();
 }
 
+/** A machine template's landing page: its name, model and picture. */
+async function openOverview(page: Page, template: Template): Promise<void> {
+  await page.goto(`/templates/${template.id}/overview`);
+  await expect(page.getByLabel('Template name')).toHaveValue(template.name);
+}
+
 /** Types at the end of a row's text. */
 async function appendToRow(page: Page, itemId: string, text: string): Promise<void> {
   await rowText(page, itemId).click();
@@ -111,7 +117,19 @@ test.describe('an admin', () => {
     ]);
     await expect(page.getByRole('button', { name: 'New template' })).toBeVisible();
 
+    // It opens on the machine template's landing page: its name, model and picture, and what
+    // is kept under it; the checklist is on the Final inspection tab.
     await row.getByRole('link', { name: published.name }).click();
+    await expect(page).toHaveURL(new RegExp(`/templates/${published.id}/overview$`));
+    await expect(page.getByLabel('Template name')).toHaveValue(published.name);
+    await expect(
+      page.getByRole('navigation', { name: 'What this machine template holds' }).getByRole('link'),
+    ).toHaveText([/Assembly/, /Quality checks/, /Final inspection.*6 rows · Rev 1/]);
+    await expect(page.locator('[data-item-text]')).toHaveCount(0);
+    await page
+      .getByRole('navigation', { name: 'Checklists of this machine' })
+      .getByRole('link', { name: 'Final inspection' })
+      .click();
     await expect(page.getByRole('heading', { level: 2, name: published.name })).toBeVisible();
     await expect(page.locator('[data-item-text]')).toHaveCount(6);
     await expect(page.getByText('Published Rev 1')).toBeVisible();
@@ -618,7 +636,7 @@ test.describe('an admin', () => {
   });
 
   test('a cover photo is resized, uploaded and shown', async ({ page, template }) => {
-    await openEditor(page, template);
+    await openOverview(page, template);
     // The browser scales the 2000 × 1500 photo to 1600 px on the long edge before uploading.
     await page.locator('input[type="file"]').setInputFiles(await photo(page));
 
@@ -635,7 +653,7 @@ test.describe('an admin', () => {
     page,
     template,
   }) => {
-    await openEditor(page, template);
+    await openOverview(page, template);
     let release = () => {};
     const held = new Promise<void>((resolve) => (release = resolve));
     await page.route('**/devstoreaccount1/images/**', async (route) => {
@@ -646,9 +664,9 @@ test.describe('an admin', () => {
     await page.locator('input[type="file"]').setInputFiles(await photo(page));
     await expect(page.getByText('Uploading…')).toBeVisible();
     await backLink(page).click();
-    // Still in the editor while the photo is on its way.
+    // Still on the landing page while the photo is on its way.
     await page.waitForTimeout(1000);
-    await expect(page).toHaveURL(new RegExp(`/templates/${template.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/templates/${template.id}/overview$`));
 
     release();
     await page.waitForURL(/\/templates$/);
@@ -791,7 +809,12 @@ test.describe('an admin', () => {
       let id: string | undefined;
       try {
         id = ((await (await created).json()) as { draft: { id: string } }).draft.id;
-        await page.waitForURL(`**/templates/${id}`);
+        // A new template opens on its landing page; its checklist is on the Final inspection tab.
+        await page.waitForURL(`**/templates/${id}/overview`);
+        await page
+          .getByRole('navigation', { name: 'Checklists of this machine' })
+          .getByRole('link', { name: 'Final inspection' })
+          .click();
         await expect(page.getByRole('heading', { name: 'No sections yet' })).toBeVisible();
         await expect(page.getByText('Draft · Rev 1')).toBeVisible();
 
@@ -872,7 +895,8 @@ test.describe('an admin', () => {
         const response = await imported;
         expect(response.status()).toBe(201);
         id = ((await response.json()) as { draft: { id: string } }).draft.id;
-        await page.waitForURL(`**/templates/${id}`);
+        // An imported template opens on its landing page, as a new one.
+        await page.waitForURL(`**/templates/${id}/overview`);
         await expect(
           page.getByRole('heading', { level: 2, name: `${template.name} (imported)` }),
         ).toBeVisible();
@@ -905,6 +929,13 @@ test.describe('an inspector', () => {
     await expect(page.getByRole('button', { name: /New template|Import JSON/ })).toHaveCount(0);
 
     await page.getByRole('link', { name: published.name }).click();
+    // The landing page, read-only; the checklist is on the Final inspection tab.
+    await expect(page.getByRole('heading', { level: 2, name: published.name })).toBeVisible();
+    await expect(page.locator('main').locator('input, textarea, select')).toHaveCount(0);
+    await page
+      .getByRole('navigation', { name: 'Checklists of this machine' })
+      .getByRole('link', { name: 'Final inspection' })
+      .click();
     await expect(page.getByRole('heading', { level: 2, name: published.name })).toBeVisible();
     await expect(page.getByText('Rev 1', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'Loading area' })).toBeVisible();

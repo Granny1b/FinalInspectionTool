@@ -50,9 +50,13 @@ import {
 import { TemplateDocument } from './document/TemplateDocument';
 import type { TemplatesPageState } from './listView';
 import { MachineHeader } from './MachineHeader';
+import { MachineTemplateTiles } from './MachineTemplateTiles';
 import { PublishDialog, type FlushResult } from './PublishDialog';
 import {
   assemblyHref,
+  machineTemplateOf,
+  templateAssemblyHref,
+  templateOverviewHref,
   fetchTemplate,
   finalTemplates,
   publishDraft,
@@ -74,6 +78,12 @@ type Props = {
   loaded: LoadedTemplate;
   /** Loads the draft again and reopens the editor on it; false if loading failed. */
   onReload: () => Promise<boolean>;
+  /**
+   * A machine template (final inspection) shows one part at a time, each a tab of its own:
+   * `overview` is its landing page (model, name and picture, and what it holds), `checklist` its
+   * Final inspection tab (the checklist and its revisions). Both edit the one draft.
+   */
+  part?: 'overview' | 'checklist';
 };
 
 /** What the server owns and tells us after each save or publish. */
@@ -92,13 +102,15 @@ const NO_ISSUES: PublishIssue[] = [];
  * A final inspection template's editor is its machine's Final inspection tab; a quality check's
  * has its own front page and rows as cards, under its machine's Quality checks.
  */
-export function TemplateEditor({ loaded, onReload }: Props) {
+export function TemplateEditor({ loaded, onReload, part = 'checklist' }: Props) {
   const id = loaded.detail.draft.id;
   const { kind, parentId } = loaded.detail.draft;
   const quality = kind === 'quality';
   const assembly = kind === 'assembly';
   /** What this is called in the dialogs and menus. */
   const noun = assembly ? 'assembly instruction' : quality ? 'quality check' : 'template';
+  /** The landing page of a machine template: its settings, without the checklist. */
+  const overview = kind === 'final' && part === 'overview';
   const queryClient = useQueryClient();
   const settings = useSettings();
   const templates = useTemplates();
@@ -327,6 +339,10 @@ export function TemplateEditor({ loaded, onReload }: Props) {
   // check and for an assembly instruction.
   const Title = quality || assembly ? 'h1' : 'h2';
   const machine = templates.data?.find((template) => template.id === parentId);
+  // An assembly instruction is kept under its model's machine template.
+  const machineTemplate = assembly
+    ? machineTemplateOf(templates.data ?? [], loaded.detail.draft.modelCode)
+    : undefined;
   const machineName = modelName(
     settings.data?.machineModels,
     machine?.modelCode ?? draft.modelCode,
@@ -371,11 +387,14 @@ export function TemplateEditor({ loaded, onReload }: Props) {
       ...(deletedChecks.current > 0 && { qualityChecks: deletedChecks.current }),
     };
     const back = assembly
-      ? '/assembly'
+      ? machineTemplate
+        ? templateAssemblyHref(machineTemplate.id)
+        : '/assembly'
       : quality && parentId
         ? qualityChecksHref(parentId)
         : '/templates';
     void navigate(back, { replace: true, state });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- where to go is read when it is deleted
   }, [deleted, navigate, quality, assembly, parentId]);
 
   function exportJson() {
@@ -399,13 +418,23 @@ export function TemplateEditor({ loaded, onReload }: Props) {
           ]}
         />
       ) : assembly ? (
-        <BackLink to="/assembly" label="Assembly instructions" />
+        machineTemplate ? (
+          <Breadcrumbs
+            items={[
+              { to: '/templates', label: 'Templates' },
+              { to: templateOverviewHref(machineTemplate.id), label: machineName },
+              { to: templateAssemblyHref(machineTemplate.id), label: 'Assembly' },
+            ]}
+          />
+        ) : (
+          <BackLink to="/templates" label="Templates" />
+        )
       ) : (
         <MachineHeader
           templateId={id}
           modelCode={draft.modelCode}
           coverImageId={draft.coverImageId}
-          tab="final"
+          tab={overview ? 'overview' : 'final'}
         />
       )}
 
@@ -475,11 +504,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
               // An assembly instruction is read on a screen: the latest revision as everyone
               // sees it, once there is one.
               latestRevision !== null && (
-                <ButtonLink
-                  variant="secondary"
-                  to={`${assemblyHref(id)}/revisions/${latestRevision}`}
-                  className="max-sm:px-2.5"
-                >
+                <ButtonLink variant="secondary" to={assemblyHref(id)} className="max-sm:px-2.5">
                   <BookOpen size={16} aria-hidden="true" />
                   <span className="max-sm:sr-only">Read view</span>
                 </ButtonLink>
@@ -593,7 +618,7 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             nameError={checking && nameBlank ? 'The assembly instruction needs a name.' : undefined}
             onChange={update}
           />
-        ) : (
+        ) : !overview ? null : (
           <TemplateSettingsCard
             name={draft.name}
             modelCode={draft.modelCode}
@@ -606,40 +631,52 @@ export function TemplateEditor({ loaded, onReload }: Props) {
             onUpload={trackUpload}
           />
         )}
-        <RevisionHistory
-          basePath={
-            assembly
-              ? assemblyHref(id)
-              : quality && parentId
-                ? qualityCheckHref(parentId, id)
-                : `/templates/${id}`
-          }
-          revisions={server.revisions}
-          emptyText={
-            assembly
-              ? 'Not published yet. Publishing creates revision 1, which everyone can then read.'
-              : quality
-                ? 'Not published yet. Publishing creates revision 1.'
-                : 'Not published yet. Publishing creates revision 1, which new inspections then use.'
-          }
-        />
+        {!overview && (
+          <RevisionHistory
+            basePath={
+              assembly
+                ? assemblyHref(id)
+                : quality && parentId
+                  ? qualityCheckHref(parentId, id)
+                  : `/templates/${id}`
+            }
+            revisions={server.revisions}
+            emptyText={
+              assembly
+                ? 'Not published yet. Publishing creates revision 1, which everyone can then read.'
+                : quality
+                  ? 'Not published yet. Publishing creates revision 1.'
+                  : 'Not published yet. Publishing creates revision 1, which new inspections then use.'
+            }
+          />
+        )}
+        {overview && <MachineTemplateTiles templateId={id} modelCode={draft.modelCode} />}
       </div>
 
-      <section aria-labelledby="checklist-title" className="mt-10">
-        <ChecklistHeading
-          id="checklist-title"
-          sections={draft.sections}
-          withTime={quality}
-          assembly={assembly}
-        />
-        <TemplateDocument
-          sections={draft.sections}
-          onChange={updateSections}
-          issues={issues}
-          onEditorDirtyChange={setEditorDirty}
-          variant={kind}
-        />
-      </section>
+      {overview ? (
+        <p className="mt-6 max-w-prose text-sm text-ink-500">
+          The model, the name and the picture are the machine template’s own: its assembly
+          instructions, quality checks and final inspection are kept under it, each on a tab above.
+          A change here is part of the draft and reaches new inspections when the final inspection
+          is published.
+        </p>
+      ) : (
+        <section aria-labelledby="checklist-title" className="mt-10">
+          <ChecklistHeading
+            id="checklist-title"
+            sections={draft.sections}
+            withTime={quality}
+            assembly={assembly}
+          />
+          <TemplateDocument
+            sections={draft.sections}
+            onChange={updateSections}
+            issues={issues}
+            onEditorDirtyChange={setEditorDirty}
+            variant={kind}
+          />
+        </section>
+      )}
 
       {publishing && (
         <PublishDialog

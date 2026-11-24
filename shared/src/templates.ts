@@ -272,6 +272,21 @@ export const ImageReadUrlResponseSchema = z.object({
 });
 export type ImageReadUrlResponse = z.infer<typeof ImageReadUrlResponseSchema>;
 
+/** The most images one POST /api/images/urls signs; the app asks in batches of at most this. */
+export const IMAGE_URLS_MAX = 500;
+
+/** POST /api/images/urls: the read URLs of many images in one call (a page full of pictures). */
+export const ImageReadUrlsRequestSchema = z.object({
+  imageIds: z.array(IdSchema).min(1).max(IMAGE_URLS_MAX),
+});
+export type ImageReadUrlsRequest = z.infer<typeof ImageReadUrlsRequestSchema>;
+
+/** By image id; an image that does not exist is left out. */
+export const ImageReadUrlsResponseSchema = z.object({
+  urls: z.record(z.string(), ImageReadUrlResponseSchema),
+});
+export type ImageReadUrlsResponse = z.infer<typeof ImageReadUrlsResponseSchema>;
+
 // ---------------------------------------------------------------------------------------------
 // Publish rules
 // ---------------------------------------------------------------------------------------------

@@ -48,6 +48,7 @@ import {
   loadQualityCheckOrder,
   loadRevision,
   loadTemplate,
+  parentIdOf,
   templateNotFound,
 } from './templates';
 
@@ -298,15 +299,16 @@ export async function machineChecks(
   machine: Machine,
   context: InvocationContext,
 ): Promise<MachineCheck[]> {
-  const checks = (await loadSummaries()).filter((summary) => summary.machineRef === machine.id);
-  const [revisions, counts, order] = await Promise.all([
+  const [summaries, revisions, counts] = await Promise.all([
+    loadSummaries(),
     listRevisions(),
     deviationCounts(machine.modelCode).catch((error: unknown) => {
       context.warn(`Machine ${machine.id}: its deviations could not be counted`, error);
       return new Map<string, { open: number; closed: number }>();
     }),
-    qualityOrderOf(checks),
   ]);
+  const checks = summaries.filter((summary) => summary.machineRef === machine.id);
+  const orderOfChecks = qualityOrderOf(checks);
   const detailed = await Promise.all(
     checks.map(async (check): Promise<MachineCheck> => {
       const latest = revisions.get(check.templateId)?.at(-1) ?? null;
@@ -318,7 +320,7 @@ export async function machineChecks(
       };
     }),
   );
-  return detailed.sort(compareMachineChecks(order));
+  return detailed.sort(compareMachineChecks(await orderOfChecks));
 }
 
 /** The machine's own changes since the revision its copy is based on; null if unreadable. */
@@ -349,7 +351,7 @@ async function qualityOrderOf(checks: readonly InspectionSummary[]): Promise<str
     checks.filter((check) => check.kind === 'quality').map((check) => check.templateId),
   );
   for (const templateId of templateIds) {
-    const parentId = (await loadTemplate(templateId))?.draft.parentId;
+    const parentId = await parentIdOf(templateId);
     if (parentId) return (await loadQualityCheckOrder(parentId))?.data.order ?? [];
   }
   return [];

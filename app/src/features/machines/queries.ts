@@ -105,7 +105,8 @@ export function useCreateMachine() {
       ),
     onSuccess: (created) => {
       queryClient.setQueryData(machineKeys.detail(created.detail.machine.id), created);
-      return invalidateAll(queryClient);
+      // Not waited for: the page opened next has what was just written, the lists catch up.
+      void invalidateAll(queryClient);
     },
   });
 }
@@ -210,7 +211,8 @@ export function useStartCheck() {
       ),
     onSuccess: (started) => {
       queryClient.setQueryData(inspectionKeys.detail(started.inspection.id), started);
-      return invalidateAll(queryClient);
+      // Not waited for: the check opens from the answer, the lists catch up meanwhile.
+      void invalidateAll(queryClient);
     },
   });
 }

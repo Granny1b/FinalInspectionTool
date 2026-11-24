@@ -15,7 +15,7 @@ import {
   type ModelChoice,
   type ModelContext,
 } from './modelChoice';
-import { useImportTemplate } from './queries';
+import { templateOverviewHref, useImportTemplate } from './queries';
 
 type Props = {
   /** A file that passed the checks (transfer.ts), and what it was called. */
@@ -62,7 +62,7 @@ export function ImportTemplateDialog({ file, fileName, models, onClose }: Props)
       {
         onSuccess: ({ loaded, droppedImages }) => {
           const id = loaded.detail.draft.id;
-          if (droppedImages === 0) void navigate(`/templates/${id}`);
+          if (droppedImages === 0) void navigate(templateOverviewHref(id));
           else setImported({ id, droppedImages });
         },
       },
@@ -90,7 +90,7 @@ export function ImportTemplateDialog({ file, fileName, models, onClose }: Props)
         onClose={onClose}
       >
         <div className="mt-6 flex justify-end">
-          <Button autoFocus onClick={() => void navigate(`/templates/${imported.id}`)}>
+          <Button autoFocus onClick={() => void navigate(templateOverviewHref(imported.id))}>
             Open template
           </Button>
         </div>

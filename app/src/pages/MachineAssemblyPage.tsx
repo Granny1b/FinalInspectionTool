@@ -10,7 +10,7 @@ import {
 import clsx from 'clsx';
 import { ArrowUpCircle, CircleCheck, LoaderCircle, Wrench } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { BackLink } from '../components/BackLink';
 import { Button, ButtonLink } from '../components/Button';
 import { Callout } from '../components/Callout';
@@ -22,6 +22,7 @@ import { percentText } from '../features/machineAssembly/percent';
 import { ProgressBar } from '../features/machineAssembly/Progress';
 import { useMachineAssembly, useMachineAssemblyAction } from '../features/machineAssembly/queries';
 import { useMachine } from '../features/machines/queries';
+import { updateRecent } from '../features/search/recent';
 import { Badge } from '../features/templates/Badge';
 import { indexIssues } from '../features/templates/document/issues';
 import { SHEET } from '../features/templates/document/layout';
@@ -99,6 +100,18 @@ function Assembly({ machineId, detail }: { machineId: string; detail: MachineAss
     [assembly.sections, signOffs],
   );
   const machineName = machine.data?.detail.machine.machineName ?? 'The machine';
+  // Remembered with the page (once its title has put it among the recent ones), so a search
+  // for a step of this instruction leads back here, where it is signed.
+  const { pathname } = useLocation();
+  const machineKnown = machine.isSuccess;
+  useEffect(() => {
+    if (!machineKnown) return;
+    const timer = setTimeout(
+      () => updateRecent(pathname, { templateId: assembly.templateId }),
+      1500,
+    );
+    return () => clearTimeout(timer);
+  }, [pathname, assembly.templateId, machineKnown]);
   const email = me.email.toLowerCase();
 
   const signing = useMemo<Signing>(() => {

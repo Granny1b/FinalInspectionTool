@@ -20,6 +20,7 @@ import {
 } from '@modig/shared';
 import { inject } from 'vitest';
 import { forgetCachedPeople } from '../src/lib/people';
+import { forgetRevisions } from '../src/lib/templates';
 import {
   containerClient,
   deviationsTable,
@@ -38,6 +39,7 @@ export function useTestStorage(): void {
  * runs its test files one at a time (vitest.config.ts): no other file is using them meanwhile.
  */
 export async function resetStorage(): Promise<void> {
+  forgetRevisions();
   await Promise.all([ensureStorage(), ensureTable()]);
   for (const name of [
     CONTAINERS.templates,

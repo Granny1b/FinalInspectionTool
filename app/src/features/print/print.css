@@ -857,3 +857,58 @@
   margin-top: 0.4mm;
   color: var(--paper-muted);
 }
+
+/* How it should and should not look, unmistakable at the machine and said three ways, so it reads
+   on a black-and-white printout too: a filled band with the symbol and the words right under the
+   picture, the band's colour (green, red), and the frame round both (solid for should, dashed
+   for should not). An Info picture has the same band and frame in grey, so the pictures of a row
+   line up. */
+.paper-guide-image {
+  --paper-verdict: #d4d4d4;
+  --paper-verdict-fill: var(--paper-fill-light);
+  --paper-verdict-ink: var(--paper-muted);
+}
+
+/* The app's own soft green and red (a "Published" badge's): a pale fill, a soft frame and the
+   words in the full colour. Calm on the page, and the words still carry it in black and white. */
+.paper-guide-image[data-verdict='good'] {
+  --paper-verdict: #b8dfc8;
+  --paper-verdict-fill: #edf7f1;
+  --paper-verdict-ink: #1e7044;
+}
+
+.paper-guide-image[data-verdict='bad'] {
+  --paper-verdict: #f2c6c1;
+  --paper-verdict-fill: #fdf1f0;
+  --paper-verdict-ink: #b42318;
+}
+
+.paper-guide-photo {
+  border: 0.5mm solid var(--paper-verdict);
+  border-bottom: 0;
+}
+
+.paper-guide-image[data-verdict='bad'] .paper-guide-photo,
+.paper-guide-image[data-verdict='bad'] .paper-guide-label {
+  border-style: dashed;
+}
+
+.paper-guide-image figcaption {
+  padding-top: 0;
+}
+
+.paper-guide-label {
+  display: block;
+  padding: 1.1mm 2.2mm;
+  /* The frame goes on round the band, so picture and words are one soft box. */
+  border: 0.5mm solid var(--paper-verdict);
+  border-top: 0;
+  background: var(--paper-verdict-fill);
+  color: var(--paper-verdict-ink);
+  font-size: 9pt;
+  letter-spacing: 0.02em;
+}
+
+.paper-guide-image .paper-guide-caption {
+  margin-top: 1mm;
+}

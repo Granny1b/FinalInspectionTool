@@ -572,6 +572,8 @@ function Thumbnail({
             // Same CORS request as the editor's, so the browser can reuse it from its cache.
             <img
               src={url.data}
+              loading="lazy"
+              decoding="async"
               crossOrigin="anonymous"
               alt=""
               // Whole, as it prints: marks near an edge must not be cropped away.

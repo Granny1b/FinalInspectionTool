@@ -24,7 +24,7 @@ import {
   writeJson,
   type WriteConditions,
 } from './storage';
-import { loadLatestPublished, loadTemplate } from './templates';
+import { latestRevisionNumber, loadLatestPublished, loadTemplate } from './templates';
 
 const { machineAssemblies: container } = CONTAINERS;
 
@@ -164,8 +164,7 @@ export async function changeSignOffs(
 
 /** The instruction's latest published revision, or null when it is gone or never published. */
 export async function latestRevisionOf(templateId: string): Promise<number | null> {
-  const template = await loadTemplate(templateId);
-  return template?.revisions.at(-1) ?? null;
+  return latestRevisionNumber(templateId);
 }
 
 /** Deletes an assembly with its sign-offs. */

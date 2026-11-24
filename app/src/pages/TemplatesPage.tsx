@@ -1,4 +1,4 @@
-import { hasRole, type TemplateExport } from '@modig/shared';
+import { hasRole, type TemplateExport, type TemplateSummary } from '@modig/shared';
 import { FileUp, LayoutTemplate, Plus } from 'lucide-react';
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -15,8 +15,15 @@ import {
   type TemplatesPageState,
   type TemplateView,
 } from '../features/templates/listView';
-import type { ModelContext } from '../features/templates/modelChoice';
-import { finalTemplates, useTemplates } from '../features/templates/queries';
+import { defaultTemplateName, type ModelContext } from '../features/templates/modelChoice';
+import {
+  assemblyInstructions,
+  finalTemplates,
+  machineTemplateOf,
+  templateOverviewHref,
+  useCreateTemplate,
+  useTemplates,
+} from '../features/templates/queries';
 import { qualityChecksByMachine } from '../features/templates/qualityCheckList';
 import { TemplateCards } from '../features/templates/TemplateCards';
 import { TemplateList } from '../features/templates/TemplateList';
@@ -53,6 +60,15 @@ export function TemplatesPage() {
     [templates.data],
   );
   const models = settings.data?.machineModels;
+  // Assembly instructions whose model has no machine template yet (written before instructions
+  // were kept under one): admins set one up for the model, and the instructions are under it.
+  const orphans = useMemo(
+    () =>
+      assemblyInstructions(templates.data ?? []).filter(
+        (instruction) => !machineTemplateOf(templates.data ?? [], instruction.modelCode),
+      ),
+    [templates.data],
+  );
   // Needs the models and the existing templates to offer only models without one.
   const modelContext = useMemo<ModelContext | null>(
     () =>
@@ -114,7 +130,7 @@ export function TemplatesPage() {
     <>
       <PageHeader
         title="Templates"
-        description="One per machine model: its final inspection and its quality checks, published in revisions."
+        description="One machine template per model: its name and picture, and under it its assembly instructions, quality checks and final inspection."
         actions={
           finals?.length ? (
             <>
@@ -191,6 +207,7 @@ export function TemplatesPage() {
           showDrafts={isAdmin}
         />
       )}
+      {isAdmin && modelContext && <ModelsToSetUp instructions={orphans} models={modelContext} />}
       {creating && modelContext && (
         <CreateTemplateDialog models={modelContext} onClose={() => setCreating(false)} />
       )}
@@ -204,4 +221,83 @@ export function TemplatesPage() {
       )}
     </>
   );
+}
+
+/**
+ * Machine models that have assembly instructions but no machine template: one click makes the
+ * model's template (named after the model, to be filled in on its landing page), and its
+ * instructions are then found, and edited, on its Assembly tab.
+ */
+function ModelsToSetUp({
+  instructions,
+  models,
+}: {
+  instructions: TemplateSummary[];
+  models: ModelContext;
+}) {
+  const navigate = useNavigate();
+  const create = useCreateTemplate();
+  const codes = [...new Set(instructions.map((instruction) => instruction.modelCode))];
+  if (codes.length === 0) return null;
+  return (
+    <section aria-labelledby="models-to-set-up" className="mt-10">
+      <h2 id="models-to-set-up" className="text-base font-semibold text-ink-900">
+        Assembly instructions without a machine template
+      </h2>
+      <p className="mt-1 max-w-prose text-sm text-ink-500">
+        These models have assembly instructions but no machine template yet. Set one up to edit the
+        instructions under it; they stay readable under Assembly meanwhile.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {codes.map((code) => {
+          const name = modelLabelOf(models, code);
+          const count = instructions.filter((instruction) => instruction.modelCode === code).length;
+          const busy =
+            create.isPending &&
+            create.variables !== undefined &&
+            'modelCode' in create.variables &&
+            create.variables.modelCode === code;
+          return (
+            <li
+              key={code}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-ink-300 px-4 py-3"
+            >
+              <p className="min-w-0 text-sm text-ink-800">
+                <span className="font-semibold text-ink-900">{name}</span>
+                <span className="ml-2 text-ink-500">
+                  {count === 1 ? '1 assembly instruction' : `${count} assembly instructions`}
+                </span>
+              </p>
+              <Button
+                variant="secondary"
+                disabled={create.isPending}
+                onClick={() =>
+                  create.mutate(
+                    { name: defaultTemplateName(name), modelCode: code },
+                    {
+                      onSuccess: (created) =>
+                        navigate(templateOverviewHref(created.detail.draft.id)),
+                    },
+                  )
+                }
+              >
+                <Plus size={16} aria-hidden="true" />
+                {busy ? 'Setting up…' : 'Set up machine template'}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      {create.isError && (
+        <p role="alert" className="mt-2 text-sm font-medium text-nok-fg">
+          {errorMessage(create.error)}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** A model's name from the settings, or its code. */
+function modelLabelOf(models: ModelContext, code: string): string {
+  return models.models.find((model) => model.code === code)?.name ?? code;
 }

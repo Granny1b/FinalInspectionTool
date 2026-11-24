@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import {
   ANNOTATION_COLORS,
   InspectionSchema,
@@ -492,6 +493,13 @@ test('a finalised inspection shows its photos in a viewer, without loading the e
   await expect
     .poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth))
     .toBe(1200);
+  // Download saves the picture as it is shown: a JPEG file.
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    viewer.getByRole('button', { name: 'Download' }).click(),
+  ]);
+  const saved = await readFile(await download.path());
+  expect(saved.subarray(0, 3)).toEqual(Buffer.from([0xff, 0xd8, 0xff]));
   await viewer.getByRole('button', { name: 'Close' }).click();
   await expect(viewer).toBeHidden();
   expect(requested.filter((url) => EDITOR_CODE.test(url))).toEqual([]);

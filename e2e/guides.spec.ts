@@ -446,6 +446,11 @@ test('leaving the template editor while the guide editor has changes asks first'
   // Opened from the list, so Back stays in the app.
   await page.goto('/templates');
   await page.getByRole('link', { name: template.name, exact: true }).click();
+  // The machine template's landing page; its checklist is on the Final inspection tab.
+  await page
+    .getByRole('navigation', { name: 'Checklists of this machine' })
+    .getByRole('link', { name: 'Final inspection' })
+    .click();
   await page.locator(`#row-${row.id}`).hover();
   await page.getByRole('button', { name: 'Add guide, row 1.b' }).click();
   const description = guideEditor(page).getByLabel('Description');
@@ -461,11 +466,11 @@ test('leaving the template editor while the guide editor has changes asks first'
   await expect(leave).toBeHidden();
   await expect(description).toHaveValue('Rails clean, no chips.');
 
-  // Leave: back on the list, without the guide.
+  // Leave: back on the machine template's landing page, without the guide.
   await nextFrames(page);
   await page.goBack();
   await leave.getByRole('button', { name: 'Leave' }).click();
-  await expect(page).toHaveURL(/\/templates$/);
+  await expect(page).toHaveURL(new RegExp(`/templates/${template.id}/overview$`));
   expect(
     (await savedDraft(page.request, template.id)).sections[0]!.items[1]!.guide,
   ).toBeUndefined();

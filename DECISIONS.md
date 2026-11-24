@@ -489,8 +489,9 @@ The calls with product, security or data impact. Each is explained in its sectio
 
 ### Photos
 
-- **Upload URL: create and write on that one blob, 10 minutes; read URL: read only, 15 minutes,
-  issued only if the blob exists.** No start time (no clock-skew window); the expiry is whole
+- **Upload URL: create and write on that one blob, 10 minutes; read URL: read only, 15 minutes
+  (since 2026-11-24: 1 to 13 hours, see "Speed: an optimisation pass"), issued only if the blob
+  exists.** No start time (no clock-skew window); the expiry is whole
   seconds so `expiresAt` equals the SAS. The account is https-only in Azure, so the protocol is
   not restricted.
 - **An upload URL cannot limit size or content type.** It is issued to role holders only and
@@ -501,7 +502,8 @@ The calls with product, security or data impact. Each is explained in its sectio
   marked-up photos JPEGs too, so this still covers every image.)
 - **Photos are scaled in the browser** (`createImageBitmap` with the camera orientation, white
   background for transparent PNGs, at most 1600 px, JPEG 0.8) and PUT with `credentials: 'omit'`.
-- **Read URLs are cached for 10 minutes**, under their 15-minute lifetime.
+- **Read URLs are cached for 10 minutes**, under their 15-minute lifetime (since 2026-11-24:
+  until five minutes before they expire).
 - **Replacing or removing a cover photo leaves the old blob.** There is no delete endpoint and
   the cost is negligible.
 - **`upload-url` runs `ensureStorage()`** although it makes no storage call, so the `images`
@@ -4008,3 +4010,200 @@ softer on the eyes. Nothing was removed; the same facts carry less ink.
   for looking up, the text is what is read), responsible, category and date are a size smaller and
   grey, and the status and severity pills have a soft fill without an outline.
 - The log's tests (roles and texts) pass unchanged.
+
+## Change requests: search (2026-11-24)
+
+The user wanted to find older fixes easily.
+
+- **One search box over open and fixed alike**, every word of it needed: the message, what was
+  done, the step (number, text, task), the instruction and its model, the machine, who flagged and
+  fixed it (names and emails) and the days ("2026-11"). In the browser: the page already has
+  every request.
+- **The tabs count what the search found, and there is an All tab.** A search made on Open that
+  only finds fixed ones says so and offers to show them, instead of an empty page.
+
+## Sidebar order (2026-11-24)
+
+Assembly, then Quality check, then Final inspection: the order a machine goes through them (the
+user). Final inspection was first only because it was the first thing the app did.
+
+## Search over everything (2026-11-24)
+
+The user wanted a well developed search that suggests hits as one types (an assy, a drawing) and
+gets one back to where one was after closing everything by accident, and that is useful rather
+than confusing. Planned with them first; built as its first two steps.
+
+- **One entry point:** a Search button at the top of the sidebar and Ctrl+K (Cmd+K) anywhere, a
+  dialog with one field. No search page and no options.
+- **Empty, it is "Continue where you left off":** the last eight pages opened on the device (a
+  machine, an assembly on a machine, an instruction, a check, a template), each with the task one
+  was in for an instruction. Kept in the browser's storage, **per device, not per account**: the
+  user plans a shared production sign-in, where an account's history would mix everyone's work.
+  Pages are remembered by the title they give themselves once loaded (`useRecentRecorder`), so
+  no page had to be changed for it; an instruction adds the task in view.
+- **Hits are grouped by kind in a fixed order, six to a group**, each with a grey line saying where
+  it leads and the words found marked. "And N more" asks for another word rather than paging.
+- **A hit leads to its place, never to another search:** a step opens the instruction at that step
+  (outlined), an assy or part number opens it with its own search filled in (`?q=`), a document
+  opens the step it is on and has Copy path in the hit itself.
+- **An assy or part number is one hit per instruction, with its steps counted,** not a hit per
+  step: "Assy 82265 · Base, HHV3 · 17 steps".
+- **Machine context wins:** if the instruction was last worked on a machine on this device, its
+  hits lead to that machine's copy, where the steps are signed; else to the read view of the
+  latest revision, for admins too (a search is for finding and reading; the editor is one click
+  from there).
+- **Every word must match; a title that is the query comes first** (an FI- or QC-number, a Machine
+  ID), then titles starting with it, then the rest.
+- **It runs in the browser** over what the app already loads (machines, inspections, templates)
+  plus the latest published revision of each assembly instruction, fetched when the search first
+  opens and kept (a revision never changes). No server index: at tens of instructions and a few
+  thousand steps it answers in milliseconds. A server index is the next step if that grows.
+- **Inspectors find published things only;** admins also drafts never published.
+- **Escape closes the search** (a search field's own Escape would only empty it).
+- **Not done yet:** deviations and change requests as hits, checklist rows of templates, a page of
+  all results.
+- **Tests:** unit (`hits.test.ts`, `recent.test.ts`), e2e (`search.spec.ts`: an assy number, a
+  step by keyboard, a drawing's Copy path, Continue, nothing found).
+
+## Downloading a picture (2026-11-24)
+
+The user asked for pictures to be downloadable, and whether that affects anything.
+
+- **Download in the large picture view** (`PhotoViewer`: a deviation's photos, a guide's, a
+  quality check's and an assembly step's pictures): the picture as shown, marks included, as a
+  JPEG named after it ("Picture 2 – Pictures · 1.3.jpg").
+- **Fetched, then saved from the browser:** the pictures are on the storage account's address,
+  where a link's `download` attribute is ignored. The read URL and the CORS rule it uses are the
+  ones showing the picture already uses.
+- **Nothing else changes:** no API, storage or permission change. Anyone who can see a picture
+  could already save it from the browser's own menu; this is the same picture with a button.
+  The original without marks is not offered.
+
+## Printed pictures: should and should not, unmistakable (2026-11-24)
+
+On a printed instruction the user found "✓ Should look like this" and "✗ Should not look like
+this" too easy to miss: a small black caption under each picture.
+
+- **A band right under the picture carries the symbol and the words** (green for should, red for
+  should not), **and picture and band share a frame**, solid for should and dashed for should
+  not. First in full colour with white words, which the user found too loud: now the app's soft
+  badge colours (a pale fill, a soft frame, the words in the full green or red). On a
+  black-and-white printout the pale frame fades, and the symbol and words carry it. An Info picture has
+  the same band and frame in grey, which keeps the pictures of a row lined up.
+- It is the one figure every printout shares (`GuideImage`): a quality check's and an assembly
+  instruction's printed instructions and a final inspection's reference appendix (Good / Bad).
+- The texts are unchanged, so the print tests (which read the PDFs) pass as they were.
+
+## Machine templates: a landing page, and instructions under them (2026-11-24)
+
+The user wanted assembly instructions under Templates as a third tab, and a landing page where
+the machine model, the template's name and its picture are set, shared by everything kept under
+the template: "we basically make a machine template, and under that we keep all the editable
+data".
+
+- **The machine template is the model's final inspection template, as it was** (quality checks
+  already hang under it, and it already holds the model, the name and the cover). No new kind of
+  document and nothing to migrate: the landing page edits the same draft.
+- **Four tabs, each an address:** Overview (`/templates/:id/overview`), Assembly
+  (`/templates/:id/assembly`), Quality checks, Final inspection (`/templates/:id`, unchanged, so
+  old links work). The list, New template and Import JSON open the landing page.
+- **Overview and Final inspection are two parts of one editor** (`TemplateEditor`'s `part`): the
+  landing page shows the name, model and cover and three tiles for what the template holds; the
+  Final inspection tab shows the checklist and its revisions. One draft, one autosave, one
+  Publish, so nothing about saving or publishing was written twice. A change to the name or
+  picture is part of that draft and reaches new inspections when it is published, as before.
+- **An instruction is found under a template by its model** (`modelCode`), not by a parent id:
+  it keeps belonging to its model, the files and the API are unchanged, and instructions written
+  before this need nothing done to them. The cost: changing a template's model (rare, and a taken
+  model can't be chosen) leaves its instructions with the old model.
+- **Writing moved, reading stayed.** Instructions are created, imported and edited on the
+  Assembly tab (`/templates/:id/assembly/:instructionId`); the model is the template's, so the
+  dialogs no longer ask for one. `/assembly` and `/assembly/:id` are the published instructions to
+  read, for admins too, with **Edit** leading to the template. This also ends the confusion of an
+  admin landing in a draft where a reader saw the published revision.
+- **A model with instructions but no machine template** (the HHV, written before this) is listed
+  on the Templates page under "Assembly instructions without a machine template" with **Set up
+  machine template**: one click makes it (named after the model), and its instructions are on
+  its Assembly tab. They stay readable meanwhile.
+- **Change requests open the step in the editor under the template;** the search's template hits
+  open the landing page.
+- **Tests:** the template, guide and assembly end-to-end tests follow the new addresses (a
+  template opens on its landing page; the checklist is on the Final inspection tab; instructions
+  are made on the Assembly tab).
+
+## Speed: an optimisation pass (2026-11-24)
+
+Pages sometimes loaded slowly. Five read-only audits (API, data fetching, bundle, rendering,
+pictures) found where the time went; this is what was changed, and what was left.
+
+### The first download
+
+- **Every page but the machines list and a machine's page is fetched when first opened** (route
+  `lazy` in `router.tsx`). The first download went from about 361 kB to about 211 kB gzip; the
+  editors with drag and drop, the print views, the deviation log and the admin pages are no
+  longer in it. The page shown stays until the next has arrived, so there is no flash; opening the
+  app straight on such a page shows the shell's skeleton meanwhile (`hydrateFallbackElement`).
+- **`/assets/*` is cached for a year, immutable** (`staticwebapp.config.json`): the files are
+  named by their content. Before, every visit asked the server about each one again. The rule
+  repeats `allowedRoles: authenticated`, because the first matching route wins.
+- After a deploy an open tab can ask for a page file that no longer exists: the router's error
+  screen, which already offers Reload, covers it.
+
+### Pictures
+
+- **A page asks for all of its picture URLs in one call** (`POST /api/images/urls`, at most 500
+  ids; the app collects the ids asked for within 10 ms). An instruction of 363 steps made up to
+  363 calls to the API before any picture came. The single route stays for one-off reads.
+  The API still checks that each image exists (all at once), so a missing picture shows as before.
+- **An image has the same read URL for everyone within a 12-hour window**, expiring an hour after
+  the window ends, and is served with `Cache-Control: private, max-age=46800, immutable` (the
+  SAS's `rscc`, so pictures already stored get it too). A new URL every time meant the browser
+  downloaded every picture again on every visit and every ten minutes. **This replaces the
+  15-minute lifetime:** a read URL that leaves the app now opens that one picture for up to 13
+  hours instead of 15 minutes. Judged acceptable for pictures of machine parts that only
+  signed-in people can get a URL for; `READ_WINDOW_HOURS` in `api/src/lib/images.ts` is the one
+  number to lower if not.
+- **Pictures in lists load when they come near the window** (`loading="lazy"`,
+  `decoding="async"`), not all at once. Not in print, which waits for every picture.
+- **Not done: thumbnails.** A tile still shows the full 1600 px picture. Small copies made at
+  upload would cut the bytes about tenfold, but need a second file per image, a fallback for
+  the pictures already stored and their deletion kept in step. Worth doing next if long
+  instructions are still slow on the workshop Wi-Fi.
+
+### The API
+
+- **Published revisions are kept in memory for five minutes** (at most 60, a copy handed out each
+  time). They never change, and were downloaded and parsed again by the templates list (every
+  template's latest), a machine's page (one per check) and every save of a draft. Five minutes
+  only, so the seed writing one again is not served for long. Deleting a template forgets its
+  revisions, and `GET …/revisions/{n}` always reads storage, so a deleted template's revision is
+  a 404 at once.
+- **A machine's page reads in parallel** what it read one after another, and the order of its
+  quality checks from the draft alone.
+- **The latest revision of an instruction bound to a machine is one listing**, not a download of
+  the whole instruction; its sign-offs are read at the same time.
+- **Not done:** the templates list still reads every draft in full (a summary kept in blob
+  metadata, as inspections and machines have, would make it one listing; it touches every place
+  a template is written). The people list is still read for every request after 5 s (a longer
+  time would let a removed person in for that long). Storage containers are still created if
+  missing on a cold start (cheap, and it is what makes a new container work without a deploy of
+  the infrastructure).
+
+### Fetching in the app
+
+- **What was fetched counts as fresh for 30 seconds** (the query client's default). Every click
+  between pages used to fetch every list again. One's own changes still show at once (each save
+  refreshes what it touches); someone else's show within 30 seconds, or on reload.
+- **Making a machine and starting a check open the next page at once**, without waiting for the
+  lists to be fetched again first.
+- **The sidebar's count of change requests is asked for every 5 minutes**, not every minute (it
+  is on every page an admin has open, and reads every request).
+
+### The instruction page
+
+- **A step's card is drawn again only when something of its own changes** (`memo`, with the sign
+  functions kept the same between renders). A sign-off, a typed initial, a dialog opening or a
+  search keystroke used to draw all 363 cards again, a sign-off about four times over.
+- **The task being read is followed inside the list of tasks**, so scrolling past a task redraws
+  those few links and not the instruction.
+- **The steps follow the search box a moment behind** (`useDeferredValue`), so typing stays quick.

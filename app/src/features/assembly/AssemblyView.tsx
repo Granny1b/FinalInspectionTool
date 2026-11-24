@@ -22,10 +22,12 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { formatDateTime } from '../../lib/format';
 import { FlagStepDialog, type FlagTarget } from '../changeRequests/FlagStepDialog';
+import { updateRecent } from '../search/recent';
 import { GuideViewer } from '../guides/GuideViewer';
 import { PictureTile } from '../qualityChecks/PictureTile';
 import type { IssueIndex } from '../templates/document/issues';
@@ -65,6 +67,9 @@ export type Signing = {
   personName: (email: string) => string;
 };
 
+/** Signing and unsigning, as functions that stay the same between renders. */
+type SignActions = Pick<Signing, 'onSign' | 'onUnsign'>;
+
 type Props = {
   sections: Section[];
   issues: IssueIndex;
@@ -82,7 +87,21 @@ type Props = {
  * steps someone needs; the list of tasks jumps to one. A step's picture opens its pictures large.
  */
 export function AssemblyView({ sections, issues, signing, flagFor }: Props) {
-  const [filter, setFilter] = useState<StepFilter>(NO_FILTER);
+  // A search hit for an assy or part number opens the instruction on its steps ("?q=82265").
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState<StepFilter>(() => ({
+    ...NO_FILTER,
+    query: params.get('q') ?? '',
+  }));
+  // A link to one step or task ("#row-{id}", "#section-{id}", from the search or from Continue):
+  // brought into view once it is drawn, the step outlined.
+  const location = useLocation();
+  const linkedRow = location.hash.startsWith('#row-') ? location.hash.slice('#row-'.length) : null;
+  useEffect(() => {
+    const id = location.hash.slice(1);
+    const element = id ? document.getElementById(id) : null;
+    element?.scrollIntoView({ block: id.startsWith('row-') ? 'center' : 'start' });
+  }, [location.hash, location.key]);
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
   const [picturesOf, setPicturesOf] = useState<string | null>(null);
   const departments = useMemo(() => departmentCounts(sections), [sections]);
@@ -94,19 +113,33 @@ export function AssemblyView({ sections, issues, signing, flagFor }: Props) {
   const [flagSent, setFlagSent] = useState(false);
   const flagged = flagging === null ? null : findStep(sections, flagging);
   const signOffs = signing?.signOffs;
+  // How to sign, the same functions for as long as the page is open: a step's card is then drawn
+  // again only when something of its own changes, not for every sign-off elsewhere.
+  const latestSigning = useRef(signing);
+  useEffect(() => {
+    latestSigning.current = signing;
+  });
+  const signActions = useMemo<SignActions>(
+    () => ({
+      onSign: (itemIds, initials) => latestSigning.current?.onSign(itemIds, initials),
+      onUnsign: (itemId) => latestSigning.current?.onUnsign(itemId),
+    }),
+    [],
+  );
   const progress = useMemo(
     () => (signOffs ? assemblyProgress(sections, signOffs) : null),
     [sections, signOffs],
   );
+  // The steps follow the search box a moment behind, so typing stays quick in a long instruction.
+  const shownFilter = useDeferredValue(filter);
   const tasks = useMemo(() => {
-    const shown = shownTasks(sections, filter);
+    const shown = shownTasks(sections, shownFilter);
     if (!hideSigned || !signOffs) return shown;
     return shown
       .map((task) => ({ ...task, steps: task.steps.filter(({ item }) => !signOffs[item.id]) }))
       .filter((task) => task.steps.length > 0);
-  }, [sections, filter, hideSigned, signOffs]);
-  const filtering = isFiltering(filter) || (hideSigned && signing !== undefined);
-  const current = useCurrentTask(tasks);
+  }, [sections, shownFilter, hideSigned, signOffs]);
+  const filtering = isFiltering(shownFilter) || (hideSigned && signing !== undefined);
   const viewing = picturesOf === null ? null : findStep(sections, picturesOf);
 
   if (sections.length === 0) {
@@ -205,7 +238,6 @@ export function AssemblyView({ sections, issues, signing, flagFor }: Props) {
           sections={sections}
           filtering={filtering}
           progress={progress?.tasks}
-          currentId={current}
         />
         <div className="min-w-0">
           {tasks.map((task) => (
@@ -219,6 +251,8 @@ export function AssemblyView({ sections, issues, signing, flagFor }: Props) {
               issues={issues}
               onOpenPictures={setPicturesOf}
               signing={signing}
+              signActions={signActions}
+              linkedRow={linkedRow}
               onFlag={flagFor ? setFlagging : undefined}
               progress={progress?.tasks.find((entry) => entry.sectionId === task.section.id)}
               onSignTask={() => setSigningTask(task.section.id)}
@@ -391,16 +425,30 @@ function TaskOutline({
   sections,
   filtering,
   progress,
-  currentId,
 }: {
   tasks: ShownTask[];
   sections: Section[];
   filtering: boolean;
   /** On a machine: how far each task has come. */
   progress?: TaskProgress[] | undefined;
-  /** The task being read: the one at the top of the window. */
-  currentId: string | null;
 }) {
+  // The task being read, the one at the top of the window, is followed here and not in the
+  // view: scrolling past a task then redraws these few links, not every step of the instruction.
+  const location = useLocation();
+  const currentId = useCurrentTask(tasks);
+  // Where one is in the instruction is remembered with the page, for Continue in the search.
+  useEffect(() => {
+    const index = sections.findIndex((section) => section.id === currentId);
+    const section = sections[index];
+    if (!section) return;
+    updateRecent(location.pathname, {
+      hash: `#section-${section.id}`,
+      // "Task 3 · Mount the base"; a task that is only called "Task 3" is not said twice.
+      place: /^task\s*\d+$/i.test(section.title.trim())
+        ? section.title.trim()
+        : `Task ${index + 1}${section.title ? ` · ${section.title}` : ''}`,
+    });
+  }, [currentId, sections, location.pathname]);
   // The list scrolls on its own when it is longer than the window: the task being read is kept
   // in sight in it, without moving the page.
   const listRef = useRef<HTMLOListElement>(null);
@@ -487,6 +535,8 @@ function TaskSection({
   issues,
   onOpenPictures,
   signing,
+  signActions,
+  linkedRow,
   onFlag,
   progress,
   onSignTask,
@@ -498,6 +548,9 @@ function TaskSection({
   issues: IssueIndex;
   onOpenPictures: (itemId: string) => void;
   signing?: Signing | undefined;
+  signActions: SignActions;
+  /** The step a link led to, outlined. */
+  linkedRow: string | null;
   onFlag?: ((itemId: string) => void) | undefined;
   progress?: TaskProgress | undefined;
   onSignTask: () => void;
@@ -578,9 +631,16 @@ function TaskSection({
                 item={item}
                 stepLabel={stepRef(index, stepIndex)}
                 issues={issues.items.get(item.id)}
-                onOpenPictures={() => onOpenPictures(item.id)}
-                signing={signing}
-                onFlag={onFlag ? () => onFlag(item.id) : undefined}
+                onOpenPictures={onOpenPictures}
+                sign={signing && signActions}
+                signOff={signing?.signOffs[item.id]}
+                signedBy={signedBy(signing, item.id)}
+                canUnsign={canUnsign(signing, item.id)}
+                busy={signing?.pending.has(item.id) ?? false}
+                // Only an unsigned step shows them: a signed one is left alone while they are typed.
+                initials={signing && !signing.signOffs[item.id] ? signing.initials : ''}
+                linked={linkedRow === item.id}
+                onFlag={onFlag}
               />
             ))}
             {signing && progress && !done && progress.steps - progress.signed > 1 && (
@@ -602,6 +662,17 @@ function TaskSection({
   );
 }
 
+/** Who signed the step, by name, for its tooltip. */
+function signedBy(signing: Signing | undefined, itemId: string): string | undefined {
+  const signOff = signing?.signOffs[itemId];
+  return signing && signOff ? signing.personName(signOff.by) : undefined;
+}
+
+function canUnsign(signing: Signing | undefined, itemId: string): boolean {
+  const signOff = signing?.signOffs[itemId];
+  return signing !== undefined && signOff !== undefined && signing.canUnsign(signOff);
+}
+
 /**
  * A step's sign-off: a small field with the initials to sign with, and the button. The field
  * starts as the initials last signed with on this device (the signed-in user's at first) and can
@@ -611,20 +682,23 @@ function SignField({
   stepRef: ref,
   itemId,
   busy,
-  signing,
+  initials: current,
+  onSign,
 }: {
   stepRef: string;
   itemId: string;
   busy: boolean;
-  signing: Signing;
+  /** The initials the page signs with. */
+  initials: string;
+  onSign: Signing['onSign'];
 }) {
   // What was typed here; null shows the initials the page signs with.
   const [typed, setTyped] = useState<string | null>(null);
-  const text = typed ?? signing.initials;
+  const text = typed ?? current;
   const initials = InitialsSchema.safeParse(text);
   const sign = () => {
     if (!initials.success || busy) return;
-    signing.onSign([itemId], initials.data);
+    onSign([itemId], initials.data);
     setTyped(null);
   };
   return (
@@ -663,26 +737,46 @@ function SignField({
   );
 }
 
-function StepCard({
+/**
+ * One step. Remembered between renders: an instruction has hundreds, and a search, a sign-off or
+ * a dialog opening elsewhere must not draw them all again.
+ */
+const StepCard = memo(function StepCard({
   item,
   stepLabel: ref,
   issues,
   onOpenPictures,
-  signing,
+  sign,
+  signOff,
+  signedBy: signer,
+  canUnsign: mayUnsign = false,
+  busy = false,
+  initials = '',
+  linked = false,
   onFlag,
 }: {
   item: Item;
   /** "1.3" */
   stepLabel: string;
   issues: string[] | undefined;
-  onOpenPictures: () => void;
-  signing?: Signing | undefined;
+  onOpenPictures: (itemId: string) => void;
+  /** On a machine: how the step is signed. Without it the step is only read. */
+  sign?: SignActions | undefined;
+  signOff?: AssemblySignOff | undefined;
+  /** The signer's name, for the sign-off's tooltip. */
+  signedBy?: string | undefined;
+  /** Whether the user may take the sign-off back. */
+  canUnsign?: boolean;
+  /** Being signed or unsigned right now. */
+  busy?: boolean;
+  /** The initials the page signs with. */
+  initials?: string;
+  /** A link led here: the card is outlined. */
+  linked?: boolean;
   /** Opens the form to say what is wrong with the step. */
-  onFlag?: (() => void) | undefined;
+  onFlag?: ((itemId: string) => void) | undefined;
 }) {
   const step = item.assembly ?? {};
-  const signOff = signing?.signOffs[item.id];
-  const busy = signing?.pending.has(item.id) ?? false;
   const pictures = (item.guide?.images.length ?? 0) > 0;
   const description = item.guide?.description?.trim();
   const fasteners = step.fasteners ?? [];
@@ -694,7 +788,8 @@ function StepCard({
     <li id={`row-${item.id}`} className="scroll-mt-24">
       <div
         className={clsx(
-          'grid gap-x-4 gap-y-3 rounded-lg border p-3 @min-[36rem]:p-4',
+          'grid gap-x-4 gap-y-3 rounded-lg border p-3 transition-shadow duration-500 @min-[36rem]:p-4',
+          linked && 'shadow-[0_0_0_3px_var(--color-brand-500)]',
           pictures && '@min-[36rem]:grid-cols-[11rem_minmax(0,1fr)]',
           issues
             ? 'border-nok-fg bg-nok-bg'
@@ -708,7 +803,7 @@ function StepCard({
             <PictureTile
               guide={item.guide}
               rowRef={ref}
-              onOpen={onOpenPictures}
+              onOpen={() => onOpenPictures(item.id)}
               editable={false}
               step
             />
@@ -728,7 +823,7 @@ function StepCard({
               {onFlag && (
                 <button
                   type="button"
-                  onClick={onFlag}
+                  onClick={() => onFlag(item.id)}
                   aria-label={`Something is wrong with step ${ref}`}
                   title="Something wrong? Tell the admins"
                   className="-mt-1 -mr-1 flex size-8 shrink-0 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink-100 hover:text-nok-fg pointer-coarse:size-10"
@@ -751,13 +846,13 @@ function StepCard({
             </div>
           )}
           {documents.length > 0 && <DocumentList documents={documents} />}
-          {signing && (
+          {sign && (
             <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 border-t border-ink-200/70 pt-3">
               {signOff ? (
                 <>
                   <p
                     className="mr-auto flex items-center gap-2 text-sm font-semibold text-ok-fg"
-                    title={`Signed by ${signing.personName(signOff.by)}`}
+                    title={signer ? `Signed by ${signer}` : undefined}
                   >
                     <CircleCheck size={18} aria-hidden="true" className="shrink-0" />
                     <span>
@@ -767,12 +862,12 @@ function StepCard({
                       </span>
                     </span>
                   </p>
-                  {signing.canUnsign(signOff) && (
+                  {mayUnsign && (
                     <button
                       type="button"
                       disabled={busy}
                       aria-label={`Take back the sign-off of step ${ref}`}
-                      onClick={() => signing.onUnsign(item.id)}
+                      onClick={() => sign.onUnsign(item.id)}
                       className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900 disabled:opacity-50"
                     >
                       {busy ? (
@@ -785,7 +880,13 @@ function StepCard({
                   )}
                 </>
               ) : (
-                <SignField stepRef={ref} itemId={item.id} busy={busy} signing={signing} />
+                <SignField
+                  stepRef={ref}
+                  itemId={item.id}
+                  busy={busy}
+                  initials={initials}
+                  onSign={sign.onSign}
+                />
               )}
             </div>
           )}
@@ -794,4 +895,4 @@ function StepCard({
       {issues && <IssueNote id={`issues-${item.id}`} messages={issues} />}
     </li>
   );
-}
+});

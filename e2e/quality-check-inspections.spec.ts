@@ -152,7 +152,7 @@ async function doneInspection(request: APIRequestContext, template: Template) {
   return InspectionSchema.parse(await finalised.json());
 }
 
-test('the sidebar has Final inspection, Quality check, Assembly, Setup and, for admins, Admin', async ({
+test('the sidebar has Assembly, Quality check, Final inspection, Setup and, for admins, Admin', async ({
   page,
   context,
 }) => {
@@ -160,9 +160,9 @@ test('the sidebar has Final inspection, Quality check, Assembly, Setup and, for 
   await page.goto('/quality-checks');
   const nav = mainNav(page);
   const groups = [
-    ['Final inspection', ['Inspections', 'Deviations']],
-    ['Quality check', ['Quality checks', 'Deviations']],
     ['Assembly', ['Instructions']],
+    ['Quality check', ['Quality checks', 'Deviations']],
+    ['Final inspection', ['Inspections', 'Deviations']],
     ['Setup', ['Templates']],
     // Change requests may carry a count of open ones after its name.
     ['Admin', [/^Change requests/, 'Insights', 'Settings']],
@@ -190,9 +190,9 @@ test('the sidebar has Final inspection, Quality check, Assembly, Setup and, for 
   await signIn(context, INSPECTOR, ['inspector']);
   await page.reload();
   await expect(mainNav(page).locator('p')).toHaveText([
-    'Final inspection',
-    'Quality check',
     'Assembly',
+    'Quality check',
+    'Final inspection',
     'Setup',
   ]);
 });

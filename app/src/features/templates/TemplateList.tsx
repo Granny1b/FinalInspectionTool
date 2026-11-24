@@ -1,3 +1,4 @@
+import { templateOverviewHref } from './queries';
 import type { MachineModel, TemplateSummary } from '@modig/shared';
 import clsx from 'clsx';
 import { Link } from 'react-router';
@@ -66,7 +67,7 @@ export function TemplateList({ templates, qualityChecks, models, showDrafts }: P
             >
               <td className={CELL}>
                 <Link
-                  to={`/templates/${template.id}`}
+                  to={templateOverviewHref(template.id)}
                   className="font-medium text-ink-900 outline-none after:absolute after:inset-0"
                 >
                   {template.name || 'Untitled template'}

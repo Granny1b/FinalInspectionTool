@@ -75,14 +75,62 @@ export async function loadAllTemplates(): Promise<StoredTemplate[]> {
   return loaded.filter((template) => template !== null);
 }
 
+/**
+ * Published revisions read lately, by blob name. A revision never changes once published, yet
+ * lists and pages read the same ones over and over (the templates list reads every template's
+ * latest, a machine's page one per check, every save of a draft its published one), each a
+ * download and a parse of the whole document. Kept a few minutes only, so a revision written
+ * again from outside the API (the seed) or one of a deleted template is not served for long.
+ */
+const REVISION_KEEP_MS = 5 * 60_000;
+const REVISIONS_KEPT = 60;
+const revisionCache = new Map<string, { template: Template; until: number }>();
+
+/** Empties the cache (tests, which wipe the storage between them). */
+export function forgetRevisions(): void {
+  revisionCache.clear();
+}
+
 /** A published revision, or null if it does not exist. */
-export async function loadRevision(id: string, revision: number): Promise<Template | null> {
-  const stored = await readJson(
-    templates,
-    blobNames.templateRevision(id, revision),
-    TemplateSchema,
-  );
-  return stored?.data ?? null;
+export async function loadRevision(
+  id: string,
+  revision: number,
+  { fresh = false }: { /** Read from storage whatever is remembered. */ fresh?: boolean } = {},
+): Promise<Template | null> {
+  const blobName = blobNames.templateRevision(id, revision);
+  const kept = fresh ? undefined : revisionCache.get(blobName);
+  // A copy each time: callers are free to change what they get.
+  if (kept && kept.until > Date.now()) return structuredClone(kept.template);
+  const stored = await readJson(templates, blobName, TemplateSchema);
+  if (!stored) return null;
+  revisionCache.delete(blobName);
+  revisionCache.set(blobName, { template: stored.data, until: Date.now() + REVISION_KEEP_MS });
+  // The oldest goes first: a Map keeps the order its keys were added in.
+  for (const oldest of revisionCache.keys()) {
+    if (revisionCache.size <= REVISIONS_KEPT) break;
+    revisionCache.delete(oldest);
+  }
+  return structuredClone(stored.data);
+}
+
+/**
+ * The number of a template's latest published revision: null when it has none, or no draft (it
+ * is gone). One listing, without reading the template itself.
+ */
+export async function latestRevisionNumber(id: string): Promise<number | null> {
+  const names = await listBlobNames(templates, `${id}/`);
+  if (!names.includes(blobNames.templateDraft(id))) return null;
+  let latest: number | null = null;
+  for (const name of names) {
+    const match = blobNames.templateRevisionPattern.exec(name.slice(id.length + 1));
+    if (match) latest = Math.max(latest ?? 0, Number(match[1]));
+  }
+  return latest;
+}
+
+/** The template a quality check is kept under, read from its draft alone. */
+export async function parentIdOf(id: string): Promise<string | undefined> {
+  return (await readJson(templates, blobNames.templateDraft(id), TemplateSchema))?.data.parentId;
 }
 
 /** The latest published revision, or null if the template has never been published. */
@@ -323,6 +371,10 @@ export async function deleteTemplate(
     if (isRestError(error) && error.statusCode === 404) throw templateNotFound();
     throw error;
   });
+  // Its revisions are no longer to be served from memory.
+  for (const kept of revisionCache.keys()) {
+    if (kept.startsWith(`${id}/`)) revisionCache.delete(kept);
+  }
   // Listed again: a publish may have added a revision since the caller read the template.
   const names = await listBlobNames(templates, `${id}/`);
   const results = await Promise.allSettled(

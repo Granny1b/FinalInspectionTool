@@ -1,6 +1,7 @@
 import { IMAGE_MAX_EDGE_PX } from '@modig/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fitWithin, ImageError, putToStorage, uploadJpeg } from './images';
+import { QueryClient } from '@tanstack/react-query';
+import { fitWithin, ImageError, imageUrlQuery, putToStorage, uploadJpeg } from './images';
 
 describe('fitWithin', () => {
   it('scales a landscape photo to the maximum long edge', () => {
@@ -104,4 +105,62 @@ describe('putToStorage', () => {
       });
     });
   }
+});
+
+describe('imageUrlQuery', () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+  const urlOf = (id: string) => `https://account.blob.core.windows.net/images/${id}.jpg?sig=x`;
+
+  beforeEach(() => vi.stubGlobal('fetch', fetchMock));
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetAllMocks();
+  });
+
+  /** Answers like the API: a URL for every id asked for, except the ones in `missing`. */
+  function answer(missing: string[] = []) {
+    fetchMock.mockImplementation((_path, init) => {
+      const { imageIds } = JSON.parse(String(init?.body)) as { imageIds: string[] };
+      const urls = Object.fromEntries(
+        imageIds
+          .filter((id) => !missing.includes(id))
+          .map((id) => [id, { url: urlOf(id), expiresAt }]),
+      );
+      return Promise.resolve(Response.json({ urls }));
+    });
+  }
+
+  it('asks for the pictures of a page in one request', async () => {
+    answer();
+    const client = new QueryClient();
+    const urls = await Promise.all(
+      ['a1', 'b2', 'c3', 'a1'].map((id) => client.fetchQuery(imageUrlQuery(id))),
+    );
+    expect(urls).toEqual([urlOf('a1'), urlOf('b2'), urlOf('c3'), urlOf('a1')]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/images/urls');
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toEqual({
+      imageIds: ['a1', 'b2', 'c3'],
+    });
+  });
+
+  it('keeps a URL until shortly before it expires, without asking again', async () => {
+    answer();
+    const client = new QueryClient();
+    await client.fetchQuery(imageUrlQuery('d4'));
+    await client.fetchQuery(imageUrlQuery('d4'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails only the picture that does not exist', async () => {
+    answer(['gone']);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const [found, missing] = await Promise.allSettled([
+      client.fetchQuery(imageUrlQuery('e5')),
+      client.fetchQuery(imageUrlQuery('gone')),
+    ]);
+    expect(found).toMatchObject({ status: 'fulfilled', value: urlOf('e5') });
+    expect(missing).toMatchObject({ status: 'rejected', reason: { status: 404 } });
+  });
 });

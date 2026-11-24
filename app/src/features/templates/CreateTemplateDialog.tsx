@@ -15,7 +15,7 @@ import {
   type ModelChoice,
   type ModelContext,
 } from './modelChoice';
-import { useCreateTemplate } from './queries';
+import { templateOverviewHref, useCreateTemplate } from './queries';
 
 type Props = {
   /** The settings' models, which have a template and which don't (one per model, brief §1). */
@@ -49,7 +49,7 @@ export function CreateTemplateDialog({ models, onClose }: Props) {
     const { modelName: _name, ...fields } = model;
     create.mutate(
       { name: name.trim(), ...fields },
-      { onSuccess: (created) => navigate(`/templates/${created.detail.draft.id}`) },
+      { onSuccess: (created) => navigate(templateOverviewHref(created.detail.draft.id)) },
     );
   }
 

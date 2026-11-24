@@ -17,6 +17,8 @@ export const changeRequestKeys = {
 
 /** New requests come from other people: the admins' count and list are refreshed this often. */
 const REFRESH_MS = 60_000;
+/** The sidebar's count is on every page an admin has open, so it asks less often. */
+const COUNT_REFRESH_MS = 5 * 60_000;
 
 /** Flags a step of an assembly instruction (everyone signed in). */
 export function useFlagStep() {
@@ -57,7 +59,7 @@ export function useOpenChangeRequests(enabled: boolean) {
             })
           ).data.open
       : skipToken,
-    refetchInterval: REFRESH_MS,
+    refetchInterval: COUNT_REFRESH_MS,
   });
 }
 
