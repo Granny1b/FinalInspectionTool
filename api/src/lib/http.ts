@@ -78,7 +78,7 @@ type Endpoint = (req: HttpRequest, context: InvocationContext) => Promise<HttpRe
  * (an inspector asking for an admin endpoint gets the plain ForbiddenError message instead).
  */
 export const NO_ACCESS_MESSAGE =
-  "You don't have access to Final Inspection yet. Ask an admin to add your email in Settings.";
+  "You don't have access to Modig Production yet. Ask an admin to add your email in Settings.";
 
 /**
  * `role` is the minimum role: admins pass every `inspector` check (see `hasRole`). The SWA route

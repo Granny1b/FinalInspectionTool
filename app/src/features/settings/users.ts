@@ -112,11 +112,11 @@ function withArticle(role: Role): string {
 export function invitation(person: PersonInput, appUrl: string): { subject: string; body: string } {
   const firstName = person.name.trim().split(/\s+/)[0] ?? '';
   return {
-    subject: 'Your access to Modig Final Inspection',
+    subject: 'Your access to Modig Production',
     body: [
       `Hi ${firstName},`,
       '',
-      `You now have access to Modig Final Inspection as ${withArticle(person.role)}.`,
+      `You now have access to Modig Production as ${withArticle(person.role)}.`,
       '',
       `Open ${appUrl} and sign in with your Microsoft account ${person.email}.`,
     ].join('\n'),

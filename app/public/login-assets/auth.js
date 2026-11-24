@@ -101,7 +101,7 @@ function showRefusal(principal, roles, refusal) {
   setText('refused-account', principal?.userId ?? '');
   show('no-access', false);
   show('refused', true);
-  document.title = 'Request refused · Modig Final Inspection';
+  document.title = 'Request refused · Modig Production';
   document.getElementById('try-again')?.addEventListener('click', () => {
     clearRefusal();
     location.assign('/');

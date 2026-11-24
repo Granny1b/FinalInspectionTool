@@ -50,7 +50,7 @@ describe('fetchMe', () => {
 
   it("goes to the no-access page on the API's 403, recording it so that page never bounces back", async () => {
     fetchMock.mockResolvedValue(
-      json(403, { error: 'forbidden', message: "You don't have access to Final Inspection yet." }),
+      json(403, { error: 'forbidden', message: "You don't have access to Modig Production yet." }),
     );
 
     expect(await settled(fetchMe())).toBe('pending');

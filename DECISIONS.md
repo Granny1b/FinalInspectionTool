@@ -3978,3 +3978,17 @@ admins to get them as tickets in a new panel under Admin.
   rows could get the same later.
 - **Tests:** api (`change-requests.test.ts`), e2e (`change-requests.spec.ts`: flagged by an
   inspector, opened and fixed by an admin). The sidebar test expects the new Admin link.
+
+## The app is called Modig Production (2026-11-24)
+
+It was "Modig Final Inspection", from when final inspections were all it did. It now also holds
+assembly instructions, sign-off on machines, quality checks and change requests, and the user
+chose **Modig Production**.
+
+- Changed where the app names itself: `APP_NAME` (page titles), the sign-in page ("Production"
+  under the logo, with a line saying what it covers), the no-access page, the invitation text and
+  the API's no-access message.
+- **Not changed:** the printed and Word final inspection report, whose title "Final Inspection" is
+  the document's name; the sidebar group "Final inspection"; the repository, the file formats'
+  `modig-final-inspection/…` identifiers (files already exported must keep importing) and the
+  Azure resource names.
