@@ -1,8 +1,9 @@
 import type { AnnotatedImage } from '@modig/shared';
-import { ChevronLeft, ChevronRight, ImageOff, LoaderCircle } from 'lucide-react';
-import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, Download, ImageOff, LoaderCircle } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Button } from '../../components/Button';
 import { useImageUrl } from '../../lib/images';
+import { downloadPicture, pictureFileName } from './download';
 import { shownImageId } from './photos';
 
 const STEP = 'px-2 aria-disabled:pointer-events-none aria-disabled:opacity-50';
@@ -20,13 +21,28 @@ type Props = {
   browse?: { index: number; count: number; onStep: (index: number) => void };
 };
 
-/** A photo with its marks (the flattened copy), large, read-only; Escape or Close closes it. */
+/**
+ * A photo with its marks (the flattened copy), large, read-only; Escape or Close closes it.
+ * Download saves it as it is shown, marks included, as a JPEG.
+ */
 export function PhotoViewer({ photo, title, label, onClose, badge, browse }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const url = useImageUrl(shownImageId(photo));
   const previous = browse && browse.index > 0 ? browse.index - 1 : null;
   const next = browse && browse.index < browse.count - 1 ? browse.index + 1 : null;
+  const [saving, setSaving] = useState<'idle' | 'busy' | 'failed'>('idle');
+
+  async function download() {
+    if (!url.data) return;
+    setSaving('busy');
+    try {
+      await downloadPicture(url.data, pictureFileName(title, label));
+      setSaving('idle');
+    } catch {
+      setSaving('failed');
+    }
+  }
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -114,6 +130,23 @@ export function PhotoViewer({ photo, title, label, onClose, badge, browse }: Pro
               </Button>
             </div>
           )}
+          {saving === 'failed' && (
+            <p role="alert" className="text-xs font-medium text-nok-fg">
+              It could not be downloaded.
+            </p>
+          )}
+          <Button
+            variant="secondary"
+            onClick={() => void download()}
+            disabled={!url.data || saving === 'busy'}
+          >
+            {saving === 'busy' ? (
+              <LoaderCircle size={16} aria-hidden="true" className="animate-spin" />
+            ) : (
+              <Download size={16} aria-hidden="true" />
+            )}
+            Download
+          </Button>
           <form method="dialog">
             <Button type="submit" variant="secondary">
               Close

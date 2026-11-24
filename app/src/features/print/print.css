@@ -857,3 +857,52 @@
   margin-top: 0.4mm;
   color: var(--paper-muted);
 }
+
+/* How it should and should not look, unmistakable at the machine and said three ways, so it reads
+   on a black-and-white printout too: a filled band with the symbol and the words right under the
+   picture, the band's colour (green, red), and the picture's frame (solid for should, dashed for
+   should not). An Info picture has the same band and frame in grey, so the pictures of a row
+   line up. */
+.paper-guide-image {
+  --paper-verdict: var(--paper-rule);
+  --paper-verdict-fill: var(--paper-fill);
+  --paper-verdict-ink: var(--paper-ink);
+}
+
+.paper-guide-image[data-verdict='good'] {
+  --paper-verdict: #1e7044;
+  --paper-verdict-fill: #1e7044;
+  --paper-verdict-ink: #fff;
+}
+
+.paper-guide-image[data-verdict='bad'] {
+  --paper-verdict: #b42318;
+  --paper-verdict-fill: #b42318;
+  --paper-verdict-ink: #fff;
+}
+
+.paper-guide-photo {
+  border: 0.8mm solid var(--paper-verdict);
+  border-bottom: 0;
+}
+
+.paper-guide-image[data-verdict='bad'] .paper-guide-photo {
+  border-style: dashed;
+}
+
+.paper-guide-image figcaption {
+  padding-top: 0;
+}
+
+.paper-guide-label {
+  display: block;
+  padding: 1.1mm 2.2mm;
+  background: var(--paper-verdict-fill);
+  color: var(--paper-verdict-ink);
+  font-size: 9pt;
+  letter-spacing: 0.02em;
+}
+
+.paper-guide-image .paper-guide-caption {
+  margin-top: 1mm;
+}

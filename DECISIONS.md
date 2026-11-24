@@ -4062,3 +4062,30 @@ than confusing. Planned with them first; built as its first two steps.
   all results.
 - **Tests:** unit (`hits.test.ts`, `recent.test.ts`), e2e (`search.spec.ts`: an assy number, a
   step by keyboard, a drawing's Copy path, Continue, nothing found).
+
+## Downloading a picture (2026-11-24)
+
+The user asked for pictures to be downloadable, and whether that affects anything.
+
+- **Download in the large picture view** (`PhotoViewer`: a deviation's photos, a guide's, a
+  quality check's and an assembly step's pictures): the picture as shown, marks included, as a
+  JPEG named after it ("Picture 2 – Pictures · 1.3.jpg").
+- **Fetched, then saved from the browser:** the pictures are on the storage account's address,
+  where a link's `download` attribute is ignored. The read URL and the CORS rule it uses are the
+  ones showing the picture already uses.
+- **Nothing else changes:** no API, storage or permission change. Anyone who can see a picture
+  could already save it from the browser's own menu; this is the same picture with a button.
+  The original without marks is not offered.
+
+## Printed pictures: should and should not, unmistakable (2026-11-24)
+
+On a printed instruction the user found "✓ Should look like this" and "✗ Should not look like
+this" too easy to miss: a small black caption under each picture.
+
+- **A filled band right under the picture carries the symbol and the words** (green for should,
+  red for should not), **and the picture has a frame in the same colour**, solid for should and
+  dashed for should not, so it still reads on a black-and-white printout. An Info picture has
+  the same band and frame in grey, which keeps the pictures of a row lined up.
+- It is the one figure every printout shares (`GuideImage`): a quality check's and an assembly
+  instruction's printed instructions and a final inspection's reference appendix (Good / Bad).
+- The texts are unchanged, so the print tests (which read the PDFs) pass as they were.
