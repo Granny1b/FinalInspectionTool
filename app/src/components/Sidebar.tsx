@@ -8,6 +8,7 @@ import {
   LayoutTemplate,
   ListChecks,
   LogOut,
+  Search,
   Settings,
   ShieldCheck,
   Wrench,
@@ -67,13 +68,15 @@ type Props = {
   onNavigate?: () => void;
   /** When given, a close button is shown (mobile drawer). */
   onClose?: () => void;
+  /** Opens the search over everything. */
+  onSearch?: (() => void) | undefined;
 };
 
 /**
  * Logo, navigation, the signed-in user and the theme. Used by the desktop sidebar and the mobile
  * drawer, whose theme controls stay in step (one store, lib/theme.ts).
  */
-export function Sidebar({ me, onNavigate, onClose }: Props) {
+export function Sidebar({ me, onNavigate, onClose, onSearch }: Props) {
   const isAdmin = hasRole(me.roles, 'admin');
   const open = useOpenChangeRequests(isAdmin).data ?? 0;
   const adminNav = ADMIN_NAV.map((item) =>
@@ -96,6 +99,25 @@ export function Sidebar({ me, onNavigate, onClose }: Props) {
         )}
       </div>
 
+      {onSearch && (
+        <div className="px-3 pt-4">
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate?.();
+              onSearch();
+            }}
+            aria-keyshortcuts="Control+K"
+            className="flex h-9 w-full items-center gap-2.5 rounded-md border border-ink-200 bg-canvas px-3 text-sm text-ink-500 transition-colors hover:border-ink-300 hover:text-ink-800"
+          >
+            <Search size={15} aria-hidden="true" />
+            Search
+            <kbd className="ml-auto rounded border border-ink-200 bg-surface px-1.5 text-[0.6875rem] text-ink-500">
+              Ctrl K
+            </kbd>
+          </button>
+        </div>
+      )}
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-5">
         <NavList items={MACHINES_NAV} onNavigate={onNavigate} label="Machines" />
         {NAV_GROUPS.map(({ label, items }) => (

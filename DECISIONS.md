@@ -4019,3 +4019,46 @@ The user wanted to find older fixes easily.
   every request.
 - **The tabs count what the search found, and there is an All tab.** A search made on Open that
   only finds fixed ones says so and offers to show them, instead of an empty page.
+
+## Sidebar order (2026-11-24)
+
+Assembly, then Quality check, then Final inspection: the order a machine goes through them (the
+user). Final inspection was first only because it was the first thing the app did.
+
+## Search over everything (2026-11-24)
+
+The user wanted a well developed search that suggests hits as one types (an assy, a drawing) and
+gets one back to where one was after closing everything by accident, and that is useful rather
+than confusing. Planned with them first; built as its first two steps.
+
+- **One entry point:** a Search button at the top of the sidebar and Ctrl+K (Cmd+K) anywhere, a
+  dialog with one field. No search page and no options.
+- **Empty, it is "Continue where you left off":** the last eight pages opened on the device (a
+  machine, an assembly on a machine, an instruction, a check, a template), each with the task one
+  was in for an instruction. Kept in the browser's storage, **per device, not per account**: the
+  user plans a shared production sign-in, where an account's history would mix everyone's work.
+  Pages are remembered by the title they give themselves once loaded (`useRecentRecorder`), so
+  no page had to be changed for it; an instruction adds the task in view.
+- **Hits are grouped by kind in a fixed order, six to a group**, each with a grey line saying where
+  it leads and the words found marked. "And N more" asks for another word rather than paging.
+- **A hit leads to its place, never to another search:** a step opens the instruction at that step
+  (outlined), an assy or part number opens it with its own search filled in (`?q=`), a document
+  opens the step it is on and has Copy path in the hit itself.
+- **An assy or part number is one hit per instruction, with its steps counted,** not a hit per
+  step: "Assy 82265 · Base, HHV3 · 17 steps".
+- **Machine context wins:** if the instruction was last worked on a machine on this device, its
+  hits lead to that machine's copy, where the steps are signed; else to the read view of the
+  latest revision, for admins too (a search is for finding and reading; the editor is one click
+  from there).
+- **Every word must match; a title that is the query comes first** (an FI- or QC-number, a Machine
+  ID), then titles starting with it, then the rest.
+- **It runs in the browser** over what the app already loads (machines, inspections, templates)
+  plus the latest published revision of each assembly instruction, fetched when the search first
+  opens and kept (a revision never changes). No server index: at tens of instructions and a few
+  thousand steps it answers in milliseconds. A server index is the next step if that grows.
+- **Inspectors find published things only;** admins also drafts never published.
+- **Escape closes the search** (a search field's own Escape would only empty it).
+- **Not done yet:** deviations and change requests as hits, checklist rows of templates, a page of
+  all results.
+- **Tests:** unit (`hits.test.ts`, `recent.test.ts`), e2e (`search.spec.ts`: an assy number, a
+  step by keyboard, a drawing's Copy path, Continue, nothing found).

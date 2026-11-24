@@ -14,7 +14,7 @@ const DESKTOP_QUERY = '(min-width: 64rem)';
  * (tablets in the workshop). The drawer is a native modal <dialog>, which gives us the focus
  * trap, Escape-to-close and an inert page behind it for free.
  */
-export function MobileNav({ me }: { me: Me }) {
+export function MobileNav({ me, onSearch }: { me: Me; onSearch?: () => void }) {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -71,7 +71,7 @@ export function MobileNav({ me }: { me: Me }) {
         }}
         className="m-0 h-dvh max-h-none w-72 max-w-[85vw] overscroll-contain border-r border-ink-200 bg-surface p-0 shadow-xl transition-transform duration-200 ease-out backdrop:bg-scrim/30 motion-reduce:transition-none lg:hidden dark:backdrop:bg-scrim/70 starting:open:-translate-x-full"
       >
-        <Sidebar me={me} onNavigate={close} onClose={close} />
+        <Sidebar me={me} onNavigate={close} onClose={close} onSearch={onSearch} />
       </dialog>
     </>
   );

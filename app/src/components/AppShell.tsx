@@ -1,5 +1,8 @@
 import clsx from 'clsx';
+import { useEffect, useState } from 'react';
 import { Outlet, ScrollRestoration } from 'react-router';
+import { SearchDialog } from '../features/search/SearchDialog';
+import { useRecentRecorder } from '../features/search/useRecentRecorder';
 import { useMe } from '../lib/useMe';
 import { AccountError } from './AccountError';
 import { CONTENT_FRAME, CONTENT_OFFSET, SIDEBAR_FRAME } from './layout';
@@ -10,6 +13,19 @@ import { Sidebar } from './Sidebar';
 /** Root layout: loads the signed-in user, then renders sidebar + page. */
 export function AppShell() {
   const me = useMe();
+  // The search over everything: from the sidebar, or Ctrl+K (Cmd+K) anywhere.
+  const [searching, setSearching] = useState(false);
+  useRecentRecorder();
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearching(true);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   if (me.isPending) return <LoadingShell />;
   // Only when nothing has loaded: Settings refetches /api/me after a change to the people list,
@@ -31,9 +47,10 @@ export function AppShell() {
         Skip to content
       </a>
       <div className={SIDEBAR_FRAME}>
-        <Sidebar me={me.data} />
+        <Sidebar me={me.data} onSearch={() => setSearching(true)} />
       </div>
-      <MobileNav me={me.data} />
+      <MobileNav me={me.data} onSearch={() => setSearching(true)} />
+      {searching && <SearchDialog onClose={() => setSearching(false)} />}
       <main id="main" tabIndex={-1} className={clsx(CONTENT_OFFSET, 'outline-none')}>
         <div className={CONTENT_FRAME}>
           <Outlet />

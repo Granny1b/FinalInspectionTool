@@ -23,9 +23,11 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { formatDateTime } from '../../lib/format';
 import { FlagStepDialog, type FlagTarget } from '../changeRequests/FlagStepDialog';
+import { updateRecent } from '../search/recent';
 import { GuideViewer } from '../guides/GuideViewer';
 import { PictureTile } from '../qualityChecks/PictureTile';
 import type { IssueIndex } from '../templates/document/issues';
@@ -82,7 +84,21 @@ type Props = {
  * steps someone needs; the list of tasks jumps to one. A step's picture opens its pictures large.
  */
 export function AssemblyView({ sections, issues, signing, flagFor }: Props) {
-  const [filter, setFilter] = useState<StepFilter>(NO_FILTER);
+  // A search hit for an assy or part number opens the instruction on its steps ("?q=82265").
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState<StepFilter>(() => ({
+    ...NO_FILTER,
+    query: params.get('q') ?? '',
+  }));
+  // A link to one step or task ("#row-{id}", "#section-{id}", from the search or from Continue):
+  // brought into view once it is drawn, the step outlined.
+  const location = useLocation();
+  const linkedRow = location.hash.startsWith('#row-') ? location.hash.slice('#row-'.length) : null;
+  useEffect(() => {
+    const id = location.hash.slice(1);
+    const element = id ? document.getElementById(id) : null;
+    element?.scrollIntoView({ block: id.startsWith('row-') ? 'center' : 'start' });
+  }, [location.hash, location.key]);
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
   const [picturesOf, setPicturesOf] = useState<string | null>(null);
   const departments = useMemo(() => departmentCounts(sections), [sections]);
@@ -107,6 +123,19 @@ export function AssemblyView({ sections, issues, signing, flagFor }: Props) {
   }, [sections, filter, hideSigned, signOffs]);
   const filtering = isFiltering(filter) || (hideSigned && signing !== undefined);
   const current = useCurrentTask(tasks);
+  // Where one is in the instruction is remembered with the page, for Continue in the search.
+  useEffect(() => {
+    const index = sections.findIndex((section) => section.id === current);
+    const section = sections[index];
+    if (!section) return;
+    updateRecent(location.pathname, {
+      hash: `#section-${section.id}`,
+      // "Task 3 · Mount the base"; a task that is only called "Task 3" is not said twice.
+      place: /^task\s*\d+$/i.test(section.title.trim())
+        ? section.title.trim()
+        : `Task ${index + 1}${section.title ? ` · ${section.title}` : ''}`,
+    });
+  }, [current, sections, location.pathname]);
   const viewing = picturesOf === null ? null : findStep(sections, picturesOf);
 
   if (sections.length === 0) {
@@ -219,6 +248,7 @@ export function AssemblyView({ sections, issues, signing, flagFor }: Props) {
               issues={issues}
               onOpenPictures={setPicturesOf}
               signing={signing}
+              linkedRow={linkedRow}
               onFlag={flagFor ? setFlagging : undefined}
               progress={progress?.tasks.find((entry) => entry.sectionId === task.section.id)}
               onSignTask={() => setSigningTask(task.section.id)}
@@ -487,6 +517,7 @@ function TaskSection({
   issues,
   onOpenPictures,
   signing,
+  linkedRow,
   onFlag,
   progress,
   onSignTask,
@@ -498,6 +529,8 @@ function TaskSection({
   issues: IssueIndex;
   onOpenPictures: (itemId: string) => void;
   signing?: Signing | undefined;
+  /** The step a link led to, outlined. */
+  linkedRow: string | null;
   onFlag?: ((itemId: string) => void) | undefined;
   progress?: TaskProgress | undefined;
   onSignTask: () => void;
@@ -580,6 +613,7 @@ function TaskSection({
                 issues={issues.items.get(item.id)}
                 onOpenPictures={() => onOpenPictures(item.id)}
                 signing={signing}
+                linked={linkedRow === item.id}
                 onFlag={onFlag ? () => onFlag(item.id) : undefined}
               />
             ))}
@@ -669,6 +703,7 @@ function StepCard({
   issues,
   onOpenPictures,
   signing,
+  linked = false,
   onFlag,
 }: {
   item: Item;
@@ -677,6 +712,8 @@ function StepCard({
   issues: string[] | undefined;
   onOpenPictures: () => void;
   signing?: Signing | undefined;
+  /** A link led here: the card is outlined. */
+  linked?: boolean;
   /** Opens the form to say what is wrong with the step. */
   onFlag?: (() => void) | undefined;
 }) {
@@ -694,7 +731,8 @@ function StepCard({
     <li id={`row-${item.id}`} className="scroll-mt-24">
       <div
         className={clsx(
-          'grid gap-x-4 gap-y-3 rounded-lg border p-3 @min-[36rem]:p-4',
+          'grid gap-x-4 gap-y-3 rounded-lg border p-3 transition-shadow duration-500 @min-[36rem]:p-4',
+          linked && 'shadow-[0_0_0_3px_var(--color-brand-500)]',
           pictures && '@min-[36rem]:grid-cols-[11rem_minmax(0,1fr)]',
           issues
             ? 'border-nok-fg bg-nok-bg'

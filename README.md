@@ -130,6 +130,13 @@ Added after the six phases:
   finds requests, open and fixed alike, by what was wrong, what was done, the step, instruction,
   machine, person or date.
 
+- **Search.** One search over everything, from the top of the sidebar or with **Ctrl+K**. Empty,
+  it offers what was last open on the device (**Continue where you left off**: the machine, the
+  instruction and the task one was in, the check). Typing lists what matches at once, by kind in
+  a fixed order: machines, assembly steps, assy and part numbers, drawings and documents (with
+  **Copy path**), instructions, inspections and quality checks, templates. A hit leads to its
+  exact place: a step opens on that step, an assy number opens the instruction on its steps.
+
 Deployed to Azure Static Web Apps (see [Deploy to Azure](#deploy-to-azure)); a push to `main` deploys.
 
 ## Prerequisites
