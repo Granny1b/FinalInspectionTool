@@ -4082,9 +4082,11 @@ The user asked for pictures to be downloadable, and whether that affects anythin
 On a printed instruction the user found "✓ Should look like this" and "✗ Should not look like
 this" too easy to miss: a small black caption under each picture.
 
-- **A filled band right under the picture carries the symbol and the words** (green for should,
-  red for should not), **and the picture has a frame in the same colour**, solid for should and
-  dashed for should not, so it still reads on a black-and-white printout. An Info picture has
+- **A band right under the picture carries the symbol and the words** (green for should, red for
+  should not), **and picture and band share a frame**, solid for should and dashed for should
+  not. First in full colour with white words, which the user found too loud: now the app's soft
+  badge colours (a pale fill, a soft frame, the words in the full green or red). On a
+  black-and-white printout the pale frame fades, and the symbol and words carry it. An Info picture has
   the same band and frame in grey, which keeps the pictures of a row lined up.
 - It is the one figure every printout shares (`GuideImage`): a quality check's and an assembly
   instruction's printed instructions and a final inspection's reference appendix (Good / Bad).
