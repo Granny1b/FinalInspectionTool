@@ -22,14 +22,14 @@ export function LoadingShell() {
           <Logo className="h-10" />
         </div>
         <div className="flex-1 px-3 py-5">
-          {/* Machines, then the sidebar's three groups (Final inspection and Quality check with
-              their list and Deviations, Setup with Templates), each a label over its links,
-              spaced as they are (Sidebar's GROUP_GAP and the links' 2 px). */}
+          {/* Machines, then the sidebar's groups in its order (Assembly, Quality check and Final
+              inspection with their list and Deviations, Setup with Templates), each a label over
+              its links, spaced as they are (Sidebar's GROUP_GAP and the links' 2 px). */}
           <Bone className={clsx(NAV_ITEM_HEIGHT, 'w-4/5')} />
           {[
-            { label: 'w-28', links: ['w-11/12', 'w-3/4'] },
-            { label: 'w-24', links: ['w-4/5', 'w-3/4'] },
             { label: 'w-16', links: ['w-3/4'] },
+            { label: 'w-24', links: ['w-4/5', 'w-3/4'] },
+            { label: 'w-28', links: ['w-11/12', 'w-3/4'] },
             { label: 'w-12', links: ['w-full'] },
           ].map(({ label, links }) => (
             <div key={label} className="mt-5">

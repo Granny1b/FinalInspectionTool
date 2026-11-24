@@ -31,18 +31,13 @@ type NavGroupItems = { label: string; items: NavItem[] };
 const MACHINES_NAV: NavItem[] = [{ to: '/machines', label: 'Machines', icon: Factory }];
 
 /**
- * What everyone sees, a group to a kind of work: final inspections before delivery, quality
- * checks along the build, each with the log of its deviations, and the templates both are made
- * from (a machine's final inspection template and its quality checks).
+ * What everyone sees, a group to a kind of work, in the order a machine goes through them: it is
+ * assembled, checked along the build, and inspected before delivery. The checks each have the log
+ * of their deviations. Then the templates the checks are made from.
  */
 const NAV_GROUPS: NavGroupItems[] = [
-  {
-    label: 'Final inspection',
-    items: [
-      { to: '/inspections', label: 'Inspections', icon: ClipboardCheck },
-      { to: '/deviations/final', label: 'Deviations', icon: ListChecks },
-    ],
-  },
+  // How the machines are built: the assembly instructions, read by everyone.
+  { label: 'Assembly', items: [{ to: '/assembly', label: 'Instructions', icon: Wrench }] },
   {
     label: 'Quality check',
     items: [
@@ -50,8 +45,13 @@ const NAV_GROUPS: NavGroupItems[] = [
       { to: '/deviations/quality', label: 'Deviations', icon: ListChecks },
     ],
   },
-  // How the machines are built: the assembly instructions, read by everyone.
-  { label: 'Assembly', items: [{ to: '/assembly', label: 'Instructions', icon: Wrench }] },
+  {
+    label: 'Final inspection',
+    items: [
+      { to: '/inspections', label: 'Inspections', icon: ClipboardCheck },
+      { to: '/deviations/final', label: 'Deviations', icon: ListChecks },
+    ],
+  },
   { label: 'Setup', items: [{ to: '/templates', label: 'Templates', icon: LayoutTemplate }] },
 ];
 const ADMIN_NAV: NavItem[] = [
