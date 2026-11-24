@@ -79,8 +79,8 @@ test('the search leads to an assy’s steps, to a step and to a drawing, and off
   test.setTimeout(120_000);
   await signIn(context, ADMIN, ['admin']);
   await page.goto('/assembly');
-  // An assy number of digits only, unique to this run.
-  const assy = `9${Date.now() % 10_000_000}`;
+  // An assy number of digits only, unique to this run (and to this worker, when several run).
+  const assy = `9${Date.now() % 10_000_000}${Math.floor(Math.random() * 900 + 100)}`;
   const name = `E2E search ${assy}`;
   const templateId = await publishInstruction(page, name, assy);
   made.push(templateId);
