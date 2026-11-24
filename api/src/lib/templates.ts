@@ -92,9 +92,13 @@ export function forgetRevisions(): void {
 }
 
 /** A published revision, or null if it does not exist. */
-export async function loadRevision(id: string, revision: number): Promise<Template | null> {
+export async function loadRevision(
+  id: string,
+  revision: number,
+  { fresh = false }: { /** Read from storage whatever is remembered. */ fresh?: boolean } = {},
+): Promise<Template | null> {
   const blobName = blobNames.templateRevision(id, revision);
-  const kept = revisionCache.get(blobName);
+  const kept = fresh ? undefined : revisionCache.get(blobName);
   // A copy each time: callers are free to change what they get.
   if (kept && kept.until > Date.now()) return structuredClone(kept.template);
   const stored = await readJson(templates, blobName, TemplateSchema);
@@ -367,6 +371,10 @@ export async function deleteTemplate(
     if (isRestError(error) && error.statusCode === 404) throw templateNotFound();
     throw error;
   });
+  // Its revisions are no longer to be served from memory.
+  for (const kept of revisionCache.keys()) {
+    if (kept.startsWith(`${id}/`)) revisionCache.delete(kept);
+  }
   // Listed again: a publish may have added a revision since the caller read the template.
   const names = await listBlobNames(templates, `${id}/`);
   const results = await Promise.allSettled(

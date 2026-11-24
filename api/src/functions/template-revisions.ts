@@ -104,7 +104,9 @@ const IMMUTABLE = 'private, max-age=31536000, immutable';
 export const getRevision = endpoint({ role: 'inspector' }, async (req) => {
   const id = idParam(req);
   const n = revisionParam(req);
-  const revision = await loadRevision(id, n);
+  // From storage, not from memory: a revision of a deleted template is gone at once, and the
+  // browser keeps this answer anyway.
+  const revision = await loadRevision(id, n, { fresh: true });
   if (!revision) throw new NotFoundError(`Revision ${n} of this template does not exist.`);
   return json(200, revision, { 'Cache-Control': IMMUTABLE });
 });

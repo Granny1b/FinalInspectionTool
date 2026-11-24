@@ -4175,7 +4175,9 @@ pictures) found where the time went; this is what was changed, and what was left
 - **Published revisions are kept in memory for five minutes** (at most 60, a copy handed out each
   time). They never change, and were downloaded and parsed again by the templates list (every
   template's latest), a machine's page (one per check) and every save of a draft. Five minutes
-  only, so the seed writing one again, or a deleted template, is not served for long.
+  only, so the seed writing one again is not served for long. Deleting a template forgets its
+  revisions, and `GET …/revisions/{n}` always reads storage, so a deleted template's revision is
+  a 404 at once.
 - **A machine's page reads in parallel** what it read one after another, and the order of its
   quality checks from the draft alone.
 - **The latest revision of an instruction bound to a machine is one listing**, not a download of
