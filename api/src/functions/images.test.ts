@@ -5,13 +5,15 @@ import {
   CONTAINERS,
   ID_PATTERN,
   ImageReadUrlResponseSchema,
+  ImageReadUrlsResponseSchema,
   ImageUploadUrlResponseSchema,
   newId,
 } from '@modig/shared';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { context, principal, request } from '../../test/requests';
 import { useTestStorage } from '../../test/storage';
-import { getImageUrl, getUploadUrl } from './images';
+import { readExpiry } from '../lib/images';
+import { getImageUrl, getImageUrls, getUploadUrl } from './images';
 
 // Record the registrations instead of letting the package (in "test mode") warn about them.
 const registrations = vi.hoisted((): unknown[][] => []);
@@ -50,7 +52,7 @@ function minutesUntil(iso: string): number {
 }
 
 describe('registration', () => {
-  it('registers both image routes, SWA doing authentication', () => {
+  it('registers the image routes, SWA doing authentication', () => {
     expect(registrations).toEqual([
       [
         'imageUploadUrl',
@@ -70,6 +72,15 @@ describe('registration', () => {
           handler: getImageUrl,
         },
       ],
+      [
+        'imageUrls',
+        {
+          methods: ['POST'],
+          authLevel: 'anonymous',
+          route: 'images/urls',
+          handler: getImageUrls,
+        },
+      ],
     ]);
   });
 });
@@ -77,6 +88,7 @@ describe('registration', () => {
 describe.each([
   ['POST /api/images/upload-url', getUploadUrl],
   ['GET /api/images/{id}/url', getImageUrl],
+  ['POST /api/images/urls', getImageUrls],
 ])('%s access', (_name, handler) => {
   it('401 without a client principal, 403 without an app role', async () => {
     const params = { id: newId() };
@@ -113,7 +125,7 @@ describe('POST /api/images/upload-url', () => {
 });
 
 describe('GET /api/images/{id}/url', () => {
-  it('returns a ~15 minute read-only URL that serves the uploaded bytes', async () => {
+  it('returns a read-only URL, valid 1 to 13 hours, that serves the uploaded bytes', async () => {
     const { imageId, sasUrl } = await uploadUrl();
     await putJpeg(sasUrl);
 
@@ -121,12 +133,15 @@ describe('GET /api/images/{id}/url', () => {
     expect(response.status).toBe(200);
     const { url, expiresAt } = ImageReadUrlResponseSchema.parse(response.jsonBody);
     expect(new URL(url).searchParams.get('sp')).toBe('r');
-    expect(minutesUntil(expiresAt)).toBeGreaterThan(14.9);
-    expect(minutesUntil(expiresAt)).toBeLessThanOrEqual(15);
+    expect(minutesUntil(expiresAt)).toBeGreaterThan(60);
+    expect(minutesUntil(expiresAt)).toBeLessThanOrEqual(13 * 60);
+    expect(new Date(new URL(url).searchParams.get('se') ?? '').toISOString()).toBe(expiresAt);
 
     const image = await fetch(url);
     expect(image.status).toBe(200);
     expect(image.headers.get('Content-Type')).toBe('image/jpeg');
+    // The picture never changes, so the browser keeps it for as long as the URL can last.
+    expect(image.headers.get('Cache-Control')).toBe('private, max-age=46800, immutable');
     expect(new Uint8Array(await image.arrayBuffer())).toEqual(JPEG);
     expect((await putJpeg(url)).status).toBe(403);
   });
@@ -162,5 +177,55 @@ describe('GET /api/images/{id}/url', () => {
 
   it('400 for a malformed id', async () => {
     expect((await readUrl('../templates/x')).status).toBe(400);
+  });
+});
+
+describe('read URLs that the browser can keep the picture under', () => {
+  it('gives the same URL for an image every time within a window', async () => {
+    const { imageId, sasUrl } = await uploadUrl();
+    await putJpeg(sasUrl);
+    const first = ImageReadUrlResponseSchema.parse((await readUrl(imageId)).jsonBody);
+    const second = ImageReadUrlResponseSchema.parse((await readUrl(imageId)).jsonBody);
+    // Unless the two calls fell on either side of a window's end.
+    if (first.expiresAt === second.expiresAt) expect(second.url).toBe(first.url);
+  });
+
+  it('expires every URL of a window together, an hour after the window ends', () => {
+    const noon = Date.UTC(2026, 10, 24, 12);
+    expect(readExpiry(noon).toISOString()).toBe('2026-11-25T01:00:00.000Z');
+    expect(readExpiry(noon + 11 * 3_600_000).toISOString()).toBe('2026-11-25T01:00:00.000Z');
+    expect(readExpiry(noon + 12 * 3_600_000).toISOString()).toBe('2026-11-25T13:00:00.000Z');
+  });
+});
+
+describe('POST /api/images/urls', () => {
+  function readUrls(body: unknown) {
+    return getImageUrls(
+      request({ principal: inspector, method: 'POST', body: JSON.stringify(body) }),
+      context(),
+    );
+  }
+
+  it('returns the read URLs of many images at once, leaving out one that does not exist', async () => {
+    const [a, b, never] = await Promise.all([uploadUrl(), uploadUrl(), uploadUrl()]);
+    await Promise.all([putJpeg(a.sasUrl), putJpeg(b.sasUrl)]);
+
+    const response = await readUrls({ imageIds: [a.imageId, b.imageId, never.imageId, a.imageId] });
+    expect(response.status).toBe(200);
+    const { urls } = ImageReadUrlsResponseSchema.parse(response.jsonBody);
+    expect(Object.keys(urls).sort()).toEqual([a.imageId, b.imageId].sort());
+    const single = ImageReadUrlResponseSchema.parse((await readUrl(a.imageId)).jsonBody);
+    if (single.expiresAt === urls[a.imageId]!.expiresAt) expect(urls[a.imageId]).toEqual(single);
+    const served = await fetch(urls[b.imageId]!.url);
+    expect(new Uint8Array(await served.arrayBuffer())).toEqual(JPEG);
+  });
+
+  it('400 for no ids, a malformed id or too many', async () => {
+    expect((await readUrls({ imageIds: [] })).status).toBe(400);
+    expect((await readUrls({ imageIds: ['../templates/x'] })).status).toBe(400);
+    expect((await readUrls({ imageIds: Array.from({ length: 501 }, () => newId()) })).status).toBe(
+      400,
+    );
+    expect((await readUrls({})).status).toBe(400);
   });
 });

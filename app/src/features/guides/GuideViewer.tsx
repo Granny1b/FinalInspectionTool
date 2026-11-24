@@ -176,6 +176,8 @@ function Tile({
           // Whole, as it prints: marks near an edge must not be cropped away.
           <img
             src={url.data}
+            loading="lazy"
+            decoding="async"
             crossOrigin="anonymous"
             alt=""
             className="size-full bg-surface object-contain"

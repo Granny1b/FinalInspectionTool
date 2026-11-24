@@ -15,6 +15,11 @@
     { "route": "/modig-logo.png", "allowedRoles": ["anonymous"] },
     { "route": "/modig-logo-dark.png", "allowedRoles": ["anonymous"] },
     { "route": "/favicon.png", "allowedRoles": ["anonymous"] },
+    {
+      "route": "/assets/*",
+      "allowedRoles": ["authenticated"],
+      "headers": { "Cache-Control": "public, max-age=31536000, immutable" }
+    },
     { "route": "/*", "allowedRoles": ["authenticated"] }
   ],
   "navigationFallback": {

@@ -1240,7 +1240,8 @@ it was stored but the log's table could not be updated: sending the same request
 | `GET /api/insights/export.csv`                | admin     | The deviation rows under the same filters, as a CSV file                 |
 | `GET /api/insights/deviations`                | admin     | The same rows as JSON, for the printed report's deviation list           |
 | `POST /api/images/upload-url`                 | inspector | New image id and a 10-minute upload URL for it                           |
-| `GET /api/images/{id}/url`                    | inspector | A 15-minute read URL for an image                                        |
+| `GET /api/images/{id}/url`                    | inspector | A read URL for an image, valid 1 to 13 hours                             |
+| `POST /api/images/urls`                       | inspector | The read URLs of up to 500 images in one call                            |
 
 ## Seed data
 
@@ -1509,8 +1510,10 @@ were removed still carry are ignored, and gone after the next save.
 
 Photos never pass through the API. The browser asks `/api/images/upload-url` for a new image id
 and a URL that can only write that one blob, valid for 10 minutes, and uploads the scaled-down
-JPEG straight to the `images` container. To show it, it asks for a read-only URL valid for 15
-minutes. Documents store only image ids: a template's `coverImageId` and its rows' guide images
+JPEG straight to the `images` container. To show it, it asks for a read-only URL: a page asks
+for all of its pictures in one call (`POST /api/images/urls`), and an image has the same URL for
+everyone for half a day (valid 1 to 13 hours), so the browser keeps the picture it downloaded
+instead of fetching it again on every visit. Documents store only image ids: a template's `coverImageId` and its rows' guide images
 (see [Guides](#guides)), which inspections share through their copy of the checklist, and an
 inspection's `front.photoId` and its deviation photos (see [Deviation photos](#deviation-photos)).
 Replacing or removing a photo leaves the old file in storage; deleting an inspection deletes its

@@ -489,8 +489,9 @@ The calls with product, security or data impact. Each is explained in its sectio
 
 ### Photos
 
-- **Upload URL: create and write on that one blob, 10 minutes; read URL: read only, 15 minutes,
-  issued only if the blob exists.** No start time (no clock-skew window); the expiry is whole
+- **Upload URL: create and write on that one blob, 10 minutes; read URL: read only, 15 minutes
+  (since 2026-11-24: 1 to 13 hours, see "Speed: an optimisation pass"), issued only if the blob
+  exists.** No start time (no clock-skew window); the expiry is whole
   seconds so `expiresAt` equals the SAS. The account is https-only in Azure, so the protocol is
   not restricted.
 - **An upload URL cannot limit size or content type.** It is issued to role holders only and
@@ -501,7 +502,8 @@ The calls with product, security or data impact. Each is explained in its sectio
   marked-up photos JPEGs too, so this still covers every image.)
 - **Photos are scaled in the browser** (`createImageBitmap` with the camera orientation, white
   background for transparent PNGs, at most 1600 px, JPEG 0.8) and PUT with `credentials: 'omit'`.
-- **Read URLs are cached for 10 minutes**, under their 15-minute lifetime.
+- **Read URLs are cached for 10 minutes**, under their 15-minute lifetime (since 2026-11-24:
+  until five minutes before they expire).
 - **Replacing or removing a cover photo leaves the old blob.** There is no delete endpoint and
   the cost is negligible.
 - **`upload-url` runs `ensureStorage()`** although it makes no storage call, so the `images`
@@ -4128,3 +4130,78 @@ data".
 - **Tests:** the template, guide and assembly end-to-end tests follow the new addresses (a
   template opens on its landing page; the checklist is on the Final inspection tab; instructions
   are made on the Assembly tab).
+
+## Speed: an optimisation pass (2026-11-24)
+
+Pages sometimes loaded slowly. Five read-only audits (API, data fetching, bundle, rendering,
+pictures) found where the time went; this is what was changed, and what was left.
+
+### The first download
+
+- **Every page but the machines list and a machine's page is fetched when first opened** (route
+  `lazy` in `router.tsx`). The first download went from about 361 kB to about 211 kB gzip; the
+  editors with drag and drop, the print views, the deviation log and the admin pages are no
+  longer in it. The page shown stays until the next has arrived, so there is no flash; opening the
+  app straight on such a page shows the shell's skeleton meanwhile (`hydrateFallbackElement`).
+- **`/assets/*` is cached for a year, immutable** (`staticwebapp.config.json`): the files are
+  named by their content. Before, every visit asked the server about each one again. The rule
+  repeats `allowedRoles: authenticated`, because the first matching route wins.
+- After a deploy an open tab can ask for a page file that no longer exists: the router's error
+  screen, which already offers Reload, covers it.
+
+### Pictures
+
+- **A page asks for all of its picture URLs in one call** (`POST /api/images/urls`, at most 500
+  ids; the app collects the ids asked for within 10 ms). An instruction of 363 steps made up to
+  363 calls to the API before any picture came. The single route stays for one-off reads.
+  The API still checks that each image exists (all at once), so a missing picture shows as before.
+- **An image has the same read URL for everyone within a 12-hour window**, expiring an hour after
+  the window ends, and is served with `Cache-Control: private, max-age=46800, immutable` (the
+  SAS's `rscc`, so pictures already stored get it too). A new URL every time meant the browser
+  downloaded every picture again on every visit and every ten minutes. **This replaces the
+  15-minute lifetime:** a read URL that leaves the app now opens that one picture for up to 13
+  hours instead of 15 minutes. Judged acceptable for pictures of machine parts that only
+  signed-in people can get a URL for; `READ_WINDOW_HOURS` in `api/src/lib/images.ts` is the one
+  number to lower if not.
+- **Pictures in lists load when they come near the window** (`loading="lazy"`,
+  `decoding="async"`), not all at once. Not in print, which waits for every picture.
+- **Not done: thumbnails.** A tile still shows the full 1600 px picture. Small copies made at
+  upload would cut the bytes about tenfold, but need a second file per image, a fallback for
+  the pictures already stored and their deletion kept in step. Worth doing next if long
+  instructions are still slow on the workshop Wi-Fi.
+
+### The API
+
+- **Published revisions are kept in memory for five minutes** (at most 60, a copy handed out each
+  time). They never change, and were downloaded and parsed again by the templates list (every
+  template's latest), a machine's page (one per check) and every save of a draft. Five minutes
+  only, so the seed writing one again, or a deleted template, is not served for long.
+- **A machine's page reads in parallel** what it read one after another, and the order of its
+  quality checks from the draft alone.
+- **The latest revision of an instruction bound to a machine is one listing**, not a download of
+  the whole instruction; its sign-offs are read at the same time.
+- **Not done:** the templates list still reads every draft in full (a summary kept in blob
+  metadata, as inspections and machines have, would make it one listing; it touches every place
+  a template is written). The people list is still read for every request after 5 s (a longer
+  time would let a removed person in for that long). Storage containers are still created if
+  missing on a cold start (cheap, and it is what makes a new container work without a deploy of
+  the infrastructure).
+
+### Fetching in the app
+
+- **What was fetched counts as fresh for 30 seconds** (the query client's default). Every click
+  between pages used to fetch every list again. One's own changes still show at once (each save
+  refreshes what it touches); someone else's show within 30 seconds, or on reload.
+- **Making a machine and starting a check open the next page at once**, without waiting for the
+  lists to be fetched again first.
+- **The sidebar's count of change requests is asked for every 5 minutes**, not every minute (it
+  is on every page an admin has open, and reads every request).
+
+### The instruction page
+
+- **A step's card is drawn again only when something of its own changes** (`memo`, with the sign
+  functions kept the same between renders). A sign-off, a typed initial, a dialog opening or a
+  search keystroke used to draw all 363 cards again, a sign-off about four times over.
+- **The task being read is followed inside the list of tasks**, so scrolling past a task redraws
+  those few links and not the instruction.
+- **The steps follow the search box a moment behind** (`useDeferredValue`), so typing stays quick.

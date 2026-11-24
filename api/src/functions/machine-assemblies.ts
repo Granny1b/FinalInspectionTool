@@ -57,13 +57,13 @@ export const listMachineAssemblies = endpoint({ role: 'inspector' }, async (req)
   if (!(await loadMachine(machineId))) throw machineNotFound();
   const assemblies = await loadMachineAssemblies(machineId);
   const summaries: MachineAssemblySummary[] = await Promise.all(
-    assemblies.map(async (assembly) =>
-      machineAssemblySummary(
-        assembly,
-        await loadSignOffs(machineId, assembly.id),
-        await latestRevisionOf(assembly.templateId),
-      ),
-    ),
+    assemblies.map(async (assembly) => {
+      const [signOffs, latest] = await Promise.all([
+        loadSignOffs(machineId, assembly.id),
+        latestRevisionOf(assembly.templateId),
+      ]);
+      return machineAssemblySummary(assembly, signOffs, latest);
+    }),
   );
   return json(200, summaries);
 });

@@ -122,6 +122,8 @@ function CoverThumbnail({ imageId }: { imageId: string }) {
       {url.data ? (
         <img
           src={url.data}
+          loading="lazy"
+          decoding="async"
           alt=""
           className="absolute inset-0 size-full object-contain p-1.5 mix-blend-multiply"
         />

@@ -112,6 +112,8 @@ function Cover({ imageId }: { imageId: string | undefined }) {
         ) : photo ? (
           <img
             src={photo}
+            loading="lazy"
+            decoding="async"
             alt=""
             className="absolute inset-0 size-full object-contain p-4 mix-blend-multiply"
           />

@@ -10,12 +10,21 @@ import {
   CONTAINERS,
   newId,
   type ImageReadUrlResponse,
+  type ImageReadUrlsResponse,
   type ImageUploadUrlResponse,
 } from '@modig/shared';
 import { containerClient, ensureStorage } from './storage';
 
 const UPLOAD_MINUTES = 10;
-const READ_MINUTES = 15;
+/**
+ * Read URLs of an image are the same for everyone within a window, so the browser can keep the
+ * picture it downloaded instead of fetching it again for every new URL: all URLs issued in a
+ * window expire together, READ_MARGIN_HOURS after it ends (so 1 to 13 hours after being issued).
+ */
+const READ_WINDOW_HOURS = 12;
+const READ_MARGIN_HOURS = 1;
+/** An image never changes (a new upload is a new id), so the browser need not ask again. */
+const READ_CACHE_CONTROL = `private, max-age=${(READ_WINDOW_HOURS + READ_MARGIN_HOURS) * 3600}, immutable`;
 
 /** A new image id and a URL that can create (and, for a retry, overwrite) only that blob. */
 export async function createUploadUrl(): Promise<ImageUploadUrlResponse> {
@@ -39,14 +48,33 @@ export async function createReadUrl(imageId: string): Promise<ImageReadUrlRespon
   await ensureStorage();
   const blob = imageBlob(imageId);
   if (!(await blob.exists())) return null;
-  const expiresOn = minutesFromNow(READ_MINUTES);
+  const expiresOn = readExpiry();
   const url = await blob.generateSasUrl({
     permissions: BlobSASPermissions.parse('r'),
     expiresOn,
     contentType: 'image/jpeg',
     contentDisposition: 'inline',
+    cacheControl: READ_CACHE_CONTROL,
   });
   return { url, expiresAt: expiresOn.toISOString() };
+}
+
+/** The read URLs of these images, all checked at once; one that does not exist is left out. */
+export async function createReadUrls(imageIds: readonly string[]): Promise<ImageReadUrlsResponse> {
+  const unique = [...new Set(imageIds)];
+  const found = await Promise.all(unique.map((imageId) => createReadUrl(imageId)));
+  const urls: ImageReadUrlsResponse['urls'] = {};
+  unique.forEach((imageId, index) => {
+    const readUrl = found[index];
+    if (readUrl) urls[imageId] = readUrl;
+  });
+  return { urls };
+}
+
+/** When the read URLs issued now expire: the end of the current window plus the margin. */
+export function readExpiry(now = Date.now()): Date {
+  const windowMs = READ_WINDOW_HOURS * 3_600_000;
+  return new Date((Math.floor(now / windowMs) + 1) * windowMs + READ_MARGIN_HOURS * 3_600_000);
 }
 
 /**

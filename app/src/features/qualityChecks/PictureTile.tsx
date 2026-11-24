@@ -96,6 +96,8 @@ export function PictureTile({ guide, rowRef, onOpen, editable, step = false }: P
         // Whole, as the pictures are drawn on: marks near an edge must not be cropped away.
         <img
           src={url.data}
+          loading="lazy"
+          decoding="async"
           crossOrigin="anonymous"
           alt=""
           className="size-full bg-surface object-contain"
