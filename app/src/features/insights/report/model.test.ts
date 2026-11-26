@@ -257,7 +257,7 @@ describe('buildReport', () => {
         value: '4',
         detail: 'Machines inspected in the period',
       },
-      { label: 'Deviations', value: '10', detail: 'NOK rows and extra deviations' },
+      { label: 'Deviations', value: '10', detail: 'NOK rows and extra findings' },
       { label: 'Deviations per machine', value: '2.5', detail: 'Average per inspection' },
       {
         label: 'First-pass rate',
@@ -291,7 +291,7 @@ describe('buildReport', () => {
     expect(report.sections.map(({ label, note, share }) => [label, note, share])).toEqual([
       ['Loading area', undefined, 0.6],
       ['Untitled section', undefined, 0.2],
-      ['Extra deviations', '(not tied to a row)', 0.2],
+      ['Extra findings', '(not tied to a row)', 0.2],
     ]);
     expect(report.resps.map(({ label }) => label)).toEqual(['Mechanical', 'Not assigned']);
     expect(report.categories.map(({ label }) => label)).toEqual(['Leakage', 'No category']);

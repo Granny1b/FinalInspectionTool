@@ -28,6 +28,7 @@ import {
   Lock,
   LockOpen,
   Pencil,
+  Plus,
   Printer,
   Trash2,
   Unlink,
@@ -63,11 +64,24 @@ import { inspectionOnScreen } from '../print/preview';
 import { QUALITY_PRINT_MODE_LABELS } from '../print/quality/model';
 import { QualityCheckPreview } from '../print/quality/QualityCheckPreview';
 import { ChecklistSheet, ShortcutHints } from './checklist/ChecklistSheet';
+import { SectionFindings } from './checklist/SectionFindings';
+import {
+  groupFindings,
+  SectionFindingsContext,
+  type SectionFindingsValue,
+} from './checklist/sectionFindingsContext';
 import { withPhotos } from './checklist/results';
 import { DeleteInspectionDialog } from './DeleteInspectionDialog';
 import { DeviationSummary } from './DeviationSummary';
 import { draftOf, sameDraft } from './draft';
-import { newExtraDeviation, removeExtra, updateExtra, type ExtraDeviationPatch } from './extras';
+import { ExtraFindingDialog } from './ExtraFindingDialog';
+import {
+  isEmptyExtra,
+  newExtraDeviation,
+  removeExtra,
+  updateExtra,
+  type ExtraDeviationPatch,
+} from './extras';
 import { FrontPageCard } from './FrontPageCard';
 import { ProgressSummary, TabBar } from './HeaderParts';
 import {
@@ -401,6 +415,36 @@ export function InspectionEditor({
       update({ extraDeviations: removeExtra(draftRef.current.extraDeviations, extraId) }),
     [update],
   );
+  // The extra finding open in its dialog: added or opened from the checklist, where one stays.
+  const [openFinding, setOpenFinding] = useState<string | null>(null);
+  const addExtraFinding = useCallback(
+    (sectionId?: string) => {
+      const extra = newExtraDeviation(sectionId);
+      update({ extraDeviations: [...draftRef.current.extraDeviations, extra] });
+      setOpenFinding(extra.id);
+    },
+    [update],
+  );
+  // Closed without anything in it (added by mistake): it is not kept.
+  const closeFinding = useCallback(() => {
+    const extra = draftRef.current.extraDeviations.find(({ id }) => id === openFinding);
+    if (extra && isEmptyExtra(extra)) removeExtraDeviation(extra.id);
+    setOpenFinding(null);
+  }, [openFinding, removeExtraDeviation]);
+  // The findings for the checklist's sections: opened in the dialog, or once finalised read on
+  // their card among the deviations.
+  const sectionFindings = useMemo<SectionFindingsValue>(
+    () => ({
+      bySection: groupFindings(deviations),
+      onAdd: finalised ? undefined : addExtraFinding,
+      onOpen: finalised
+        ? (key) => goTo({ tab: 'deviations', elementId: deviationCardId(key) })
+        : setOpenFinding,
+    }),
+    [deviations, finalised, addExtraFinding, goTo],
+  );
+  const editedFinding =
+    openFinding === null ? undefined : deviations.find(({ key }) => key === openFinding);
 
   const headerRef = useRef<HTMLElement>(null);
   useScrollPaddingBelow(headerRef);
@@ -914,33 +958,44 @@ export function InspectionEditor({
           />
         )}
         <section aria-labelledby={`${idPrefix}-checklist`} className="mt-10">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
             <h2 id={`${idPrefix}-checklist`} className="text-base font-semibold text-ink-900">
               Checklist
             </h2>
             {!finalised && (quality ? QUALITY_SHORTCUT_HINTS : SHORTCUT_HINTS)}
+            {!finalised && (
+              // Something found that no row asks about and that belongs to no section; each
+              // section has the same button at its end.
+              <Button variant="secondary" onClick={() => addExtraFinding()}>
+                <Plus size={16} aria-hidden="true" />
+                Add extra finding
+              </Button>
+            )}
           </div>
-          {quality ? (
-            <QualityCheckSheet
-              sections={sections}
-              results={draft.results}
-              onChange={finalised ? undefined : updateResults}
-              responsibles={responsibles}
-              categories={categories}
-              issues={issues}
-              onEditorDirtyChange={onEditorDirtyChange}
-            />
-          ) : (
-            <ChecklistSheet
-              sections={sections}
-              results={draft.results}
-              onChange={finalised ? undefined : updateResults}
-              responsibles={responsibles}
-              categories={categories}
-              issues={issues}
-              onShowPhotos={goToPhotos}
-            />
-          )}
+          <SectionFindingsContext value={sectionFindings}>
+            <SectionFindings sectionId={null} className="mb-4" />
+            {quality ? (
+              <QualityCheckSheet
+                sections={sections}
+                results={draft.results}
+                onChange={finalised ? undefined : updateResults}
+                responsibles={responsibles}
+                categories={categories}
+                issues={issues}
+                onEditorDirtyChange={onEditorDirtyChange}
+              />
+            ) : (
+              <ChecklistSheet
+                sections={sections}
+                results={draft.results}
+                onChange={finalised ? undefined : updateResults}
+                responsibles={responsibles}
+                categories={categories}
+                issues={issues}
+                onShowPhotos={goToPhotos}
+              />
+            )}
+          </SectionFindingsContext>
         </section>
       </div>
       <div
@@ -970,6 +1025,22 @@ export function InspectionEditor({
           />
         )}
       </div>
+
+      {editedFinding && !finalised && (
+        <ExtraFindingDialog
+          // A dialog per finding: adding the next one starts from an empty form.
+          key={editedFinding.key}
+          deviation={editedFinding}
+          issue={extraErrors.get(editedFinding.key)}
+          responsibles={responsibles}
+          categories={categories}
+          onUpdate={updateExtraDeviation}
+          onPhotosChange={updateDeviationPhotos}
+          onEditorDirtyChange={setEditorDirty}
+          onRemove={removeExtraDeviation}
+          onClose={closeFinding}
+        />
+      )}
 
       {dialog?.change === 'finalise' && (
         <StateChangeDialog

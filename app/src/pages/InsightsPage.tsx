@@ -265,7 +265,7 @@ function Dashboard({ insights, models, filter, words, onShowAllTime }: Dashboard
 function sectionBars(insights: Insights): BarItem[] {
   return insights.perSection.map(({ title, deviations }) => ({
     key: title ?? '\u0000extra',
-    label: title === null ? 'Extra deviations' : title || 'Untitled section',
+    label: title === null ? 'Extra findings' : title || 'Untitled section',
     note: title === null ? '(not tied to a row)' : undefined,
     value: deviations,
   }));

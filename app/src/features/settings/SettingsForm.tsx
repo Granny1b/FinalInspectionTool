@@ -153,6 +153,30 @@ export function SettingsForm({ loaded, onReload }: Props) {
         </div>
       </section>
 
+      <section aria-labelledby="settings-menu-title" className="mt-8 border-t border-ink-100 pt-6">
+        <h3 id="settings-menu-title" className="text-sm font-semibold text-ink-900">
+          Menu
+        </h3>
+        <p className="mt-0.5 text-xs text-ink-500">
+          What everyone sees in the menu on the left. Nothing is deleted by hiding it.
+        </p>
+        <label className="mt-4 flex w-fit items-start gap-3 text-sm text-ink-800">
+          <input
+            type="checkbox"
+            checked={form.showAssembly}
+            onChange={(event) => update({ showAssembly: event.target.checked })}
+            className="mt-0.5 size-4 accent-brand-600"
+          />
+          <span>
+            <span className="font-medium text-ink-900">Show Assembly instructions</span>
+            <span className="mt-0.5 block text-xs text-ink-500">
+              Off, the Assembly group is hidden from the menu. Instructions are still written under
+              Templates, and the ones bound to machines still open from the machine.
+            </span>
+          </span>
+        </label>
+      </section>
+
       <section
         aria-labelledby="settings-reports-title"
         className="mt-8 border-t border-ink-100 pt-6"

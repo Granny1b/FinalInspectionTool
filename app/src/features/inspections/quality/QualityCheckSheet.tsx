@@ -6,6 +6,7 @@ import { guideRow } from '../../guides/guide';
 import { GuideViewer } from '../../guides/GuideViewer';
 import { QUALITY_GUIDE_WORDING } from '../../guides/wording';
 import { sectionStats } from '../../qualityChecks/stats';
+import { SectionFindings } from '../checklist/SectionFindings';
 import { rowsWithoutStatus, type Results } from '../checklist/results';
 import { useChecklistActions, type ChecklistActions } from '../checklist/useChecklistActions';
 import { QualityCheckRow } from './QualityCheckRow';
@@ -223,6 +224,11 @@ const QualityCheckSection = memo(function QualityCheckSection({
           ))}
         </ol>
       )}
+      <SectionFindings
+        sectionId={section.id}
+        sectionNumber={number}
+        className="border-t border-ink-200 p-2 empty:hidden @min-[34rem]:p-3"
+      />
     </section>
   );
 }, sameSection);

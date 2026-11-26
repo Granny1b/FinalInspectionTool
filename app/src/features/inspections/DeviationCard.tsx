@@ -1,5 +1,5 @@
 import {
-  MAX_PHOTOS_PER_DEVIATION,
+  extraFindingPlace,
   refWithText,
   SEVERITY_LABELS,
   type AnnotatedImage,
@@ -13,6 +13,7 @@ import { CornerDownRight, Trash2 } from 'lucide-react';
 import { useId } from 'react';
 import { AnnotatedPhotos } from '../annotate/AnnotatedPhotos';
 import { FollowUpActions, StatusPill } from '../deviationLog/FollowUpActions';
+import { maxPhotos } from './deviations';
 import { ExtraDeviationFields } from './ExtraDeviationFields';
 import type { ExtraDeviationPatch } from './extras';
 import { deviationCardId, deviationPhotosId } from './issues';
@@ -44,8 +45,8 @@ type Props = {
 
 /**
  * One deviation, as it prints on the report's deviation pages: D-nn, ref, checkpoint (or the
- * extra deviation's description), comment, severity, category, responsible, and up to two
- * marked-up photos. A row
+ * extra finding's description), comment, severity, category, responsible, and its marked-up
+ * photos (up to two; an extra finding's up to four). A row
  * deviation is edited in its row (the ref jumps there); an extra deviation in the card itself.
  * Photos are added here for both.
  */
@@ -93,7 +94,9 @@ export function DeviationCard({
             </span>
           </>
         ) : (
-          <span className="min-w-0 flex-1 text-xs text-ink-500">Not on the checklist</span>
+          <span className="min-w-0 flex-1 truncate text-xs text-ink-500">
+            {extraFindingPlace(deviation.sectionTitle)}
+          </span>
         )}
         {editable ? (
           <button
@@ -125,7 +128,8 @@ export function DeviationCard({
             <Details deviation={deviation} />
           )}
         </div>
-        <Photos
+        <DeviationPhotos
+          id={deviationPhotosId(deviation.key)}
           deviation={deviation}
           readOnly={readOnly}
           onChange={onPhotosChange}
@@ -269,6 +273,8 @@ function Details({ deviation }: { deviation: InspectionDeviation }) {
 }
 
 type PhotosProps = {
+  /** On the card: the target of a NOK row's photo count. */
+  id?: string;
   deviation: InspectionDeviation;
   readOnly: boolean;
   onChange: (deviation: InspectionDeviation, photos: AnnotatedImage[]) => void;
@@ -279,15 +285,22 @@ type PhotosProps = {
  * The deviation's photos. The block is the target of a NOK row's photo count (focusable from
  * script only); the page moves the focus on to its first button.
  */
-function Photos({ deviation, readOnly, onChange, onEditorDirtyChange }: PhotosProps) {
+export function DeviationPhotos({
+  id,
+  deviation,
+  readOnly,
+  onChange,
+  onEditorDirtyChange,
+}: PhotosProps) {
   const { photos, number } = deviation;
+  const max = maxPhotos(deviation);
   return (
-    <div id={deviationPhotosId(deviation.key)} tabIndex={-1} className="min-w-0 outline-none">
+    <div id={id} tabIndex={-1} className="min-w-0 outline-none">
       <p className="mb-2 flex items-baseline justify-between text-xs font-medium text-ink-600">
         Photos
         {!readOnly && (
           <span className="font-normal text-ink-500 tabular-nums">
-            {photos.length} / {MAX_PHOTOS_PER_DEVIATION}
+            {photos.length} / {max}
           </span>
         )}
       </p>
@@ -297,7 +310,7 @@ function Photos({ deviation, readOnly, onChange, onEditorDirtyChange }: PhotosPr
         <AnnotatedPhotos
           photos={photos}
           onChange={readOnly ? undefined : (next) => onChange(deviation, next)}
-          max={MAX_PHOTOS_PER_DEVIATION}
+          max={max}
           label={`Photos of ${number}`}
           onDirtyChange={onEditorDirtyChange}
         />

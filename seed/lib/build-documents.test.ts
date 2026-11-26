@@ -61,6 +61,7 @@ describe('buildTemplateDocuments', () => {
       companyName: DEFAULT_COMPANY_NAME,
       responsibles: [...DEFAULT_RESPONSIBLES],
       deviationCategories: [...DEFAULT_DEVIATION_CATEGORIES],
+      showAssembly: true,
       updatedAt: now,
       updatedBy: 'seed',
     });

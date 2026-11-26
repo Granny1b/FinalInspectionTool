@@ -42,6 +42,7 @@ const edited: SettingsInput = {
   logoImageId: 'Logo000000000001',
   responsibles: ['Mechanical', 'Electrical', 'Hydraulics'],
   deviationCategories: ['Markings & labels', 'Missing parts'],
+  showAssembly: true,
 };
 
 function put(body: unknown, ifMatch?: string | null, who = admin) {

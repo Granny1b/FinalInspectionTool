@@ -95,7 +95,7 @@ export function DeviationList({ list, footer, words = INSIGHTS_WORDS.final }: Pr
                   <td className="report-ref">{row.ref}</td>
                   <td>
                     {row.text}
-                    {row.extra && <span className="report-sub">Not on the checklist</span>}
+                    {row.extra && <span className="report-sub">Extra finding</span>}
                     {row.comment && <span className="report-comment">{row.comment}</span>}
                   </td>
                   <td className="report-severity" data-severity={row.severity}>

@@ -61,6 +61,12 @@ export const SettingsSchema = z.object({
   responsibles: z.array(ListEntrySchema).default(() => [...DEFAULT_RESPONSIBLES]),
   /** The category choices on a deviation, in the order shown; defaults as for `responsibles`. */
   deviationCategories: z.array(ListEntrySchema).default(() => [...DEFAULT_DEVIATION_CATEGORIES]),
+  /**
+   * Whether the menu shows Assembly (the instructions to read). Off, only the menu entry is
+   * gone: instructions are still written under Templates, bound to machines and opened by their
+   * links. Settings written before the switch existed show it.
+   */
+  showAssembly: z.boolean().default(true),
   updatedAt: IsoDateTime,
   updatedBy: z.string(),
 });
@@ -339,6 +345,10 @@ export const DEFAULT_SEVERITY: Severity = 'minor';
  * 2-per-page and 4-per-page layouts (typically an overview and a close-up).
  */
 export const MAX_PHOTOS_PER_DEVIATION = 2;
+/**
+ * An extra finding takes more: it has no checkpoint to say what is meant, so its pictures do.
+ */
+export const MAX_PHOTOS_PER_EXTRA_FINDING = 4;
 /** How a severity is shown to people (inspection page, deviation summary, print). */
 export const SEVERITY_LABELS: Record<Severity, string> = {
   minor: 'Minor',
@@ -364,19 +374,25 @@ export const RowResultSchema = z.object({
 export type RowResult = z.infer<typeof RowResultSchema>;
 
 /**
- * A deviation that is not tied to a checklist row (added from the Deviation Summary).
+ * An extra finding: a deviation that is not tied to a checklist row, found while checking and
+ * added on the spot (from a section of the checklist, or from the Deviation Summary).
  * The brief references this type without defining it; this is the smallest shape that
  * fills the summary columns (D-nn | ref | checkpoint/description | comment | severity | resp).
  */
 export const ExtraDeviationSchema = z.object({
   id: IdSchema,
+  /**
+   * The section of the checklist it was found in, when it was added from one. Without it, or
+   * once that section is gone from the check's checklist, it is a general finding.
+   */
+  sectionId: IdSchema.optional(),
   description: z.string().max(1000),
   comment: z.string().max(2000).optional(),
   resp: z.string().max(200).optional(),
   severity: SeveritySchema,
   /** As on a row result. */
   category: ListEntrySchema.optional(),
-  photos: z.array(AnnotatedImageSchema).max(MAX_PHOTOS_PER_DEVIATION).optional(),
+  photos: z.array(AnnotatedImageSchema).max(MAX_PHOTOS_PER_EXTRA_FINDING).optional(),
 });
 export type ExtraDeviation = z.infer<typeof ExtraDeviationSchema>;
 

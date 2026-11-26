@@ -282,7 +282,7 @@ export function buildReport(input: ReportInput): Report {
     sections: shareRows(
       insights.perSection.map(({ title, deviations }) => ({
         key: title ?? '\u0000extra',
-        label: title === null ? 'Extra deviations' : title || 'Untitled section',
+        label: title === null ? 'Extra findings' : title || 'Untitled section',
         note: title === null ? '(not tied to a row)' : undefined,
         value: deviations,
       })),
@@ -341,7 +341,7 @@ function kpis(insights: Insights, words: InsightsWords): ReportKpi[] {
     {
       label: 'Deviations',
       value: formatCount(insights.deviations),
-      detail: 'NOK rows and extra deviations',
+      detail: 'NOK rows and extra findings',
     },
     {
       label: words.perOneLabel,

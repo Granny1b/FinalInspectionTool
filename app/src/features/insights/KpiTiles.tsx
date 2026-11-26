@@ -39,7 +39,7 @@ export function KpiTiles({
       <Tile
         label="Deviations"
         value={formatCount(insights.deviations)}
-        detail="NOK rows and extra deviations"
+        detail="NOK rows and extra findings"
       />
       <Tile
         label={words.perOneLabel}

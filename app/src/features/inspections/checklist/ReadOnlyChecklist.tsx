@@ -13,6 +13,7 @@ import { IssueNote } from '../../templates/document/parts';
 import { ISSUE_OUTLINE, NOK_BAR, READ_CELL, READ_GRID, ROW_FOCUS, ROW_LINE } from './layout';
 import { EmptySectionNote, GuideButton, PhotoCount, StatusMark } from './parts';
 import type { Results } from './results';
+import { SectionFindings } from './SectionFindings';
 import { SectionHeader } from './SectionHeader';
 
 type Props = {
@@ -125,6 +126,11 @@ export function ReadOnlyChecklist({
           })}
         </ol>
       )}
+      <SectionFindings
+        sectionId={section.id}
+        sectionNumber={sectionNumber(sectionIndex)}
+        className="mt-2"
+      />
     </div>
   ));
 }

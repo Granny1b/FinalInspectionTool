@@ -19,6 +19,7 @@ const input: SettingsInput = {
   companyName: 'Modig Machine Tool',
   responsibles: [...DEFAULT_RESPONSIBLES],
   deviationCategories: [...DEFAULT_DEVIATION_CATEGORIES],
+  showAssembly: true,
 };
 
 /** The zod issues as `path: message`. */
@@ -52,7 +53,18 @@ describe('SettingsInputSchema', () => {
       companyName: 'Modig',
       responsibles: ['Mechanical'],
       deviationCategories: [],
+      // Not sent: the menu shows Assembly unless it is switched off.
+      showAssembly: true,
     });
+  });
+
+  it('keeps the menu switch for Assembly, and stored settings without one show it', () => {
+    expect(SettingsInputSchema.parse({ ...input, showAssembly: false }).showAssembly).toBe(false);
+    const { showAssembly: _switch, ...older } = input;
+    expect(
+      SettingsSchema.parse({ ...older, updatedAt: '2026-11-01T08:00:00.000Z', updatedBy: 'seed' })
+        .showAssembly,
+    ).toBe(true);
   });
 
   it('wants model codes of letters and digits, and a name for every model and entry', () => {

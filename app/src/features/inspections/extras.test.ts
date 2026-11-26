@@ -1,6 +1,6 @@
 import { ID_PATTERN, type ExtraDeviation } from '@modig/shared';
 import { describe, expect, it } from 'vitest';
-import { newExtraDeviation, removeExtra, updateExtra } from './extras';
+import { isEmptyExtra, newExtraDeviation, removeExtra, updateExtra } from './extras';
 
 const a: ExtraDeviation = {
   id: 'Extr00000000000a',
@@ -62,5 +62,22 @@ describe('removeExtra', () => {
   it('drops it and keeps the order of the rest', () => {
     expect(removeExtra([a, b], a.id)).toEqual([b]);
     expect(removeExtra([a, b], 'unknown0000000000')).toEqual([a, b]);
+  });
+});
+
+describe('extra findings of a section', () => {
+  it('starts one in a section, or as a general one', () => {
+    expect(newExtraDeviation('sec1')).toMatchObject({ sectionId: 'sec1', description: '' });
+    expect(newExtraDeviation()).not.toHaveProperty('sectionId');
+  });
+
+  it('is empty until something is typed, chosen or photographed', () => {
+    const extra = newExtraDeviation('sec1');
+    expect(isEmptyExtra(extra)).toBe(true);
+    expect(isEmptyExtra({ ...extra, description: '  ' })).toBe(true);
+    expect(isEmptyExtra({ ...extra, severity: 'major' })).toBe(true);
+    expect(isEmptyExtra({ ...extra, description: 'Dent' })).toBe(false);
+    expect(isEmptyExtra({ ...extra, category: 'Paint' })).toBe(false);
+    expect(isEmptyExtra({ ...extra, photos: [{ imageId: 'img1', annotations: [] }] })).toBe(false);
   });
 });
