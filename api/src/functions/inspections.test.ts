@@ -8,6 +8,7 @@ import {
   InspectionListSchema,
   InspectionSchema,
   MAX_PHOTOS_PER_DEVIATION,
+  MAX_PHOTOS_PER_EXTRA_FINDING,
   newId,
   snapshotTemplate,
   TemplateDetailSchema,
@@ -771,13 +772,21 @@ describe('PUT /api/inspections/{id}', () => {
   it('400 for a deviation with more photos than allowed, on a row or an extra one', async () => {
     const { inspection, etag } = await created(await publishedTemplate());
     const [a] = itemIds(inspection);
-    const photos = Array.from({ length: MAX_PHOTOS_PER_DEVIATION + 1 }, () => ({
+    // One more than an extra finding takes; a row takes fewer.
+    const photos = Array.from({ length: MAX_PHOTOS_PER_EXTRA_FINDING + 1 }, () => ({
       imageId: newId(),
       annotations: [],
     }));
     const extra = { id: newId(), description: 'Scratch', severity: 'minor' as const };
     for (const [body, path] of [
-      [{ results: { [a!]: { status: 'NOK', photos } } }, ['results', a, 'photos']],
+      [
+        {
+          results: {
+            [a!]: { status: 'NOK', photos: photos.slice(0, MAX_PHOTOS_PER_DEVIATION + 1) },
+          },
+        },
+        ['results', a, 'photos'],
+      ],
       [{ extraDeviations: [{ ...extra, photos }] }, ['extraDeviations', 0, 'photos']],
     ] as const) {
       const response = await put(inspection.id, { ...draftOf(inspection), ...body }, etag);
@@ -785,7 +794,7 @@ describe('PUT /api/inspections/{id}', () => {
       expect(errorOf(response).details).toEqual([expect.objectContaining({ path })]);
     }
     expect((await stored(inspection.id))?.etag).toBe(etag);
-    // Two are fine.
+    // Four are fine on an extra finding.
     const two = await put(
       inspection.id,
       { ...draftOf(inspection), extraDeviations: [{ ...extra, photos: photos.slice(1) }] },

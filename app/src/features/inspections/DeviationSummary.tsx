@@ -63,7 +63,7 @@ export const DeviationSummary = memo(function DeviationSummary({
 
   function remove(deviation: InspectionDeviation) {
     onRemove(deviation.key);
-    // Its own buttons are gone; carry on from "Add extra deviation".
+    // Its own buttons are gone; carry on from "Add extra finding".
     addRef.current?.focus();
   }
 
@@ -78,8 +78,8 @@ export const DeviationSummary = memo(function DeviationSummary({
         </p>
         {!readOnly && deviations.length > 0 && (
           <p className="w-full text-sm text-ink-500">
-            Add up to two photos to each and mark them up with arrows, boxes and text: they print on
-            the report’s deviation pages.
+            Add up to two photos to each (four to an extra finding) and mark them up with arrows,
+            boxes and text: they print on the report’s deviation pages.
           </p>
         )}
       </div>
@@ -120,9 +120,12 @@ export const DeviationSummary = memo(function DeviationSummary({
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Button ref={addRef} variant="secondary" onClick={onAdd}>
             <Plus size={16} aria-hidden="true" />
-            Add extra deviation
+            Add extra finding
           </Button>
-          <p className="text-xs text-ink-500">For a finding that isn’t tied to a checklist row.</p>
+          <p className="text-xs text-ink-500">
+            For something found that no checklist row asks about. A section of the checklist has the
+            same button, for a finding that belongs to it.
+          </p>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  extraFindingPlace,
   CreateInspectionRequestSchema,
   EXTRA_DEVIATION_REF,
   InspectionDraftInputSchema,
@@ -196,6 +197,27 @@ describe('deriveDeviations', () => {
       text: 'Scratch on outer sheet',
       sectionTitle: '',
     });
+  });
+
+  it('gives an extra finding the section it was found in, while the checklist has it', () => {
+    const [sectionId, title] = ['s2', 'Electrical Cabinets'];
+    const devs = deriveDeviations(
+      inspection({
+        extraDeviations: [
+          { id: 'x1', sectionId, description: 'Loose cable', severity: 'minor' },
+          { id: 'x2', sectionId: 'gone', description: 'Dent', severity: 'minor' },
+          { id: 'x3', description: 'Manual missing', severity: 'minor' },
+        ],
+      }),
+    );
+    expect(devs.map((d) => [d.key, d.sectionId, d.sectionTitle, d.ref])).toEqual([
+      ['x1', sectionId, title, EXTRA_DEVIATION_REF],
+      // Its section was removed from the check's checklist: a general finding again.
+      ['x2', undefined, '', EXTRA_DEVIATION_REF],
+      ['x3', undefined, '', EXTRA_DEVIATION_REF],
+    ]);
+    expect(extraFindingPlace(title)).toBe(`Extra finding · ${title}`);
+    expect(extraFindingPlace('  ')).toBe('Extra finding');
   });
 
   it('is empty when nothing is NOK', () => {

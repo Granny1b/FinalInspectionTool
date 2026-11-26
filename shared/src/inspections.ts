@@ -181,6 +181,9 @@ export type InspectionDeviation = {
   key: string;
   /** Item.id for row deviations, null for extra ones. */
   itemId: string | null;
+  /** An extra finding's section, while the checklist still has it; absent for a general one. */
+  sectionId?: string;
+  /** The row's section; an extra finding's when it has one, else ''. */
   sectionTitle: string;
   /** "3.c", or EXTRA_DEVIATION_REF for extra deviations. */
   ref: string;
@@ -194,6 +197,15 @@ export type InspectionDeviation = {
   /** Annotated evidence photos (rendered copies are what print shows). */
   photos: AnnotatedImage[];
 };
+
+/**
+ * Where an extra finding was found, for a card or a list: "Extra finding · Electrical cabinet",
+ * or "Extra finding" for a general one.
+ */
+export function extraFindingPlace(sectionTitle: string): string {
+  const title = sectionTitle.trim();
+  return title ? `Extra finding · ${title}` : 'Extra finding';
+}
 
 type DeviationSource = Pick<Inspection, 'templateSnapshot' | 'results' | 'extraDeviations'>;
 
@@ -218,19 +230,26 @@ export function deriveDeviations(inspection: DeviationSource): InspectionDeviati
       },
     ];
   });
-  const extras = inspection.extraDeviations.map((extra) => ({
-    kind: 'extra' as const,
-    key: extra.id,
-    itemId: null,
-    sectionTitle: '',
-    ref: EXTRA_DEVIATION_REF,
-    text: extra.description,
-    comment: extra.comment ?? '',
-    severity: extra.severity,
-    resp: extra.resp ?? '',
-    category: extra.category ?? '',
-    photos: extra.photos ?? [],
-  }));
+  const sections = new Map(
+    inspection.templateSnapshot.sections.map((section) => [section.id, section]),
+  );
+  const extras = inspection.extraDeviations.map((extra) => {
+    const section = extra.sectionId === undefined ? undefined : sections.get(extra.sectionId);
+    return {
+      kind: 'extra' as const,
+      key: extra.id,
+      itemId: null,
+      ...(section && { sectionId: section.id }),
+      sectionTitle: section?.title ?? '',
+      ref: EXTRA_DEVIATION_REF,
+      text: extra.description,
+      comment: extra.comment ?? '',
+      severity: extra.severity,
+      resp: extra.resp ?? '',
+      category: extra.category ?? '',
+      photos: extra.photos ?? [],
+    };
+  });
   return [...rows, ...extras].map((deviation, index) => ({
     number: deviationNumber(index),
     ...deviation,

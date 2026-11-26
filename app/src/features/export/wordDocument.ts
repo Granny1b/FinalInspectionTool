@@ -6,6 +6,7 @@
  * never split, headings keep with what follows. Pure (no browser), so it is tested in node.
  */
 import {
+  extraFindingPlace,
   GUIDE_VERDICT_LABELS,
   SEVERITY_LABELS,
   STATUS_LABELS,
@@ -764,7 +765,12 @@ function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImag
       }),
     ]),
     paragraph(
-      [run(card.ref ? card.sectionTitle : 'Not on the checklist', { size: pt(7.5), color: MUTED })],
+      [
+        run(card.ref ? card.sectionTitle : extraFindingPlace(card.sectionTitle), {
+          size: pt(7.5),
+          color: MUTED,
+        }),
+      ],
       {
         spacing: { before: twips(1.2) },
       },
@@ -815,8 +821,15 @@ function deviationCard(card: DeviationCard, photos: ReadonlyMap<string, WordImag
 function cardPhotos(card: DeviationCard, photos: ReadonlyMap<string, WordImage>): Table {
   // Room to sketch or stick a photo on by hand.
   if (card.photos.length === 0) return frame('Sketch / photo', { width: CARD_WIDTH, height: 40 });
-  const box = card.photos.length === 1 ? { width: 120, height: 80 } : { width: 85, height: 64 };
   const width = CARD_WIDTH / card.photos.length;
+  // One is large, two share the width; three or four (an extra finding's) are a row of smaller
+  // ones, each 4:3 in its share of the card.
+  const box =
+    card.photos.length === 1
+      ? { width: 120, height: 80 }
+      : card.photos.length === 2
+        ? { width: 85, height: 64 }
+        : { width: Math.floor(width) - 4, height: Math.floor(((Math.floor(width) - 4) * 3) / 4) };
   return table(
     [
       new TableRow({

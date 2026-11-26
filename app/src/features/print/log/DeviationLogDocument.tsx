@@ -1,4 +1,4 @@
-import { SEVERITY_LABELS } from '@modig/shared';
+import { extraFindingPlace, SEVERITY_LABELS } from '@modig/shared';
 import { Check } from 'lucide-react';
 import { useId, type Ref } from 'react';
 import { DeviationCards } from '../DeviationCards';
@@ -177,7 +177,7 @@ function GroupTable({
 }
 
 function Row({ row }: { row: LogPrintRow }) {
-  const where = [row.check, row.ref ? row.sectionTitle : 'Not on the checklist']
+  const where = [row.check, row.ref ? row.sectionTitle : extraFindingPlace(row.sectionTitle)]
     .filter(Boolean)
     .join(' · ');
   return (

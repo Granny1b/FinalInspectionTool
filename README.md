@@ -599,9 +599,17 @@ rows.
   then for each extra deviation: D-01, the row's ref (a link back to the row), its section, the
   checkpoint, comment, responsible, category and severity, and the deviation's photos (see
   [Deviation photos](#deviation-photos)). A row's comment, responsible, category and severity are
-  edited in its checklist row. **Add extra deviation** adds a finding that isn't tied to a row; it
-  is edited on its card (Description, Comment, Severity, Responsible, Category) and removed with
-  its bin icon, which asks first if anything was typed or a photo added. A NOK row in the
+  edited in its checklist row. **Add extra finding** adds something found that no row asks
+  about; it is edited on its card (Description, Comment, Severity, Responsible, Category) and
+  removed with its bin icon, which asks first if anything was typed or a photo added.
+- **Extra findings from the checklist.** Every section of the checklist ends with **Add extra
+  finding**, and the checklist's heading has one for a finding that belongs to no section. It
+  opens a dialog with the same fields and up to four photos (file, camera, paste or drop),
+  saved as it is typed; **Done** returns to the row one was at. The finding is then a red line
+  at the end of its section (D-nn, its description, severity and photo count; a click opens it
+  again), and a card on the _Deviations_ tab headed _Extra finding · the section_. It prints,
+  and shows in the deviation log, under that section. One closed without anything in it is not
+  kept. On a quality check it works the same. A NOK row in the
   checklist shows _Add photo_ or _2 photos_ under Responsible; a click opens its card's photos
   (it is not a Tab stop, so transcribing is unchanged). Once finalised, the cards are read-only
   and a photo opens in a viewer.

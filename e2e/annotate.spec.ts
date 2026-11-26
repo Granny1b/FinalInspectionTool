@@ -399,7 +399,7 @@ test('an extra deviation’s photo added in the UI is saved with the inspection'
 
   await page.goto(`/inspections/${inspection.id}`);
   await page.getByRole('tab', { name: /^Deviations/ }).click();
-  await page.getByRole('button', { name: 'Add extra deviation' }).click();
+  await page.getByRole('button', { name: 'Add extra finding' }).click();
   await page
     .getByRole('textbox', { name: 'Description, D-01' })
     .fill('Paint damage on the right-hand door');
@@ -586,7 +586,7 @@ test('if the editor can’t load, a message says so and the page keeps its unsav
 
   await page.goto(`/inspections/${inspection.id}`);
   await page.getByRole('tab', { name: /^Deviations/ }).click();
-  await page.getByRole('button', { name: 'Add extra deviation' }).click();
+  await page.getByRole('button', { name: 'Add extra finding' }).click();
   const description = page.getByRole('textbox', { name: 'Description, D-01' });
   await description.fill('Paint damage on the right-hand door');
   const add = page.locator('article[data-deviation="D-01"]').getByRole('button', {

@@ -6,6 +6,7 @@ import { ChecklistRow } from './ChecklistRow';
 import { CONTROL_HEIGHT } from './layout';
 import { EmptySectionNote } from './parts';
 import { rowsWithoutStatus, type Results } from './results';
+import { SectionFindings } from './SectionFindings';
 import { SectionHeader } from './SectionHeader';
 import type { ChecklistActions } from './useChecklistActions';
 
@@ -37,6 +38,7 @@ export const ChecklistSection = memo(function ChecklistSection({
       <div id={`section-${section.id}`} className="mt-8 first:mt-0">
         <SectionHeader number={number} title={section.title} empty />
         <EmptySectionNote />
+        <SectionFindings sectionId={section.id} sectionNumber={number} className="mt-2" />
       </div>
     );
   }
@@ -87,6 +89,7 @@ export const ChecklistSection = memo(function ChecklistSection({
           actions={actions}
         />
       ))}
+      <SectionFindings sectionId={section.id} sectionNumber={number} className="mt-2" />
     </div>
   );
 }, sameSection);

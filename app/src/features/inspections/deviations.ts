@@ -1,5 +1,9 @@
 /** Small pure helpers for the Deviations tab and the checklist's photo counts. */
-import type { InspectionDeviation } from '@modig/shared';
+import {
+  MAX_PHOTOS_PER_DEVIATION,
+  MAX_PHOTOS_PER_EXTRA_FINDING,
+  type InspectionDeviation,
+} from '@modig/shared';
 
 /** "1 photo", "2 photos"; null for none. */
 export function photoCountText(count: number): string | null {
@@ -29,4 +33,9 @@ export function removalMessage({ text, comment, resp, photos }: InspectionDeviat
   return name
     ? `“${name}” is removed from the summary${withPhotos}.`
     : `It is removed from the summary${withPhotos}.`;
+}
+
+/** A row's deviation takes two photos, an extra finding four. */
+export function maxPhotos(deviation: Pick<InspectionDeviation, 'kind'>): number {
+  return deviation.kind === 'extra' ? MAX_PHOTOS_PER_EXTRA_FINDING : MAX_PHOTOS_PER_DEVIATION;
 }

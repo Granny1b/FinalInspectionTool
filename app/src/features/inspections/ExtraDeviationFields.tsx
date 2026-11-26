@@ -21,10 +21,15 @@ type Props = {
   /** The settings' deviation categories. */
   categories: readonly string[];
   onUpdate: (id: string, patch: ExtraDeviationPatch) => void;
+  /**
+   * The description field's id, when these are not the fields on the finding's card (the dialog
+   * it is added in from the checklist): the card's own keeps the id the page's links go to.
+   */
+  descriptionId?: string;
 };
 
 /**
- * An extra deviation's fields, edited in its card: description, comment, then severity,
+ * An extra finding's fields, edited in its card or in the dialog it is added in: description, comment, then severity,
  * responsible and category. That is also the Tab order.
  */
 export function ExtraDeviationFields({
@@ -33,6 +38,7 @@ export function ExtraDeviationFields({
   responsibles,
   categories,
   onUpdate,
+  descriptionId,
 }: Props) {
   const issueId = useId();
   const commentId = useId();
@@ -42,12 +48,13 @@ export function ExtraDeviationFields({
   // As stored when the card opened: a value off the list stays on offer after another is picked.
   const [opened] = useState(deviation);
   const { key: id, number } = deviation;
+  const descriptionField = descriptionId ?? extraDescriptionId(id);
   return (
     // Its own container: the three selects share a line once the text column is wide enough.
     <div className="@container grid gap-3">
-      <Labelled htmlFor={extraDescriptionId(id)} label="Description">
+      <Labelled htmlFor={descriptionField} label="Description">
         <GrowingText
-          id={extraDescriptionId(id)}
+          id={descriptionField}
           name={`Description, ${number}`}
           placeholder="What was found"
           maxLength={1000}

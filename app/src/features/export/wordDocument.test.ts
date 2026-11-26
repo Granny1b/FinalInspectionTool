@@ -229,7 +229,7 @@ describe('the Word export of a report', () => {
     expect(all).toContain('Lifting columns - Marked screws');
     expect(all).toContain('Left column');
     expect(all).toContain('D-02 · Minor');
-    expect(all).toContain('Not on the checklist');
+    expect(all).toContain('Extra finding');
     expect(all).toContain('Operator manual missing');
     expect(detailLines(document)).toEqual([
       'Category\tMissing parts',

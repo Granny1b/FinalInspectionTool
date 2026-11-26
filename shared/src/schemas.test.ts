@@ -10,6 +10,7 @@ import {
   GuideSchema,
   MAX_GUIDE_IMAGES,
   MAX_PHOTOS_PER_DEVIATION,
+  MAX_PHOTOS_PER_EXTRA_FINDING,
   InspectionSchema,
   ModelCodeSchema,
   TemplateSchema,
@@ -404,16 +405,27 @@ describe('ExtraDeviationSchema', () => {
   const photo = { imageId: 'img1', annotations: [] };
   const extra = { id: 'x1', description: 'Paint damage', severity: 'minor' as const };
 
-  it('takes up to MAX_PHOTOS_PER_DEVIATION photos, like a row', () => {
+  it('takes up to MAX_PHOTOS_PER_EXTRA_FINDING photos, more than a row', () => {
     const photos = (count: number) => Array<typeof photo>(count).fill(photo);
+    expect(MAX_PHOTOS_PER_EXTRA_FINDING).toBe(4);
+    expect(MAX_PHOTOS_PER_EXTRA_FINDING).toBeGreaterThan(MAX_PHOTOS_PER_DEVIATION);
     expect(ExtraDeviationSchema.safeParse(extra).success).toBe(true);
     expect(
-      ExtraDeviationSchema.safeParse({ ...extra, photos: photos(MAX_PHOTOS_PER_DEVIATION) })
+      ExtraDeviationSchema.safeParse({ ...extra, photos: photos(MAX_PHOTOS_PER_EXTRA_FINDING) })
         .success,
     ).toBe(true);
     expect(
-      ExtraDeviationSchema.safeParse({ ...extra, photos: photos(MAX_PHOTOS_PER_DEVIATION + 1) })
-        .success,
+      ExtraDeviationSchema.safeParse({
+        ...extra,
+        photos: photos(MAX_PHOTOS_PER_EXTRA_FINDING + 1),
+      }).success,
     ).toBe(false);
+  });
+
+  it('may name the section it was found in', () => {
+    expect(ExtraDeviationSchema.parse({ ...extra, sectionId: 'sec1' }).sectionId).toBe('sec1');
+    expect(ExtraDeviationSchema.safeParse({ ...extra, sectionId: 'not an id' }).success).toBe(
+      false,
+    );
   });
 });

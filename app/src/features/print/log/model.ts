@@ -227,7 +227,7 @@ function printRow(entry: DeviationLogEntry): LogPrintRow {
     severity: entry.severity,
     ref: entry.itemId ? entry.displayRef : null,
     text: entry.checkpointText.trim(),
-    sectionTitle: entry.itemId ? entry.sectionTitle.trim() : '',
+    sectionTitle: entry.sectionTitle.trim(),
     check: qualityCheckShortName(entry.checkName),
     comment: entry.comment.trim(),
     resp: entry.resp.trim(),

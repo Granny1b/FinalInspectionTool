@@ -4207,3 +4207,34 @@ pictures) found where the time went; this is what was changed, and what was left
 - **The task being read is followed inside the list of tasks**, so scrolling past a task redraws
   those few links and not the instruction.
 - **The steps follow the search box a moment behind** (`useDeferredValue`), so typing stays quick.
+
+## Extra findings: added from the checklist, tied to a section (2026-11-26)
+
+During a check one finds things no row asks about. That was already possible (an "extra
+deviation", added at the bottom of the Deviations tab), but hidden: one had to leave the
+checklist to find it. Nothing new is stored; the same thing is now where the work is done.
+
+- **Called an extra finding** everywhere it is shown (the button, the cards, print, Word, the
+  deviation log, Insights). The stored field stays `extraDeviations`: nothing stored changes.
+- **A section's last element is _Add extra finding_**, and the checklist's heading has one for a
+  finding of no section. Both open a dialog on the finding itself (the same fields as its card,
+  and its photos): there is nothing to save or cancel, every change autosaves as on the page.
+  **A finding closed empty is removed**, so a mistaken click leaves nothing behind.
+- **`sectionId` on the extra finding** (optional). It is shown at the end of its section in the
+  checklist, and its section's title goes where a row's does: its card, the printed card, the
+  Word export and the deviation table's `sectionTitle` (so the log and its print). A finding
+  whose section an admin has since removed from the check's checklist is a general one again;
+  the id is kept, nothing is rewritten.
+- **Still numbered after the NOK rows** (D-nn is rows in checklist order, then extra findings),
+  so adding one never renumbers the rows' deviations.
+- **Insights still counts them apart** ("Extra findings", not under their section): a section's
+  figures there are about its checkpoints.
+- **Four photos on an extra finding, two on a row** (`MAX_PHOTOS_PER_EXTRA_FINDING`): it has no
+  checkpoint to say what is meant. Printed, three or four share the card's row and are smaller;
+  two cards to a page is the layout for them.
+- **Not real rows.** Inspectors still cannot add checklist rows: a row has a status, counts
+  toward progress and takes part in "Update to latest template". Admins edit a machine's own
+  checklist for that.
+- **The checklist's sections get the findings through a context** (`SectionFindingsContext`), so
+  the memoised sections need no new props and the checklist editor and previews, which have no
+  provider, show nothing.

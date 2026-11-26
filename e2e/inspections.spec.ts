@@ -458,6 +458,56 @@ test.describe('an inspector', () => {
     await expect(listed.getByRole('cell').nth(6)).toHaveText('2');
   });
 
+  test('an extra finding is added from a section of the checklist, in a dialog, and belongs to it', async ({
+    page,
+    published,
+    inspections,
+  }) => {
+    const [, two] = published.sections;
+    const loaded = await inspections.create(page.request, published, `Findings – ${published.id}`);
+    await openInspection(page, loaded);
+
+    // From the section it was found in, without leaving the checklist.
+    await page.getByRole('button', { name: 'Add extra finding to section 2' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Extra finding D-01' });
+    await expect(dialog).toContainText(`Found in “${two!.title}”`);
+    await expect(dialog.getByRole('textbox', { name: 'Description, D-01' })).toBeFocused();
+    await page.keyboard.type('Cable tie missing');
+    await dialog.getByRole('combobox', { name: 'Severity, D-01' }).selectOption('major');
+    await dialog.getByRole('button', { name: 'Done' }).click();
+    await expect(dialog).toBeHidden();
+
+    // Listed at the end of its section, counted with the deviations, saved with its section.
+    await expect(page.locator(`[data-section-findings="${two!.id}"]`)).toContainText(
+      'Cable tie missing',
+    );
+    await expect(deviationsTab(page)).toHaveText(/^Deviations\s*1$/);
+    await expect
+      .poll(
+        async () => (await stored(page.request, loaded.inspection.id)).inspection.extraDeviations,
+      )
+      .toMatchObject([{ sectionId: two!.id, description: 'Cable tie missing', severity: 'major' }]);
+
+    // One added by mistake and closed empty is not kept.
+    await page.getByRole('button', { name: 'Add extra finding', exact: true }).click();
+    const second = page.getByRole('dialog', { name: 'Extra finding D-02' });
+    await expect(second).toContainText('Not tied to a section');
+    await second.getByRole('button', { name: 'Done' }).click();
+    await expect(second).toBeHidden();
+    await expect(deviationsTab(page)).toHaveText(/^Deviations\s*1$/);
+
+    // Opened again from its line, changed, and shown on its card with its section.
+    await page.getByRole('button', { name: 'Extra finding D-01: Cable tie missing' }).click();
+    await dialog.getByRole('textbox', { name: 'Comment, D-01' }).fill('Behind the main breaker');
+    await dialog.getByRole('button', { name: 'Done' }).click();
+    await deviationsTab(page).click();
+    await expect(summaryCards(page)).toHaveCount(1);
+    await expect(summaryCards(page).first()).toContainText(`Extra finding · ${two!.title}`);
+    await expect(page.getByRole('textbox', { name: 'Comment, D-01' })).toHaveValue(
+      'Behind the main breaker',
+    );
+  });
+
   test('the Deviation Summary follows the NOK rows and takes extra deviations; the deviation table keeps up', async ({
     page,
     published,
@@ -506,7 +556,7 @@ test.describe('an inspector', () => {
     });
 
     // An extra deviation, not tied to a row, filled in from the keyboard.
-    await page.getByRole('button', { name: 'Add extra deviation' }).click();
+    await page.getByRole('button', { name: 'Add extra finding' }).click();
     await expect(page.getByRole('textbox', { name: 'Description, D-03' })).toBeFocused();
     await page.keyboard.type('Operator manual missing');
     await page.keyboard.press('Tab');

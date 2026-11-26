@@ -1,4 +1,4 @@
-import { SEVERITY_LABELS } from '@modig/shared';
+import { extraFindingPlace, SEVERITY_LABELS } from '@modig/shared';
 import { useId, type ReactNode } from 'react';
 import {
   isOversizedPage,
@@ -205,7 +205,7 @@ function DeviationCard({
         </h3>
         {card.context && <p className="paper-card-context">{card.context}</p>}
         <p className="paper-card-section">
-          {card.ref ? card.sectionTitle : 'Not on the checklist'}
+          {card.ref ? card.sectionTitle : extraFindingPlace(card.sectionTitle)}
         </p>
         <p className="paper-card-text">{card.text}</p>
         {card.comment && <p className="paper-card-comment">{card.comment}</p>}
