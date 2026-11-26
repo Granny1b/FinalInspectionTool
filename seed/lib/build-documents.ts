@@ -70,6 +70,7 @@ export function buildSettings(parsed: ParsedWorkbook, now: string): Settings {
     companyName: DEFAULT_COMPANY_NAME,
     responsibles: [...DEFAULT_RESPONSIBLES],
     deviationCategories: [...DEFAULT_DEVIATION_CATEGORIES],
+    showAssembly: true,
     updatedAt: now,
     updatedBy: SEED_USER,
   } satisfies Settings);

@@ -30,6 +30,7 @@ const saved: SettingsInput = {
   logoImageId: 'Logo000000000001',
   responsibles: ['Mechanical', 'Electrical', 'Media'],
   deviationCategories: ['Leakage', 'Missing parts'],
+  showAssembly: true,
 };
 
 const values = (rows: readonly ListRow[]) => rows.map((row) => row.value);

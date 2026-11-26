@@ -4238,3 +4238,20 @@ checklist to find it. Nothing new is stored; the same thing is now where the wor
 - **The checklist's sections get the findings through a context** (`SectionFindingsContext`), so
   the memoised sections need no new props and the checklist editor and previews, which have no
   provider, show nothing.
+
+## Settings: a switch for Assembly in the menu (2026-11-26)
+
+The work now is quality checks and final inspections; assembly instructions stay in the app but
+out of the way.
+
+- **`showAssembly` in the settings (default on)**, a checkbox under Menu on the Settings page,
+  saved with the form's one Save. Stored settings without it, and a client that does not send
+  it, show the group, so nothing changes until an admin switches it off.
+- **Only the menu entry is hidden.** The Assembly tab of a machine template, the instructions
+  bound to machines and their sign-off, the search and the `/assembly` addresses all work as
+  before: "the whole system is there". Change requests stay under Admin.
+- **Hidden until the settings have loaded**, so the group never flashes by where it is off; where
+  it is on it appears a moment after the rest of the menu on a first load.
+- **No end-to-end test flips it**: the settings are shared by the tests that run in parallel, and
+  several assert the menu's groups. The schema default and the form are unit-tested; the switch
+  was tried in a browser (off, reload, `/assembly` still opens, on again).

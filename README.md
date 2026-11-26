@@ -1251,6 +1251,14 @@ it was stored but the log's table could not be updated: sending the same request
 | `GET /api/images/{id}/url`                    | inspector | A read URL for an image, valid 1 to 13 hours                             |
 | `POST /api/images/urls`                       | inspector | The read URLs of up to 500 images in one call                            |
 
+### The menu switch for Assembly
+
+**Settings → Models, lists & reports → Menu** has **Show Assembly instructions** (admins, saved
+with the rest of the settings: `showAssembly`). Off, the Assembly group is gone from everyone's
+menu. Nothing else changes: instructions are still written under Templates, bound to machines,
+signed off from the machine's page, found by the search and opened by their address. Settings
+stored before the switch existed show the group.
+
 ## Seed data
 
 `npm run dev` runs the seed every time. To run it on its own:

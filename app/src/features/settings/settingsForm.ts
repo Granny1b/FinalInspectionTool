@@ -30,6 +30,8 @@ export type SettingsForm = {
   logoImageId: string | undefined;
   responsibles: ListRow[];
   deviationCategories: ListRow[];
+  /** Whether the menu shows Assembly. */
+  showAssembly: boolean;
 };
 
 /** The two pick lists, edited with the same list editor. */
@@ -56,6 +58,7 @@ export function formFromInput(input: SettingsInput): SettingsForm {
     logoImageId: input.logoImageId,
     responsibles: input.responsibles.map(listRow),
     deviationCategories: input.deviationCategories.map(listRow),
+    showAssembly: input.showAssembly,
   };
 }
 
@@ -102,6 +105,7 @@ export function inputFromForm(form: SettingsForm): SettingsInput {
     ...(form.logoImageId && { logoImageId: form.logoImageId }),
     responsibles: form.responsibles.map((row) => row.value),
     deviationCategories: form.deviationCategories.map((row) => row.value),
+    showAssembly: form.showAssembly,
   };
 }
 

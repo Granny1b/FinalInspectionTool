@@ -61,6 +61,12 @@ export const SettingsSchema = z.object({
   responsibles: z.array(ListEntrySchema).default(() => [...DEFAULT_RESPONSIBLES]),
   /** The category choices on a deviation, in the order shown; defaults as for `responsibles`. */
   deviationCategories: z.array(ListEntrySchema).default(() => [...DEFAULT_DEVIATION_CATEGORIES]),
+  /**
+   * Whether the menu shows Assembly (the instructions to read). Off, only the menu entry is
+   * gone: instructions are still written under Templates, bound to machines and opened by their
+   * links. Settings written before the switch existed show it.
+   */
+  showAssembly: z.boolean().default(true),
   updatedAt: IsoDateTime,
   updatedBy: z.string(),
 });

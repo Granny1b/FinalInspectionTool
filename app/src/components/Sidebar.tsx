@@ -18,6 +18,7 @@ import {
 import { useId } from 'react';
 import { NavLink } from 'react-router';
 import { useOpenChangeRequests } from '../features/changeRequests/queries';
+import { useSettings } from '../lib/useSettings';
 import { signOutUrl } from '../lib/auth';
 import { NAV_ITEM_HEIGHT, USER_PANEL, USER_PANEL_ROW } from './layout';
 import { Logo } from './Logo';
@@ -36,9 +37,12 @@ const MACHINES_NAV: NavItem[] = [{ to: '/machines', label: 'Machines', icon: Fac
  * assembled, checked along the build, and inspected before delivery. The checks each have the log
  * of their deviations. Then the templates the checks are made from.
  */
+/** The group the settings can hide. */
+const ASSEMBLY = 'Assembly';
+
 const NAV_GROUPS: NavGroupItems[] = [
   // How the machines are built: the assembly instructions, read by everyone.
-  { label: 'Assembly', items: [{ to: '/assembly', label: 'Instructions', icon: Wrench }] },
+  { label: ASSEMBLY, items: [{ to: '/assembly', label: 'Instructions', icon: Wrench }] },
   {
     label: 'Quality check',
     items: [
@@ -82,6 +86,10 @@ export function Sidebar({ me, onNavigate, onClose, onSearch }: Props) {
   const adminNav = ADMIN_NAV.map((item) =>
     item.to === '/change-requests' ? { ...item, count: open } : item,
   );
+  // Assembly is in the menu when the settings say so (an admin's switch on the Settings page).
+  // Not shown until they have loaded, so it never flashes by where it is switched off.
+  const showAssembly = useSettings().data?.showAssembly === true;
+  const groups = showAssembly ? NAV_GROUPS : NAV_GROUPS.filter(({ label }) => label !== ASSEMBLY);
   return (
     // A landmark, so the user panel (and Sign out) is reachable by landmark navigation too.
     <aside aria-label="Sidebar" className="flex h-full flex-col bg-surface">
@@ -120,7 +128,7 @@ export function Sidebar({ me, onNavigate, onClose, onSearch }: Props) {
       )}
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-5">
         <NavList items={MACHINES_NAV} onNavigate={onNavigate} label="Machines" />
-        {NAV_GROUPS.map(({ label, items }) => (
+        {groups.map(({ label, items }) => (
           <NavGroup
             key={label}
             label={label}

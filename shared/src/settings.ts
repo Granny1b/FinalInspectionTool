@@ -40,6 +40,8 @@ export const SettingsInputSchema = z
     logoImageId: IdSchema.optional(),
     responsibles: List,
     deviationCategories: List,
+    /** As in the settings; a client that does not send it leaves the menu as it is by default. */
+    showAssembly: z.boolean().default(true),
   })
   .superRefine((input, context) => {
     const models = input.machineModels;
@@ -72,6 +74,7 @@ export function settingsInput({
   logoImageId,
   responsibles,
   deviationCategories,
+  showAssembly,
 }: Settings): SettingsInput {
   return {
     machineModels: machineModels.map(({ code, name }) => ({ code, name })),
@@ -80,6 +83,7 @@ export function settingsInput({
     ...(logoImageId && { logoImageId }),
     responsibles: [...responsibles],
     deviationCategories: [...deviationCategories],
+    showAssembly,
   };
 }
 
