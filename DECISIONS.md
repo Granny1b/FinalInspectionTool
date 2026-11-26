@@ -4255,3 +4255,20 @@ out of the way.
 - **No end-to-end test flips it**: the settings are shared by the tests that run in parallel, and
   several assert the menu's groups. The schema default and the form are unit-tested; the switch
   was tried in a browser (off, reload, `/assembly` still opens, on again).
+
+## Quality checks: the row's ref is quiet (2026-11-26)
+
+On a quality check's cards (doing one, and reading the published one) the ref ("1.a") is small
+and grey beside the checkpoint instead of as heavy as it. It stays: the deviations, the report,
+the deviation log and "Continue at 1.a" name the row by it. The picture column is unchanged,
+since every row is meant to have a picture.
+
+## The Assembly switch also covers the machines' pages (2026-11-26)
+
+Off, a machine's page was still headed by "1. Assembly · No instruction" and an empty Assembly
+section. The switch (`showAssembly`) now also hides those: the overview is two stages, the
+section is not drawn and the badge never says "In assembly". **A new machine is then given no
+instructions** (the group is not offered when making one), or the hidden part would fill up
+unseen. What a machine already has stays stored, hidden, and is back with the switch. Templates,
+the search and the `/assembly` and `/machines/…/assembly/…` addresses are unchanged. As in the
+menu, Assembly is not drawn until the settings have loaded.

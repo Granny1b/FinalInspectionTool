@@ -153,7 +153,9 @@ export const QualityCheckRow = memo(function QualityCheckRow({
 
           <div className={item.guide ? CARD_CELL.text : CARD_CELL.textAlone}>
             <p className="flex items-start gap-2">
-              <span className="w-8 shrink-0 text-sm leading-6 font-semibold text-ink-900 tabular-nums">
+              {/* Quiet: the checkpoint is what is read; the ref is there for the deviations, the
+                  report and the log, which name the row by it. */}
+              <span className="w-8 shrink-0 text-xs leading-6 font-medium text-ink-500 tabular-nums">
                 {ref}
               </span>
               <span className="min-w-0 text-[0.9375rem] leading-6 font-semibold wrap-break-word text-ink-900">

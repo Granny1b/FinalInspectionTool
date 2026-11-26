@@ -116,6 +116,9 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
   // What the overview and the sections' Add buttons go by: the machine's assembly instructions,
   // and the model's published checks the machine doesn't have yet.
   const assemblies = useMachineAssemblies(machine.id);
+  // Assembly is shown where the settings show it in the menu (an admin's switch). Hidden, the
+  // machine keeps the instructions bound to it and their sign-offs; they are back with the switch.
+  const showAssembly = settings.data?.showAssembly === true;
   const templates = useTemplates();
   const missing = checkChoices(templates.data ?? [], machine.modelCode).filter(
     (choice) => !checks.some((check) => check.templateId === choice.templateId),
@@ -150,7 +153,7 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
               {machine.machineName}
             </h1>
             {/* Without checks yet, its assembly says where it is. */}
-            {checks.length === 0 && assemblySteps > 0 ? (
+            {showAssembly && checks.length === 0 && assemblySteps > 0 ? (
               assemblySigned === assemblySteps ? (
                 <Badge tone="ok">Assembly completed</Badge>
               ) : (
@@ -232,14 +235,16 @@ function Machine({ loaded, onReload }: { loaded: LoadedMachine; onReload: () => 
         )}
       </div>
 
-      <MachineOverview assemblies={assemblies.data} checks={checks} />
+      <MachineOverview assemblies={assemblies.data} checks={checks} showAssembly={showAssembly} />
 
       <div className="mt-10 space-y-10">
-        <MachineAssemblySection
-          id={MACHINE_SECTIONS.assembly}
-          machine={machine}
-          isAdmin={isAdmin}
-        />
+        {showAssembly && (
+          <MachineAssemblySection
+            id={MACHINE_SECTIONS.assembly}
+            machine={machine}
+            isAdmin={isAdmin}
+          />
+        )}
         <CheckSection
           id={MACHINE_SECTIONS.quality}
           kind="quality"

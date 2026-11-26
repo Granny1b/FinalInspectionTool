@@ -13,6 +13,8 @@ type Props = {
   /** Undefined while they load. */
   assemblies: readonly MachineAssemblySummary[] | undefined;
   checks: readonly MachineCheck[];
+  /** Whether assembly is part of what is shown (the settings' menu switch); it is by default. */
+  showAssembly?: boolean;
 };
 
 import { MACHINE_SECTIONS } from './sections';
@@ -23,14 +25,14 @@ type Tone = 'done' | 'active' | 'idle';
  * A machine's build at a glance, in the order it is done: assembly, then the quality checks, then
  * the final inspection. Each says how far it has come (green when done) and jumps to its section.
  */
-export function MachineOverview({ assemblies, checks }: Props) {
+export function MachineOverview({ assemblies, checks, showAssembly = true }: Props) {
   const steps = (assemblies ?? []).reduce((sum, assembly) => sum + assembly.steps, 0);
   const signed = (assemblies ?? []).reduce((sum, assembly) => sum + assembly.signed, 0);
   const quality = checks.filter((check) => check.kind === 'quality');
   const qualityDone = quality.filter((check) => check.state === 'finalised').length;
   const final = checks.find((check) => check.kind === 'final');
 
-  const stages: { id: string; label: string; icon: LucideIcon; tone: Tone; text: string }[] = [
+  const all: { id: string; label: string; icon: LucideIcon; tone: Tone; text: string }[] = [
     {
       id: MACHINE_SECTIONS.assembly,
       label: 'Assembly',
@@ -72,10 +74,11 @@ export function MachineOverview({ assemblies, checks }: Props) {
             : { tone: 'idle', text: 'Not started' }),
     },
   ];
+  const stages = showAssembly ? all : all.filter(({ id }) => id !== MACHINE_SECTIONS.assembly);
 
   return (
     <nav aria-label="Build overview">
-      <ol className="grid gap-2 sm:grid-cols-3">
+      <ol className={clsx('grid gap-2', showAssembly ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
         {stages.map(({ id, label, icon: Icon, tone, text }, index) => (
           <li key={id} className="relative">
             <a

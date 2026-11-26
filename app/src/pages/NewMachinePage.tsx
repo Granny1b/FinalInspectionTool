@@ -96,7 +96,9 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
     return models.length === 1 ? (models[0]?.code ?? null) : null;
   });
   const choices = modelCode ? checkChoices(templates, modelCode) : [];
-  const instructions = modelCode ? assemblyChoices(templates, modelCode) : [];
+  // Where the settings hide Assembly, a new machine is not given instructions either.
+  const showAssembly = settings.data?.showAssembly === true;
+  const instructions = modelCode && showAssembly ? assemblyChoices(templates, modelCode) : [];
   const [ticked, setTicked] = useState<Set<string>>(
     () => new Set(modelCode ? offered(templates, modelCode) : []),
   );
@@ -220,12 +222,16 @@ function NewMachineForm({ templates }: { templates: TemplateSummary[] }) {
           value={ticked}
           onChange={setTicked}
           groups={[
-            {
-              label: 'Assembly',
-              icon: Wrench,
-              items: instructions,
-              empty: 'No assembly instruction is published for this model yet.',
-            },
+            ...(showAssembly
+              ? [
+                  {
+                    label: 'Assembly',
+                    icon: Wrench,
+                    items: instructions,
+                    empty: 'No assembly instruction is published for this model yet.',
+                  },
+                ]
+              : []),
             {
               label: 'Quality checks',
               icon: ShieldCheck,

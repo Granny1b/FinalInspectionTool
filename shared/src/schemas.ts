@@ -62,9 +62,10 @@ export const SettingsSchema = z.object({
   /** The category choices on a deviation, in the order shown; defaults as for `responsibles`. */
   deviationCategories: z.array(ListEntrySchema).default(() => [...DEFAULT_DEVIATION_CATEGORIES]),
   /**
-   * Whether the menu shows Assembly (the instructions to read). Off, only the menu entry is
-   * gone: instructions are still written under Templates, bound to machines and opened by their
-   * links. Settings written before the switch existed show it.
+   * Whether Assembly is shown: its group in the menu, and on a machine's page its stage and
+   * section; off, a new machine is given no instructions either. Nothing is deleted: instructions
+   * are still written under Templates and opened by their links, and what machines already have
+   * is back with the switch. Settings written before the switch existed show it.
    */
   showAssembly: z.boolean().default(true),
   updatedAt: IsoDateTime,
