@@ -170,8 +170,9 @@ export function SettingsForm({ loaded, onReload }: Props) {
           <span>
             <span className="font-medium text-ink-900">Show Assembly instructions</span>
             <span className="mt-0.5 block text-xs text-ink-500">
-              Off, the Assembly group is hidden from the menu. Instructions are still written under
-              Templates, and the ones bound to machines still open from the machine.
+              Off, Assembly is hidden from the menu and from the machines’ pages, and new machines
+              get no instructions. Nothing is deleted: instructions are still written under
+              Templates, and everything is back when this is switched on again.
             </span>
           </span>
         </label>

@@ -1251,13 +1251,19 @@ it was stored but the log's table could not be updated: sending the same request
 | `GET /api/images/{id}/url`                    | inspector | A read URL for an image, valid 1 to 13 hours                             |
 | `POST /api/images/urls`                       | inspector | The read URLs of up to 500 images in one call                            |
 
-### The menu switch for Assembly
+### The switch for Assembly
 
 **Settings → Models, lists & reports → Menu** has **Show Assembly instructions** (admins, saved
-with the rest of the settings: `showAssembly`). Off, the Assembly group is gone from everyone's
-menu. Nothing else changes: instructions are still written under Templates, bound to machines,
-signed off from the machine's page, found by the search and opened by their address. Settings
-stored before the switch existed show the group.
+with the rest of the settings: `showAssembly`). Off:
+
+- the Assembly group is gone from everyone's menu;
+- a machine's page has no Assembly stage or section (its overview is Quality checks and Final
+  inspection), and its badge no longer says _In assembly_;
+- a new machine is offered, and given, no assembly instructions.
+
+Nothing is deleted: instructions are still written under Templates, found by the search and
+opened by their address, and the instructions and sign-offs machines already have are back when
+it is switched on again. Settings stored before the switch existed show Assembly.
 
 ## Seed data
 

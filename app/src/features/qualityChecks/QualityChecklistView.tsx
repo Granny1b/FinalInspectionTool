@@ -129,7 +129,7 @@ function RowCard({
           <div aria-hidden="true" className={clsx(PICTURE_CELL, 'hidden @min-[36rem]:block')} />
         )}
         <p className="flex min-w-0 items-start gap-1">
-          <span className="w-8 shrink-0 pl-0.5 text-sm leading-6 font-semibold text-ink-900 tabular-nums">
+          <span className="w-8 shrink-0 pl-0.5 text-xs leading-6 font-medium text-ink-500 tabular-nums">
             {ref}
           </span>
           <span className="min-w-0 px-2 text-[0.9375rem] leading-6 font-semibold wrap-break-word text-ink-900">
